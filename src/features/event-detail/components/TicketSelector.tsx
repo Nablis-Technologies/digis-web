@@ -1,0 +1,73 @@
+import type { Event, TicketTier } from '@/types';
+import { TicketTypeCard } from './TicketTypeCard';
+
+export function TicketSelector({
+  event,
+  ticketTypes,
+  selectedTicketType,
+  onSelectTicketType,
+  isSoldOut,
+  isDark,
+}: {
+  event: Event;
+  ticketTypes: TicketTier[];
+  selectedTicketType: string | null;
+  onSelectTicketType: (ticketType: string) => void;
+  isSoldOut: boolean;
+  isDark: boolean;
+}) {
+  return (
+    <>
+      {/* Section header */}
+      <div className="flex items-center justify-center gap-4 mb-3">
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent" />
+        <h2 className="text-[12px] tracking-[3px] uppercase" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? 'rgba(244,255,128,0.6)' : 'rgba(0,0,0,0.55)' }}>
+          {isSoldOut ? 'Sold Out' : 'Select Your Ticket'}
+        </h2>
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent" />
+      </div>
+
+      {/* Availability indicator */}
+      {isSoldOut ? (
+        <div className="flex items-center justify-center gap-2 mb-7">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+            style={{ background: isDark ? 'rgba(255,59,48,0.12)' : 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)' }}>
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#ff3b30' }} />
+            <span className="text-[10px] tracking-[1.5px] uppercase"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,100,90,0.9)' : 'rgba(200,40,30,0.85)', fontWeight: 600 }}>
+              All tickets sold out
+            </span>
+          </div>
+        </div>
+      ) : event.ticketsLeft != null && (
+        <div className="flex items-center justify-center gap-1.5 mb-7">
+          <span className="relative flex w-1.5 h-1.5">
+            <span className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping"
+              style={{ background: '#d6f905' }} />
+            <span className="relative inline-flex w-1.5 h-1.5 rounded-full"
+              style={{ background: '#d6f905' }} />
+          </span>
+          <span className="text-[10px] tracking-[1.5px] uppercase"
+            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+            {event.ticketsLeft} tickets left
+          </span>
+        </div>
+      )}
+
+      {/* Ticket cards — dimmed + non-interactive when sold out */}
+      <div className={`space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:gap-5 transition-opacity duration-300 ${isSoldOut ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+        {ticketTypes.map((type, index) => (
+          <TicketTypeCard key={type.name} type={type} selected={selectedTicketType === type.name}
+            onSelect={() => !isSoldOut && onSelectTicketType(type.name)} index={index} />
+        ))}
+      </div>
+
+      {!isSoldOut && (
+        <p className="text-center text-[11px] mt-6 tracking-[0.5px]"
+          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.45)' }}>
+          By purchasing you agree to the Terms of Service.
+        </p>
+      )}
+    </>
+  );
+}

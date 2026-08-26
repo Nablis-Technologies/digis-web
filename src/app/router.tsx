@@ -1,0 +1,373 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createHashRouter, RouterProvider, useLocation, useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'motion/react';
+import { LogIn, UserCircle } from 'lucide-react';
+import { ticketsService, ticketKeys } from '@/services/tickets.service';
+import { eventsService } from '@/services/events.service';
+import type { Event, UserTicket } from '@/types';
+import { EventDiscovery } from '@/features/discovery/pages/DiscoveryPage';
+import { TicketView } from '@/features/tickets/pages/TicketsPage';
+import { EventDetail } from '@/features/event-detail/pages/EventDetailPage';
+import { UserProfile } from '@/features/profile/pages/ProfilePage';
+import { SettingsView } from '@/features/profile/pages/SettingsPage';
+import { ResaleMarketplace } from '@/features/resale/pages/ResalePage';
+import { ClaimTicketPage } from '@/features/tickets/pages/ClaimTicketPage';
+import { Navigation } from '@/components/Navigation';
+import { useTheme } from './components/ThemeContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { AuthModal } from '@/features/auth/components/AuthModal';
+import { TopBar } from '@/components/TopBar';
+
+export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings';
+
+export const VIEW_PATHS: Record<AppView, string> = {
+  discover: '/',
+  tickets: '/tickets',
+  profile: '/profile',
+  create: '/create',
+  resale: '/resale',
+  settings: '/settings',
+};
+
+export function eventPath(event: Event): string {
+  const slug = (event.name || event.id)
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `/events/${slug}`;
+}
+
+export function pathToView(pathname: string): AppView {
+  if (pathname === '/tickets') return 'tickets';
+  if (pathname === '/profile') return 'profile';
+  if (pathname === '/create') return 'create';
+  if (pathname === '/resale') return 'resale';
+  if (pathname === '/settings') return 'settings';
+  return 'discover';
+}
+
+function eventMatchesPath(event: Event, pathname: string): boolean {
+  return eventPath(event) === pathname || `/events/${event.id}` === pathname;
+}
+
+// Module-level so the saved feed scroll position survives any route-driven
+// remount of AppContent (a component-local ref would reset and lose it).
+const scrollStore = { discover: 0 };
+
+export const ORGANIZER_APP_URL = "https://ORGANIZER_APP_URL_PLACEHOLDER"; // TODO: replace with real organizer app URL
+
+function CreateRedirect() {
+  useEffect(() => {
+    window.location.href = ORGANIZER_APP_URL;
+  }, []);
+  return null;
+}
+
+// Restore scroll reliably: with AnimatePresence mode="wait" the feed mounts a
+// few frames after navigation, and its height settles as cards lay out — so we
+// re-apply the target each frame until it sticks (or we give up).
+function restoreScroll(y: number) {
+  let tries = 0;
+  const tick = () => {
+    window.scrollTo(0, y);
+    if (Math.abs(window.scrollY - y) <= 2 || tries++ > 30) return;
+    requestAnimationFrame(tick);
+  };
+  tick(); // apply now, then keep re-applying each frame until it sticks
+}
+
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentView = pathToView(location.pathname);
+  const routeEvent = useMemo(() => {
+    if (!location.pathname.startsWith('/events/')) return null;
+    const stateEvent = (location.state as { event?: Event } | null)?.event;
+    return stateEvent ?? eventsService.initialData.find((event) => eventMatchesPath(event, location.pathname)) ?? null;
+  }, [location.pathname, location.state]);
+  const selectedEvent = routeEvent;
+  const navigateToView = useCallback((view: AppView) => navigate(VIEW_PATHS[view]), [navigate]);
+  const [resaleTicket, setResaleTicket] = useState<UserTicket | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState(false);
+  const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
+  const { isAuthenticated } = useAuth();
+  const [heroSearchInView, setHeroSearchInView] = useState(true);
+  const heroSearchRef = useRef<HTMLDivElement>(null);
+  const heroSearchInputRef = useRef<HTMLInputElement>(null);
+  const savedFeaturedIdx = useRef(0);
+  const savedMagazineIdx = useRef(0);
+  const pendingRestore = useRef(false);
+  const { isDark } = useTheme();
+
+  // Note: scroll-to-top when opening an event is handled by EventDetail's own
+  // on-mount effect, which (with AnimatePresence mode="wait") runs only after
+  // the feed has unmounted — doing it here would scroll the still-exiting feed
+  // up to the featured listings and flash them before the detail appears.
+
+  useEffect(() => {
+    const el = heroSearchRef.current;
+    if (!el) {
+      setHeroSearchInView(false);
+      return;
+    }
+    const obs = new IntersectionObserver(
+      ([entry]) => setHeroSearchInView(entry.isIntersecting),
+      { threshold: 0, rootMargin: '-72px 0px 0px 0px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [currentView, selectedEvent]);
+
+  const focusHeroSearch = () => {
+    setSearchMode(true);
+    const input = heroSearchInputRef.current;
+    const el = heroSearchRef.current;
+    input?.focus({ preventScroll: true });
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  useEffect(() => {
+    if (searchQuery) setSearchMode(true);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (heroSearchInView && !searchQuery) setSearchMode(false);
+  }, [heroSearchInView, searchQuery]);
+
+  const { data: userTickets = [] } = useQuery({
+    queryKey: ticketKeys.userTickets,
+    queryFn: ticketsService.fetchUserTickets,
+    staleTime: Infinity,
+  });
+
+  return (
+    <div
+      className="relative min-h-screen transition-colors duration-500 scrollbar-hide"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        overflowX: 'clip',
+        background: isDark ? '#0a0a0a' : '#f8f7fc',
+        color: isDark ? '#fff' : '#1a1a1a',
+      }}
+    >
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: isDark ? 0.02 : 0.015,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+            backgroundSize: '128px 128px',
+          }}
+        />
+      </div>
+
+      {!selectedEvent && (
+        <TopBar
+          currentView={currentView}
+          showSearchButton={currentView === 'discover' && !heroSearchInView}
+          onSearchClick={focusHeroSearch}
+          onRequestAuth={(mode) => setAuthModal(mode)}
+          onNavigate={(view) => {
+            if (view !== 'resale') setResaleTicket(null);
+            navigateToView(view);
+          }}
+        />
+      )}
+
+      <div className="relative">
+        <AnimatePresence
+          mode="wait"
+          onExitComplete={() => {
+            // Restore the feed scroll only after the detail has fully unmounted,
+            // so we never scroll the outgoing detail page (which flashed the
+            // ticket section before).
+            if (pendingRestore.current) {
+              pendingRestore.current = false;
+              restoreScroll(scrollStore.discover);
+            }
+          }}
+        >
+          {selectedEvent ? (
+            <motion.div
+              key="detail"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0 } }}
+              transition={{ duration: 0.4 }}
+            >
+              <EventDetail
+                event={selectedEvent}
+                onBack={() => {
+                  pendingRestore.current = true;
+                  navigate('/');
+                }}
+                onPurchase={() => navigateToView('tickets')}
+                onNavigate={(view) => navigateToView(view as AppView)}
+                onRequestAuth={() => setAuthModal('signin')}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={currentView}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-7xl mx-auto"
+            >
+              {currentView === 'discover' ? (
+                <EventDiscovery
+                  onSelectEvent={(event) => {
+                    scrollStore.discover = window.scrollY;
+                    navigate(eventPath(event), { state: { event } });
+                  }}
+                  initialFeaturedIdx={savedFeaturedIdx.current}
+                  onFeaturedIdxChange={(i) => { savedFeaturedIdx.current = i; }}
+                  initialMagazineIdx={savedMagazineIdx.current}
+                  onMagazineIdxChange={(i) => { savedMagazineIdx.current = i; }}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  heroSearchRef={heroSearchRef}
+                  heroSearchInputRef={heroSearchInputRef}
+                  searchMode={searchMode}
+                  onSearchModeChange={setSearchMode}
+                />
+              ) : currentView === 'tickets' ? (
+                <TicketView tickets={userTickets} onDiscover={() => navigateToView('discover')} onListForResale={(ticket) => {
+                  setResaleTicket(ticket);
+                  navigateToView('resale');
+                }} />
+              ) : currentView === 'profile' ? (
+                isAuthenticated ? (
+                  <UserProfile tickets={userTickets} onOpenSettings={() => navigateToView('settings')} />
+                ) : (
+                  <SignInGate isDark={isDark} onSignIn={() => setAuthModal('signin')} />
+                )
+              ) : currentView === 'create' ? (
+                null
+              ) : currentView === 'resale' ? (
+                <ResaleMarketplace userTickets={userTickets} initialListTicket={resaleTicket} />
+              ) : currentView === 'settings' ? (
+                <SettingsView
+                  onBack={() => navigateToView('profile')}
+                  onRequestAuth={() => setAuthModal('signin')}
+                />
+              ) : null}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {!selectedEvent && (
+        <div className="lg:hidden">
+          <Navigation
+            currentView={currentView}
+            onRequestAuth={() => setAuthModal('signin')}
+            onNavigate={(view) => {
+              if (view !== 'resale') setResaleTicket(null);
+              navigateToView(view);
+            }}
+          />
+        </div>
+      )}
+
+      <AnimatePresence>
+        {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function SignInGate({ isDark, onSignIn }: { isDark: boolean; onSignIn: () => void }) {
+  return (
+    <div className="px-6 pt-24 pb-20 flex flex-col items-center text-center">
+      <div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
+        style={{
+          background: isDark ? 'rgba(217,255,0,0.08)' : 'rgba(214,249,5,0.1)',
+          border: `1px solid ${isDark ? 'rgba(217,255,0,0.2)' : 'rgba(214,249,5,0.25)'}`,
+        }}
+      >
+        <UserCircle className="w-8 h-8" strokeWidth={1.5} style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
+      </div>
+      <h2
+        className="text-[24px] font-light mb-2"
+        style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}
+      >
+        Log in to your profile
+      </h2>
+      <p
+        className="text-[13px] leading-relaxed max-w-[300px] mb-7"
+        style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)' }}
+      >
+        Your tickets, transfers, and saved events live here. You can still browse and buy as a guest anytime.
+      </p>
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onSignIn}
+        className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full cursor-pointer"
+        style={{
+          background: isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a',
+          color: isDark ? '#000' : '#fff',
+          fontFamily: "'Inter', sans-serif",
+          fontSize: '13px',
+          letterSpacing: '0.5px',
+          fontWeight: 600,
+        }}
+      >
+        <LogIn className="w-4 h-4" strokeWidth={2} />
+        Log in or create account
+      </motion.button>
+    </div>
+  );
+}
+
+function ClaimRoute() {
+  const navigate = useNavigate();
+  const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
+  const { isDark } = useTheme();
+  return (
+    <div
+      className="relative min-h-screen"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        background: isDark ? '#0a0a0a' : '#f8f7fc',
+        color: isDark ? '#fff' : '#1a1a1a',
+      }}
+    >
+      <ClaimTicketPage
+        onRequestAuth={() => setAuthModal('signin')}
+        onNavigateHome={() => navigate(VIEW_PATHS.discover)}
+        onNavigateTickets={() => navigate(VIEW_PATHS.tickets)}
+      />
+      <AnimatePresence>
+        {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function AppRouterProvider() {
+  // Create the router lazily inside the component so it is always constructed
+  // inside the React tree (and therefore inside AuthProvider / ThemeProvider).
+  // useState with an initialiser guarantees it runs exactly once, on first
+  // render, never at module-evaluation time.
+  const [router] = useState(() =>
+    createHashRouter([
+      { path: '/', Component: AppContent },
+      { path: '/events/:eventTitle', Component: AppContent },
+      { path: '/tickets', Component: AppContent },
+      { path: '/profile', Component: AppContent },
+      { path: '/resale', Component: AppContent },
+      { path: '/create', Component: CreateRedirect },
+      { path: '/settings', Component: AppContent },
+      { path: '/claim/:token', Component: ClaimRoute },
+    ])
+  );
+  return <RouterProvider router={router} />;
+}
