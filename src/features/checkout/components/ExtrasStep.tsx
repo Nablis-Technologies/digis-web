@@ -1,6 +1,7 @@
 import { Car, Coffee, Gift, Heart, Package, Plus, Minus, Smartphone } from 'lucide-react';
 import type { EventProduct, SelectedEventProduct } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
 
 const iconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
 
@@ -35,7 +36,7 @@ export function ExtrasStep({ products, selected, onChange, includedProductIds = 
     const existing = selected.find((item) => item.productId === product.id);
     const quantity = Math.max(0, Math.min(product.maxPerOrder ?? 8, (existing?.quantity ?? 0) + delta));
     const next = selected.filter((item) => item.productId !== product.id);
-    if (quantity) next.push({ productId: product.id, type: product.type, name: product.name, unitPrice: product.price, quantity });
+    if (quantity) next.push({ productId: product.id, type: product.type, name: product.name, unitPrice: product.priceMinor, quantity });
     onChange(next);
   };
 
@@ -77,7 +78,7 @@ export function ExtrasStep({ products, selected, onChange, includedProductIds = 
               <div className="relative shrink-0 flex flex-col items-end gap-1.5">
                 {!isIncluded && (
                   <span className="text-[11px] tabular-nums" style={{ fontFamily: "'Inter', sans-serif", color: priceColor, fontWeight: 500 }}>
-                    ETB {product.price.toLocaleString()}
+                    {Money.fromMinor(product.priceMinor, "ETB").format()}
                   </span>
                 )}
                 {isIncluded ? (

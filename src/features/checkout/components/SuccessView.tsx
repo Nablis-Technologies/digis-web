@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Check, Mail } from 'lucide-react';
 import { SummaryLine } from './OrderSummary';
+import { Money } from '@/lib/money';
 
 export function SuccessView({ event, ticketType, total, isDark }: any) {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
@@ -92,7 +93,7 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
           <SummaryLine label="Tier" value={ticketType} isDark={isDark} />
           <SummaryLine label="When" value={`${event.date} · ${event.time}`} isDark={isDark} />
           <div className="h-px" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.1)' }} />
-          <SummaryLine label="Paid" value={`ETB ${total.toLocaleString()}`} isDark={isDark} />
+          <SummaryLine label="Paid" value={Money.fromMinor(total, "ETB").format()} isDark={isDark} />
         </div>
 
         {/* Vertical perforation + notches */}

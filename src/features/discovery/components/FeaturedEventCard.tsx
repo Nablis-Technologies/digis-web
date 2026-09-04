@@ -3,7 +3,7 @@ import { ArrowUpRight, MapPin } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
-import { formatETB } from "@/lib/utils/format";
+import { Money } from "@/lib/money";
 import { readableAccent } from "@/lib/utils/color";
 import { useProminentHue } from "@/lib/hooks/useProminentHue";
 import { EventDateBadge } from "@/components/EventDateBadge";
@@ -33,7 +33,7 @@ export function FeaturedEventCard({
       ? "Free"
       : event.eventType === "inviteOnly" && !event.inviteOnlyPaid
         ? "Invite only"
-        : formatETB(event.priceFrom);
+        : Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
 
   // Desktop magazine layout — unchanged
   if (isLarge) {

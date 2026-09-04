@@ -6,6 +6,7 @@ import { ExtrasStep } from '@/features/checkout/components/ExtrasStep';
 import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
 
 export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onConfirm }: {
   ticket: UserTicket;
@@ -64,7 +65,7 @@ export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onC
             <div className="flex items-center justify-between mb-3.5">
               <div>
                 <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>
-                <span className="text-[22px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>ETB {total.toLocaleString()}</span>
+                <span className="text-[22px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>{Money.fromMinor(total, "ETB").format()}</span>
               </div>
               <div className="flex items-center gap-1.5" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}><Lock className="w-3 h-3" strokeWidth={1.8} /><span className="text-[10px] tracking-[1px] uppercase">Secure</span></div>
             </div>
@@ -79,7 +80,7 @@ export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onC
               ) : done ? (
                 <><Check className="w-4 h-4" strokeWidth={2.5} />Added</>
               ) : (
-                count ? `Pay ETB ${total.toLocaleString()}` : 'Select extras to continue'
+                count ? `Pay ${Money.fromMinor(total, "ETB").format()}` : 'Select extras to continue'
               )}
             </AppButton>
           </div>

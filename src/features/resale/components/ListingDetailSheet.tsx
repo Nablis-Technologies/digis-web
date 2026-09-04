@@ -1,8 +1,11 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
+import { Money } from '@/lib/money';
 import { useTheme } from '@/app/components/ThemeContext';
 import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
+import { resaleModule } from '@/lib/resale';
+import { orderModule } from '@/lib/order';
 import { AppButton } from '@/components/primitives/AppButton';
 
 function getInitials(name: string): string {
@@ -29,12 +32,17 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
   const [purchasing, setPurchasing] = useState(false);
   const [purchased, setPurchased] = useState(false);
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     setPurchasing(true);
-    setTimeout(() => {
-      setPurchasing(false);
+    try {
+      // Mirror POST /resale_listings/:id/purchase (returns an Order) then pay via
+      // the Order module — the backend's purchase → payment_attempts flow.
+      const order = await resaleModule.purchaseListing(listing.id);
+      await orderModule.startPayment({ orderId: order.id, provider: 'chapa', paymentMethod: 'telebirr' });
       setPurchased(true);
-    }, 2000);
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   return (
@@ -146,7 +154,7 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                 </span>
                 <span className="text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
-                  ETB {listing.originalPrice.toLocaleString()}
+                  {Money.fromMinor(listing.originalPriceMinor, "ETB").format()}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-2">
@@ -156,7 +164,7 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                 </span>
                 <span className="text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
-                  ETB {Math.round(listing.askingPrice * 0.05).toLocaleString()}
+                  {Money.fromMinor(Math.round(listing.askingPriceMinor * listing.fee_terms.rate_bps / 10000), "ETB").format()}
                 </span>
               </div>
               <div className="h-px w-full my-2.5"
@@ -169,7 +177,7 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                 </span>
                 <span className="text-[18px] font-light"
                   style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                  ETB {(listing.askingPrice + Math.round(listing.askingPrice * 0.05)).toLocaleString()}
+{Money.fromMinor(listing.askingPriceMinor + Math.round(listing.askingPriceMinor * listing.fee_terms.rate_bps / 10000), "ETB").format()}
                 </span>
               </div>
             </div>
@@ -225,7 +233,7 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                   <DollarSign className="w-5 h-5" style={{ color: isDark ? '#f4ff66' : '#fff' }} strokeWidth={1.5} />
                   <span className="text-[14px] font-medium tracking-[0.3px]"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#f4ff66' : '#fff' }}>
-                    Buy Ticket · ETB {(listing.askingPrice + Math.round(listing.askingPrice * 0.05)).toLocaleString()}
+                    Buy Ticket · {Money.fromMinor(listing.askingPriceMinor + Math.round(listing.askingPriceMinor * listing.fee_terms.rate_bps / 10000), "ETB").format()}
                   </span>
                 </>
               )}

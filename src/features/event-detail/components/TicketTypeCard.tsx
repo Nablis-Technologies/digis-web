@@ -5,6 +5,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import type { TicketTier, TicketTierFeature } from '@/types';
 import { InlineCountdown } from './InlineCountdown';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
 
 export function TicketTypeCard({ type, selected, onSelect, index }: { type: TicketTier; selected: boolean; onSelect: () => void; index: number }) {
   const { isDark: pageIsDark } = useTheme();
@@ -36,8 +37,8 @@ export function TicketTypeCard({ type, selected, onSelect, index }: { type: Tick
     : isCouples ? 'rgba(251,113,133,0.08)'
     : isElite ? 'rgba(196,181,253,0.08)' : isPremium ? 'rgba(250,200,60,0.06)' : 'rgba(96,165,250,0.08)';
 
-  const savingsPct = isEarlyBird && type.originalPrice
-    ? Math.round((1 - type.price / type.originalPrice) * 100)
+  const savingsPct = isEarlyBird && type.originalPriceMinor
+    ? Math.round((1 - type.priceMinor / type.originalPriceMinor) * 100)
     : 0;
 
   return (
@@ -218,7 +219,7 @@ export function TicketTypeCard({ type, selected, onSelect, index }: { type: Tick
           <div className="flex items-baseline gap-1 flex-shrink-0">
             <span className="text-[18px] font-light tracking-[-0.3px] tabular-nums"
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : 'rgba(0,0,0,0.88)' }}>
-              ${type.price.toLocaleString()}
+              {Money.fromMinor(type.priceMinor, "ETB").formatNumber()}
             </span>
             <span className="text-[10px]"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.55)` : mutedInk }}>

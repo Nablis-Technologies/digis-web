@@ -6,6 +6,7 @@ import type { InviteUnlockState } from '@/types';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { Money } from '@/lib/money';
 
 interface InviteOnlySectionProps {
   event: any;
@@ -556,7 +557,7 @@ function InviteTicketCard({ ticket, selected, onSelect, accent, accentRgb, accen
           <div className="flex items-baseline gap-1.5">
             <span className="text-[22px] leading-none"
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
-              {ticket.price.toLocaleString()}
+              {Money.fromMinor(ticket.priceMinor, "ETB").formatNumber()}
             </span>
             <span className="text-[11px] tracking-[1px]"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>

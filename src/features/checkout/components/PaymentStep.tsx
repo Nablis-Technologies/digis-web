@@ -4,6 +4,7 @@ import { AlertCircle, Building2, Calendar, Check, ChevronRight, CreditCard, Lock
 import type { PaymentMethod } from '@/features/checkout/hooks/useCheckoutFlow';
 import { OrderSummary } from './OrderSummary';
 import { PromoCodeField } from './PromoCodeField';
+import { Money } from '@/lib/money';
 import { ProviderLogo } from '@/components/ProviderLogo';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
@@ -98,7 +99,7 @@ export function PaymentStep({
             <p className="text-[11px] leading-relaxed"
               style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
               You'll be redirected to {method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to authorize{' '}
-              <span style={{ color: textPrimary, fontWeight: 500 }}>ETB {total.toLocaleString()}</span>.
+              <span style={{ color: textPrimary, fontWeight: 500 }}>{Money.fromMinor(total, "ETB").format()}</span>.
             </p>
           </motion.div>
         )}

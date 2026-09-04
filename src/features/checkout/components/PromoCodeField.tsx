@@ -4,6 +4,7 @@ import type { AppliedPromo } from '@/features/checkout/hooks/useCheckoutFlow';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { Money } from '@/lib/money';
 
 interface PromoCodeFieldProps { promoApplied: AppliedPromo | null; promoCodeInput: string; setPromoCodeInput: (value: string) => void; promoExpanded: boolean; setPromoExpanded: (value: boolean) => void; promoError: string; setPromoError: (value: string) => void; promoLoading: boolean; validatePromo: () => void; removePromo: () => void; discountAmount: number; isDark: boolean; }
 
@@ -29,7 +30,7 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                   {promoApplied.label}
                 </p>
                 <p className="text-[10px] truncate" style={{ color: isDark ? 'rgba(52,211,153,0.55)' : 'rgba(22,163,74,0.6)', fontFamily: "'Inter', sans-serif" }}>
-                  {promoApplied.code} · −ETB {discountAmount.toLocaleString()} per ticket
+                  {promoApplied.code} · −{Money.fromMinor(discountAmount, "ETB").format()} per ticket
                 </p>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { readableCategoryRgb } from '@/lib/categoryColors';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
 
 export function ReviewStep({
   event, ticketType, ticketLevel, quantity, setQuantity,
@@ -62,7 +63,7 @@ export function ReviewStep({
             {ticketType}
           </h4>
           <p className="text-[10px]" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}>
-            ETB {basePrice.toLocaleString()} each
+            {Money.fromMinor(basePrice, "ETB").format()} each
           </p>
         </div>
         {hasSeats ? (
@@ -71,7 +72,7 @@ export function ReviewStep({
               {quantity} {quantity === 1 ? 'seat' : 'seats'}
             </p>
             <p className="text-[13px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-              ETB {(basePrice * quantity).toLocaleString()}
+              {Money.fromMinor(basePrice * quantity, "ETB").format()}
             </p>
           </div>
         ) : (

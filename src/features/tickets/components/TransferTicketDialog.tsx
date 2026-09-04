@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
+import { Money } from '@/lib/money';
 import { Field, Row, TicketPreview } from '@/features/tickets/components/TransferTicketParts';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
@@ -341,7 +342,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                           <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, border: `1px solid ${selected ? accentBorder : borderSoft}` }}>
                             <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: selected ? ACCENT_HEX : 'transparent', border: `1px solid ${selected ? ACCENT_HEX : border}` }}>{selected && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}</span>
                             <span className="min-w-0 flex-1"><span className="block text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: text, fontWeight: 600 }}>{extra.name}</span><span className="block mt-0.5 text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>{extra.description}</span></span>
-                            <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: text }}>ETB {extra.price.toLocaleString()}</span>
+                            <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: text }}>ETB {Money.fromMinor(extra.priceMinor, "ETB").formatNumber()}</span>
                           </AppButton>
                         );
                       })}

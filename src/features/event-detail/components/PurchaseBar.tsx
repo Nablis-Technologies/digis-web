@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { ArrowRight, Gift } from 'lucide-react';
-import { formatETB } from '@/lib/utils/format';
 import type { TicketTier } from '@/types';
+import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
 
 export function PurchaseBar({
@@ -23,8 +23,8 @@ export function PurchaseBar({
   onGift: () => void;
   onPurchase: () => void;
 }) {
-  const priceLabel = formatETB(selectedTicketType ? totalPrice : minPrice);
-  const [priceAmount, priceCurrency] = priceLabel.split(' ');
+  const priceAmount = Money.fromMinor(selectedTicketType ? totalPrice : minPrice, "ETB").formatNumber();
+  const priceCurrency = "ETB";
 
   return (
     <div className="relative flex items-center gap-3 min-[380px]:gap-4 px-4 min-[380px]:px-5 py-3 rounded-2xl"

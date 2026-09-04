@@ -4,7 +4,7 @@ import { ChevronRight, Clock, Hourglass, Lock, MapPin, Radio } from "lucide-reac
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
-import { formatETB } from "@/lib/utils/format";
+import { Money } from "@/lib/money";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { EventDateBadge } from "@/components/EventDateBadge";
 
@@ -231,7 +231,7 @@ export function EventCard({
       ? "Free RSVP"
       : event.eventType === "inviteOnly" && !event.inviteOnlyPaid
         ? "Invite only"
-        : formatETB(event.priceFrom);
+        : Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
 
   return (
     <motion.div

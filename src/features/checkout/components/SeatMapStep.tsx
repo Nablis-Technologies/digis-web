@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import type { SeatSection, SelectedSeat } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
 
 interface SeatMapStepProps {
   sections: SeatSection[];
@@ -69,7 +70,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
                   {section.name}
                 </p>
                 <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                  ETB {basePrice.toLocaleString()}
+                  {Money.fromMinor(basePrice, "ETB").format()}
                 </p>
               </div>
 
@@ -129,7 +130,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
           </p>
           {selectedSeats.length > 0 && (
             <p className="text-[12px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-              ETB {(basePrice * selectedSeats.length).toLocaleString()}
+              ETB {Money.fromMinor(basePrice * selectedSeats.length, "ETB").formatNumber()}
             </p>
           )}
         </div>

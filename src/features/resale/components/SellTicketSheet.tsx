@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
 import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket, Wallet } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
-import { payoutService, payoutKeys } from '@/services/payout.service';
+import { RESALE_FEE_BPS } from '@/types/resale';
+import { payoutService, payoutKeys } from '@/lib/payout';
 import { PayoutMethodsSheet, maskAccount, ProviderLogo, PAYOUT_PROVIDERS } from './PayoutMethodsSheet';
 import { AppButton } from '@/components/primitives/AppButton';
 
@@ -13,7 +14,9 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
   const [step, setStep] = useState<'price' | 'confirm'>('price');
   const [price, setPrice] = useState(2000);
   const [payoutOpen, setPayoutOpen] = useState(false);
-  const platformFee = Math.round(price * 0.08);
+  // MOCK estimate using the shared seller fee rate. The real rate comes from the
+  // created listing's fee_terms.rate_bps (backend resolves it at ActivateListing).
+  const platformFee = Math.round(price * RESALE_FEE_BPS / 10000);
   const youReceive = price - platformFee;
 
   const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
