@@ -30,6 +30,9 @@ export interface TicketTierFeature {
 }
 
 export interface TicketTier {
+  /** Backend Catalog::EventProduct id when the tier came from the live
+   *  products endpoint — this is what order_quotes consumes. Mock tiers omit it. */
+  id?: string;
   name: string;
   level: string;
   /** Integer cents (backend `*_minor`). */
