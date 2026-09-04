@@ -29,6 +29,8 @@ interface CheckoutProps {
   event: CheckoutEvent;
   ticketType: string;
   ticketLevel: string;
+  /** Backend Catalog::EventProduct id when the tier came from live products — what order_quotes consumes. */
+  ticketProductId?: string;
   basePrice: number;
   eventId?: string;
   customQuestions?: CustomQuestion[];
@@ -44,9 +46,9 @@ interface CheckoutProps {
   onComplete: () => void;
 }
 
-export function Checkout({ event, ticketType, ticketLevel, basePrice, eventId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, onClose, onComplete }: CheckoutProps) {
+export function Checkout({ event, ticketType, ticketLevel, ticketProductId, basePrice, eventId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, onClose, onComplete }: CheckoutProps) {
   const { isDark } = useTheme();
-  const flow = useCheckoutFlow({ basePrice, eventId, ticketType, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, onClose });
+  const flow = useCheckoutFlow({ basePrice, eventId, ticketType, ticketProductId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, onClose });
   const {
     step, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats, requiredSeats,
     promoApplied, promoCodeInput, setPromoCodeInput,

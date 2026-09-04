@@ -20,6 +20,14 @@
 
 ## Phase 1 COMPLETE (2026-09-03) — detail-by-slug live
 
+**Products wired into the purchase path (2026-09-03):** `src/lib/products.ts` fetches
+`GET /public/events/:slug/products` and maps `price_options` (lowest active, cents)
+→ `TicketTier[]` + `EventProduct[]` extras; EventDetailPage prefers live tiers/extras
+with mock fallback. The quote line now carries the **real backend product UUID**
+(`ticketProductId` threaded EventDetail → Checkout → `useCheckoutFlow`, replacing the
+synthetic `ticket:<name>` id). GiftTicket extras `price` bug fixed (now `priceMinor`).
+e2e: detail page asserts the products request fires (11/11 suite green).
+
 **Wallet de-mocked (2026-09-03):** `ticketsService.fetchUserTickets` now calls the real
 `GET /tickets` (branch ships `Ticketing::TicketsController#index` +
 `TicketWalletSerializer`) and maps the wire → `UserTicket` (`mapWalletTicket`; QR token

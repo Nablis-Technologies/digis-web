@@ -37,6 +37,22 @@ test.describe('event detail', () => {
     });
   });
 
+  test('detail page fetches live products for ticket tiers', async ({ page }) => {
+    // The ticket tiers/extras on the detail page come from
+    // GET /public/events/:slug/products (price_options + available) — not
+    // from the mock. Assert the request fires; tier names render from either
+    // source (the seed mirrors the mock), so the request itself is the proof.
+    const productsResponse = page.waitForResponse(
+      (res) => res.url().includes('/public/events/on-on/products') && res.status() === 200,
+      { timeout: 15_000 },
+    );
+    await page.goto('/events/on-on');
+    await expect(page.getByRole('heading', { name: 'On & On' })).toBeVisible({ timeout: 15_000 });
+    await productsResponse;
+    // Live tiers render — "General Admission" priced from the backend (600 ETB).
+    await expect(page.getByText('General Admission').first()).toBeVisible({ timeout: 15_000 });
+  });
+
   test('unknown slug redirects back to discovery', async ({ page }) => {
     await page.goto('/events/does-not-exist');
     await page.waitForURL('http://localhost:5173/', { timeout: 15_000 });

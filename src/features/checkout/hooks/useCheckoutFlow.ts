@@ -17,8 +17,8 @@ function sectionsForTier(seatMap: SeatMapConfig | undefined, ticketType: string)
   return scoped.length ? scoped : seatMap.sections.filter((s) => !s.tierName);
 }
 
-export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestions, products = [], includedProductIds = [], answerEditWindowHours, seatMap, requiredSeatCount = 1, onClose }: {
-  basePrice: number; eventId?: string; ticketType: string; customQuestions?: CustomQuestion[]; products?: EventProduct[]; includedProductIds?: string[]; answerEditWindowHours?: number | null; seatMap?: SeatMapConfig; /** Tier-specific assigned-seat count; couples tiers require two seats. */ requiredSeatCount?: number; onClose: () => void;
+export function useCheckoutFlow({ basePrice, eventId, ticketType, ticketProductId, customQuestions, products = [], includedProductIds = [], answerEditWindowHours, seatMap, requiredSeatCount = 1, onClose }: {
+  basePrice: number; eventId?: string; ticketType: string; /** Real backend product id — what order_quotes consumes. Falls back to the synthetic id for mock tiers. */ ticketProductId?: string; customQuestions?: CustomQuestion[]; products?: EventProduct[]; includedProductIds?: string[]; answerEditWindowHours?: number | null; seatMap?: SeatMapConfig; /** Tier-specific assigned-seat count; couples tiers require two seats. */ requiredSeatCount?: number; onClose: () => void;
 }) {
   // Extras bundled into the chosen tier are pre-selected and free (already in ticket price).
   const [selectedAddOns, setSelectedAddOns] = useState<SelectedEventProduct[]>(() =>
@@ -77,7 +77,7 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
   // discount, buyer fee, and total — the frontend only displays what it returns.
   // Mock body is swappable for POST /events/:event_id/order_quotes in Phase 3.
   const quoteInput = useMemo(() => {
-    const ticketLine = { eventProductId: `ticket:${ticketType}`, quantity, unitPriceMinor: basePrice };
+    const ticketLine = { eventProductId: ticketProductId ?? `ticket:${ticketType}`, quantity, unitPriceMinor: basePrice };
     const addOnLines = addOns
       .filter((a) => a.quantity > 0)
       .map((a) => ({ eventProductId: a.productId, quantity: a.quantity, unitPriceMinor: a.unitPrice }));

@@ -1,6 +1,8 @@
 ﻿import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, MapPin, Clock, Users, Ticket as TicketIcon, Heart, Sparkle, Sparkles, Gift, Crown, Zap, Flame } from 'lucide-react';
 import { useState, useLayoutEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { productsModule } from '@/lib/products';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -139,7 +141,21 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   ];
 
   const ticketTypes = event.ticketTypes ?? defaultTicketTypes;
-  const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes, selectedTicketType, event, isDark });
+  // Live products (tickets + extras) from GET /public/events/:slug/products.
+  // Live wins when the endpoint serves priced tiers/extras; the mock fallback
+  // covers draft events and keeps every downstream consumer (pricing, checkout,
+  // gift) untouched — they just receive real product ids.
+  const productsQuery = useQuery({
+    queryKey: productsModule.keys.forEvent(event.slug ?? ''),
+    queryFn: () => productsModule.fetchForEvent(event.slug!),
+    enabled: !!event.slug,
+  });
+  const live = productsQuery.data;
+  const liveTicketTypes = live && live.tiers.length > 0 ? live.tiers : null;
+  const liveProducts = live && live.extras.length > 0 ? live.extras : null;
+  const displayTicketTypes = liveTicketTypes ?? ticketTypes;
+  const displayProducts = liveProducts ?? event.products ?? [];
+  const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes: displayTicketTypes, selectedTicketType, event, isDark });
  const scrollToTicketSelection = () => {
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -269,7 +285,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
           <>
           <TicketSelector
             event={event}
-            ticketTypes={ticketTypes}
+            ticketTypes={displayTicketTypes}
             selectedTicketType={selectedTicketType}
             onSelectTicketType={setSelectedTicketType}
             isSoldOut={isSoldOut}
@@ -347,7 +363,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               ticketType: selectedTicketType,
               image: event.image,
             }}
-            extras={(event.products ?? []).filter((product) => product.type !== 'ticket').map(({ id, name, description, price }) => ({ id, name, description, price }))}
+            extras={displayProducts.filter((product) => product.type !== 'ticket').map(({ id, name, description, priceMinor }) => ({ id, name, description, price: priceMinor }))}
             onClose={() => setShowGift(false)}
             onSend={() => setShowGift(false)}
           />
@@ -368,9 +384,10 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
             }}
             ticketType={selectedTicketType}
             ticketLevel={selectedTicket?.level || ''}
+            ticketProductId={selectedTicket?.id}
             basePrice={basePrice}
             eventId={eventId}
-            products={event.products ?? []}
+            products={displayProducts}
             includedProductIds={selectedTicket?.includedProductIds}
             answerEditWindowHours={event.answerEditWindowHours}
             seatMap={event.seatMap}
