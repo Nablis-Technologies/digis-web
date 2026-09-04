@@ -37,10 +37,10 @@ export function useEventFilter(events: Event[], options: EventFilterOptions): Ev
             : "ticketed";
         const matchesAccess = eventTypes.length === 0 || eventTypes.includes(eventAccess);
         const matchesPrice = !priceRange || (
-          priceRange === "free" ? event.priceFrom === 0
-            : priceRange === "under-1000" ? event.priceFrom > 0 && event.priceFrom < 1000
-            : priceRange === "1000-3000" ? event.priceFrom >= 1000 && event.priceFrom <= 3000
-            : event.priceFrom > 3000
+          priceRange === "free" ? event.priceFromMinor === 0
+            : priceRange === "under-1000" ? event.priceFromMinor > 0 && event.priceFromMinor < 100000
+            : priceRange === "1000-3000" ? event.priceFromMinor >= 100000 && event.priceFromMinor <= 300000
+            : event.priceFromMinor > 300000
         );
         return matchesSearch && matchesCategory && matchesAvailable && matchesAccess && matchesPrice;
       })
@@ -48,9 +48,9 @@ export function useEventFilter(events: Event[], options: EventFilterOptions): Ev
         // Featured events take precedence in the list; the chosen sort applies within groups.
         if (!!a.featured !== !!b.featured) return a.featured ? -1 : 1;
         if (sortBy === "price-low")
-          return a.priceFrom - b.priceFrom;
+          return a.priceFromMinor - b.priceFromMinor;
         if (sortBy === "price-high")
-          return b.priceFrom - a.priceFrom;
+          return b.priceFromMinor - a.priceFromMinor;
         if (sortBy === "available")
           return b.ticketsLeft - a.ticketsLeft;
         return (

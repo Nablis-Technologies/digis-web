@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { eventsService, eventKeys } from "@/services/events.service";
+import { eventsModule } from "@/lib/events";
 import { useTheme } from "@/app/components/ThemeContext";
 import { FeaturedCarousel } from "@/features/discovery/components/FeaturedCarousel";
 import { FeaturedEventCard } from "@/features/discovery/components/FeaturedEventCard";
@@ -9,7 +9,12 @@ import { FeaturedMagazine } from "@/features/discovery/components/FeaturedMagazi
 import { CategoryFilter } from "@/features/discovery/components/CategoryFilter";
 import { EventGrid } from "@/features/discovery/components/EventGrid";
 import { HeroSearch } from "@/features/discovery/components/HeroSearch";
-import { useEventFilter, type EventAccessFilter, type EventPriceFilter, type EventSortBy } from "@/features/discovery/hooks/useEventFilter";
+import {
+  useEventFilter,
+  type EventAccessFilter,
+  type EventPriceFilter,
+  type EventSortBy,
+} from "@/features/discovery/hooks/useEventFilter";
 import type { Event } from "@/types";
 
 interface EventDiscoveryProps {
@@ -50,13 +55,12 @@ export function EventDiscovery({
   const [priceRange, setPriceRange] = useState<EventPriceFilter | null>(null);
   const { isDark } = useTheme();
 
-  // Fetch events via service — initialData ensures zero loading state in mock mode.
-  // Swap eventsService.fetchAll for a real API call when the Rails backend is ready.
+  // Fetch events via service. No initialData/placeholderData — the mock must
+  // never appear while loading. The grid renders an empty/loading state until
+  // the backend responds.
   const { data: events = [] } = useQuery({
-    queryKey: eventKeys.all,
-    queryFn: eventsService.fetchAll,
-    initialData: eventsService.initialData,
-    staleTime: Infinity,
+    queryKey: eventsModule.keys.all,
+    queryFn: eventsModule.fetchAll,
   });
 
   const filteredEvents = useEventFilter(events, {
@@ -69,11 +73,12 @@ export function EventDiscovery({
   });
 
   const activeFilterCount =
-    (sortBy !== "soonest" ? 1 : 0) + (onlyAvailable ? 1 : 0) + eventTypes.length + (priceRange ? 1 : 0);
+    (sortBy !== "soonest" ? 1 : 0) +
+    (onlyAvailable ? 1 : 0) +
+    eventTypes.length +
+    (priceRange ? 1 : 0);
   const filtersActive =
-    showFilters ||
-    activeFilterCount > 0 ||
-    selectedCategory !== "All";
+    showFilters || activeFilterCount > 0 || selectedCategory !== "All";
   const featuredEvents = filteredEvents.filter((e) => e.featured);
 
   return (
@@ -95,25 +100,14 @@ export function EventDiscovery({
                 fill={isDark ? "#d6f905" : "#0a0a0a"}
               >
                 <path d="M481.88,355.78v142.38c-46.95-6.63-89.03-20.18-126.27-40.59-43.22-23.76-78.63-55.56-106.26-95.49-7.6-10.97-14.62-22.59-21.08-34.81-19.52-37.09-32.65-79-39.35-125.65h161.2c4.05,22.52,10.15,42.5,18.25,60.06,16.46,35.55,40.87,61.77,73.22,78.58,7.03,3.65,14.4,6.9,22.15,9.71,5.83,2.16,11.89,4.1,18.15,5.81Z" />
-                <rect
-                  x="482.05"
-                  y="196.36"
-                  width="325.96"
-                  height="160.48"
-                />
+                <rect x="482.05" y="196.36" width="325.96" height="160.48" />
                 <path d="M801.18,817.1h-161.33c-4.02-21.15-9.93-40.07-17.6-56.71-16.46-35.58-40.87-61.8-73.22-78.6-32.38-16.76-72.3-25.18-119.72-25.18h-81.21v-137.52h89.73c15.1,0,29.79.6,44.04,1.79,9.41.77,18.64,1.81,27.68,3.13,46.63,6.65,88.44,20.18,125.48,40.49,55.09,30.26,97.52,73.71,127.32,130.27,19.07,36.22,32,76.96,38.83,122.32Z" />
-                <rect
-                  x="187.65"
-                  y="656.64"
-                  width="160.46"
-                  height="160.46"
-                />
+                <rect x="187.65" y="656.64" width="160.46" height="160.46" />
               </svg>
               <span
                 className="text-[16px] leading-none tracking-[-0.3px]"
                 style={{
-                  fontFamily:
-                    "'Zalando Sans Expanded', sans-serif",
+                  fontFamily: "'Zalando Sans Expanded', sans-serif",
                   fontWeight: 500,
                   color: isDark ? "#fff" : "#0a0a0a",
                   transform: "translateY(1px)",
@@ -130,17 +124,16 @@ export function EventDiscovery({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05, duration: 0.6 }}
-              className="text-[64px] xl:text-[88px] font-light tracking-[-2px] leading-[0.95] whitespace-nowrap"
+              className="text-[64px] font-light tracking-[-2px] leading-[0.95] whitespace-nowrap"
               style={{
-                fontFamily:
-                  "'Zalando Sans Expanded', sans-serif",
+                fontFamily: "'Zalando Sans Expanded', sans-serif",
                 color: isDark ? "#ffffff" : "#0a0a0a",
               }}
             >
               <span
                 style={{
                   color: isDark ? "#d6f905" : "#0a0a0a",
-                  fontStyle: "italic",
+                  fontStyle: "regular",
                   fontWeight: 300,
                 }}
               >
@@ -176,72 +169,66 @@ export function EventDiscovery({
       />
 
       {/* Featured Events */}
-      {featuredEvents.length > 0 &&
-        !searchMode &&
-        !filtersActive && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="mb-10"
-          >
-            {/* Header — hidden on desktop (desktop shows it inside the magazine nav strip) */}
-            <div className="lg:hidden flex items-center gap-3 mb-4 px-4 sm:px-6">
+      {featuredEvents.length > 0 && !searchMode && !filtersActive && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="mb-10"
+        >
+          {/* Header — hidden on desktop (desktop shows it inside the magazine nav strip) */}
+          <div className="lg:hidden flex items-center gap-3 mb-4 px-4 sm:px-6">
+            <span
+              className="text-[11px] tracking-[1.5px] uppercase"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.8)",
+              }}
+            >
+              Headliners
+            </span>
+            <div className="flex-1 flex items-center justify-end">
               <span
-                className="text-[11px] tracking-[1.5px] uppercase"
+                className="text-[11px] tracking-[1px] uppercase tabular-nums"
                 style={{
                   fontFamily: "'Inter', sans-serif",
-                  fontWeight: 600,
-                  color: isDark
-                    ? "rgba(255,255,255,0.9)"
-                    : "rgba(0,0,0,0.8)",
+                  color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)",
                 }}
               >
-                Headliners
+                {featuredEvents.length} events
               </span>
-              <div className="flex-1 flex items-center justify-end">
-                <span
-                  className="text-[11px] tracking-[1px] uppercase tabular-nums"
-                  style={{
-                    fontFamily: "'Inter', sans-serif",
-                    color: isDark
-                      ? "rgba(255,255,255,0.45)"
-                      : "rgba(0,0,0,0.45)",
-                  }}
-                >
-                  {featuredEvents.length} events
-                </span>
-              </div>
             </div>
-            {/* Mobile: coverflow carousel */}
-            <FeaturedCarousel
+          </div>
+          {/* Mobile: coverflow carousel */}
+          <FeaturedCarousel
+            events={featuredEvents}
+            onSelectEvent={onSelectEvent}
+            initialActive={initialFeaturedIdx}
+            onActiveChange={onFeaturedIdxChange}
+            showDots={true}
+          />
+          {/* Tablet: 2-col grid */}
+          <div className="hidden md:grid lg:hidden md:grid-cols-2 gap-4 px-4 sm:px-6">
+            {featuredEvents.map((event) => (
+              <FeaturedEventCard
+                key={event.id}
+                event={event}
+                onClick={() => onSelectEvent(event)}
+              />
+            ))}
+          </div>
+          {/* Desktop: cinematic magazine layout */}
+          <div className="hidden lg:block px-4 sm:px-6 lg:px-8">
+            <FeaturedMagazine
               events={featuredEvents}
               onSelectEvent={onSelectEvent}
-              initialActive={initialFeaturedIdx}
-              onActiveChange={onFeaturedIdxChange}
-              showDots={true}
+              initialActiveIdx={initialMagazineIdx}
+              onActiveIdxChange={onMagazineIdxChange}
             />
-            {/* Tablet: 2-col grid */}
-            <div className="hidden md:grid lg:hidden md:grid-cols-2 gap-4 px-4 sm:px-6">
-              {featuredEvents.map((event) => (
-                <FeaturedEventCard
-                  key={event.id}
-                  event={event}
-                  onClick={() => onSelectEvent(event)}
-                />
-              ))}
-            </div>
-            {/* Desktop: cinematic magazine layout */}
-            <div className="hidden lg:block px-4 sm:px-6 lg:px-8">
-              <FeaturedMagazine
-                events={featuredEvents}
-                onSelectEvent={onSelectEvent}
-                initialActiveIdx={initialMagazineIdx}
-                onActiveIdxChange={onMagazineIdxChange}
-              />
-            </div>
-          </motion.div>
-        )}
+          </div>
+        </motion.div>
+      )}
 
       <EventGrid
         events={filteredEvents}

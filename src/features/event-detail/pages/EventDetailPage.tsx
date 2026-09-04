@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'motion/react';
+﻿import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, MapPin, Clock, Users, Ticket as TicketIcon, Heart, Sparkle, Sparkles, Gift, Crown, Zap, Flame } from 'lucide-react';
 import { useState, useLayoutEffect, useRef } from 'react';
 import 'slick-carousel/slick/slick.css';
@@ -69,8 +69,8 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
     {
       name: 'Early Bird',
       level: 'LIMITED OFFER',
-      price: 850,
-      originalPrice: 1200,
+      priceMinor: 85000,
+      originalPriceMinor: 120000,
       available: 35,
       isEarlyBird: true,
       startedAt: earlyBirdStartedAt,
@@ -85,7 +85,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
     {
       name: 'Standard Access',
       level: 'ENTRY LEVEL',
-      price: 1200, 
+      priceMinor: 120000, 
       available: 150, 
       features: [
         { icon: <TicketIcon className="w-4 h-4" />, text: 'Digital Event Ticket' },
@@ -95,8 +95,8 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
     {
       name: 'Couples Bundle',
       level: 'FOR TWO',
-      price: 20000,
-      originalPrice: 2400,
+      priceMinor: 2000000,
+      originalPriceMinor: 240000,
       available: 28,
       isCouples: true,
       seats: 2,
@@ -110,7 +110,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
     {
       name: 'VIP Gold Access',
       level: 'PREMIUM',
-      price: 2500,
+      priceMinor: 250000,
       available: 45,
       isPremium: true,
       includedProductIds: ['av-parking'],
@@ -124,7 +124,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
     { 
       name: 'VVIP Diamond Access', 
       level: 'ELITE',
-      price: 5000,
+      priceMinor: 500000,
       available: 20,
       isPremium: true,
       isElite: true,
@@ -402,7 +402,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               venue: event.venue,
               image: event.image,
               category: event.category,
-              price: selectedTicket?.price,
+              price: selectedTicket?.priceMinor,
             }}
             ticketType={selectedTicketType}
             ticketLevel={selectedTicket?.level || ''}

@@ -9,7 +9,8 @@ export interface EventProduct {
   type: EventProductType;
   name: string;
   description?: string;
-  price: number;
+  /** Integer cents (backend `*_minor`). */
+  priceMinor: number;
   available?: number;
   maxPerOrder?: number;
   requiresTicket?: boolean;
@@ -31,8 +32,10 @@ export interface TicketTierFeature {
 export interface TicketTier {
   name: string;
   level: string;
-  price: number;
-  originalPrice?: number;
+  /** Integer cents (backend `*_minor`). */
+  priceMinor: number;
+  /** Integer cents, when a pre-discount face price exists. */
+  originalPriceMinor?: number;
   available: number;
   isEarlyBird?: boolean;
   startedAt?: number;
@@ -125,6 +128,8 @@ export interface RsvpRequirements {
 
 export interface Event {
   id: string;
+  /** Backend URL slug (GET /public/events/:slug). Preferred over name-derived paths. */
+  slug?: string;
   name: string;
   date: string;
   time: string;
@@ -142,10 +147,11 @@ export interface Event {
   soldOut?: boolean;
   /** Tailwind gradient classes used for the event's artwork overlay. */
   gradient?: string;
-  /** Starting price for international/foreign-currency buyers. */
-  priceForeignFrom?: number;
+  /** Starting price for international/foreign-currency buyers, in cents (backend `*_minor`). */
+  priceForeignFromMinor?: number;
   category: string;
-  priceFrom: number;
+  /** Lowest starting price in integer cents (backend `*_minor`). */
+  priceFromMinor: number;
   currency: "ETB";
   ticketsLeft: number;
   ticketTypes?: TicketTier[];
@@ -176,7 +182,8 @@ export interface Event {
   waitlistAhead?: number;
   inviteTickets?: {
     name: string;
-    price: number;
+    /** Integer cents (backend `*_minor`). */
+    priceMinor: number;
     perks: string[];
     premium?: boolean;
   }[];

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createHashRouter, RouterProvider, useLocation, useNavigate } from 'react-router';
+import { createBrowserRouter, RouterProvider, useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogIn, UserCircle } from 'lucide-react';
-import { ticketsService, ticketKeys } from '@/services/tickets.service';
-import { eventsService } from '@/services/events.service';
+import { ticketsService, ticketKeys } from '@/lib/tickets';
+import { eventsModule } from '@/lib/events';
 import type { Event, UserTicket } from '@/types';
 import { EventDiscovery } from '@/features/discovery/pages/DiscoveryPage';
 import { TicketView } from '@/features/tickets/pages/TicketsPage';
@@ -31,6 +31,9 @@ export const VIEW_PATHS: Record<AppView, string> = {
 };
 
 export function eventPath(event: Event): string {
+  // Prefer the backend slug (handles duplicate titles like "…-2"); fall back
+  // to a name-derived slug for mock-only events.
+  if (event.slug) return `/events/${event.slug}`;
   const slug = (event.name || event.id)
     .toLowerCase()
     .replace(/\s+/g, '-')
@@ -47,10 +50,6 @@ export function pathToView(pathname: string): AppView {
   if (pathname === '/resale') return 'resale';
   if (pathname === '/settings') return 'settings';
   return 'discover';
-}
-
-function eventMatchesPath(event: Event, pathname: string): boolean {
-  return eventPath(event) === pathname || `/events/${event.id}` === pathname;
 }
 
 // Module-level so the saved feed scroll position survives any route-driven
@@ -83,12 +82,31 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentView = pathToView(location.pathname);
-  const routeEvent = useMemo(() => {
+  const eventSlug = useMemo(() => {
     if (!location.pathname.startsWith('/events/')) return null;
-    const stateEvent = (location.state as { event?: Event } | null)?.event;
-    return stateEvent ?? eventsService.initialData.find((event) => eventMatchesPath(event, location.pathname)) ?? null;
-  }, [location.pathname, location.state]);
-  const selectedEvent = routeEvent;
+    return decodeURIComponent(location.pathname.split('/')[2] ?? '') || null;
+  }, [location.pathname]);
+  // In-app navigation ships the just-fetched list event through location.state
+  // (instant paint, no request). Deep links and refreshes have no state and
+  // fetch the event by slug instead (gap #1b — backend public_show now serves
+  // the full detail shape).
+  const routeEvent = useMemo(
+    () => (location.state as { event?: Event } | null)?.event ?? null,
+    [location.state],
+  );
+  const detailQuery = useQuery({
+    queryKey: eventsModule.keys.detail(eventSlug ?? ''),
+    queryFn: () => eventsModule.fetchById(eventSlug!),
+    enabled: !!eventSlug && !routeEvent,
+  });
+  const selectedEvent = routeEvent ?? (eventSlug && !routeEvent ? detailQuery.data ?? null : null);
+  const detailLoading = !!eventSlug && !routeEvent && detailQuery.isPending;
+  const detailMissing =
+    !!eventSlug && !routeEvent && detailQuery.isSuccess && !detailQuery.data;
+
+  useEffect(() => {
+    if (detailMissing) navigate('/', { replace: true });
+  }, [detailMissing, navigate]);
   const navigateToView = useCallback((view: AppView) => navigate(VIEW_PATHS[view]), [navigate]);
   const [resaleTicket, setResaleTicket] = useState<UserTicket | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,10 +156,14 @@ function AppContent() {
     if (heroSearchInView && !searchQuery) setSearchMode(false);
   }, [heroSearchInView, searchQuery]);
 
+  // Owner wallet — GET /tickets (real). Keyed on auth state so signing in
+  // fetches (the signed-out 401 must not poison the cache) and signing out
+  // drops the previous user's tickets. Disabled while signed out.
   const { data: userTickets = [] } = useQuery({
-    queryKey: ticketKeys.userTickets,
+    queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
     queryFn: ticketsService.fetchUserTickets,
-    staleTime: Infinity,
+    enabled: isAuthenticated,
+    staleTime: 60_000,
   });
 
   return (
@@ -209,6 +231,23 @@ function AppContent() {
                 onNavigate={(view) => navigateToView(view as AppView)}
                 onRequestAuth={() => setAuthModal('signin')}
               />
+            </motion.div>
+          ) : detailLoading ? (
+            // Deep-link fetch in flight. Deliberately NOT the mock feed —
+            // mock must never appear while loading (user rule).
+            <motion.div key="detail-loading" className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
+              <motion.div
+                className="w-10 h-10 rounded-full"
+                style={{
+                  border: `3px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(214,249,5,0.35)'}`,
+                  borderTopColor: isDark ? '#d6f905' : '#7c9a00',
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+              />
+              <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
+                Loading event…
+              </p>
             </motion.div>
           ) : (
             <motion.div
@@ -358,7 +397,7 @@ export function AppRouterProvider() {
   // useState with an initialiser guarantees it runs exactly once, on first
   // render, never at module-evaluation time.
   const [router] = useState(() =>
-    createHashRouter([
+    createBrowserRouter([
       { path: '/', Component: AppContent },
       { path: '/events/:eventTitle', Component: AppContent },
       { path: '/tickets', Component: AppContent },

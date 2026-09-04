@@ -14,9 +14,9 @@ export function useTicketPricing({
   const selectedTicket = selectedTicketType
     ? ticketTypes.find((t) => t.name === selectedTicketType) ?? null
     : null;
-  const basePrice = selectedTicket?.price || 0;
+  const basePrice = selectedTicket?.priceMinor || 0;
   const totalPrice = basePrice;
-  const minPrice = Math.min(...ticketTypes.map((t) => t.price));
+  const minPrice = Math.min(...ticketTypes.map((t) => t.priceMinor));
   const isSoldOut = event.ticketsLeft === 0 || ticketTypes.every((t) => t.available === 0);
   const selectedTicketAccentRgb = selectedTicket?.isEarlyBird
     ? '52, 211, 153'

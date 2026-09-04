@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { toPng } from 'html-to-image';
 import { BadgeCheck, ChevronRight, Clock, QrCode } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { ticketKeys, ticketsService } from '@/services/tickets.service';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { ticketKeys, ticketsService } from '@/lib/tickets';
 import { DetailedTicket } from '@/features/tickets/components/DetailedTicket';
 import { DownloadableTicketCard } from '@/features/tickets/components/DownloadableTicketCard';
 import type { UserTicket } from '@/types';
@@ -27,15 +28,18 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
   onNavigate?: (view: string) => void;
 }) {
   const { isDark } = useTheme();
+  const { isAuthenticated } = useAuth();
   const [openTicket, setOpenTicket] = useState<UserTicket | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
 
-  // The router prefetches this query, so on a warm cache there's no spinner.
+  // Shares the router's auth-aware wallet query (keyed on auth state, disabled
+  // while signed out — a signed-out fetch would 401 on every event page).
   const { data: tickets = [] } = useQuery({
-    queryKey: ticketKeys.userTickets,
+    queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
     queryFn: ticketsService.fetchUserTickets,
+    enabled: isAuthenticated,
   });
 
   const mine = tickets.filter(

@@ -1,5 +1,5 @@
 export type { Event, TicketTier, TicketTierFeature, EventArtist, EventOrganizer, EventProduct, EventProductType, SelectedEventProduct, SeatMapConfig, SeatSection, SeatRow, Seat, SeatStatus, SelectedSeat } from './event';
-export type { AuthUser, AuthSession, AuthResult, CheckAccountRequest, CheckAccountResponse, SignInRequest, SignInResponse, SignUpRequest, SignUpResponse, PendingVerification, VerifyOtpRequest, VerifyOtpResponse, ResendOtpRequest, ResendOtpResponse, PasswordResetRequest, PasswordResetResponse, SetNewPasswordRequest, SetNewPasswordResponse, UpdateProfileRequest, UpdateProfileResponse, GoogleSignInRequest, GoogleSignInResponse, CompleteGooglePhoneRequest, CompleteGooglePhoneResponse } from './auth';
+export type { AuthUser, AuthUserWire, AuthRole, AuthSession, AuthResult, SignInRequest, SignInResponse, SignUpRequest, SignUpResponse, MeResponse, LogoutResponse } from './auth';
 export type { RsvpStatus, InviteUnlockState } from './ticket';
 export type { CustomQuestion, AnswerEditWindowHours } from './checkout';
 
