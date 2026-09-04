@@ -18,15 +18,9 @@ interface SettingsViewProps {
   onRequestAuth?: () => void;
 }
 
-// Edit flow: 'idle' | 'info' (name + email) | 'phone-entry' | 'phone-otp'
-type EditStep = 'idle' | 'info' | 'phone-entry' | 'phone-otp';
-
-// Fake OTP for demo — in production this would be sent via SMS.
-const DEMO_OTP = '123456';
-
 export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const { isDark, toggleTheme } = useTheme();
-  const { user, isAuthenticated, signOut, updateProfile } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
 
   // Toggles
   const [pushNotifs, setPushNotifs] = useState(true);
@@ -71,88 +65,6 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
     setTimeout(closeSheet, 1400);
   };
 
-  // Edit state
-  const [step, setStep] = useState<EditStep>('idle');
-  const [formName, setFormName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [formError, setFormError] = useState('');
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  const openEdit = () => {
-    setFormName(user?.name || '');
-    setFormEmail(user?.email || '');
-    setFormPhone(user?.phone || '');
-    setFormError('');
-    setStep('info');
-  };
-
-  const saveInfo = async () => {
-    setFormError(''); setSaving(true);
-    const res = await updateProfile({ name: formName, email: formEmail });
-    setSaving(false);
-    if (res.ok) {
-      setStep('idle');
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2500);
-    } else {
-      setFormError(res.error || 'Could not save changes.');
-    }
-  };
-
-  // Proceed to phone OTP gate (if phone changed from current)
-  const proceedToPhone = () => {
-    const currentPhone = user?.phone || '';
-    if (formPhone === currentPhone) {
-      saveInfo();
-    } else {
-      setOtp(''); setOtpError('');
-      setStep('phone-otp');
-    }
-  };
-
-  const verifyOtp = async () => {
-    if (otp !== DEMO_OTP) {
-      setOtpError('Incorrect code. Try 123456 for the demo.');
-      return;
-    }
-    setOtpError(''); setSaving(true);
-    const res = await updateProfile({ name: formName, email: formEmail, phone: formPhone });
-    setSaving(false);
-    if (res.ok) {
-      setStep('idle');
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2500);
-    } else {
-      setOtpError(res.error || 'Could not save changes.');
-    }
-  };
-
-  const closeEdit = () => { setStep('idle'); setFormError(''); setOtpError(''); };
-
-  // Photo upload: read as base64, save immediately
-  const pickPhoto = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        await updateProfile({ photo: dataUrl });
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
-  };
-
-  const removePhoto = async () => { await updateProfile({ photo: null }); };
-
   const avatarColor = flatAvatarColor(user?.name || user?.email || 'Digis');
   const brand = '#d6f905';
   const cardBg = isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.7)';
@@ -191,30 +103,8 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         avatarColor={avatarColor}
         isAuthenticated={isAuthenticated}
         user={user}
-        step={step}
-        savedFlash={savedFlash}
-        pickPhoto={pickPhoto}
-        removePhoto={removePhoto}
-        openEdit={openEdit}
         accentText={accentText}
         subtle={subtle}
-        formName={formName}
-        setFormName={setFormName}
-        formEmail={formEmail}
-        setFormEmail={setFormEmail}
-        formPhone={formPhone}
-        setFormPhone={setFormPhone}
-        formError={formError}
-        closeEdit={closeEdit}
-        saving={saving}
-        saveInfo={saveInfo}
-        setStep={setStep}
-        setOtpError={setOtpError}
-        proceedToPhone={proceedToPhone}
-        otp={otp}
-        setOtp={setOtp}
-        otpError={otpError}
-        verifyOtp={verifyOtp}
         onRequestAuth={onRequestAuth}
       />
 

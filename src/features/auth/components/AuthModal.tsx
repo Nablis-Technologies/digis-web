@@ -1,9 +1,15 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
-  X, Mail, Phone, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff,
+  X, Phone, Lock, ArrowRight, Eye, EyeOff,
   AlertCircle, Check, ShieldCheck, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
+import { useTheme } from '@/app/components/ThemeContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
+import { AppButton } from '@/components/primitives/AppButton';
+import { AppInput } from '@/components/primitives/AppInput';
+import type { CSSProperties } from 'react';
 
 /* ─── Country data ─────────────────────────────────────────── */
 interface Country { code: string; name: string; dial: string; flag: string; }
@@ -43,37 +49,28 @@ function buildPhone(value: string, dial: string): string {
   if (!v || v.includes('@') || v.startsWith('+')) return v;
   return `+${dial}${v.replace(/^0+/, '')}`;
 }
-import { useTheme } from '@/app/components/ThemeContext';
-import { useAuth } from '@/features/auth/context/AuthContext';
-import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
-import { AppButton } from '@/components/primitives/AppButton';
-import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
-
-type Step = 'identify' | 'password' | 'register' | 'googlePhone' | 'otp' | 'forgot' | 'reset' | 'success';
 
 interface AuthModalProps {
   onClose: () => void;
   onAuthed?: () => void;
 }
 
+/**
+ * Phone-first auth, matching digis_backend's identifier+password surface.
+ * No OTP / Google / password-reset (the backend has none — see BACKEND_GAPS.md #8).
+ */
 export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
   const { isDark } = useTheme();
   const auth = useAuth();
-  const [step, setStep] = useState<Step>('identify');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [devCode, setDevCode] = useState('');
-  const otpPurpose = useRef<'signup' | 'reset'>('signup');
+  const [success, setSuccess] = useState(false);
 
   // form state
   const [identifier, setIdentifier] = useState(''); // unified entry (phone or email)
-  const [entryWasEmail, setEntryWasEmail] = useState(false);
-  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [otp, setOtp] = useState('');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
 
   useEffect(() => {
@@ -89,37 +86,11 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
   const bgPanel = isDark ? '#0a0a0a' : '#ffffff';
   const borderSoft = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)';
 
-  const go = (s: Step) => { setError(''); setStep(s); };
+  const switchMode = (m: 'signin' | 'signup') => { setError(''); setMode(m); };
 
   const finishAuthed = () => {
-    setStep('success');
+    setSuccess(true);
     setTimeout(() => { onAuthed?.(); onClose(); }, 1400);
-  };
-
-  // ── Step 1: single entry, then branch
-  const handleContinue = async () => {
-    setError(''); setLoading(true);
-    const full = buildPhone(identifier, country.dial);
-    const res = await auth.checkAccount(full);
-    setLoading(false);
-    if (res.error) { setError(res.error); return; }
-    setEntryWasEmail(res.isEmail);
-    if (res.exists) {
-      go('password');
-    } else {
-      if (res.isEmail) { setEmail(full); setPhone(''); }
-      else { setPhone(full); setEmail(''); }
-      go('register');
-    }
-  };
-
-  const handleGoogle = async () => {
-    setError(''); setLoading(true);
-    const res = await auth.signInWithGoogle();
-    setLoading(false);
-    if (!res.ok) { setError(res.error || 'Could not sign in with Google.'); return; }
-    if (res.needsPhone) go('googlePhone');
-    else finishAuthed();
   };
 
   const handleSignIn = async () => {
@@ -129,71 +100,33 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
     if (res.ok) finishAuthed();
     else setError(res.error || 'Could not log in.');
   };
-
-  const handleRegister = async () => {
-    setError(''); setLoading(true);
-    const res = await auth.startSignUp({ name, phone: buildPhone(phone, country.dial), email: email || undefined, password });
-    setLoading(false);
-    if (res.ok) { otpPurpose.current = 'signup'; setDevCode(res.devCode || ''); setOtp(''); go('otp'); }
-    else setError(res.error || 'Could not create account.');
-  };
-
-  const handleGooglePhone = async () => {
-    setError(''); setLoading(true);
-    const res = await auth.completeGooglePhone(buildPhone(phone, country.dial));
-    setLoading(false);
-    if (res.ok) finishAuthed();
-    else setError(res.error || 'Could not save phone number.');
-  };
-
-  const handleForgot = async () => {
-    setError(''); setLoading(true);
-    const res = await auth.requestPasswordReset(buildPhone(identifier, country.dial));
-    setLoading(false);
-    if (res.ok) { otpPurpose.current = 'reset'; setDevCode(res.devCode || ''); setOtp(''); go('otp'); }
-    else setError(res.error || 'Could not start password reset.');
-  };
-
-  const handleVerify = async (codeOverride?: string) => {
-    const code = codeOverride ?? otp;
-    setError(''); setLoading(true);
-    const res = await auth.verifyOtp(code);
-    setLoading(false);
-    if (res.ok) { if (otpPurpose.current === 'signup') finishAuthed(); else go('reset'); }
-    else setError(res.error || 'Invalid code.');
-  };
-
-  const handleResend = async () => {
-    const res = await auth.resendOtp();
-    if (res.ok) setDevCode(res.devCode || '');
-  };
-
-  const handleReset = async () => {
-    setError(''); setLoading(true);
-    const res = await auth.setNewPassword(newPass);
+  const handleSignUp = async () => {
+    setError('');
+    const e164 = buildPhone(phone, country.dial);
+    // Client-side policy — the backend currently enforces none of these
+    // (BACKEND_GAPS.md #10), so the signup form is the only gate.
+    if (!/^\+[1-9]\d{6,14}$/.test(e164)) {
+      setError('Enter a valid mobile number for the selected country.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    setLoading(true);
+    const res = await auth.signUp({ phone: e164, password });
     setLoading(false);
     if (res.ok) finishAuthed();
-    else setError(res.error || 'Could not set new password.');
+    // Backend per-field messages (e.g. "Phone has already been taken") are
+    // more useful than the generic signup copy — show them verbatim.
+    else setError(res.fieldErrors?.join(' ') || res.error || 'Could not create account.');
   };
 
-  const titles: Record<Step, { kicker: string; title: string; sub: string }> = {
-    identify: { kicker: 'Welcome to Digis', title: 'Log in or create an account', sub: 'Enter your phone number to continue. Email works too.' },
-    password: { kicker: 'Welcome back', title: 'Enter your password', sub: `Signing in as ${identifier}.` },
-    register: { kicker: 'Create your account', title: 'A few quick details', sub: 'Your phone number is required — email is optional.' },
-    googlePhone: { kicker: 'One more thing', title: 'Add your phone number', sub: 'We use it to secure your tickets. Required to finish.' },
-    otp: { kicker: 'Verify it’s you', title: 'Enter the 6-digit code', sub: `We sent a code to ${maskIdentifier(auth.pendingIdentifier || phone || identifier)}.` },
-    forgot: { kicker: 'Reset password', title: 'Forgot your password?', sub: 'We’ll send a code to verify your identity.' },
-    reset: { kicker: 'Almost done', title: 'Set a new password', sub: 'Choose something secure you’ll remember.' },
-    success: { kicker: 'You’re in', title: 'Signed in', sub: 'Taking you back to the action.' },
+  const titles = {
+    signin: { kicker: 'Welcome back', title: 'Log in', sub: 'Enter your phone number or email and password to continue.' },
+    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required to secure your tickets.' },
   };
-  const t = titles[step];
-  const canBack = step !== 'identify' && step !== 'success';
-  const backTo = (): Step => {
-    if (step === 'password' || step === 'register' || step === 'forgot' || step === 'googlePhone') return 'identify';
-    if (step === 'otp') return otpPurpose.current === 'reset' ? 'forgot' : 'register';
-    if (step === 'reset') return 'identify';
-    return 'identify';
-  };
+  const t = titles[mode];
 
   return (
     <motion.div
@@ -223,13 +156,7 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
 
         {/* Header */}
         <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${borderSoft}` }}>
-          {canBack ? (
-            <AppButton whileTap={{ scale: 0.9 }} onClick={() => go(backTo())}
-              className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
-              style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', border: `1px solid ${borderSoft}` }}>
-              <ArrowLeft className="w-4 h-4" strokeWidth={1.8} style={{ color: textMuted }} />
-            </AppButton>
-          ) : <div className="w-9 h-9" />}
+          <div className="w-9 h-9" />
           <p className="text-[9px] tracking-[3px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
             {t.kicker}
           </p>
@@ -242,7 +169,7 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
 
         {/* Body */}
         <div className="relative flex-1 overflow-y-auto scrollbar-hide px-6 py-6">
-          {step !== 'success' && (
+          {!success && (
             <div className="flex flex-col items-center mb-5">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -267,141 +194,89 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
           </div>
 
           <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-4"
-            >
-              {/* ── IDENTIFY (unified entry) ── */}
-              {step === 'identify' && (
-                <>
-                  <PhoneField
-                    country={country} onCountryChange={setCountry}
-                    placeholder="Phone or email"
-                    value={identifier} onChange={(v) => { setIdentifier(v); setError(''); }}
-                    isDark={isDark} onEnter={handleContinue}
-                  />
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={handleContinue} loading={loading} isDark={isDark} label="Continue" disabled={!identifier.trim()} />
-                  <Divider isDark={isDark} />
-                  <GoogleButton onClick={handleGoogle} disabled={loading} isDark={isDark} label="Continue with Google" />
-                </>
-              )}
-
-              {/* ── PASSWORD (existing) ── */}
-              {step === 'password' && (
-                <>
-                  <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Your password" onEnter={handleSignIn} />
-                  <div className="flex justify-end -mt-1">
-                    <AppButton onClick={() => go('forgot')} className="text-[11.5px] cursor-pointer" style={{ fontFamily: "'Inter', sans-serif", color: accent }}>
-                      Forgot password?
-                    </AppButton>
-                  </div>
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={handleSignIn} loading={loading} isDark={isDark} label="Log in" />
-                </>
-              )}
-
-              {/* ── REGISTER (new) ── */}
-              {step === 'register' && (
-                <>
-                  <Field icon={<User className="w-4 h-4" />} placeholder="Full name" value={name} onChange={(v) => { setName(v); setError(''); }} isDark={isDark} />
-                  <PhoneField country={country} onCountryChange={setCountry} placeholder="Phone number" value={phone} onChange={(v) => { setPhone(v); setError(''); }} isDark={isDark} />
-                  <Field icon={<Mail className="w-4 h-4" />} type="email" placeholder="Email (optional)" value={email} onChange={(v) => { setEmail(v); setError(''); }} isDark={isDark} optional />
-                  <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Create a password (min 6 chars)" />
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={handleRegister} loading={loading} isDark={isDark} label="Create account" />
-                  <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                    By continuing you agree to Digis’ Terms & Privacy Policy.
-                  </p>
-                </>
-              )}
-
-              {/* ── GOOGLE PHONE ── */}
-              {step === 'googlePhone' && (
-                <>
-                  <PhoneField country={country} onCountryChange={setCountry} placeholder="Phone number" value={phone} onChange={(v) => { setPhone(v); setError(''); }} isDark={isDark} onEnter={handleGooglePhone} />
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={handleGooglePhone} loading={loading} isDark={isDark} label="Finish" disabled={!phone.trim()} />
-                </>
-              )}
-
-              {/* ── OTP ── */}
-              {step === 'otp' && (
-                <>
-                  <OtpInput value={otp} onChange={(v) => { setOtp(v); setError(''); }} isDark={isDark} onComplete={(code) => handleVerify(code)} />
-                  {devCode && (
-                    <div className="flex items-center justify-center gap-2 rounded-xl py-2.5 px-3"
-                      style={{ background: isDark ? 'rgba(217,255,0,0.06)' : 'rgba(214,249,5,0.06)', border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.15)'}` }}>
-                      <Sparkles className="w-3.5 h-3.5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.75} />
-                      <span className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
-                        Demo code: <span style={{ color: textPrimary, fontWeight: 600, letterSpacing: '2px' }}>{devCode}</span>
-                      </span>
-                    </div>
-                  )}
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={() => handleVerify()} loading={loading} isDark={isDark} label="Verify" disabled={otp.length !== 6} />
-                  <div className="text-center">
-                    <AppButton onClick={handleResend} className="text-[11.5px] cursor-pointer" style={{ fontFamily: "'Inter', sans-serif", color: accent }}>
-                      Didn’t get it? Resend code
-                    </AppButton>
-                  </div>
-                </>
-              )}
-
-              {/* ── FORGOT ── */}
-              {step === 'forgot' && (
-                <>
-                  <PhoneField country={country} onCountryChange={setCountry} placeholder="Phone or email" value={identifier} onChange={(v) => { setIdentifier(v); setError(''); }} isDark={isDark} onEnter={handleForgot} />
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={handleForgot} loading={loading} isDark={isDark} label="Send reset code" />
-                </>
-              )}
-
-              {/* ── RESET ── */}
-              {step === 'reset' && (
-                <>
-                  <PasswordField value={newPass} onChange={(v) => { setNewPass(v); setError(''); }} isDark={isDark} placeholder="New password (min 6 chars)" />
-                  <ErrorLine error={error} />
-                  <PrimaryButton onClick={handleReset} loading={loading} isDark={isDark} label="Update password" />
-                </>
-              )}
-
-              {/* ── SUCCESS ── */}
-              {step === 'success' && (
-                <div className="flex flex-col items-center py-4">
-                  <div className="relative mb-5">
-                    {/* pulse rings */}
-                    {[0, 1].map((i) => (
-                      <motion.div key={i}
-                        className="absolute inset-0 rounded-full"
-                        style={{ border: '1.5px solid rgba(52,211,153,0.5)' }}
-                        initial={{ scale: 1, opacity: 0.6 }}
-                        animate={{ scale: 2, opacity: 0 }}
-                        transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.6, ease: 'easeOut' }}
-                      />
-                    ))}
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 14, stiffness: 200 }}
-                      className="relative w-20 h-20 rounded-full flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)' }}>
-                      <Check className="w-9 h-9 text-white" strokeWidth={3} />
-                    </motion.div>
-                  </div>
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-                    className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4" strokeWidth={2} style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
-                    <span className="text-[14px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", fontWeight: 500, color: textPrimary }}>
-                      Welcome to Digis
-                    </span>
+            {success ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                className="flex flex-col items-center py-4"
+              >
+                <div className="relative mb-5">
+                  {[0, 1].map((i) => (
+                    <motion.div key={i}
+                      className="absolute inset-0 rounded-full"
+                      style={{ border: '1.5px solid rgba(52,211,153,0.5)' }}
+                      initial={{ scale: 1, opacity: 0.6 }}
+                      animate={{ scale: 2, opacity: 0 }}
+                      transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.6, ease: 'easeOut' }}
+                    />
+                  ))}
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 14, stiffness: 200 }}
+                    className="relative w-20 h-20 rounded-full flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)' }}>
+                    <Check className="w-9 h-9 text-white" strokeWidth={3} />
                   </motion.div>
                 </div>
-              )}
-            </motion.div>
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+                  className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" strokeWidth={2} style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
+                  <span className="text-[14px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", fontWeight: 500, color: textPrimary }}>
+                    Welcome to Digis
+                  </span>
+                </motion.div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                {mode === 'signin' && (
+                  <>
+                    <PhoneField
+                      country={country} onCountryChange={setCountry}
+                      placeholder="Phone number or email"
+                      value={identifier} onChange={(v) => { setIdentifier(v); setError(''); }}
+                      isDark={isDark} onEnter={handleSignIn}
+                    />
+                    <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Your password" onEnter={handleSignIn} />
+                    <ErrorLine error={error} />
+                    <PrimaryButton onClick={handleSignIn} loading={loading} isDark={isDark} label="Log in" disabled={!identifier.trim() || !password} />
+                  </>
+                )}
+
+                {mode === 'signup' && (
+                  <>
+                    <PhoneField
+                      country={country} onCountryChange={setCountry}
+                      placeholder="Phone number"
+                      value={phone} onChange={(v) => { setPhone(v); setError(''); }}
+                      isDark={isDark} onEnter={handleSignUp}
+                    />
+                    <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleSignUp} />
+                    <ErrorLine error={error} />
+                    <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!phone.trim() || !password} />
+                    <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+                      By continuing you agree to Digis’ Terms & Privacy Policy.
+                    </p>
+                  </>
+                )}
+
+                <div className="text-center pt-1">
+                  <AppButton
+                    onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+                    className="text-[11.5px] cursor-pointer"
+                    style={{ fontFamily: "'Inter', sans-serif", color: accent }}
+                  >
+                    {mode === 'signin' ? "Don't have an account? Create one" : 'Already have an account? Log in'}
+                  </AppButton>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
-        {step !== 'success' && (
+        {!success && (
           <div className="px-6 pb-6 pt-1 flex items-center justify-center gap-1.5" style={{ color: textDim }}>
             <ShieldCheck className="w-3 h-3" strokeWidth={1.8} />
             <span className="text-[10px] tracking-[1px] uppercase" style={{ fontFamily: "'Inter', sans-serif" }}>Encrypted &amp; secure</span>
@@ -424,17 +299,7 @@ function DigisMark({ className, color }: { className?: string; color: string }) 
   );
 }
 
-function maskIdentifier(v: string) {
-  if (!v) return 'your contact';
-  if (v.includes('@')) {
-    const [u, d] = v.split('@');
-    return `${u.slice(0, 2)}${'•'.repeat(Math.max(1, u.length - 2))}@${d}`;
-  }
-  const digits = v.replace(/\s/g, '');
-  return `${digits.slice(0, 4)}•••${digits.slice(-2)}`;
-}
-
-function inputStyle(isDark: boolean): React.CSSProperties {
+function inputStyle(isDark: boolean): CSSProperties {
   return {
     fontFamily: "'Inter', sans-serif", fontSize: '14px',
     background: 'transparent', color: isDark ? '#fff' : '#1a1a1a',
@@ -565,6 +430,7 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
+        noFocusRing
         style={{ ...inputStyle(isDark), paddingLeft: '10px' }}
       />
     </div>
@@ -572,35 +438,6 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
 }
 
 /* ─── Generic Field ────────────────────────────────────────── */
-function Field({ icon, label, type = 'text', placeholder, value, onChange, isDark, onEnter, optional }: {
-  icon: React.ReactNode; label?: string; type?: string; placeholder?: string;
-  value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; optional?: boolean;
-}) {
-  const [focused, setFocused] = useState(false);
-  const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
-  return (
-    <div>
-      {label && (
-        <label className="text-[10px] tracking-[1.5px] uppercase mb-2 ml-1 block" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-          {label}{optional && <span className="ml-1 normal-case tracking-normal">· optional</span>}
-        </label>
-      )}
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
-        style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
-          }}>
-        <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}>{icon}</span>
-        <AppInput
-          type={type} value={value} placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
-          style={inputStyle(isDark)} />
-      </div>
-    </div>
-  );
-}
 
 function PasswordField({ value, onChange, isDark, placeholder, onEnter }: { value: string; onChange: (v: string) => void; isDark: boolean; placeholder: string; onEnter?: () => void }) {
   const [show, setShow] = useState(false);
@@ -616,91 +453,10 @@ function PasswordField({ value, onChange, isDark, placeholder, onEnter }: { valu
       <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder} style={inputStyle(isDark)}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
+        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
       <AppButton type="button" onClick={() => setShow((s) => !s)} className="cursor-pointer flex-shrink-0" style={{ color: textDim }}>
         {show ? <EyeOff className="w-4 h-4" strokeWidth={1.75} /> : <Eye className="w-4 h-4" strokeWidth={1.75} />}
       </AppButton>
-    </div>
-  );
-}
-
-function OtpInput({ value, onChange, isDark, onComplete }: { value: string; onChange: (v: string) => void; isDark: boolean; onComplete: (code: string) => void }) {
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const digits = value.padEnd(6, ' ').slice(0, 6).split('');
-  const textPrimary = isDark ? '#fff' : '#1a1a1a';
-
-  const setAt = (i: number, ch: string) => {
-    const arr = value.padEnd(6, ' ').slice(0, 6).split('');
-    arr[i] = ch || ' ';
-    const next = arr.join('').replace(/ /g, '');
-    onChange(next);
-    return next;
-  };
-
-  return (
-    <div className="flex items-center justify-center gap-2">
-      {digits.map((d, i) => (
-        <AppInput
-          key={i}
-          ref={(el) => { refs.current[i] = el; }}
-          inputMode="numeric" maxLength={1}
-          value={d.trim()}
-          onChange={(e) => {
-            const ch = e.target.value.replace(/\D/g, '').slice(-1);
-            const next = setAt(i, ch);
-            if (ch && i < 5) refs.current[i + 1]?.focus();
-            if (next.length === 6) onComplete(next);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Backspace' && !d.trim() && i > 0) refs.current[i - 1]?.focus();
-          }}
-          onPaste={(e) => {
-            e.preventDefault();
-            const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-            if (pasted) { onChange(pasted); if (pasted.length === 6) onComplete(pasted); refs.current[Math.min(pasted.length, 5)]?.focus(); }
-          }}
-          className="w-11 rounded-xl text-center outline-none transition-all"
-          style={{
-            fontFamily: "'Zalando Sans Expanded', sans-serif", fontSize: '20px', fontWeight: 300,
-            height: 52, color: textPrimary,
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-            border: `1px solid ${d.trim() ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function GoogleButton({ onClick, disabled, isDark, label }: { onClick: () => void; disabled?: boolean; isDark: boolean; label: string }) {
-  return (
-    <AppButton whileTap={{ scale: 0.98 }} onClick={onClick} disabled={disabled}
-      className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl cursor-pointer disabled:opacity-50"
-      style={{ background: '#fff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(26,26,46,0.12)'}` }}>
-      <GoogleIcon />
-      <span className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500, color: '#1a1a1a' }}>{label}</span>
-    </AppButton>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg className="w-[18px] h-[18px]" viewBox="0 0 48 48">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-    </svg>
-  );
-}
-
-function Divider({ isDark }: { isDark: boolean }) {
-  const line = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-px" style={{ background: line }} />
-      <span className="text-[10px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(26,26,46,0.4)' }}>or</span>
-      <div className="flex-1 h-px" style={{ background: line }} />
     </div>
   );
 }

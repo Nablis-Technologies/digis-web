@@ -6,7 +6,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { NAV_ITEMS } from '@/components/Navigation';
 import { UserAvatar } from '@/components/UserAvatar';
-import { useNotifications, notificationsStore } from '@/services/notifications.service';
+import { useNotifications, notificationsStore } from '@/lib/notifications';
 import type { NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 
@@ -138,7 +138,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             background: isAuthenticated ? 'transparent' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
             transition: 'border-color 0.25s ease',
           }}
-          aria-label="Profile"
+          aria-label="Account menu"
         >
           {isAuthenticated && user ? (
             <UserAvatar user={user} size={40} style={{ borderRadius: '50%' }} />

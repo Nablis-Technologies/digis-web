@@ -1,21 +1,22 @@
 import { flatAvatarColor, initialsOf } from '@/lib/utils/avatarColor';
 import type { AuthUser } from '@/types/auth';
+import type { CSSProperties } from 'react';
 
 /**
  * Consistent profile avatar used across TopBar, UserProfile, and Settings.
- * Shows the user's photo when available, falls back to initials on the
- * hash-based avatar color.
+ * Shows initials on a hash-based avatar color. (No photo — the backend has no
+ * profile photo field, see docs/BACKEND_GAPS.md.)
  */
 export function UserAvatar({
   user,
   size = 36,
   className = '',
-  style = {},
+  style = {} as CSSProperties,
 }: {
   user: AuthUser | null;
   size?: number;
   className?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 }) {
   if (!user) return null;
 
@@ -31,7 +32,7 @@ export function UserAvatar({
   const textColor = lum > 0.55 ? '#0a0a0a' : '#ffffff';
   const fontSize = Math.round(size * 0.38);
 
-  const shared: React.CSSProperties = {
+  const shared: CSSProperties = {
     width: size,
     height: size,
     borderRadius: Math.round(size * 0.32),
@@ -39,18 +40,6 @@ export function UserAvatar({
     overflow: 'hidden',
     ...style,
   };
-
-  if (user.photo) {
-    return (
-      <div className={`inline-flex items-center justify-center ${className}`} style={shared}>
-        <img
-          src={user.photo}
-          alt={user.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-      </div>
-    );
-  }
 
   return (
     <div
