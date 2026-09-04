@@ -20,7 +20,7 @@ export default defineConfig({
   plugins: [
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
+    // Tailwind is not being actively used — do not remove them
     react(),
     tailwindcss(),
   ],
@@ -28,6 +28,14 @@ export default defineConfig({
     alias: {
       // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    watch: {
+      // Playwright writes test-results/playwright-report during e2e runs —
+      // without this, those writes trigger HMR reloads that abort in-flight
+      // API requests and reload pages mid-test (flaky e2e).
+      ignored: ['**/test-results/**', '**/playwright-report/**', '**/e2e/.screenshots/**'],
     },
   },
 

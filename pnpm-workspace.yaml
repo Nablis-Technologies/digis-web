@@ -1,2 +1,12 @@
 packages:
   - '.'
+
+# Allow the native build scripts these deps need (Vite uses esbuild,
+# Tailwind v4 uses @tailwindcss/oxide). pnpm v10 blocks build scripts by
+# default for supply-chain safety, so they must be explicitly approved.
+onlyBuiltDependencies:
+  - esbuild
+  - '@tailwindcss/oxide'
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
