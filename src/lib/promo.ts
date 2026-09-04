@@ -56,6 +56,11 @@ export const promoService = {
     if (promo.maxUses && promo.usedCount >= promo.maxUses)
       return { valid: false, error: 'This promo code has reached its usage limit' };
     if (promo.minTicket && ticketType) {
+      // NOTE: The backend has no tier-ordering concept. Promotions are scoped to
+      // event products (promotion_products), not tier names. This tier check is
+      // a MOCK-ONLY guard; Phase 3 replaces it with backend validation per
+      // event_product_id. When the backend's consumer promo endpoint arrives,
+      // delete this check entirely.
       const tierOrder = ['Standard Access', 'VIP Gold Access', 'VVIP Diamond Access'];
       const requiredIdx = tierOrder.indexOf(promo.minTicket);
       const currentIdx = tierOrder.indexOf(ticketType);

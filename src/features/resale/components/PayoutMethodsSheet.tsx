@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
 import { X, Plus, Check, Trash2, ArrowLeft } from 'lucide-react';
-import { payoutService, payoutKeys } from '@/services/payout.service';
+import { payoutService, payoutKeys } from '@/lib/payout';
 import type { PayoutMethod, PayoutMethodKind, AddPayoutMethodInput } from '@/types';
 import { ProviderLogo as SharedProviderLogo } from '@/components/ProviderLogo';
 import { AppButton } from '@/components/primitives/AppButton';

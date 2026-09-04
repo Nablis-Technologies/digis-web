@@ -1,5 +1,5 @@
-import { notificationsStore, DEMO_TRANSFER_TOKEN } from '@/services/notifications.service';
-import { ticketsService } from '@/services/tickets.service';
+import { notificationsStore, DEMO_TRANSFER_TOKEN } from '@/lib/notifications';
+import { ticketsService } from '@/lib/tickets';
 import { getEventImage } from '@/lib/utils/eventImages';
 import type { UserTicket } from '@/types/ticket';
 

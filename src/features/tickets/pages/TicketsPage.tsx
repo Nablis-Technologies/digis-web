@@ -12,11 +12,10 @@ import { EditTicketAnswersDialog } from '@/features/tickets/components/EditTicke
 import { AddExtrasDialog } from '@/features/tickets/components/AddExtrasDialog';
 import { useTicketGroups } from '@/features/tickets/hooks/useTicketGroups';
 import { toPng } from 'html-to-image';
-import { ticketsService, ticketKeys } from '@/services/tickets.service';
-import { transferService } from '@/services/transfer.service';
-import { eventsService } from '@/services/events.service';
+import { ticketsService, ticketKeys } from '@/lib/tickets';
+import { transferService } from '@/lib/transfer';
 import { useAuth } from '@/features/auth/context/AuthContext';
-import type { SelectedEventProduct, UserTicket } from '@/types';
+import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 
 interface TicketViewProps {
@@ -55,9 +54,7 @@ export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewP
       setTimeout(() => { setAddingExtrasTicket(null); setExtrasDone(false); }, 1200);
     },
   });
-  const extrasProducts = addingExtrasTicket?.eventId
-    ? eventsService.initialData.find((e) => e.id === addingExtrasTicket.eventId)?.products ?? []
-    : [];
+  const extrasProducts: EventProduct[] = [];
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const { upcoming, past } = useTicketGroups(tickets);
@@ -197,7 +194,6 @@ export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewP
                 onShare={() => { setSharingTicket(selectedTicket); setSelectedTicket(null); }}
                 onResell={() => { if (onListForResale) { onListForResale(selectedTicket); setSelectedTicket(null); } }}
                 onEditAnswers={selectedTicket.customQuestions?.length && selectedTicket.answersEditableUntil && Date.parse(selectedTicket.answersEditableUntil) > Date.now() ? () => { setAnswerSaveError(''); setEditingAnswersTicket(selectedTicket); setSelectedTicket(null); } : undefined}
-                onAddExtras={selectedTicket.eventId && (eventsService.initialData.find((e) => e.id === selectedTicket.eventId)?.products?.length) ? () => { setExtrasDone(false); setAddingExtrasTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onDownload={handleDownload}
                 downloading={downloading}
                 downloadDone={downloadDone} />

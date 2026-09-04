@@ -13,6 +13,7 @@ import { ProcessingView } from '@/features/checkout/components/ProcessingView';
 import { SuccessView } from '@/features/checkout/components/SuccessView';
 import { useCheckoutFlow } from '@/features/checkout/hooks/useCheckoutFlow';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
+import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
 
 interface CheckoutEvent {
@@ -135,14 +136,14 @@ export function Checkout({ event, ticketType, ticketLevel, basePrice, eventId, c
               <div>
                 <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-[22px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>ETB {total.toLocaleString()}</span>
-                  {discountTotal > 0 && <span className="text-[12px] line-through" style={{ color: textDim }}>{(subtotal + serviceFee).toLocaleString()}</span>}
+                  <span className="text-[22px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>{Money.fromMinor(total, "ETB").format()}</span>
+                  {discountTotal > 0 && <span className="text-[12px] line-through" style={{ color: textDim }}>{Money.fromMinor(subtotal + serviceFee, "ETB").formatNumber()}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1.5" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}><Lock className="w-3 h-3" strokeWidth={1.8} /><span className="text-[10px] tracking-[1px] uppercase">Secure</span></div>
             </div>
             <AppButton whileHover={{ scale: canContinue ? 1.01 : 1 }} whileTap={{ scale: canContinue ? 0.98 : 1 }} onClick={goNext} disabled={!canContinue} className="w-full py-4 rounded-2xl flex items-center justify-center gap-2.5 relative overflow-hidden" style={{ ...primaryButtonSurface(canContinue, isDark), boxShadow: 'none', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', fontWeight: 500 }}>
-              {step === 'payment' ? `Pay ETB ${total.toLocaleString()}` : 'Continue'}<ArrowRight className="w-4 h-4" strokeWidth={2} />
+              {step === 'payment' ? `Pay ${Money.fromMinor(total, "ETB").format()}` : 'Continue'}<ArrowRight className="w-4 h-4" strokeWidth={2} />
             </AppButton>
           </div>
         )}

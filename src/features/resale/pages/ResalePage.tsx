@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Money } from '@/lib/money';
 import { useTheme } from '@/app/components/ThemeContext';
 import {
   Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft,
@@ -8,7 +9,8 @@ import {
 } from 'lucide-react';
 import { ResaleEventCard } from '@/features/resale/components/ResaleEventCard';
 import type { Event, ResaleListing, UserTicket } from '@/types';
-import { resaleService, resaleKeys } from '@/services/resale.service';
+import { resaleModule } from '@/lib/resale';
+import { MOCK_CURRENT_USER } from '@/lib/mock/current-user';
 import { FilterPanel } from '@/features/resale/components/FilterPanel';
 import { ListingDetailSheet } from '@/features/resale/components/ListingDetailSheet';
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
@@ -16,8 +18,8 @@ import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSh
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
 import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
 import { PayoutMethodsSheet, PAYOUT_PROVIDERS } from '@/features/resale/components/PayoutMethodsSheet';
-import { payoutService, payoutKeys } from '@/services/payout.service';
-import { ticketKeys } from '@/services/tickets.service';
+import { payoutService, payoutKeys } from '@/lib/payout';
+import { ticketKeys } from '@/lib/tickets';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -27,9 +29,6 @@ interface ResaleMarketplaceProps {
   userTickets: UserTicket[];
   initialListTicket?: UserTicket | null;
 }
-
-/* ─── Mock listings ─── */
-const MOCK_LISTINGS: ResaleListing[] = resaleService.initialListings;
 
 /* ═══════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -43,13 +42,16 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const [listingTicket, setListingTicket] = useState<UserTicket | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'priceAsc' | 'priceDesc'>('recent');
-  const [myListings, setMyListings] = useState<{ ticket: UserTicket; price: number; id: string }[]>([]);
   const [selectedEventName, setSelectedEventName] = useState<string | null>(null);
   const [showListingSuccess, setShowListingSuccess] = useState(false);
-  const [successListing, setSuccessListing] = useState<{ ticket: UserTicket; price: number; id: string } | null>(null);
+  const [successListing, setSuccessListing] = useState<ResaleListing | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [removedFlashId, setRemovedFlashId] = useState<string | null>(null);
   const [showPayoutSheet, setShowPayoutSheet] = useState(false);
+  // Browse + my-listings read through the Resale module (mirrors the backend's
+  // Pundit scope: active OR seller_user_id == current user). No page-local state.
+  const { data: browseListings = [] } = useQuery({ queryKey: resaleModule.keys.all, queryFn: () => resaleModule.fetchListings(MOCK_CURRENT_USER.id) });
+  const { data: myListings = [] } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings(MOCK_CURRENT_USER.id) });
   const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
   const defaultPayout = payoutMethods.find(m => m.isDefault) ?? payoutMethods[0];
   const [showFilters, setShowFilters] = useState(false);
@@ -61,25 +63,28 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const matchesFilters = (l: ResaleListing) => {
     if (typeFilter !== 'all' && l.ticketType !== typeFilter) return false;
     if (verifiedOnly && !l.verified) return false;
-    if (priceFilter === 'belowFace' && l.askingPrice >= l.originalPrice) return false;
-    if (priceFilter === 'atFace' && l.askingPrice !== l.originalPrice) return false;
-    if (priceFilter === 'aboveFace' && l.askingPrice <= l.originalPrice) return false;
+    if (priceFilter === 'belowFace' && l.askingPriceMinor >= l.originalPriceMinor) return false;
+    if (priceFilter === 'atFace' && l.askingPriceMinor !== l.originalPriceMinor) return false;
+    if (priceFilter === 'aboveFace' && l.askingPriceMinor <= l.originalPriceMinor) return false;
     return true;
   };
   const resetFilters = () => { setTypeFilter('all'); setVerifiedOnly(false); setPriceFilter('any'); };
   const createListingMutation = useMutation({
     mutationKey: ['resale', 'createListing'],
-    mutationFn: ({ ticket, price }: { ticket: UserTicket; price: number }) => resaleService.createListing(ticket, price),
+    mutationFn: ({ ticket, price }: { ticket: UserTicket; price: number }) =>
+      resaleModule.createListing(ticket, Math.round(price * 100)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
-      queryClient.invalidateQueries({ queryKey: resaleKeys.all });
+      queryClient.invalidateQueries({ queryKey: resaleModule.keys.all });
+      queryClient.invalidateQueries({ queryKey: resaleModule.keys.myListings });
     },
   });
   const removeListingMutation = useMutation({
     mutationKey: ['resale', 'removeListing'],
-    mutationFn: resaleService.removeListing,
+    mutationFn: (listingId: string) => resaleModule.cancelListing(listingId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: resaleKeys.all });
+      queryClient.invalidateQueries({ queryKey: resaleModule.keys.all });
+      queryClient.invalidateQueries({ queryKey: resaleModule.keys.myListings });
     },
   });
 
@@ -102,7 +107,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     return () => { document.body.style.overflow = ''; };
   }, [selectedListing, showListSheet]);
 
-  // Aggregate listings by eventName into event groups
+  // Group browse listings by eventName (mirrors the browse view's "Events with Resale").
   const eventGroups = (() => {
     const map = new Map<string, {
       eventName: string;
@@ -117,31 +122,31 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
       hasVerified: boolean;
       listings: ResaleListing[];
     }>();
-    // for (const l of MOCK_LISTINGS.filter(matchesFilters)) {
-    //   const g = map.get(l.eventName);
-    //   if (g) {
-    //     g.count += 1;
-    //     g.minPrice = Math.min(g.minPrice, l.askingPrice);
-    //     g.maxPrice = Math.max(g.maxPrice, l.askingPrice);
-    //     g.hasVIP = g.hasVIP || l.ticketType === 'VIP';
-    //     g.hasVerified = g.hasVerified || l.verified;
-    //     g.listings.push(l);
-    //   } else {
-    //     map.set(l.eventName, {
-    //       eventName: l.eventName,
-    //       eventDate: l.eventDate,
-    //       eventTime: l.eventTime,
-    //       venue: l.venue,
-    //       image: l.image,
-    //       count: 1,
-    //       minPrice: l.askingPrice,
-    //       maxPrice: l.askingPrice,
-    //       hasVIP: l.ticketType === 'VIP',
-    //       hasVerified: l.verified,
-    //       listings: [l],
-    //     });
-    //   }
-    // }
+    for (const l of browseListings.filter(matchesFilters)) {
+      const g = map.get(l.eventName);
+      if (g) {
+        g.count += 1;
+        g.minPrice = Math.min(g.minPrice, l.askingPriceMinor);
+        g.maxPrice = Math.max(g.maxPrice, l.askingPriceMinor);
+        g.hasVIP = g.hasVIP || l.ticketType === 'VIP';
+        g.hasVerified = g.hasVerified || l.verified;
+        g.listings.push(l);
+      } else {
+        map.set(l.eventName, {
+          eventName: l.eventName,
+          eventDate: l.eventDate,
+          eventTime: l.eventTime,
+          venue: l.venue,
+          image: l.image,
+          count: 1,
+          minPrice: l.askingPriceMinor,
+          maxPrice: l.askingPriceMinor,
+          hasVIP: l.ticketType === 'VIP',
+          hasVerified: l.verified,
+          listings: [l],
+        });
+      }
+    }
     return Array.from(map.values()).filter(g =>
       g.eventName.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -149,7 +154,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
 
   const selectedGroup = selectedEventName
     ? (() => {
-        const all = MOCK_LISTINGS.filter(l => l.eventName === selectedEventName);
+        const all = browseListings.filter(l => l.eventName === selectedEventName);
         if (!all.length) return null;
         const first = all[0];
         return {
@@ -159,8 +164,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
           venue: first.venue,
           image: first.image,
           count: all.length,
-          minPrice: Math.min(...all.map(l => l.askingPrice)),
-          maxPrice: Math.max(...all.map(l => l.askingPrice)),
+          minPrice: Math.min(...all.map(l => l.askingPriceMinor)),
+          maxPrice: Math.max(...all.map(l => l.askingPriceMinor)),
           hasVIP: all.some(l => l.ticketType === 'VIP'),
           hasVerified: all.some(l => l.verified),
           listings: all,
@@ -169,8 +174,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     : null;
   const eventListings = selectedGroup
     ? [...selectedGroup.listings].filter(matchesFilters).sort((a, b) => {
-        if (sortBy === 'priceAsc') return a.askingPrice - b.askingPrice;
-        if (sortBy === 'priceDesc') return b.askingPrice - a.askingPrice;
+        if (sortBy === 'priceAsc') return a.askingPriceMinor - b.askingPriceMinor;
+        if (sortBy === 'priceDesc') return b.askingPriceMinor - a.askingPriceMinor;
         return 0;
       })
     : [];
@@ -187,9 +192,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
       { ticket, price },
       {
         onSuccess: (listing) => {
-          setMyListings(prev => [...prev, { ticket, price, id: listing.id }]);
           setShowListSheet(false);
-          setSuccessListing({ ticket, price, id: listing.id });
+          setSuccessListing(listing);
           setListingTicket(null);
           setShowListingSuccess(true);
           // Keep the confirmation open so the seller can share their listing before continuing.
@@ -211,7 +215,6 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     setRemovedFlashId(id);
     setTimeout(() => {
       removeListingMutation.mutate(id);
-      setMyListings(prev => prev.filter(l => l.id !== id));
       setRemovedFlashId(null);
     }, 400);
   };
@@ -367,7 +370,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                         city: '',
                         image: group.image,
                         category: group.hasVIP ? 'Resale · VIP' : 'Resale',
-                        priceFrom: group.minPrice,
+                        priceFromMinor: group.minPrice,
                         currency: "ETB",
                         ticketsLeft: group.count,
                       };
@@ -512,9 +515,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                     {/* Flat sales list */}
                     <div className="flex flex-col gap-2">
                       {eventListings.map((listing, index) => {
-                        const above = listing.askingPrice > listing.originalPrice;
-                        const below = listing.askingPrice < listing.originalPrice;
-                        const deltaPct = Math.round(Math.abs(listing.askingPrice - listing.originalPrice) / listing.originalPrice * 100);
+                        const above = listing.askingPriceMinor > listing.originalPriceMinor;
+                        const below = listing.askingPriceMinor < listing.originalPriceMinor;
+                        const deltaPct = Math.round(Math.abs(listing.askingPriceMinor - listing.originalPriceMinor) / listing.originalPriceMinor * 100);
                         const isVIP = listing.ticketType === 'VIP';
                         const accent = isDark ? '#d6f905' : '#0a0a0a';
                         return (
@@ -553,7 +556,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                               </p>
                               <p className="text-[11px] leading-none"
                                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-                                Face value · ETB {listing.originalPrice.toLocaleString()}
+                                Face value · {Money.fromMinor(listing.originalPriceMinor, "ETB").format()}
                               </p>
                             </div>
 
@@ -561,7 +564,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                             <div className="flex-shrink-0 text-right">
                               <p className="text-[18px] font-light leading-none tracking-[-0.3px]"
                                 style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#0a0a0a' }}>
-                                {listing.askingPrice.toLocaleString()}
+                                {Money.fromMinor(listing.askingPriceMinor, "ETB").format()}
                                 <span className="text-[10px] ml-1 tracking-[1px]"
                                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
                                   ETB
@@ -642,16 +645,16 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                         </div>
                       )}
                       <div className="flex items-center gap-3 min-w-0">
-                        {listing.ticket.image && (
-                          <img src={listing.ticket.image} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                        {listing.image && (
+                          <img src={listing.image} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
                         )}
                         <div className="min-w-0">
                           <p className="text-[13px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                            {listing.ticket.eventName}
+                            {listing.eventName}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}>
-                              ETB {listing.price.toLocaleString()}
+                              {Money.fromMinor(listing.askingPriceMinor, listing.currency).format()}
                             </p>
                             <span className="text-[9px] tracking-[1px] uppercase px-1.5 py-0.5 rounded-full"
                               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, background: 'rgba(34,197,94,0.12)', color: '#16a34a' }}>
@@ -778,8 +781,18 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
       <AnimatePresence>
         {showListingSuccess && successListing && (
           <ListingSuccessOverlay
-            ticket={successListing.ticket}
-            price={successListing.price}
+            ticket={successListing.ticket ?? {
+              id: successListing.id,
+              eventName: successListing.eventName,
+              eventDate: successListing.eventDate,
+              eventTime: successListing.eventTime,
+              venue: successListing.venue,
+              ticketType: successListing.ticketType,
+              qrCode: '',
+              purchased: new Date().toISOString(),
+              image: successListing.image,
+            }}
+            price={successListing.askingPriceMinor}
             listingId={successListing.id}
             isDark={isDark}
             onClose={() => { setShowListingSuccess(false); setActiveTab('myListings'); }}

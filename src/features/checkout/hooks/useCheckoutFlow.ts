@@ -1,14 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { promoService } from '@/services/promo.service';
-import { checkoutService } from '@/services/checkout.service';
-import { ticketKeys } from '@/services/tickets.service';
+import { promoService } from '@/lib/promo';
+import { ticketsService } from '@/lib/tickets';
+import { orderModule, type OrderQuote } from '@/lib/order';
 import type { AppliedPromo, CheckoutStep, ContactDetails, CustomQuestion, EventProduct, PaymentMethod, SeatMapConfig, SelectedEventProduct, SelectedSeat } from '@/types';
 
 
 export type { AppliedPromo, CheckoutStep, ContactDetails, PaymentMethod };
 
-const SERVICE_FEE_RATE = 0.05;
 const MAX_SEATS = 8;
 
 /** Sections available for the chosen tier: those matching its name, else all. */
@@ -60,20 +59,51 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
   const queryClient = useQueryClient();
   const completeCheckoutMutation = useMutation({
     mutationKey: ['checkout', 'complete'],
-    mutationFn: checkoutService.completeOrder,
+    mutationFn: async ({ quoteToken, eventId, payMethod }: { quoteToken?: string; eventId?: string; payMethod: PaymentMethod }) => {
+      // Mirror the backend order pipeline: create order from the quote token, then
+      // start a payment attempt. The backend charges total_minor server-side.
+      const order = await orderModule.createOrder({ eventId, quoteToken: quoteToken ?? '' });
+      await orderModule.startPayment({ orderId: order.id, provider: 'chapa', paymentMethod: payMethod });
+      return order;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+      queryClient.invalidateQueries({ queryKey: ['tickets', 'user'] });
     },
   });
 
   const promoCode = promoApplied?.code;
-  const discountAmount = promoApplied ? promoApplied.type === 'percent' ? Math.round(basePrice * promoApplied.discount / 100) : promoApplied.discount : 0;
-  const addOnsSubtotal = addOns.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const subtotal = basePrice * quantity + addOnsSubtotal;
-  const discountTotal = discountAmount * quantity;
-  const afterDiscount = Math.max(0, subtotal - discountTotal);
-  const serviceFee = Math.round(afterDiscount * SERVICE_FEE_RATE);
-  const total = afterDiscount + serviceFee;
+
+  // Backend-authoritative money: the quote (orderModule.quote) computes subtotal,
+  // discount, buyer fee, and total — the frontend only displays what it returns.
+  // Mock body is swappable for POST /events/:event_id/order_quotes in Phase 3.
+  const quoteInput = useMemo(() => {
+    const ticketLine = { eventProductId: `ticket:${ticketType}`, quantity, unitPriceMinor: basePrice };
+    const addOnLines = addOns
+      .filter((a) => a.quantity > 0)
+      .map((a) => ({ eventProductId: a.productId, quantity: a.quantity, unitPriceMinor: a.unitPrice }));
+    return { eventId, items: [ticketLine, ...addOnLines], chargeCurrency: "ETB", promotionCode: promoCode ?? undefined };
+  }, [eventId, ticketType, quantity, addOns, promoCode, basePrice]);
+
+  const [quote, setQuote] = useState<OrderQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    setQuoteLoading(true);
+    orderModule.quote(quoteInput).then((q) => {
+      if (!alive) return;
+      setQuote(q);
+      setQuoteLoading(false);
+    });
+    return () => { alive = false; };
+  }, [quoteInput]);
+
+  // Display-only money (cents) from the server quote. 0 while loading.
+  const subtotal = quote?.subtotal_minor ?? 0;
+  const discountTotal = quote?.discount_minor ?? 0;
+  const discountAmount = Math.round((discountTotal / Math.max(1, quantity)) / 100) * 100;
+  const serviceFee = quote?.buyer_fee_total ?? 0;
+  const total = quote?.total_minor ?? 0;
+  const quoteToken = quote?.quote_token;
 
   const hasExtras = products.length > 0;
   const steps = useMemo<{ id: CheckoutStep; label: string }[]>(() => [
@@ -113,7 +143,30 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
     questions.forEach((q) => { if (!q.required) return; const v = answers[q.id]; if (q.type === 'checkbox') { if (!Array.isArray(v) || v.length === 0) qe[q.id] = 'Please select at least one option'; } else if (typeof v !== 'string' || v.trim() === '') qe[q.id] = 'This field is required'; });
     setQuestionErrors(qe); return Object.keys(qe).length === 0;
   };
-  const goNext = () => { if (step === 'seat') setStep('review'); else if (step === 'review') setStep(hasExtras ? 'extras' : 'details'); else if (step === 'extras') setStep('details'); else if (step === 'details') { if (validateDetails()) setStep(hasQuestions ? 'questions' : 'payment'); } else if (step === 'questions') { if (validateQuestions()) setStep('payment'); } else if (step === 'payment') { const order = checkoutService.createOrder({ eventId, ticketType, basePrice, quantity, seats: hasSeats ? selectedSeats : undefined, promoApplied, contactDetails, answers, addOns, customQuestions: questions, answerEditWindowHours, paymentMethod: payMethod, subtotal, discountAmount, discountTotal, serviceFee, total }); setStep('processing'); completeCheckoutMutation.mutate(order, { onSettled: () => setStep('success') }); } };
+  const goNext = () => { if (step === 'seat') setStep('review'); else if (step === 'review') setStep(hasExtras ? 'extras' : 'details'); else if (step === 'extras') setStep('details'); else if (step === 'details') { if (validateDetails()) setStep(hasQuestions ? 'questions' : 'payment'); } else if (step === 'questions') { if (validateQuestions()) setStep('payment'); } else if (step === 'payment') { setStep('processing'); completeCheckoutMutation.mutate(
+        { quoteToken, eventId, payMethod },
+        {
+          onSuccess: (order) => {
+            // MOCK-ONLY wallet effect (ADR-0003): the backend issues tickets after
+            // payment via Ticketing::Packages::Issue; the frontend reads them from a
+            // future GET /tickets. Until then, mirror the issued tickets locally so
+            // My Tickets renders. Deleted at Phase 3.
+            ticketsService.issueTicketsForOrder({
+              id: order.id,
+              eventId,
+              ticketType,
+              quantity,
+              seats: hasSeats ? selectedSeats : undefined,
+              addOns,
+              answers,
+              customQuestions: questions,
+              answerEditWindowHours,
+              completedAt: new Date().toISOString(),
+            });
+            setStep('success');
+          },
+        },
+      ); } };
   const goBack = () => { if (step === 'review') { if (hasSeats) setStep('seat'); else onClose(); } else if (step === 'extras') setStep('review'); else if (step === 'details') setStep(hasExtras ? 'extras' : 'review'); else if (step === 'questions') setStep('details'); else if (step === 'payment') setStep(hasQuestions ? 'questions' : 'details'); else onClose(); };
   const toggleSeat = (seat: SelectedSeat) => {
     setSelectedSeats((prev) => {
@@ -128,5 +181,5 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
     return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
   }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc]);
 
-  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns };
+  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading };
 }

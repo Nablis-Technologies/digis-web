@@ -1,13 +1,32 @@
-import { getEventImage } from "@/lib/utils/eventImages";
+﻿import { getEventImage } from "@/lib/utils/eventImages";
 import { EVENTS } from "@/lib/mock/events";
-import { resaleService } from "@/services/resale.service";
-import type { CompletedCheckoutOrder } from "@/services/checkout.service";
+import { apiFetch } from "@/lib/api";
+import { isoToDisplayDate, isoToDisplayTime } from "@/lib/mappers";
+import { resaleModule } from "@/lib/resale";
 import type { CheckoutAnswers } from "@/types/checkout";
 import type {
   ListForResaleResult,
   TicketActionResult,
   UserTicket,
 } from "@/types/ticket";
+
+/**
+ * Minimal shape issueTicketsForOrder needs. NOT the backend Order wire type —
+ * this is the mock wallet side-effect input (ADR-0003: tickets are issued
+ * server-side after payment; the frontend reads them from a future GET /tickets).
+ */
+export interface IssuableOrder {
+  id: string;
+  eventId?: string;
+  ticketType: string;
+  quantity: number;
+  seats?: import("@/types/event").SelectedSeat[];
+  addOns?: import("@/types/event").SelectedEventProduct[];
+  answers?: CheckoutAnswers;
+  customQuestions?: import("@/types/checkout").CustomQuestion[];
+  answerEditWindowHours?: number | null;
+  completedAt: string;
+}
 
 /** Mock fixtures are dated relative to today so the Upcoming tab is never empty. */
 const inDays = (days: number) =>
@@ -125,7 +144,7 @@ const MOCK_USER_TICKETS: UserTicket[] = [
         productId: "av-tee",
         type: "merchandise",
         name: "Festival tee",
-        unitPrice: 850,
+        unitPrice: 85000,
         quantity: 2,
       },
     ],
@@ -175,14 +194,14 @@ const MOCK_USER_TICKETS: UserTicket[] = [
         productId: "esk-table",
         type: "other",
         name: "Table service · 4 seats",
-        unitPrice: 6000,
+        unitPrice: 600000,
         quantity: 1,
       },
       {
         productId: "esk-valet",
         type: "parking",
         name: "Valet parking",
-        unitPrice: 400,
+        unitPrice: 40000,
         quantity: 1,
       },
     ],
@@ -258,21 +277,21 @@ const MOCK_USER_TICKETS: UserTicket[] = [
         productId: "c2c-tent",
         type: "other",
         name: "Two-person tent rental",
-        unitPrice: 1800,
+        unitPrice: 180000,
         quantity: 1,
       },
       {
         productId: "c2c-meals",
         type: "food",
         name: "Full board meal plan",
-        unitPrice: 2400,
+        unitPrice: 240000,
         quantity: 1,
       },
       {
         productId: "c2c-shuttle",
         type: "other",
         name: "Round-trip shuttle seat",
-        unitPrice: 1500,
+        unitPrice: 150000,
         quantity: 2,
       },
     ],
@@ -295,14 +314,14 @@ const MOCK_USER_TICKETS: UserTicket[] = [
         productId: "tse-workshop",
         type: "digital_addon",
         name: "Workshop track access",
-        unitPrice: 1200,
+        unitPrice: 120000,
         quantity: 1,
       },
       {
         productId: "tse-lunch",
         type: "food",
         name: "Two-day lunch pass",
-        unitPrice: 900,
+        unitPrice: 90000,
         quantity: 1,
       },
     ],
@@ -324,14 +343,14 @@ const MOCK_USER_TICKETS: UserTicket[] = [
         productId: "cae-catalogue",
         type: "merchandise",
         name: "Printed exhibition catalogue",
-        unitPrice: 650,
+        unitPrice: 65000,
         quantity: 1,
       },
       {
         productId: "cae-fund",
         type: "donation",
         name: "Support emerging artists",
-        unitPrice: 300,
+        unitPrice: 30000,
         quantity: 1,
       },
     ],
@@ -354,14 +373,83 @@ function editDeadline(
   ).toISOString();
 }
 
+/**
+ * Backend wire shape — Ticketing::TicketWalletSerializer (GET /tickets).
+ * `qr_token` is only present for the caller's own ACTIVE tickets.
+ */
+export interface TicketWalletWire {
+  id: string;
+  status: string;
+  unit_number: number;
+  admissions_per_unit_snapshot: number;
+  credential_mode: string;
+  event: { id: string; slug: string; title: string; timezone: string; currency: string };
+  product: { id: string; name: string; type: string };
+  ticket_type: { id: string; admissions_per_unit: number; entry_validation_mode: string } | null;
+  event_dates: {
+    id: string;
+    name: string | null;
+    starts_at: string;
+    ends_at: string | null;
+    status: string;
+    venue: { id: string; name: string; city: string } | null;
+  }[];
+  admission_slots: { id: string; position: number; assignment_status: string }[];
+  credentials: {
+    id: string;
+    admission_slot_id: string | null;
+    entry_limit: number | null;
+    status: string;
+    issued_at: string;
+    lookup_code: string | null;
+    qr_token: string | null;
+  }[];
+}
+
+/** Map the wallet wire projection onto the UI's UserTicket shape. */
+export function mapWalletTicket(w: TicketWalletWire): UserTicket {
+  const firstCredential = w.credentials[0];
+  const firstDate = w.event_dates[0];
+  return {
+    id: w.id,
+    eventId: w.event.id,
+    eventName: w.event.title,
+    eventDate: isoToDisplayDate(firstDate?.starts_at),
+    eventTime: isoToDisplayTime(firstDate?.starts_at),
+    venue: firstDate?.venue?.name ?? "",
+    ticketType: w.product.name,
+    // QR secret is delivered only for active tickets — never render a fake code.
+    qrCode: w.status === "active" ? (firstCredential?.qr_token ?? "") : "",
+    purchased: isoToDisplayDate(firstCredential?.issued_at ?? firstDate?.starts_at),
+  };
+}
+
 export const ticketsService = {
-  async fetchUserTickets(): Promise<UserTicket[]> {
-    return userTickets;
+  /**
+   * Reset the store to its seed state — mirrors the backend's wipable,
+   * re-seedable Postgres state. Tests and dev reloads call this for a clean slate.
+   */
+  resetToSeed(): void {
+    userTickets.length = 0;
+    userTickets.push(...MOCK_USER_TICKETS.map((t) => ({ ...t, addOns: t.addOns ? [...t.addOns] : undefined })));
   },
 
-  /** Called only after a successful payment; one ticket is created per purchased quantity. */
+  /**
+   * GET /tickets — the real owner wallet (Ticketing::TicketsController#index,
+   * TicketWalletSerializer). This replaces the mock read path (ADR-0003): the
+   * wallet now renders exactly what the backend says the user owns — an empty
+   * list until tickets are actually issued. Unauthenticated callers surface as
+   * an empty wallet (401 → the router's `= []` default).
+   */
+  async fetchUserTickets(): Promise<UserTicket[]> {
+    const { data } = await apiFetch<TicketWalletWire[]>("tickets");
+    return (data ?? []).map(mapWalletTicket);
+  },
+
+  /** MOCK wallet side-effect (ADR-0003): mirror the tickets the backend issues
+   *  after payment. Deleted at Phase 3 when GET /tickets lands. */
   issueTicketsForOrder(
-    order: CompletedCheckoutOrder,
+    order: IssuableOrder,
   ): UserTicket[] {
     const slug = (name: string) =>
       name
@@ -511,7 +599,7 @@ export const ticketsService = {
     ticketId: UserTicket["id"],
     price: number,
   ): Promise<ListForResaleResult> {
-    return resaleService.createTicketListingReference(
+    return resaleModule.createTicketListingReference(
       ticketId,
       price,
     );
