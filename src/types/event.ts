@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement } from "react";
 import type { CustomQuestion } from "./checkout";
 
 
@@ -25,7 +25,7 @@ export interface SelectedEventProduct {
 }
 
 export interface TicketTierFeature {
-  icon?: ReactNode;
+  icon?: ReactElement;
   text: string;
 }
 
@@ -33,6 +33,9 @@ export interface TicketTier {
   /** Backend Catalog::EventProduct id when the tier came from the live
    *  products endpoint — this is what order_quotes consumes. Mock tiers omit it. */
   id?: string;
+  /** Backend Ticketing::TicketType id (nested in the product payload) —
+   *  consent_requirements + registration submit address this id. Mock tiers omit it. */
+  ticketTypeId?: string;
   name: string;
   level: string;
   /** Integer cents (backend `*_minor`). */
@@ -46,6 +49,10 @@ export interface TicketTier {
   totalCapacity?: number;
   isCouples?: boolean;
   seats?: number;
+  /** Rank-based presentation accent (cheapest→emerald, priciest→gold).
+   *  Absent for single-tier events and unknown callers — falls back to the
+   *  semantic flags below. */
+  accent?: 'emerald' | 'rose' | 'violet' | 'gold' | 'blue';
   isPremium?: boolean;
   isElite?: boolean;
   /** Ids of EventProducts bundled into this tier — pre-selected (and free) at checkout. */
@@ -139,6 +146,11 @@ export interface Event {
   venue: string;
   city: string;
   image: string;
+  /**
+   * Small (200px) cover variant for grid cards. `image` stays the 800px
+   * medium for hero/detail. Absent for mock events (they use `image`).
+   */
+  imageThumb?: string;
   images?: string[];
   /** Short marketing blurb shown on the event detail page. */
   description?: string;
@@ -156,7 +168,8 @@ export interface Event {
   /** Lowest starting price in integer cents (backend `*_minor`). */
   priceFromMinor: number;
   currency: "ETB";
-  ticketsLeft: number;
+  /** Backend `config.tickets_left` — 0 when unserved until the serializer expands. */
+  ticketsLeft?: number;
   ticketTypes?: TicketTier[];
   /** Purchasable event extras such as parking, merchandise, food, or digital access. */
   products?: EventProduct[];

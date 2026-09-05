@@ -1,61 +1,78 @@
 @font-face {
   font-family: 'Zalando Sans Expanded';
   font-weight: 300;
+  font-display: swap;
   src: url('/fonts/zalando-300.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Zalando Sans Expanded';
   font-weight: 400;
+  font-display: swap;
   src: url('/fonts/zalando-400.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Zalando Sans Expanded';
   font-weight: 500;
+  font-display: swap;
   src: url('/fonts/zalando-500.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Zalando Sans Expanded';
   font-weight: 600;
+  font-display: swap;
   src: url('/fonts/zalando-600.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Zalando Sans Expanded';
   font-weight: 700;
+  font-display: swap;
   src: url('/fonts/zalando-700.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Zalando Sans Expanded';
   font-weight: 800;
+  font-display: swap;
   src: url('/fonts/zalando-800.ttf') format('truetype');
 }
 
 @font-face {
   font-family: 'Inter';
   font-weight: 300;
+  font-display: swap;
   src: url('/fonts/inter-300.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Inter';
   font-weight: 400;
+  font-display: swap;
   src: url('/fonts/inter-400.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Inter';
   font-weight: 500;
+  font-display: swap;
   src: url('/fonts/inter-500.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Inter';
   font-weight: 600;
+  font-display: swap;
   src: url('/fonts/inter-600.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Inter';
   font-weight: 700;
+  font-display: swap;
   src: url('/fonts/inter-700.ttf') format('truetype');
 }
 
 :root {
   --font-display: 'Zalando Sans Expanded', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Register with Tailwind v4 so `font-display` / `font-sans` utilities work. */
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Zalando Sans Expanded', system-ui, sans-serif;
 }
