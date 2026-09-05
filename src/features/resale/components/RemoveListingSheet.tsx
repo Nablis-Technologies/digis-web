@@ -2,8 +2,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket } from 'lucide-react';
-import type { ResaleListing, UserTicket } from '@/types';
+import type { ResaleListing } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
 
 export function RemoveListingSheet({
   listing,
@@ -12,7 +13,7 @@ export function RemoveListingSheet({
   onConfirm,
   removing = false,
 }: {
-  listing: { ticket: UserTicket; price: number; id: string };
+  listing: ResaleListing;
   isDark: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -79,17 +80,17 @@ export function RemoveListingSheet({
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}`,
             }}>
-            {listing.ticket.image && (
+            {listing.ticket?.image && (
               <img src={listing.ticket.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
             )}
             <div className="min-w-0">
               <p className="text-[13px] font-medium truncate"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                {listing.ticket.eventName}
+                {listing.ticket?.eventName ?? listing.eventName}
               </p>
               <p className="text-[12px] mt-0.5"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
-                {listing.ticket.eventDate} · ETB {listing.price.toLocaleString()}
+                {listing.ticket?.eventDate ?? listing.eventDate} · {Money.fromMinor(listing.askingPriceMinor, "ETB").format()}
               </p>
               <div className="flex items-center gap-1 mt-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-400" />

@@ -17,7 +17,7 @@
  * because the backend does not return them yet (BACKEND_GAPS.md #4).
  */
 
-import { orderModule, type CheckoutOrder } from "@/lib/order";
+import type { CheckoutOrder } from "@/lib/order";
 import { RESALE_FEE_BPS, type ResaleListing, type ResaleListingWire } from "@/types/resale";
 import type { UserTicket } from "@/types/ticket";
 import { getEventImage } from "@/lib/utils/eventImages";
@@ -133,12 +133,35 @@ export const resaleModule = {
   /**
    * Mirror POST /resale_listings/:id/purchase — returns an Orders::OrderSerializer
    * (pending_payment). The buyer then pays via orderModule.startPayment, exactly
-   * like checkout. MOCK: returns a backend-shaped pending order.
+   * like checkout. MOCK (marketplace data is not wired to the backend yet, see
+   * BACKEND_GAPS.md #4): returns a backend-shaped pending order locally. It
+   * must NOT call orderModule.createOrder — that posts to the real backend and
+   * requires a real quote token.
    */
   async purchaseListing(listingId: string): Promise<CheckoutOrder> {
     const listing = resaleListings.get(listingId);
     if (!listing) throw new Error('Listing not found');
-    return orderModule.createOrder({ eventId: listing.event_id, quoteToken: `mock_quote_${listingId}` });
+    const now = new Date().toISOString();
+    return {
+      id: `mock-resale-order-${listingId}`,
+      event_id: listing.event_id,
+      status: 'pending_payment',
+      sales_channel: 'resale',
+      charge_currency: listing.currency,
+      subtotal_minor: listing.asking_amount_minor,
+      discount_minor: 0,
+      subsidy_minor: 0,
+      fee_minor: Math.round((listing.asking_amount_minor * listing.fee_terms.rate_bps) / 10000),
+      tax_minor: 0,
+      adjustment_minor: 0,
+      total_minor: listing.asking_amount_minor,
+      expires_at: null,
+      paid_at: null,
+      created_at: now,
+      updated_at: now,
+      items: [],
+      adjustments: [],
+    };
   },
 
   /** Convenience for the UI — converts major input to cents at the boundary. */

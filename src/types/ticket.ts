@@ -7,6 +7,8 @@ export type InviteUnlockState = {
   unlocked: boolean;
   method: 'code' | 'guestlist' | 'waitlist' | null;
   selectedTicket?: string;
+  /** The access code the buyer entered — threaded into registration as audience proof. */
+  code?: string;
 };
 
 export interface UserTicket {

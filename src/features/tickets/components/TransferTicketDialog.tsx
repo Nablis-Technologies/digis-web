@@ -39,7 +39,7 @@ interface TransferTicketProps {
   /** Uses the same in-dialog delivery flow with gift-specific language. */
   mode?: 'transfer' | 'gift';
   /** Optional extras can be included only when gifting. */
-  giftExtras?: { id: string; name: string; description: string; price: number }[];
+  giftExtras?: { id: string; name: string; description: string; priceMinor: number }[];
   onTransfer: (payload: { ticketId?: string; recipientName: string; contactMethod: ContactMethod; contactValue: string; note: string; extraIds?: string[] }) => Promise<TransferOutcome | void> | TransferOutcome | void;
 }
 

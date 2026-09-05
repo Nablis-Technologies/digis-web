@@ -7,6 +7,7 @@ import type { ResaleListing, UserTicket } from '@/types';
 import { RESALE_FEE_BPS } from '@/types/resale';
 import { payoutService, payoutKeys } from '@/lib/payout';
 import { PayoutMethodsSheet, maskAccount, ProviderLogo, PAYOUT_PROVIDERS } from './PayoutMethodsSheet';
+import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
 
 export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false }: { ticket: UserTicket; onClose: () => void; onConfirm: (price: number) => void; submitting?: boolean }) {
@@ -19,8 +20,10 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
   const platformFee = Math.round(price * RESALE_FEE_BPS / 10000);
   const youReceive = price - platformFee;
 
-  const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
-  const defaultPayout = payoutMethods.find(m => m.isDefault) ?? payoutMethods[0];
+  const { data: payoutMethods = [], isPending, isError, refetch } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
+  const showLoading = useShowSkeleton(isPending);
+  const payoutReady = !showLoading && !isError;
+  const defaultPayout = payoutReady ? payoutMethods.find(m => m.isDefault) ?? payoutMethods[0] : undefined;
   const hasPayout = !!defaultPayout;
 
   return (
@@ -172,6 +175,36 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                 </div>
 
                 {/* Payout destination */}
+                {showLoading ? (
+                  <div className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3"
+                    style={{
+                      background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
+                    }}>
+                    <Pulse className="w-10 h-10 rounded-xl flex-shrink-0" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Pulse className="h-[10px] w-20 rounded-md" />
+                      <Pulse className="h-[13px] w-32 rounded-md" />
+                    </div>
+                  </div>
+                ) : isError ? (
+                  <AppButton onClick={() => void refetch()}
+                    className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 text-left cursor-pointer"
+                    style={{
+                      background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                      border: `1px solid ${isDark ? 'rgba(229,72,77,0.25)' : 'rgba(229,72,77,0.3)'}`,
+                    }}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] tracking-[1px] uppercase mb-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                        Payout methods
+                      </p>
+                      <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#ff6b70' : '#c0392b' }}>
+                        Couldn't load — tap to retry
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }} strokeWidth={1.5} />
+                  </AppButton>
+                ) : (
                 <AppButton onClick={() => setPayoutOpen(true)}
                   className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 text-left cursor-pointer"
                   style={{
@@ -202,6 +235,7 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                   </div>
                   <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }} strokeWidth={1.5} />
                 </AppButton>
+                )}
 
                 <div className="flex items-start gap-3 mb-6 p-3 rounded-xl"
                   style={{
@@ -228,8 +262,8 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                     </span>
                   </AppButton>
                   <AppButton whileHover={hasPayout ? { scale: 1.02 } : undefined} whileTap={hasPayout ? { scale: 0.97 } : undefined}
-                    onClick={() => { if (!submitting && hasPayout) onConfirm(price); else if (!hasPayout) setPayoutOpen(true); }}
-                    disabled={submitting}
+                    onClick={() => { if (showLoading || submitting) return; if (hasPayout) onConfirm(price); else setPayoutOpen(true); }}
+                    disabled={submitting || showLoading}
                     className="flex-1 h-[56px] rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                     style={{
                       background: isDark

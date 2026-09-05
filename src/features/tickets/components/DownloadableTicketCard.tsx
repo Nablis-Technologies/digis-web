@@ -176,13 +176,12 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
           <TicketQRCode code={ticket.qrCode} size={180} />
         </div>
         <p style={{
-          fontSize: '11px',
-          fontFamily: 'monospace',
+          fontSize: '12px',
           letterSpacing: '2px',
-          color: 'rgba(255,255,255,0.4)',
+          color: 'rgba(255,255,255,0.55)',
           marginTop: '12px',
         }}>
-          {ticket.qrCode}
+          {ticket.ticketType || 'Standard'}
         </p>
       </div>
 

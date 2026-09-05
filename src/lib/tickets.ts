@@ -440,10 +440,32 @@ export const ticketsService = {
    * wallet now renders exactly what the backend says the user owns — an empty
    * list until tickets are actually issued. Unauthenticated callers surface as
    * an empty wallet (401 → the router's `= []` default).
+   *
+   * The wallet wire carries no artwork, so each distinct event's cover is
+   * resolved via the public detail endpoint (one request per event, settled —
+   * a failure falls back to the local name-matched image, never a blank).
    */
   async fetchUserTickets(): Promise<UserTicket[]> {
     const { data } = await apiFetch<TicketWalletWire[]>("tickets");
-    return (data ?? []).map(mapWalletTicket);
+    const wires = data ?? [];
+    const tickets = wires.map(mapWalletTicket);
+    const slugs = [...new Set(wires.map((w) => w.event.slug).filter(Boolean))];
+    if (slugs.length > 0) {
+      const { eventsModule } = await import("@/lib/events");
+      const covers = await Promise.allSettled(
+        slugs.map(async (slug) => ({ slug, event: await eventsModule.fetchById(slug) })),
+      );
+      const bySlug = new Map<string, string>();
+      covers.forEach((r) => {
+        if (r.status === "fulfilled" && r.value.event?.image) bySlug.set(r.value.slug, r.value.event.image);
+      });
+      tickets.forEach((t, i) => {
+        const slug = wires[i]?.event.slug;
+        const cover = (slug && bySlug.get(slug)) || getEventImage(wires[i]?.event.title ?? "") || undefined;
+        if (cover) t.image = cover;
+      });
+    }
+    return tickets;
   },
 
   /** MOCK wallet side-effect (ADR-0003): mirror the tickets the backend issues

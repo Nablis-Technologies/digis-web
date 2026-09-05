@@ -250,8 +250,8 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 style={{ fontFamily: "'Inter', sans-serif", color: '#9ca3af' }}>
                 Scan at entry
               </p>
-              <p className="text-[10px] sm:text-[11px] font-mono tracking-[1.5px] text-gray-500 break-all leading-snug">
-                {ticket.qrCode}
+              <p className="text-[13px] font-light text-gray-700 leading-snug">
+                {ticket.ticketType || 'Standard'}
               </p>
               <div className="flex items-center gap-1 mt-3 text-[10px] tracking-[1px] uppercase"
                 style={{ fontFamily: "'Inter', sans-serif", color: '#6b7280' }}>
@@ -489,7 +489,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               <div className="w-[280px] h-[280px] flex items-center justify-center">
                 <TicketQRCode code={ticket.qrCode} />
               </div>
-              <p className="text-[14px] font-mono tracking-[2px] text-gray-700 mt-6">{ticket.qrCode}</p>
+              <p className="text-[14px] font-light tracking-[1px] text-gray-700 mt-6">{ticket.ticketType || 'Standard'}</p>
               <p className="text-[11px] tracking-[1px] uppercase mt-8 text-gray-400"
                 style={{ fontFamily: "'Inter', sans-serif" }}>
                 Tap anywhere to close

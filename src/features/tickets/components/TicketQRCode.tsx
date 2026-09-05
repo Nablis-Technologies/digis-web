@@ -5,6 +5,10 @@ import QRCode from 'react-qr-code';
  * error-correction level M, so a gate scanner reads back exactly the string the
  * ticket record is keyed on. Rendered as SVG to stay crisp at any size and to
  * survive being rasterized into the downloadable ticket card.
+ *
+ * This is the ONLY place the raw token may be used: it enters the QR matrix
+ * for the scanner and must never be rendered as human-readable text anywhere
+ * (no mono token strings under the QR — show the ticket type instead).
  */
 export function TicketQRCode({ code, size }: { code: string; size?: number }) {
   const common = {

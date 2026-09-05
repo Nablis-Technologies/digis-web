@@ -5,13 +5,17 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
 import type { UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { ProfileRowSkeleton, useShowSkeleton } from '@/components/loading';
 
 interface UserProfileProps {
   tickets: UserTicket[];
   onOpenSettings?: () => void;
+  /** Wallet not yet resolved — row skeletons, not a blank section. */
+  loading?: boolean;
 }
 
-export function UserProfile({ tickets, onOpenSettings }: UserProfileProps) {
+export function UserProfile({ tickets, onOpenSettings, loading = false }: UserProfileProps) {
+  const showLoading = useShowSkeleton(loading);
   const { isDark } = useTheme();
   const { user: authUser } = useAuth();
 
@@ -322,7 +326,13 @@ export function UserProfile({ tickets, onOpenSettings }: UserProfileProps) {
           Coming Up
         </h2>
         <div className="space-y-2.5">
-          {tickets.map((ticket, index) => (
+          {showLoading ? (
+            <>
+              <ProfileRowSkeleton />
+              <ProfileRowSkeleton />
+            </>
+          ) : (
+          tickets.map((ticket, index) => (
             <motion.div key={ticket.id}
               initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.55 + index * 0.06 }}
@@ -364,7 +374,8 @@ export function UserProfile({ tickets, onOpenSettings }: UserProfileProps) {
               <ChevronRight className="w-4 h-4 flex-shrink-0"
                 style={{ color: mutedText }} strokeWidth={1.75} />
             </motion.div>
-          ))}
+          ))
+          )}
         </div>
       </div>
 

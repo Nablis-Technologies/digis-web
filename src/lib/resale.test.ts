@@ -24,11 +24,11 @@ describe('resaleModule', () => {
     expect(cancelled.status).toBe('cancelled');
   });
 
-  it('purchaseListing returns a pending_payment order (delegates to order module)', async () => {
+  it('purchaseListing returns a pending_payment resale order (mock store, no backend call)', async () => {
     const listing = await resaleModule.createListing({ id: 'tk-3', eventName: 'E3', eventDate: 'Mar 3', eventTime: '9 PM', venue: 'V', ticketType: 'GA', qrCode: 'Q', purchased: 'now' } as any, 150000);
     const order = await resaleModule.purchaseListing(listing.id);
     expect(order.status).toBe('pending_payment');
-    expect(order.sales_channel).toBe('online');
+    expect(order.sales_channel).toBe('resale');
   });
 
   it('fetchMyListings is ownership-scoped (mirrors Pundit Scope)', async () => {

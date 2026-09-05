@@ -7,6 +7,7 @@ import { X, Plus, Check, Trash2, ArrowLeft } from 'lucide-react';
 import { payoutService, payoutKeys } from '@/lib/payout';
 import type { PayoutMethod, PayoutMethodKind, AddPayoutMethodInput } from '@/types';
 import { ProviderLogo as SharedProviderLogo } from '@/components/ProviderLogo';
+import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
@@ -40,7 +41,8 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
 
-  const { data: methods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
+  const { data: methods = [], isPending, isError, refetch } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
+  const showLoading = useShowSkeleton(isPending);
 
   const addMutation = useMutation({
     mutationFn: (input: AddPayoutMethodInput) => payoutService.addMethod(input),
@@ -125,7 +127,23 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
                 isDark={isDark} text={text} muted={muted} cardBg={cardBg} cardBorder={cardBorder} />
             ) : (
               <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                {methods.length === 0 ? (
+                {showLoading ? (
+                  <div className="flex flex-col gap-2.5 mb-4">
+                    <PayoutRowSkeleton isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} />
+                    <PayoutRowSkeleton isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} />
+                  </div>
+                ) : isError ? (
+                  <div className="rounded-2xl p-4 mb-4 text-center"
+                    style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                    <p className="text-[13px] mb-3" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
+                      Couldn't load payout methods.
+                    </p>
+                    <AppButton onClick={() => void refetch()} className="cursor-pointer"
+                      style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                      Retry
+                    </AppButton>
+                  </div>
+                ) : methods.length === 0 ? (
                   <div className="rounded-2xl p-6 mb-4 text-center"
                     style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
                     <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
@@ -198,6 +216,21 @@ function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect, 
       <AppButton onClick={onRemove} aria-label={`Remove ${p.full} payout method`} className="cursor-pointer p-2.5 rounded-xl">
         <Trash2 className="w-4 h-4" style={{ color: muted }} strokeWidth={1.5} />
       </AppButton>
+    </div>
+  );
+}
+
+function PayoutRowSkeleton({ isDark, cardBg, cardBorder }: { isDark: boolean; cardBg: string; cardBorder: string }) {
+  return (
+    <div className="rounded-2xl p-1.5 flex items-center gap-1.5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      <div className="min-w-0 flex-1 flex items-center gap-3 p-2.5 rounded-xl">
+        <Pulse className="w-10 h-10 rounded-xl flex-shrink-0" />
+        <div className="flex-1 min-w-0 space-y-2">
+          <Pulse className="h-[14px] w-24 rounded-md" />
+          <Pulse className="h-[11px] w-32 rounded-md" />
+        </div>
+        <Pulse className="w-5 h-5 rounded-full flex-shrink-0" />
+      </div>
     </div>
   );
 }

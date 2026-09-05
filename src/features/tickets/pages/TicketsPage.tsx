@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
 import { TransferTicket } from '@/features/tickets/components/TransferTicketDialog';
@@ -13,6 +14,7 @@ import { AddExtrasDialog } from '@/features/tickets/components/AddExtrasDialog';
 import { useTicketGroups } from '@/features/tickets/hooks/useTicketGroups';
 import { toPng } from 'html-to-image';
 import { ticketsService, ticketKeys } from '@/lib/tickets';
+import { LoadErrorCard, TicketRowSkeleton, useShowSkeleton } from '@/components/loading';
 import { transferService } from '@/lib/transfer';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
@@ -22,9 +24,14 @@ interface TicketViewProps {
   tickets: UserTicket[];
   onListForResale?: (ticket: UserTicket) => void;
   onDiscover?: () => void;
+  /** Wallet not yet resolved — row skeletons in the card's own layout. */
+  loading?: boolean;
+  refreshing?: boolean;
+  loadError?: boolean;
+  onRetry?: () => void;
 }
 
-export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewProps) {
+export function TicketView({ tickets, onListForResale, onDiscover, loading = false, refreshing = false, loadError = false, onRetry }: TicketViewProps) {
   const [selectedTicket, setSelectedTicket] = useState<UserTicket | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [transferringTicket, setTransferringTicket] = useState<UserTicket | null>(null);
@@ -57,9 +64,33 @@ export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewP
   const extrasProducts: EventProduct[] = [];
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
+  // Just-returned-from-Chapa: the router lands here with ?ticket=<id> once the
+  // webhook-issued ticket appears. The success message already lives in the
+  // checkout sheet, so instead of a redundant banner we auto-open the new
+  // ticket's QR. The ticket may still be settling in the wallet (the return
+  // poll keeps updating it), so re-check whenever `tickets` changes.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoOpenTicketId = searchParams.get('ticket');
+  const autoOpenedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!autoOpenTicketId || autoOpenedRef.current.has(autoOpenTicketId)) return;
+    const target = tickets.find((t) => t.id === autoOpenTicketId);
+    if (!target) return; // not issued yet — the wallet poll will bring it
+    autoOpenedRef.current.add(autoOpenTicketId);
+    setSelectedTicket(target);
+    setShowQR(true);
+    setDownloadDone(false);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('ticket');
+      return next;
+    }, { replace: true });
+  }, [autoOpenTicketId, tickets, setSelectedTicket, setSearchParams]);
+
   const { upcoming, past } = useTicketGroups(tickets);
 
   const visibleTickets = tab === 'upcoming' ? upcoming : past;
+  const showLoading = useShowSkeleton(loading);
 
   const handleDownload = useCallback(async () => {
     if (!selectedTicket || !downloadRef.current) return;
@@ -99,7 +130,10 @@ export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewP
         </h1>
         <p className="text-[13px] mt-1"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}>
-          {upcoming.length} upcoming · {past.length} past
+          {showLoading ? '…' : `${upcoming.length} upcoming · ${past.length} past`}
+          {refreshing && !showLoading && (
+            <span className="ml-2 text-[11px]">Refreshing…</span>
+          )}
         </p>
       </motion.div>
 
@@ -159,6 +193,15 @@ export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewP
       </div>
 
       {/* Tickets */}
+      {loadError ? (
+        <LoadErrorCard onRetry={onRetry ?? (() => {})} />
+      ) : showLoading ? (
+        <div className="px-4 sm:px-6 lg:px-8 pt-6 space-y-6 md:grid md:grid-cols-2 md:gap-5 md:space-y-0">
+          <TicketRowSkeleton />
+          <TicketRowSkeleton />
+          <TicketRowSkeleton />
+        </div>
+      ) : (
       <div className="px-4 sm:px-6 lg:px-8 pt-6 space-y-6 md:grid md:grid-cols-2 md:gap-5 md:space-y-0">
         {visibleTickets.map((ticket, index) => (
           <motion.div
@@ -172,8 +215,9 @@ export function TicketView({ tickets, onListForResale, onDiscover }: TicketViewP
           </motion.div>
         ))}
       </div>
+      )}
 
-      {visibleTickets.length === 0 && (
+      {!showLoading && !loadError && visibleTickets.length === 0 && (
         <TicketsEmptyState tab={tab} isDark={isDark} onDiscover={onDiscover} />
       )}
 

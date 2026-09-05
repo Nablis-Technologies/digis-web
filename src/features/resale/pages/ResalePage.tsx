@@ -24,6 +24,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { EventCardSkeleton, ListingRowSkeleton, LoadErrorCard, useShowSkeleton } from '@/components/loading';
 
 interface ResaleMarketplaceProps {
   userTickets: UserTicket[];
@@ -50,8 +51,21 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const [showPayoutSheet, setShowPayoutSheet] = useState(false);
   // Browse + my-listings read through the Resale module (mirrors the backend's
   // Pundit scope: active OR seller_user_id == current user). No page-local state.
-  const { data: browseListings = [] } = useQuery({ queryKey: resaleModule.keys.all, queryFn: () => resaleModule.fetchListings(MOCK_CURRENT_USER.id) });
-  const { data: myListings = [] } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings(MOCK_CURRENT_USER.id) });
+  const {
+    data: browseListings = [],
+    isPending: browsePending,
+    isError: browseError,
+    refetch: refetchBrowse,
+  } = useQuery({ queryKey: resaleModule.keys.all, queryFn: () => resaleModule.fetchListings(MOCK_CURRENT_USER.id) });
+  const {
+    data: myListings = [],
+    isPending: myPending,
+    isError: myError,
+    refetch: refetchMine,
+  } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings(MOCK_CURRENT_USER.id) });
+  // Mock stores resolve in a tick — skeletons only appear if loading persists.
+  const showBrowseLoading = useShowSkeleton(browsePending);
+  const showMyLoading = useShowSkeleton(myPending);
   const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
   const defaultPayout = payoutMethods.find(m => m.isDefault) ?? payoutMethods[0];
   const [showFilters, setShowFilters] = useState(false);
@@ -382,7 +396,17 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                         </motion.div>
                       );
                     })}
-                    {eventGroups.length === 0 && (
+                    {browseError ? (
+                      <div className="col-span-full">
+                        <LoadErrorCard onRetry={() => void refetchBrowse()} />
+                      </div>
+                    ) : showBrowseLoading ? (
+                      <>
+                        <div className="col-span-full sm:col-span-1"><EventCardSkeleton /></div>
+                        <div className="col-span-full sm:col-span-1"><EventCardSkeleton /></div>
+                        <div className="col-span-full sm:col-span-1"><EventCardSkeleton /></div>
+                      </>
+                    ) : eventGroups.length === 0 && (
                       <div className="col-span-full">
                         <ResaleEmptyState
                           isDark={isDark}
@@ -610,7 +634,22 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
         ) : (
           <motion.div key="myListings" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
             {/* Active Listings */}
-            {myListings.length > 0 && (
+            {myError ? (
+              <div className="px-5 pt-5">
+                <LoadErrorCard onRetry={() => void refetchMine()} />
+              </div>
+            ) : showMyLoading ? (
+              <div className="px-5 pt-5">
+                <p className="text-[11px] tracking-[2px] uppercase mb-3 ml-1"
+                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                  Active Listings
+                </p>
+                <div className="space-y-3">
+                  <ListingRowSkeleton />
+                  <ListingRowSkeleton />
+                </div>
+              </div>
+            ) : myListings.length > 0 && (
               <div className="px-5 pt-5">
                 <p className="text-[11px] tracking-[2px] uppercase mb-3 ml-1"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
@@ -758,7 +797,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
               </AppButton>
             </div>
 
-            {myListings.length === 0 && (
+            {!showMyLoading && !myError && myListings.length === 0 && (
               <div className="flex flex-col items-center justify-center pt-12 text-center px-6">
                 <Sparkles className="w-6 h-6 mb-2" style={{ color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }} strokeWidth={1} />
                 <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }}>
