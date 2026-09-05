@@ -40,8 +40,11 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
   const [waitlistJoined, setWaitlistJoined] = useState(false);
 
   const tryCode = () => {
+    // The code is stored on the unlock state and threaded into registration
+    // as audience proof (the backend's Audience::Authorize consumes it).
+    // Local unlock is display-only — the server re-validates at registration.
     if (code.trim().length > 0) {
-      onUnlockChange({ unlocked: true, method: 'code' });
+      onUnlockChange({ unlocked: true, method: 'code', code: code.trim() });
       setCodeError(false);
     } else {
       setCodeError(true);

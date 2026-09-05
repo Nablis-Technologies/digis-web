@@ -526,7 +526,7 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
             <SegmentedToggle
               className="mb-3"
               value={eventsTab}
-              onValueChange={setEventsTab}
+              onValueChange={(v) => setEventsTab(v as 'upcoming' | 'past')}
               isDark={isDark}
               ariaLabel="Venue event history"
               options={(['upcoming', 'past'] as const).map((tab) => {

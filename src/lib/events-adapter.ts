@@ -10,13 +10,12 @@
  *   EventDetailSerializer: adds event_setting.config (JSONB: featured, rating,
  *                          tickets_left, seat_map, access_codes, rsvp_*, ...)
  *
- * Display gaps (backend does not return them yet — BACKEND_GAPS.md):
- *   venue {name,city}, organizer name, products. These fall back to the mock,
- *   correlated by exact title, until the backend nests them.
+ * Mock policy: the backend is the only source of truth. No mock event record
+ * is merged in by title — when the backend does not serve a field (config
+ * flags, rich seat maps), it renders as absent until the serializer expands.
  */
 
 import type { Event } from "@/types";
-import { EVENTS } from "@/lib/mock/events";
 import { isoToDisplayDate, isoToDisplayTime } from "@/lib/mappers";
 
 /* ─── Backend wire types ─── */
@@ -52,18 +51,11 @@ export interface BackendEvent {
   organization?: { id: string; name: string; slug?: string } | null;
 }
 
-/** Correlate a backend event to its mock counterpart by exact title. */
-export function findMockEvent(title: string): Event | undefined {
-  return EVENTS.find((e) => e.name === title);
-}
-
 /**
  * Map a backend event (list or detail) onto the frontend `Event` type.
- * Backend fields are the live truth; mock fills only what the backend does
- * not serve yet (config-driven flags, rich products/seat maps, foreign price).
+ * Backend fields are the live truth; absent backend data renders as absent.
  */
 export function backendEventToEvent(be: BackendEvent): Event {
-  const mock = findMockEvent(be.title);
   const config = be.event_setting?.config ?? {};
 
   const date0 = be.event_dates?.[0];
@@ -72,41 +64,38 @@ export function backendEventToEvent(be: BackendEvent): Event {
     (be.event_media ?? []).find((m) => m.type === "cover") ??
     be.event_media?.[0];
   // Active Storage serves pre-sized variants (medium 800px, thumbnail 200px),
-  // not `url` — prefer the card-sized variant.
+  // not `url`. Grid cards render ~343px wide through a per-image Rails
+  // redirect (~600ms measured), so they take the 200px thumbnail; hero and
+  // detail views take the 800px medium.
   const imageUrl = (m?: BackendMedia) =>
     m?.file?.medium ?? m?.file?.thumbnail ?? m?.file?.url;
-  const image = imageUrl(cover) ?? mock?.image ?? "";
+  const thumbUrl = (m?: BackendMedia) =>
+    m?.file?.thumbnail ?? m?.file?.medium ?? m?.file?.url;
+  const image = imageUrl(cover) ?? "";
+  const imageThumb = thumbUrl(cover);
   const gallery = (be.event_media ?? [])
     .map(imageUrl)
     .filter((u): u is string => Boolean(u));
 
-  const live: Event = {
+  return {
     id: be.id,
     slug: be.slug,
     name: be.title,
-    date: startsAt ? isoToDisplayDate(startsAt) : (mock?.date ?? ""),
-    time: startsAt ? isoToDisplayTime(startsAt) : (mock?.time ?? ""),
-    // Venue/organizer now arrive nested on the payload — mock only when absent.
-    venue: date0?.venue?.name ?? mock?.venue ?? "",
-    city: date0?.venue?.city ?? mock?.city ?? "",
-    organizer: be.organization?.name ?? mock?.organizer,
+    date: startsAt ? isoToDisplayDate(startsAt) : "",
+    time: startsAt ? isoToDisplayTime(startsAt) : "",
+    venue: date0?.venue?.name ?? "",
+    city: date0?.venue?.city ?? "",
+    organizer: be.organization?.name,
     image,
-    images: gallery.length ? gallery : mock?.images,
-    description: be.description ?? mock?.description,
-    category: be.categories?.[0]?.name ?? mock?.category ?? "",
-    priceFromMinor:
-      typeof be.price_from_minor === "number"
-        ? be.price_from_minor
-        : (mock?.priceFromMinor ?? 0),
-    currency: (be.currency as Event["currency"]) ?? mock?.currency ?? "ETB",
-    ticketsLeft: (config.tickets_left as number) ?? mock?.ticketsLeft ?? 0,
-    featured: (config.featured as boolean) ?? mock?.featured,
+    ...(imageThumb ? { imageThumb } : {}),
+    images: gallery,
+    description: be.description,
+    category: be.categories?.[0]?.name ?? "",
+    priceFromMinor: typeof be.price_from_minor === "number" ? be.price_from_minor : 0,
+    currency: (be.currency as Event["currency"]) ?? "ETB",
+    // Absent until the public serializer exposes it (BACKEND_GAPS #1) — a
+    // missing value must NOT read as sold out.
+    ...(typeof config.tickets_left === "number" ? { ticketsLeft: config.tickets_left } : {}),
+    featured: config.featured as boolean | undefined,
   };
-
-  // Carry over the rich mock-only fields (products, seat maps, RSVP,
-  // invite-only, etc.) so the detail view renders fully.
-  if (mock) {
-    return { ...mock, ...live };
-  }
-  return live;
 }

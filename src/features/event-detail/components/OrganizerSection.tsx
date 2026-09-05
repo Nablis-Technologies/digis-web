@@ -592,7 +592,7 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                 <SegmentedToggle
                   className="mb-3"
                   value={eventsTab}
-                  onValueChange={setEventsTab}
+                  onValueChange={(v) => setEventsTab(v as 'upcoming' | 'past')}
                   isDark={isDark}
                   ariaLabel="Organizer event history"
                   options={(['upcoming', 'past'] as const).map((tab) => {

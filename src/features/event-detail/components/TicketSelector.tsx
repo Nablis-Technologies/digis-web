@@ -1,5 +1,6 @@
 import type { Event, TicketTier } from '@/types';
 import { TicketTypeCard } from './TicketTypeCard';
+import { Spinner, LoadErrorCard } from '@/components/loading';
 
 export function TicketSelector({
   event,
@@ -8,6 +9,9 @@ export function TicketSelector({
   onSelectTicketType,
   isSoldOut,
   isDark,
+  loading = false,
+  loadError = false,
+  onRetry,
 }: {
   event: Event;
   ticketTypes: TicketTier[];
@@ -15,7 +19,29 @@ export function TicketSelector({
   onSelectTicketType: (ticketType: string) => void;
   isSoldOut: boolean;
   isDark: boolean;
+  /** Products not yet resolved — tier-shaped skeletons, not an empty list. */
+  loading?: boolean;
+  loadError?: boolean;
+  onRetry?: () => void;
 }) {
+  if (loadError) {
+    return <LoadErrorCard message="Tickets for this event could not be loaded." onRetry={onRetry ?? (() => {})} />;
+  }
+
+  if (loading) {
+    return (
+      <>
+        <div className="flex items-center justify-center gap-4 mb-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent" />
+          <h2 className="text-[12px] tracking-[3px] uppercase" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? 'rgba(244,255,128,0.6)' : 'rgba(0,0,0,0.55)' }}>
+            Select Your Ticket
+          </h2>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent" />
+        </div>
+        <Spinner label="Loading tickets…" />
+      </>
+    );
+  }
   return (
     <>
       {/* Section header */}

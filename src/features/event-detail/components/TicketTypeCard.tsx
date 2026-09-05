@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Check, ChevronDown, Crown, Sparkle, Sparkles, Heart, Flame } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { TicketTier, TicketTierFeature } from '@/types';
+import { resolveTierAccent } from '@/lib/tierAccents';
 import { InlineCountdown } from './InlineCountdown';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
@@ -13,29 +14,14 @@ export function TicketTypeCard({ type, selected, onSelect, index }: { type: Tick
   const isElite = type.isElite;
   const isEarlyBird = type.isEarlyBird;
   const isCouples = type.isCouples;
-  const isDark = true;
+  const isDark = pageIsDark;
   const [expanded, setExpanded] = useState(false);
 
-  // Per-tier accents — emerald early bird, rose couples, gold VIP, violet elite, blue standard
-  const accentRgb = isEarlyBird
-    ? '52, 211, 153'
-    : isCouples ? '251, 113, 133'
-    : isElite ? '196, 181, 253' : isPremium ? '250, 200, 60' : '96, 165, 250';
-  // Bright accent for dark mode; deep, high-contrast "ink" for light mode
-  const accentBright = isEarlyBird
-    ? '#34d399'
-    : isCouples ? '#fb7185'
-    : isElite ? '#c4b5fd' : isPremium ? '#fac83c' : '#60a5fa';
-  const accentInk = isEarlyBird
-    ? '#047857'
-    : isCouples ? '#be123c'
-    : isElite ? '#6d28d9' : isPremium ? '#9a6a00' : '#1d4ed8';
+  // Rank-based accent (cheapest→emerald, priciest→gold; legacy semantic flags
+  // as fallback). Dark mode uses the bright shade; light mode the adjacent ink.
+  const { rgb: accentRgb, bright: accentBright, ink: accentInk, bg: accentBg } = resolveTierAccent(type);
   const accentColor = isDark ? accentBright : accentInk;
   const mutedInk = 'rgba(0,0,0,0.55)';
-  const accentBg = isEarlyBird
-    ? 'rgba(52,211,153,0.08)'
-    : isCouples ? 'rgba(251,113,133,0.08)'
-    : isElite ? 'rgba(196,181,253,0.08)' : isPremium ? 'rgba(250,200,60,0.06)' : 'rgba(96,165,250,0.08)';
 
   const savingsPct = isEarlyBird && type.originalPriceMinor
     ? Math.round((1 - type.priceMinor / type.originalPriceMinor) * 100)

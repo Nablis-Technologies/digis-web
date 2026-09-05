@@ -23,6 +23,7 @@
  */
 
 import { apiFetch } from "@/lib/api";
+import { applyRankAccents } from "@/lib/tierAccents";
 import type { EventProduct, EventProductType, TicketTier } from "@/types";
 
 export interface BackendPriceOption {
@@ -47,7 +48,7 @@ export interface BackendProduct {
   sort_order?: number;
   price_options: BackendPriceOption[];
   available: boolean;
-  ticket_type?: { admission?: unknown } | null;
+  ticket_type?: { id?: string; admission?: unknown } | null;
 }
 
 export interface EventProducts {
@@ -95,6 +96,9 @@ function toTier(p: BackendProduct): TicketTier | null {
   if (priceMinor <= 0) return null;
   return {
     id: p.id,
+    // The nested Ticketing::TicketType id — consent_requirements and the
+    // registration submit both address it, not the product id.
+    ticketTypeId: p.ticket_type?.id ?? undefined,
     name: p.name,
     level: "GENERAL",
     priceMinor,
@@ -116,6 +120,7 @@ export async function fetchEventProducts(slug: string): Promise<EventProducts> {
     .map(toTier)
     .filter((t): t is TicketTier => t !== null)
     .sort((a, b) => a.priceMinor - b.priceMinor);
+  applyRankAccents(tiers);
   const extras = products
     .filter((p) => p.type !== "ticket")
     .map(toExtra)

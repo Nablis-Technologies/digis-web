@@ -283,20 +283,24 @@ export function FeaturedMagazine({
                   grow
                   truncate
                 />
-                <div
-                  className="w-px self-stretch my-3"
-                  style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.08)"
-                      : "rgba(0,0,0,0.07)",
-                  }}
-                />
-                <MagazineMeta
-                  label="Tickets left"
-                  value={String(hero.ticketsLeft)}
-                  isDark={isDark}
-                  valueColor={accentText}
-                />
+                {typeof hero.ticketsLeft === "number" && (
+                  <>
+                    <div
+                      className="w-px self-stretch my-3"
+                      style={{
+                        background: isDark
+                          ? "rgba(255,255,255,0.08)"
+                          : "rgba(0,0,0,0.07)",
+                      }}
+                    />
+                    <MagazineMeta
+                      label="Tickets left"
+                      value={String(hero.ticketsLeft)}
+                      isDark={isDark}
+                      valueColor={accentText}
+                    />
+                  </>
+                )}
               </div>
 
               {/* CTA */}

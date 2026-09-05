@@ -434,7 +434,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                 <SegmentedToggle
                   className="mb-3"
                   value={eventsTab}
-                  onValueChange={setEventsTab}
+                  onValueChange={(v) => setEventsTab(v as 'upcoming' | 'past')}
                   isDark={isDark}
                   ariaLabel="Artist event history"
                   options={(['upcoming', 'past'] as const).map((tab) => {

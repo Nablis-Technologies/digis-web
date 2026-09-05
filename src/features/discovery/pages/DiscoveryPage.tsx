@@ -8,6 +8,7 @@ import { FeaturedEventCard } from "@/features/discovery/components/FeaturedEvent
 import { FeaturedMagazine } from "@/features/discovery/components/FeaturedMagazine";
 import { CategoryFilter } from "@/features/discovery/components/CategoryFilter";
 import { EventGrid } from "@/features/discovery/components/EventGrid";
+import { FeaturedSkeleton, useShowSkeleton } from "@/components/loading";
 import { HeroSearch } from "@/features/discovery/components/HeroSearch";
 import {
   useEventFilter,
@@ -56,9 +57,14 @@ export function EventDiscovery({
   const { isDark } = useTheme();
 
   // Fetch events via service. No initialData/placeholderData — the mock must
-  // never appear while loading. The grid renders an empty/loading state until
-  // the backend responds.
-  const { data: events = [] } = useQuery({
+  // never appear while loading. Pending (no cache yet) renders skeletons in
+  // the real layouts; background refetches keep stale data on screen.
+  const {
+    data: events = [],
+    isPending: eventsPending,
+    isError: eventsError,
+    refetch: refetchEvents,
+  } = useQuery({
     queryKey: eventsModule.keys.all,
     queryFn: eventsModule.fetchAll,
   });
@@ -71,6 +77,8 @@ export function EventDiscovery({
     eventTypes,
     priceRange,
   });
+
+  const showLoading = useShowSkeleton(eventsPending);
 
   const activeFilterCount =
     (sortBy !== "soonest" ? 1 : 0) +
@@ -168,7 +176,12 @@ export function EventDiscovery({
         onChange={setSelectedCategory}
       />
 
-      {/* Featured Events */}
+      {/* Featured Events — skeleton hero while loading (same footprint) */}
+      {showLoading && !searchMode && !filtersActive && (
+        <div className="mb-10">
+          <FeaturedSkeleton />
+        </div>
+      )}
       {featuredEvents.length > 0 && !searchMode && !filtersActive && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -235,6 +248,9 @@ export function EventDiscovery({
         onSelectEvent={onSelectEvent}
         selectedCategory={selectedCategory}
         searchQuery={searchQuery}
+        loading={showLoading}
+        loadError={eventsError}
+        onRetry={() => void refetchEvents()}
         onReset={() => {
           setSelectedCategory("All");
           setSearchQuery("");

@@ -48,9 +48,13 @@ test.describe('event detail', () => {
     );
     await page.goto('/events/on-on');
     await expect(page.getByRole('heading', { name: 'On & On' })).toBeVisible({ timeout: 15_000 });
-    await productsResponse;
-    // Live tiers render — "General Admission" priced from the backend (600 ETB).
-    await expect(page.getByText('General Admission').first()).toBeVisible({ timeout: 15_000 });
+    const productsRes = await productsResponse;
+    // Live tiers render from the backend — assert a product name the API
+    // actually returned (don't hardcode seed names, which drift).
+    const body = await productsRes.json();
+    const products = (body?.data ?? []) as { name: string }[];
+    expect(products.length).toBeGreaterThan(0);
+    await expect(page.getByText(products[0].name).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('unknown slug redirects back to discovery', async ({ page }) => {

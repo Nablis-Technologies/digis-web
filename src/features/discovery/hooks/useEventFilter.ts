@@ -29,7 +29,11 @@ export function useEventFilter(events: Event[], options: EventFilterOptions): Ev
         const matchesCategory =
           selectedCategory === "All" ||
           event.category === selectedCategory;
-        const matchesAvailable = !onlyAvailable || (event.soldOut !== true && event.ticketsLeft > 0);
+        // Availability: only exclude when the backend explicitly reports zero
+        // left (or flags soldOut) — a missing count is not "sold out".
+        const ticketsLeft = typeof event.ticketsLeft === "number" ? event.ticketsLeft : null;
+        const matchesAvailable =
+          !onlyAvailable || (event.soldOut !== true && ticketsLeft !== 0);
         const eventAccess: EventAccessFilter = event.eventType === "rsvp"
           ? "free-rsvp"
           : event.eventType === "inviteOnly"
@@ -51,8 +55,11 @@ export function useEventFilter(events: Event[], options: EventFilterOptions): Ev
           return a.priceFromMinor - b.priceFromMinor;
         if (sortBy === "price-high")
           return b.priceFromMinor - a.priceFromMinor;
-        if (sortBy === "available")
-          return b.ticketsLeft - a.ticketsLeft;
+        if (sortBy === "available") {
+          const leftA = typeof a.ticketsLeft === "number" ? a.ticketsLeft : -1;
+          const leftB = typeof b.ticketsLeft === "number" ? b.ticketsLeft : -1;
+          return leftB - leftA;
+        }
         return (
           new Date(a.date).getTime() - new Date(b.date).getTime()
         );

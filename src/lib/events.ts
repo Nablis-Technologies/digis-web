@@ -6,11 +6,11 @@
  *
  * Backend endpoints:
  *   - GET /public/events            → EventListSerializer (expanded, ADR-0004)
- *   - GET /public/events/:slug      → EventDetailSerializer (policy-filtered,
- *                                     BACKEND_GAPS.md #1b — detail-by-slug blocked)
+ *   - GET /public/events/:slug      → EventDetailSerializer (`public_show` action,
+ *                                     full shape — BACKEND_GAPS.md #1b resolved)
  *
- * Display gaps (venue/city/organizer/products — BACKEND_GAPS.md) fall back to
- * the mock inside the adapter until the backend nests them.
+ * No mock fallback: absent backend data renders as absent (the adapter does
+ * not merge mock records).
  */
 
 import { apiFetch } from "@/lib/api";
@@ -35,8 +35,7 @@ export const eventsModule = {
     return fetchAllEvents();
   },
 
-  /** Mirror GET /public/events/:slug. Null when the backend can't serve it
-   *  (e.g. the policy-filtered detail endpoint — BACKEND_GAPS.md #1b). */
+  /** Mirror GET /public/events/:slug. Returns null when the backend can't serve it. */
   async fetchById(idOrSlug: string): Promise<Event | null> {
     try {
       const { data: be } = await apiFetch<BackendEvent>(

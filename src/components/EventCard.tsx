@@ -214,15 +214,20 @@ export function CountdownBadge({ event }: { event: Event }) {
 export function EventCard({
   event,
   onClick,
+  /** Above-the-fold cards skip lazy-loading so the first paint isn't gated. */
+  eager = false,
 }: {
   event: Event;
   onClick: () => void;
+  eager?: boolean;
 }) {
   const { rgb } = useImageColor(event.image);
   const { isDark } = useTheme();
-  const isSoldOut = event.ticketsLeft <= 0;
+  // Sold out only when the backend says so — a missing tickets_left value
+  // (config not serialized yet) must not read as zero left.
+  const isSoldOut = event.soldOut === true || event.ticketsLeft === 0;
   const isLow =
-    event.ticketsLeft > 0 && event.ticketsLeft <= 45;
+    typeof event.ticketsLeft === "number" && event.ticketsLeft > 0 && event.ticketsLeft <= 45;
   const accent = isDark ? "#d6f905" : "#d6f905";
   const accentRgb = "214,249,5";
   const priceColor = isDark ? "#d6f905" : "#0a0a0a";
@@ -255,10 +260,14 @@ export function EventCard({
         }}
       >
         <img
-          src={event.image}
+          src={event.imageThumb ?? event.image}
+          {...(event.imageThumb
+            ? { srcSet: `${event.imageThumb} 200w, ${event.image} 800w`, sizes: "(max-width: 768px) 100vw, 343px" }
+            : {})}
           alt={event.name}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
-          loading="lazy"
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : "auto"}
           decoding="async"
           style={{
             filter: isSoldOut
@@ -311,8 +320,8 @@ export function EventCard({
           </motion.div>
         )}
 
-        {/* Top-left: tickets left chip */}
-        {!isSoldOut && (
+        {/* Top-left: tickets left chip (only when the backend serves the count) */}
+        {!isSoldOut && typeof event.ticketsLeft === "number" && (
           <div className="absolute top-3 left-3 z-20">
             <motion.span
               animate={

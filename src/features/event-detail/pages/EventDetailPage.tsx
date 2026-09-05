@@ -1,5 +1,5 @@
 ﻿import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Users, Ticket as TicketIcon, Heart, Sparkle, Sparkles, Gift, Crown, Zap, Flame } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Ticket as TicketIcon, Heart, Sparkles, Gift, Crown, Zap } from 'lucide-react';
 import { useState, useLayoutEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { productsModule } from '@/lib/products';
@@ -12,7 +12,7 @@ import { ShareCard } from '@/features/tickets/components/ShareCard';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 import { RsvpRegistrationSheet, RsvpSection } from '@/features/event-detail/components/RsvpSection';
 import { InviteOnlySection } from '@/features/event-detail/components/InviteOnlySection';
-import type { Event, RsvpStatus, InviteUnlockState, TicketTier } from '@/types';
+import type { Event, RsvpStatus, InviteUnlockState } from '@/types';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
 import { OrganizerCard, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
 import { VenueSection } from '@/features/event-detail/components/VenueMap';
@@ -43,9 +43,6 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   // Always land at the top of the detail page (the hero), regardless of how
   // far the user had scrolled on the discovery feed before tapping the event.
   useLayoutEffect(() => { window.scrollTo(0, 0); }, []);
-  // Early bird window: started 4 days ago, ends 3 days from now (7-day window)
-  const [earlyBirdStartedAt] = useState(() => Date.now() - 4 * 24 * 60 * 60 * 1000);
-  const [earlyBirdEndsAt] = useState(() => Date.now() + 3 * 24 * 60 * 60 * 1000);
   const [liked, setLiked] = useState(false);
   const [showGift, setShowGift] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -67,94 +64,17 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   // promos) can resolve the event. Falls back to a name slug for legacy data.
   const eventId = event.id || (event.name ? event.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '');
 
-  const defaultTicketTypes: TicketTier[] = [
-    {
-      name: 'Early Bird',
-      level: 'LIMITED OFFER',
-      priceMinor: 85000,
-      originalPriceMinor: 120000,
-      available: 35,
-      isEarlyBird: true,
-      startedAt: earlyBirdStartedAt,
-      expiresAt: earlyBirdEndsAt,
-      totalCapacity: 100,
-      features: [
-        { icon: <Flame className="w-4 h-4" />, text: '30% off Standard price' },
-        { icon: <TicketIcon className="w-4 h-4" />, text: 'Digital Event Ticket' },
-        { icon: <Zap className="w-4 h-4" />, text: 'Priority Entry Lane' },
-      ],
-    },
-    {
-      name: 'Standard Access',
-      level: 'ENTRY LEVEL',
-      priceMinor: 120000, 
-      available: 150, 
-      features: [
-        { icon: <TicketIcon className="w-4 h-4" />, text: 'Digital Event Ticket' },
-        { icon: <Users className="w-4 h-4" />, text: 'General Admission Seating' }
-      ]
-    },
-    {
-      name: 'Couples Bundle',
-      level: 'FOR TWO',
-      priceMinor: 2000000,
-      originalPriceMinor: 240000,
-      available: 28,
-      isCouples: true,
-      seats: 2,
-      features: [
-        { icon: <Heart className="w-4 h-4" />, text: 'Two admissions — bundled' },
-        { icon: <Sparkles className="w-4 h-4" />, text: 'Side-by-side seating guaranteed' },
-        { icon: <Gift className="w-4 h-4" />, text: 'Welcome drink for two' },
-        { icon: <TicketIcon className="w-4 h-4" />, text: 'Save 400 ETB vs. solo' },
-      ],
-    },
-    {
-      name: 'VIP Gold Access',
-      level: 'PREMIUM',
-      priceMinor: 250000,
-      available: 45,
-      isPremium: true,
-      includedProductIds: ['av-parking'],
-      features: [
-        { icon: <Zap className="w-4 h-4" />, text: 'Fast-track Entry' },
-        { icon: <Crown className="w-4 h-4" />, text: 'Exclusive Lounge Access' },
-        { icon: <Gift className="w-4 h-4" />, text: 'Complimentary Drinks' },
-        { icon: <Sparkles className="w-4 h-4" />, text: 'Premium Seating' }
-      ]
-    },
-    { 
-      name: 'VVIP Diamond Access', 
-      level: 'ELITE',
-      priceMinor: 500000,
-      available: 20,
-      isPremium: true,
-      isElite: true,
-      includedProductIds: ['av-parking', 'av-tee'],
-      features: [
-        { icon: <Sparkle className="w-4 h-4" />, text: 'Backstage Access' },
-        { icon: <Users className="w-4 h-4" />, text: 'Meet & Greet' },
-        { icon: <Crown className="w-4 h-4" />, text: 'All VIP Benefits' },
-        { icon: <Sparkles className="w-4 h-4" />, text: 'Reserved VIP Table' }
-      ]
-    },
-  ];
-
-  const ticketTypes = event.ticketTypes ?? defaultTicketTypes;
   // Live products (tickets + extras) from GET /public/events/:slug/products.
-  // Live wins when the endpoint serves priced tiers/extras; the mock fallback
-  // covers draft events and keeps every downstream consumer (pricing, checkout,
-  // gift) untouched — they just receive real product ids.
+  // No mock fallback: when the backend serves no tiers/extras, the UI renders
+  // nothing purchasable instead of inventing tiers (backend owns all money).
   const productsQuery = useQuery({
     queryKey: productsModule.keys.forEvent(event.slug ?? ''),
     queryFn: () => productsModule.fetchForEvent(event.slug!),
     enabled: !!event.slug,
   });
   const live = productsQuery.data;
-  const liveTicketTypes = live && live.tiers.length > 0 ? live.tiers : null;
-  const liveProducts = live && live.extras.length > 0 ? live.extras : null;
-  const displayTicketTypes = liveTicketTypes ?? ticketTypes;
-  const displayProducts = liveProducts ?? event.products ?? [];
+  const displayTicketTypes = live?.tiers ?? [];
+  const displayProducts = live?.extras ?? [];
   const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes: displayTicketTypes, selectedTicketType, event, isDark });
  const scrollToTicketSelection = () => {
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -290,6 +210,9 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
             onSelectTicketType={setSelectedTicketType}
             isSoldOut={isSoldOut}
             isDark={isDark}
+            loading={productsQuery.isPending}
+            loadError={productsQuery.isError}
+            onRetry={() => void productsQuery.refetch()}
           />
           </>
           )}
@@ -363,7 +286,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               ticketType: selectedTicketType,
               image: event.image,
             }}
-            extras={displayProducts.filter((product) => product.type !== 'ticket').map(({ id, name, description, priceMinor }) => ({ id, name, description, price: priceMinor }))}
+            extras={displayProducts.filter((product) => product.type !== 'ticket').map(({ id, name, description, priceMinor }) => ({ id, name, description, priceMinor }))}
             onClose={() => setShowGift(false)}
             onSend={() => setShowGift(false)}
           />
@@ -382,9 +305,12 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               image: event.image,
               category: event.category,
             }}
+            eventSlug={event.slug}
             ticketType={selectedTicketType}
             ticketLevel={selectedTicket?.level || ''}
             ticketProductId={selectedTicket?.id}
+            ticketTypeId={selectedTicket?.ticketTypeId}
+            accessCode={isInvite && inviteUnlock.method === 'code' ? inviteUnlock.code : undefined}
             basePrice={basePrice}
             eventId={eventId}
             products={displayProducts}
@@ -392,16 +318,6 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
             answerEditWindowHours={event.answerEditWindowHours}
             seatMap={event.seatMap}
             requiredSeatCount={selectedTicket?.seats ?? (selectedTicket?.isCouples ? 2 : undefined)}
-            customQuestions={[
-              { id: 'tshirt', type: 'select', label: 'T-shirt size', required: true,
-                placeholder: 'Choose a size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
-              { id: 'diet', type: 'checkbox', label: 'Dietary preferences', helper: 'Select all that apply',
-                options: ['Vegetarian', 'Vegan', 'Gluten-free', 'Halal', 'No preference'] },
-              { id: 'arrival', type: 'select', label: 'How are you arriving?', required: true,
-                placeholder: 'Select an option', options: ['Driving', 'Rideshare / Taxi', 'Public transport', 'Walking'] },
-              { id: 'notes', type: 'textarea', label: 'Anything the organizer should know?',
-                placeholder: 'Accessibility needs, plus-ones, requests…', maxLength: 240 },
-            ]}
             onClose={() => setShowCheckout(false)}
             onComplete={() => { setShowCheckout(false); onPurchase(); }}
           />
