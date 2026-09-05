@@ -62,17 +62,27 @@ Never do `price / 100` or `price * 0.05` in components.
 
 ## Backend gaps (do NOT build against these — flag to backend dev)
 
-Full detail (what's missing + why + proposed solution) in **`docs/BACKEND_GAPS.md`**.
-Summary:
+Single source of truth: **`docs/BACKEND_GAPS.md`** (reorganized
+2026-09-04: blocking → degrading → informational → deferred → resolved
+archive). Open items that matter for new work:
 
-- No user-tickets list endpoint (`GET /tickets` does not exist) → My Tickets is mock/deferred
-- No consumer notifications / payout-methods / promo endpoints
-- Public products endpoint lacks `price`, `available`, `requires_ticket`
-- Public event lacks `venue {name,city}` and organizer name
-- Public events list serializer is minimal (being expanded by backend dev)
-- Resale listing serializer returns no display fields (event/ticket/seller)
-- Free orders (`total_minor == 0`) never issue tickets (backend correctness)
-- Auth has no OTP / Google / check-account / password-reset
+- **#14** No guest checkout + no `verified_at` path → new users can't buy
+- **#17** `cbe` payment method not in backend `PAYMENT_METHODS` (CBE option
+  is currently disabled in the UI)
+- **#18** No buyer-scoped `GET /orders/:id` (Chapa return uses wallet-poll)
+- **#19** No public registration-schema endpoint (per-slot answers + version
+  staleness can't be wired)
+- **#1** `event_setting.config` is `{}` for the public list (featured/rating/
+  tickets_left/seat_map fall back to mock)
+- **#13** List lacks `price_from_minor` (grid prices mock-fed)
+- **#7** No consumer notifications / payout-methods / consumer promo endpoints
+  (deferred by product)
+- **#8/9/10/12** No `name`/self-service update/signup validation/rate-limit
+
+Resolved (do NOT keep mocks against): #1b (detail-by-slug), #2 (venue/organizer
+nested), #3 (product `price_options` + `available`), #4 (resale display fields),
+#5 (`GET /tickets` wallet), #6 (free orders fulfill), #15 (commercial terms
+seeded).
 
 ## Agent skills
 
@@ -81,7 +91,44 @@ Summary:
 Issues and specs live as markdown files under `.scratch/` (local markdown convention).
 See `docs/agents/issue-tracker.md`.
 
+### Triage labels
+
+Five canonical roles, label strings equal to their names
+(`needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`).
+See `docs/agents/triage-labels.md`.
+
 ### Domain docs
 
 Single-context: one `CONTEXT.md` at the repo root, ADRs in `docs/adr/`.
 See `docs/agents/domain.md`.
+
+### Skills workflow
+
+How to get more out of the installed skills (flow, gaps, invocation rules):
+`docs/agents/skills-workflow.md`.
+
+### Autonomous skill use (operate without being asked)
+
+Load and follow these skills **on your own** whenever the situation matches —
+do not wait to be told:
+
+- **code-review** — before committing a slice or finishing work, run the
+  two-axis review (Standards + Spec). This is the single biggest win.
+- **tdd** — build features/fixes test-first at the spec's agreed seam
+  (red-green loop, integration-style tests, mock only at system boundaries).
+- **codebase-design** — when designing/improving a module interface, choosing
+  a seam, or judging depth.
+- **domain-modeling** — when a term is fuzzy or a hard-to-reverse decision
+  crystallizes (offer an ADR), and update `CONTEXT.md`/`docs/adr/` inline.
+- **grilling** — stress-test a plan before building (agent finds facts, human
+  makes decisions).
+- **diagnosing-bugs** — on any bug report: tight red-capable feedback loop →
+  reproduce → minimise → hypothesis → fix + regression test.
+- **writing-for-agents** — any edit to AGENTS.md, skills, or agent-consumed docs.
+
+When a feature needs the full chain (`/grill-with-docs → /to-spec → /to-tickets
+→ /implement → /code-review`), run the model-invocable parts (grilling,
+codebase-design, domain-modeling, tdd, code-review) yourself and follow the
+slash-only skills' process, drafting `.scratch/` specs/tickets rather than
+blocking on a human `/`-command. Flag explicitly when a step genuinely needs
+the human's go-ahead.

@@ -2,444 +2,247 @@
 
 > Every confirmed gap between what the frontend needs and what the backend provides,
 > **verified against the actual backend code** (serializers, policies, controllers,
-> routes). Each entry has: what's missing (with exact file + fields), why it matters,
-> and a concrete solution. The frontend does NOT work around these (ADR-0002) — it
-> mocks/defer/disables until the backend resolves them.
+> routes). The frontend does NOT work around these (ADR-0002) — it mocks/defer/disables
+> until the backend resolves them.
 >
-> Status key: `blocking` (frontend feature can't go live), `degrading` (works but
+> Status key: `blocking` (frontend feature can't ship), `degrading` (works but
 > suboptimal), `informational` (note for backend correctness), `RESOLVED` (fixed on
 > `feat/launch-hardening-telemetry`, verified live 2026-09-03).
 >
-> Note: verified by reading code, not live HTTP (backend not running at review time).
+> Verified against live HTTP where noted; the rest verified by code read.
 
 ---
 
-## RESOLVED ON THIS BRANCH (summary — details in each entry)
-| Gap | Resolution | Verified |
+## Open — blocking
+
+These are the items the frontend cannot ship a feature around. Each entry: what's
+missing (file + fields), why it matters, and a concrete fix.
+
+### #14. No guest checkout + unreachable `verified_at` (BLOCKING for new buyers)
+
+`allow_guest_checkout` is documented in `COMPOSABLE_EVENT_PLATFORM_DATABASE_DESIGN.md`
+but never implemented; the rejection path in `AUTHENTICATION AND IDENTITY ARCHITECTURE.md`
+won. No consumer-side OTP/verify endpoint exists, so freshly signed-up users can
+never reach `verified_at: present` and `RegistrationsController#create` rejects them
+with `422 phone_identity_unverified`. Backend must pick (a) or (b) per the existing
+entry text; until then nobody new can buy.
+
+### #17. `cbe` is not a valid backend payment method (BLOCKING for the CBE Birr option)
+
+Frontend `PaymentMethod = 'telebirr' | 'cbe' | 'card'`; backend
+`Commercial::FeeComponent::PAYMENT_METHODS = %w[telebirr card bank]`. Selecting CBE
+Birr → `422 invalid_payment_method`. Add `"cbe"` to the model, the
+`chapa_adapter` capabilities, and any organizer-facing `payment_method` enums; the
+frontend's CBE button is currently disabled as a workaround.
+
+### #18. No buyer-scoped order/attempt read endpoint (BLOCKING for Chapa return)
+
+`POST /orders/:id/payment_attempts` returns `PaymentSerializer { status, checkout_url }`
+and the buyer is redirected to Chapa's hosted page. On return the frontend has no
+endpoint to confirm completion (`routes.rb:110-113` — create/restart only). The
+frontend works around this by polling `GET /tickets` until the issued ticket appears,
+but the correct fix is a `GET /orders/:id` (or `GET /orders/:id/payment_attempts`)
+endpoint scoped to the buyer.
+
+---
+
+## Open — degrading
+
+Work but suboptimal. Frontend falls back to mock or local enrichment.
+
+### #1. `event_setting.config` is whitelisted to `{}` for the public list
+
+`Events::Public::EventSettingSerializer::PUBLIC_CONFIG_KEYS = %w[allow_waitlist public_guest_limit]`
+strips `featured`, `rating`, `tickets_left`, `sold_out`, `event_type`, `seat_map`,
+`rsvp_*`, `access_codes`, `invite_tickets`. Seed writes the full config; serializer
+just doesn't project it. Frontend adapter falls back to mock for these fields.
+Fix: expand `PUBLIC_CONFIG_KEYS` to a deliberate public projection.
+
+### #13. Public events LIST lacks `price_from_minor`
+
+`Events::Public::EventListSerializer` doesn't compute the min-active-price across
+the event's products. `Catalog::ProductPrice` rows are seeded in integer cents;
+the serializer just doesn't expose them. Discovery grid prices are still mock-fed.
+Fix: add the `price_from_minor` attribute method to the list serializer
+(`flat_map { |p| p.prices.active.map(&:amount_minor) }.min`).
+
+### #3-nuance. `requires_ticket` not exposed on `Catalog::Public::EventProductSerializer`
+
+Product `metadata: { requires_ticket: true }` JSONB exists in the seed but isn't
+serialized. Extras gating ("this add-on requires a ticket line") is currently
+read from the mock. Fix: project `metadata` (or just `requires_ticket`) on the
+public product serializer.
+
+### #19. No public registration-schema endpoint (FRONTEND-BLOCKED for slot-coord answers)
+
+The backend validates answers against published `RegistrationFormVersion`
+schemas, including `response_scope` (`registration` vs per-slot
+`package_unit_number`/`admission_position`) and `form_version_id` (stale-version
+detection). `routes.rb:119` exposes `registration_forms` only to organizer
+auth. The frontend cannot learn schema keys/versions/scopes before submission,
+so it sends `{question_key, value}` only — fine for single-line `registration`
+scope, broken for per-admission-slot questions and any stale-version flow. Fix:
+add a public `GET public/events/:event_slug/ticket_types/:ticket_type_id/registration_schema`
+mirroring `Ticketing::Forms::ApplicableSchema`.
+
+### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column
+
+`Core::UserAuthSerializer` returns `id, email, phone, verified_at, ...` only.
+Frontend derives display name from email local-part. Fix: add `name` column
+and serializer field if the product wants a real display name.
+
+### #9. No self-service `PATCH /auth/me` or `PATCH /users/me`
+
+Settings profile-edit UI is display-only. Add an auth-bounded update endpoint
+guarded by `Core::Authorizable`; needs `name` column (#8) for the same payload.
+
+### #10. No server-side signup validations (verified live 2026-09-03)
+
+`Core::UserAuthenticatable` uses `has_secure_password validations: false` —
+any 1-char password works, `password_confirmation` is silently ignored,
+malformed phones accepted. Frontend gates locally (8-char min, E.164) but the
+API is open. Fix: re-enable `has_secure_password` validations or add
+explicit length/confirmation validators; add a phone format validation
+(`+2519XXXXXXXX`).
+
+### #12. No rate limiting on auth endpoints (no `rack-attack`)
+
+Unlimited password guessing on `POST /auth/login` (and signup/refresh). 15-min
+access tokens + refresh rotation are useless if the refresh token is
+brute-forceable. Auth strength itself is solid (bcrypt, HMAC'd refresh tokens,
+device-binding, no user enumeration, mid-window revocation). Fix: add
+`rack-attack` with `5/minute` per IP + per identifier digest.
+
+### #20. Audience gating — backend ready, frontend still local-only
+
+`POST ticketing/audience_authorizations` (public, no auth) is live and
+`Audience::Authorize` validates `access_code` / `invitation_token` correctly.
+`RegistrationsController#create` accepts these as top-level params. The
+`InviteOnlySection` unlock is still client-side only (any non-empty code
+"unlocks") and the code is not threaded into registration. Frontend work
+in progress; the backend contract is correct.
+
+### #21. Paid registrations are never confirmed (BLOCKING for re-buying the same ticket)
+
+`Ticketing::Registration` stays `pending_payment` forever after its order is
+paid and fulfilled — nothing transitions it to `confirmed` (only
+`Registrations::ConfirmFree` writes `confirmed`, for the free path). Since
+`Submit#existing_active_registration` treats `pending_payment` as active, a
+buyer who completed a purchase can never buy the same tier again: any new
+submit with different content → `422 active_registration_conflict`, and the
+frontend has no valid next step (same registration can't back a second order
+item per `idx_one_order_item_per_registration`). The paid path issues from
+the order item (`Issue#verify_order_item`, which needs only a fulfilled
+order), so tickets work — but re-purchase is permanently wedged. Fix:
+transition the registration to `confirmed` during `AcceptPayment` (or the
+`orders.payment.fulfilled` handler) once its order is paid.
+
+### #22. No buyer cancel for own pending registration (BLOCKING for "discard & start fresh")
+
+When a checkout is interrupted (tab closed, payment failed, answers changed),
+the buyer can only *continue* it (restart/resume while the order is still
+`draft`/`pending_payment`). There is no buyer-scoped way to discard their own
+pending registration and start over — `ReleaseCheckout`/`RestartCheckout`
+close orders but leave the registration active, so a fresh submit still
+conflicts. The frontend's "start fresh" therefore only works while a
+restartable order exists; otherwise it can only offer View Tickets. Fix: a
+buyer-bounded cancel (or release) for own `pending_payment` registrations
+that frees the identity+ticket-type slot.
+
+### #23. One active registration per identity+ticket type (BLOCKING for buying the same ticket twice)
+
+Even with #21 fixed, `Submit` allows exactly one *active* registration per
+(identity, ticket type, date). Buying the same tier in a second, separate
+checkout is rejected by design — multi-ticket intent must be expressed
+upfront via `package_quantity`. If the product wants true repeat purchase
+(e.g. "buy one now, one next week"), the backend must either allow multiple
+active registrations up to `TicketType.max_packages_per_user`, or confirm
+#21 is sufficient (a `confirmed` registration no longer blocks). Until one of
+these lands, the frontend funnels multi-ticket buyers into the quantity
+stepper and surfaces a choice sheet (continue / view Tickets) on conflict —
+never a dead-end error.
+
+---
+
+## Informational
+
+Cheap insurance / product-clarity notes, not blocking.
+
+### #11. Slug namespace safety + redirects
+
+Event slugs (`title.parameterize`) leak into the public URL space. A
+`RESERVED_SLUGS` denylist (tickets, profile, settings, create, claim, resale,
+admin, api, public, events, auth) plus a `slug_history` 301 table keep
+short-link / sitemap / deep-link surfaces collision-free forever. Frontend
+needs zero changes.
+
+### #16. Chapa v1 vs v2 (key-prefix gated)
+
+Backend implements v1 only. Keys prefixed `CHASECK_TEST-`/`CHASECK-` work;
+`CHAPA_TEST-` keys (v2) crash the boot-time validator. No frontend impact —
+backend presents the same `PaymentSerializer` either way.
+
+---
+
+## Deferred by design
+
+These are product decisions, not bugs. Re-open only if requirements change.
+
+### #7. No consumer notifications / payout-methods / consumer promo endpoints
+
+- Consumer notifications: no `notification` routes exist.
+- Consumer payout methods: existing surface (`marketplace/seller/payout_accounts`)
+  is organizer/admin only.
+- Consumer promos: `/catalog/promotions` is organizer CRUD. `order_quotes`
+  accepts `promotion_code` server-side so the consumer path runs through the
+  quote — confirm and drop the standalone UI validate when wiring.
+
+### #8-deferred. Auth: no OTP / Google / check-account / password-reset
+
+Removed from UI. Add only if the product spec demands these flows.
+
+---
+
+## Resolved (archive)
+
+Full text of resolved items is in the original `BACKEND_GAPS.md` (git history).
+Summary (verified live on `feat/launch-hardening-telemetry`, 2026-09-03):
+
+| # | Resolution | Verified |
 |---|---|---|
-| 1b | Detail policy-filter → new `public_show` action, full shape | ✅ live HTTP |
-| 2 | `venue {name,city}` + `organization {name,slug}` nested in public payloads | ✅ live HTTP |
-| 3 | Products: `price_options` (cents) + `available` | ✅ live HTTP |
-| 4 | Buyer-facing resale listing with event/product/ticket/venue context | ✅ code + live endpoint |
-| 5 | `GET /tickets` owner wallet (`TicketWalletSerializer`) | ✅ live HTTP + frontend wired |
-| 6 | Free orders now fulfill → issue tickets | ✅ code (`accept_zero_total!`) |
-| 1 | **PARTIAL** — `event_setting` included but `config` stripped → still open | ✅ live HTTP |
-| 13 | **NEW** — list serializer lacks `price_from_minor` → still open | ✅ live HTTP |
-
-**Known backend endpoints with no frontend consumer yet (not gaps, just recorded so
-the knowledge isn't lost — recovered from the retired root `integration-plan.md`):**
-- `GET /feed` (`core/feed#index`) — follows-based social feed. No roadmap phase
-  consumes it yet; discovery is the browse surface.
-- `GET /categories`, `/venues`, `/artists` (+ `:id`) — public read endpoints backing
-  the follow system; no consumer integration required for Phases 0–3.
+| 1b | Detail policy-filter → `public_show` action serves the full shape | live HTTP |
+| 2 | `venue {name,city}` + `organization {name,slug}` nested in public payloads | live HTTP |
+| 3 (main) | Products: `price_options` (cents) + `available` | live HTTP |
+| 4 | Buyer-facing resale listing with event/product/ticket/venue context | live HTTP |
+| 5 | `GET /tickets` owner wallet (`TicketWalletSerializer`) | live HTTP + frontend wired |
+| 6 | Free orders fulfill → issue tickets (`accept_zero_total!`) | code |
+| 15 | Mock-mirror dev events seeded with `platform_default` fee schedule | live (login → consent → registration → quote → order proven 2026-09-04) |
 
 ---
 
-## SEED-SIDE REVIEW (2026-09-03) — no open gap is a seed problem
+## Seed-side review (2026-09-04)
 
-Audited every open gap against `db/seeds_events.rb` (the mock-mirror seed we own):
+Every open gap is backend serializer/code-level — not a seed problem. The
+frontend-owned `db/seeds_events.rb` mock-mirror seed writes everything the
+backend can possibly consume (full `event_setting.config` JSONB, `price_from_minor`
+data via `Catalog::ProductPrice`, `requires_ticket` via product metadata).
+Per the hard constraint we do not touch backend code; the seed is ready
+for backend fixes to land without further seed work.
 
-| Open gap | What the seed already writes | Verdict |
-|---|---|---|
-| #1 config stripped | full `event_setting.config` JSONB (featured, rating, tickets_left, rsvp_*, seat_map, access_codes, invite_tickets) | **backend serializer** (`PUBLIC_CONFIG_KEYS` whitelist) — seed data is correct |
-| #13 list `price_from_minor` | `Catalog::ProductPrice` rows (integer cents) per product | **backend serializer** — data exists, serializer doesn't project it |
-| #3 nuance `requires_ticket` | product `metadata: { requires_ticket: true }` JSONB | **backend serializer** — data exists, not exposed |
-| #8 user `name` | n/a (no column) | **backend** |
-| #9 profile update | n/a (no endpoint) | **backend** |
-| #10 signup validations | n/a (no model validations) | **backend** |
-| #12 rate limiting | n/a (no middleware) | **backend** |
-| #7 notifications/payouts | n/a (no routes) | **backend** |
-
-**Conclusion:** every open item is backend serializer/code-level — the seed is not the
-blocker for anything, and per the hard constraint we do not touch backend code.
-
-**One seed-side TODO (owned by frontend, for Phase 3):** add a promotion + promo code
-fixture to `db/seeds_events.rb` (or dev extensions) so `order_quotes.promotion_code`
-can be integration-tested once the frontend passes the code at quote time — the
-backend already validates it server-side (`OrderQuotesController#promotion_context`),
-no consumer endpoint needed.
+**One seed-side TODO (frontend-owned, for Phase 3 wiring):** ~~add a promotion
++ promo code fixture to `db/seeds_events.rb` so `order_quotes.promotion_code`
+can be integration-tested once the frontend passes the code at quote time.~~
+**DONE 2026-09-05** — active 10% promotion + `LAUNCH10` code seeded on the
+`on-on` event; verified live (quote applies `discount_minor`, unknown codes →
+`invalid_promotion_code`).
 
 ---
 
-## 1. Public events LIST lacks `event_setting.config` (featured/rating/tickets_left)
+## Discovered endpoints (no consumer yet — recorded for knowledge)
 
-**Status: PARTIALLY RESOLVED — still open**
+Recovered from the retired root `integration-plan.md`:
 
-**What the branch did (how it was solved):** `Events::Public::EventListSerializer` now
-declares `has_one :event_setting, serializer: Events::Public::EventSettingSerializer`
-(alongside `event_dates`, `event_media`, `event_organizations`, `organization`), and
-`PublicEventsController#index` eager-loads `:event_setting`. The association is
-therefore present in `GET /public/events` responses.
-
-**What's still missing (verified live 2026-09-03):**
-`Events::Public::EventSettingSerializer` whitelists config down to
-`PUBLIC_CONFIG_KEYS = %w[allow_waitlist public_guest_limit]`, so the seeded config
-fields the grid needs — `featured`, `rating`, `tickets_left`, `sold_out`, `event_type`,
-`seat_map`, `access_codes`, `rsvp_*`, `invite_tickets` — never reach the client
-(`"config": {}` in responses). The frontend adapter falls back to mock for these
-(`events-adapter.ts:93-94`), so the grid works but is not backend-truthed for
-featured/rating/tickets_left.
-
-**Remaining solution (backend dev):** expand `PUBLIC_CONFIG_KEYS` to a deliberate
-public projection (featured, rating, tickets_left, sold_out, event_type, rsvp_*,
-access_codes, invite_tickets, seat_map) — or expose a computed public-flags attribute.
-Frontend needs zero changes once served.
-
-> Verified note (2026-08-29): the LIST endpoint is NOT policy-filtered — the public
-> controller passes a Relation, `@clazz` is nil, so `resolved_visible_attributes` is
-> nil and the serializer emits all declared fields. The earlier "only id/slug/title/
-> visibility" claim was incorrect.
-
----
-
-## 1b. Public events DETAIL is heavily policy-filtered (blocks detail-by-slug)
-
-**Status: RESOLVED** on `feat/launch-hardening-telemetry` — verified live 2026-09-03
-
-**How it was solved:** the branch split public detail onto its own action —
-`PublicEventsController#public_show` (route `GET /public/events/:slug`, separate from
-the organizer-facing `show`) — with `skip_authorization` for the public pair and a
-dedicated `EventPolicy::VISIBILITY[:public_show]` entry. The controller eager-loads
-everything (`:categories, :event_setting, :organization, {event_dates: :venue},
-{event_organizations: :organization}, event_media → blob`) and passes the full
-`include:` list explicitly to `EventDetailSerializer`, so no policy stripping occurs.
-`EventDetailSerializer` also gained `has_one :event_setting` and
-`has_one :organization`.
-
-**Verified live:** `GET /public/events/:slug` returns categories (names), event_dates
-(starts_at/ends_at + `venue {id,name,city}`), event_media (Active Storage variant
-URLs), organization summary — the frontend's deep-link detail (`fetchById`) renders
-fully from it (e2e: `event-detail.spec.ts`). Detail images are pre-sized variants
-(`file.medium`/`file.thumbnail`) — the frontend adapter consumes those.
-
-**Frontend follow-through (done):** router deep-links fetch `GET /public/events/:slug`
-via `eventsModule.fetchById`; `location.state` is still used for instant paint on
-in-app clicks. Unknown slugs 404 → redirect to discovery.
-
----
-
-## 2. Event detail lacks venue name/city and organizer name
-
-**Status: RESOLVED** on `feat/launch-hardening-telemetry` — verified live 2026-09-03
-
-**How it was solved:** two new public serializers were added on the branch:
-- `Events::Public::EventDateSerializer` — schedule projection that embeds
-  `venue` via a `venue` method returning `Events::Public::VenueSummarySerializer`
-  (`id, name, city`) — so `event_dates[0].venue.name/city` arrives nested.
-- `Events::Public::OrganizationSummarySerializer` (`id, name, slug`) — exposed as
-  `has_one :organization` on BOTH the list and detail serializers (organizer name
-  no longer requires walking `event_organizations`).
-
-**Verified live:** detail payloads return
-`"venue": {"id","name","city"}` inside each event_date and
-`"organization": {"id","name","slug"}` at the top level.
-
-**Frontend follow-through (done):** `events-adapter.ts` maps
-`date0.venue.name/city` → `Event.venue/city` and `be.organization.name` →
-`Event.organizer`, falling back to mock only when the backend omits them.
-
----
-
-## 3. Public products endpoint lacks price, availability, and requires_ticket
-
-**Status: RESOLVED** on `feat/launch-hardening-telemetry` — verified live 2026-09-03
-(one nuance remains, see below)
-
-**How it was solved:** `Catalog::Public::EventProductSerializer` now exposes:
-- `price_options` — a method projecting every ACTIVE `Catalog::ProductPrice` window
-  (`currency, amount_minor, active_from, active_to`) via the new
-  `Catalog::Public::ProductPriceSerializer`, sorted by currency/amount/start;
-- `available` — boolean fed from `Catalog::Public::ProductAvailability` (the public
-  products controller computes availability per product and passes it through
-  serializer `instance_options`), so capacity math stays server-side.
-
-**Verified live:** `GET /public/events/:slug/products` returns products with
-`price_options` in integer cents and `available: true/false`.
-
-**Remaining nuance:** `requires_ticket` still isn't serialized — the product's
-`metadata` JSONB (holding `requires_ticket`) is not exposed. The frontend's extras
-gating currently reads it from the mock. Tiny ask: add `metadata` (or a
-`requires_ticket` boolean) to the public product serializer.
-
----
-
-## 4. Resale listing serializer returns no display fields
-
-**Status: RESOLVED** on `feat/launch-hardening-telemetry` — verified (code + live endpoint)
-
-**How it was solved:** a new buyer-facing projection was added:
-`app/serializers/marketplace/public/resale_listing_serializer.rb` — exposes
-`id, status, asking_amount_minor, currency, resale_cutoff_at, fee_terms, created_at,
-updated_at` PLUS the display context a listing card needs:
-- `event {id, slug, title, timezone, currency}`
-- `product {id, name, type}` (via `ticket.event_product`)
-- `ticket_type {id, name, admissions_per_unit, entry_validation_mode}`
-- `event_dates [{id, name, starts_at, ends_at, status, venue {id,name,city}}]`
-  (from the ticket's product accesses)
-
-Seller identity/payout data remains deliberately excluded (privacy), which is correct.
-
-**Verified:** `GET /resale_listings` routes to the marketplace controller with the
-public serializer wired (`resale_listings_controller.rb` changed on the branch);
-live endpoint returns 200 (empty list until listings exist — the projection shape is
-confirmed by the serializer code).
-
----
-
-## 5. No user-tickets list endpoint (My Tickets)
-
-**Status: RESOLVED** on `feat/launch-hardening-telemetry` — verified live 2026-09-03,
-**and wired into the frontend**
-
-**How it was solved:**
-- `app/controllers/ticketing/tickets_controller.rb` — `TicketsController#index`
-  (`GET /tickets`, route `resources :tickets, only: :index`): authorizes the owner,
-  scopes via `policy_scope` (ownership boundary), eager-loads
-  event/admission_slots/credential generation/product accesses, supports pagination
-  and whitelisted ordering.
-- `app/serializers/ticketing/ticket_wallet_serializer.rb` — owner wallet projection:
-  `id, status, unit_number, event {id,slug,title,timezone,currency}, product
-  {id,name,type}, ticket_type, event_dates (with venue summary), admission_slots,
-  credentials` — credential `lookup_code`/`qr_token` are delivered ONLY for the
-  caller's own ACTIVE tickets (`TicketWalletCredentialSerializer`, `deliver_secret:`).
-- `app/models/ticketing/ticket.rb` gained the policy/scope support
-  (`ticket_policy.rb` +6 lines).
-
-**Verified live:** authenticated `GET /tickets` → 200 with the wallet envelope
-(empty for fresh users — correct); unauthenticated → 401.
-
-**Frontend follow-through (done):** `ticketsService.fetchUserTickets` calls the real
-endpoint and maps the wire (`mapWalletTicket` — QR token only for active tickets);
-the router's wallet query is auth-aware (keyed on `isAuthenticated`). The mock
-fixture store no longer renders anywhere (e2e-proven). The mock WRITE path
-(`issueTicketsForOrder`) remains until Phase 3 checkout issues real tickets.
-
----
-
-## 6. Free orders never issue tickets
-
-**Status: RESOLVED** on `feat/launch-hardening-telemetry` — verified in code
-
-**How it was solved:** `Orders::CreateCheckout#accept_zero_total!` now runs the real
-fulfillment path instead of just marking the order paid:
-
-```ruby
-result = Orders::FulfillOrder.call(
-  order:, payment: nil, idempotency_key: "orders-free-fulfilled-#{order.id}"
-)
-```
-
-So a `total_minor == 0` order (free RSVP) goes through the same
-fulfillment → `orders.payment.fulfilled` outbox event →
-`Ticketing::OutboxHandlers::OrderFulfilled` → `Ticketing::Packages::Issue` pipeline as
-paid orders — the attendee gets a ticket/credential/QR. `Orders::FulfillOrder` itself
-also changed on the branch (+12 lines) to support the paymentless call, and
-`fulfill_order_test.rb` (+125 lines) covers it.
-
----
-
-## 7. No consumer notifications / payout-methods / consumer promo endpoints
-
-**Status:** confirmed, unresolved (deferred)
-
-**What's missing:**
-- **Notifications:** no notification routes/controllers exist for consumers (nothing in
-  `config/routes.rb` matches "notification").
-- **Payout methods:** consumer payout-method CRUD does not exist. Existing payout
-  surface is organizer/admin only: `marketplace/seller/payout_accounts`
-  (`routes.rb` line 217), `finance/.../payouts` (lines 235-243), `admin/commercial`
-  (lines 254-281).
-- **Consumer promos:** promotions are organizer CRUD only
-  (`/catalog/promotions`, routes lines 71-78). There is no consumer promo-validate
-  endpoint. However, `POST /events/:id/order_quotes` accepts `promotion_code` and the
-  backend validates it server-side (`OrderQuotesController#promotion_context`), so the
-  consumer promo path may already work through the quote — needs confirmation.
-
-**Why it matters (deferred):** The notification bell, payout settings, and a standalone
-promo-validate UI cannot be wired. They stay mock/deferred.
-
-**Solution (backend dev):**
-- Add consumer notification endpoints (or confirm a realtime channel).
-- Add consumer payout-method CRUD, or confirm `marketplace/seller/payout_accounts` is
-  usable by end-user sellers.
-- Confirm `order_quotes.promotion_code` is the consumer promo path (the frontend can
-  then pass the code at quote time and drop its standalone promo-validate mock).
-
----
-
-## 8. Auth has no OTP / Google / check-account / password-reset, and user has no name
-
-**Status:** confirmed, resolved-by-design (removed from UI)
-
-**What's missing:** Auth routes (`config/routes.rb` lines 4-10) are identifier+password
-only: `POST /auth/login`, `POST /auth/signup`, `POST /auth/refresh`, `POST /auth/logout`,
-`POST /auth/reauthenticate`, `GET /auth/me`. No OTP, no Google/SSO, no `check-account`,
-no server-side password reset. Additionally, `Core::UserAuthSerializer`
-(`app/serializers/core/user_auth_serializer.rb`) returns `id, email, phone, verified_at,
-created_at, updated_at, permissions, roles` — **no `name`**, no `photo`, no `provider`.
-
-**Why it matters (degrading):** The frontend simplified its auth modal to
-identifier+password; OTP/Google/reset flows were removed (Phase 2 plan). The missing
-`name` field means the frontend must derive a display name from the email locally.
-
-**Solution (backend dev):** Only if OTP/Google are product requirements — add the
-corresponding endpoints. Add a `name` attribute to `UserAuthSerializer` (or a
-`profile` field) if the platform wants users to have a display name.
-
----
-
-## 9. No self-service profile-update endpoint (consumer account editing)
-
-**Status:** confirmed, unresolved — **NEW finding (2026-08-31), blocks Settings edit UI**
-
-**What's missing:** There is no consumer-facing endpoint to update one's own profile.
-Routes show only `admin/users` CRUD (`config/routes.rb` line 284, admin-scoped) and the
-`auth/*` block. Nothing handles `PATCH /auth/me` or `PATCH /users/me` for an end user
-to change name/email/phone/photo.
-
-**Why it matters (degrading):** The Settings account card is now display-only
-(`src/features/profile/components/SettingsAccountCard.tsx`). Name/email/phone/photo
-editing was stripped from the UI (and `updateProfile` removed from `AuthContext`)
-because there is no endpoint to trace it to. The card shows "Profile editing is coming
-soon."
-
-**Solution (backend dev):** Add a self-service update endpoint, e.g.
-`PATCH /auth/me` (or `PATCH /users/me`) permitting `name`, `email`, `phone` (with the
-existing uniqueness validations in `Core::UserAuthenticatable`), guarded by
-`Core::Authorizable` so a user can only edit their own record. A `name` column would
-also be needed (see gap #8). Until then the edit UI stays disabled.
-
----
-
-## 10. Signup has no server-side password/phone-format validation (verified live, 2026-09-03)
-
-**Status:** confirmed — backend correctness; frontend now gates locally (AuthModal)
-
-**What's missing (verified by hitting the live API):** `Core::UserAuthenticatable` uses
-`has_secure_password validations: false` and `Core::User` adds no password validations.
-`POST /auth/signup` therefore accepts:
-
-- **Any password** — `"a"` (1 char) creates a working, login-able account
-- **`password != password_confirmation`** — the confirmation param is silently ignored
-  (`validations: false` also disables the built-in confirmation match), so the user can
-  believe their password is "different" while the account's real password is the first one
-- **Malformed phones** — `"123"` creates a valid account (no E.164/format check;
-  uniqueness is the only phone rule)
-
-The only enforced rules are `email_or_phone_present` and phone/email uniqueness.
-
-**Why it matters (backend correctness):** password policy is a security baseline; the
-confirmation mismatch is a correctness trap, not just UX. The frontend now enforces
-min-8 chars + E.164 shape client-side, but client-side rules are advisory — the API
-remains open.
-
-**Solution (backend dev):** In `Core::UserAuthenticatable` (or `Core::User`):
-`validates :password, length: { minimum: 8 }` (re-enable `has_secure_password`
-validations or add `validates_confirmation_of :password`), and a phone format
-validation normalizing/requiring Ethiopian E.164 (`+2519XXXXXXXX`, cf.
-`Core::PhoneIdentity::ResolveOrCreate.normalize`). Keep returning per-field
-`errors: [...]` — the frontend already surfaces them.
-
----
-
-## 11. SUGGESTION — slug namespace safety + stability (event URLs)
-
-**Status:** suggestion (no current bug) — from the frontend routing review (2026-09-03)
-
-**Context:** the frontend serves event detail at `/events/:slug` (namespaced on
-purpose) and builds links with `eventPath()` preferring the backend slug
-(`Events::Event#slug`, generated by `title.parameterize` in `build_slug` /
-`Core::Slugable`). The frontend URL does not need to mirror the API path, but it
-consumes the backend slug directly as the public URL — which makes slug generation
-part of the platform's public URL space.
-
-**Two low-cost protections worth adding before public launch:**
-
-1. **Reserved-slug guard.** Event titles are organizer free text, so any word is a
-   potential slug. Today that is safe because the frontend namespaces events under
-   `/events/…` (no collision with `/tickets`, `/profile`, `/resale`, `/settings`,
-   `/create`, `/claim/:token`). But slugs leak into OTHER surfaces that do share
-   top-level namespaces with future pages — short links (dig.is `/…`), email
-   deep links, organizer share cards, sitemaps. A small guard keeps those surfaces
-   collision-free forever:
-   - a `RESERVED_SLUGS` denylist on event/venue/artist/organization slug
-     generation (`tickets`, `profile`, `settings`, `create`, `claim`, `resale`,
-     `admin`, `api`, `public`, `events`, `auth`, …) — either reject or suffix
-     (`tickets-2`) like `build_slug` already does for duplicate titles;
-   - cheap to add now, expensive to retrofit (needs a backfill for any slug
-     created before the guard).
-
-2. **Slug stability (redirects).** Shared event URLs outlive code — posters,
-   WhatsApp forwards, sitemaps. If slug generation ever changes (parameterize
-   version, transliteration for Amharic titles, normalization fixes), old links
-   should keep working: keep a `slug_history` (or `previous_slugs`) table and
-   301 old → new in the public show action. Without it, slug logic changes break
-   every link already printed or shared.
-
-**Why (degrading, not blocking):** neither is broken today; both are cheap-insurance
-items where the retrofit cost is much higher than the upfront cost. The frontend
-needs zero changes for either — it already prefers `event.slug` and tolerates any
-slug value.
-
----
-
-## 12. No rate limiting / brute-force protection on auth endpoints
-
-**Status:** confirmed — NEW finding (2026-09-03 security review), `informational` but
-should be `blocking` before public launch
-
-**What's missing (verified):** no `rack-attack` (or equivalent) in the Gemfile and no
-throttling middleware anywhere in `config/`. `POST /auth/login` accepts unlimited
-password guesses from one IP/account. The only rate limit in the codebase is the
-ticketing manual-lookup counter (`manual_lookup/online_search.rb`), which proves the
-pattern (Rails.cache increment + window) but isn't applied to auth.
-
-**Verified auth strength (everything else is solid — see the 2026-09-03 session
-review):** bcrypt via `has_secure_password`; access JWT HS256 15-min TTL, expiry
-enforced; refresh tokens are 256-bit random stored as SHA-256 fingerprints only,
-30-day TTL, rotated-with-revocation in a transaction (old refresh token rejected on
-reuse), device-bound (`invalid_device` on mismatch), ip/user-agent recorded; access
-tokens carry their session's `jti` so logout/rotation revokes the access token
-mid-window; no user enumeration (identical error for unknown identifier vs wrong
-password); deactivated users can't authenticate or refresh.
-
-**Why it matters:** everything above is undone by unlimited offline-style password
-guessing over HTTP. 15-min access tokens + rotation assume the refresh token isn't
-brute-forceable.
-
-**Solution (backend dev):** add `rack-attack` — throttle `POST /auth/login` (and
-`/auth/signup`, `/auth/refresh`) per IP + per identifier (e.g. 5/minute keyed
-`"auth:#{ip}"` and `"auth:id:#{digest}"`), returning `429` with a flat `code`
-(`rate_limited`) the frontend already maps through `errors.ts` (add the friendly
-copy). Optional: `revoke_all_user_tokens` already exists for lockout flows.
-
----
-
-## 13. Public events LIST lacks `price_from_minor` (grid prices)
-
-**Status:** confirmed, unresolved — **verified live + against branch code 2026-09-03**
-
-**What's missing:** `Events::Public::EventListSerializer` declares
-`id, slug, title, description, visibility, timezone, currency, published_at` +
-associations — **no `price_from_minor`**. Live check: the attribute is absent from
-every item in `GET /public/events`.
-
-**Why it matters (degrading):** the discovery grid shows a "from Br X" price per card.
-The adapter (`events-adapter.ts:88-91`) falls back to `mock.priceFromMinor` when the
-field is absent — so **grid prices are mock data**, violating the "backend computes
-all money" rule. The detail side already solved this pattern elsewhere; the list just
-never got it.
-
-**Solution (backend dev):** add to `EventListSerializer`:
-
-```ruby
-attribute :price_from_minor do
-  object.event_products.flat_map { |p| p.prices.select(&:active?).map(&:amount_minor) }.min
-end
-```
-
-(or the same min-active-price projection the products endpoint uses via
-`Catalog::Public::ProductAvailability`) + ensure `event_products`/`prices` are in the
-index eager-load. **The data is already seeded** (`Catalog::ProductPrice` rows, integer
-cents) — serializer-only. The frontend adapter already handles the field when present
-(`typeof be.price_from_minor === "number"` branch) — zero frontend changes needed.
+- `GET /feed` (`core/feed#index`) — follows-based social feed. Discovery is
+  the browse surface; not consumed yet.
+- `GET /categories`, `/venues`, `/artists` (+ `:id`) — public read endpoints
+  backing the follow system. Not consumed.

@@ -7,6 +7,44 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-05 (pm) — price-rank tier accents + live Chapa
+
+### Tier colors are now rank-based and theme-aware (no longer all blue)
+
+The four semantic flags (`isEarlyBird/isCouples/isElite/isPremium`) drive
+badges/shimmer/countdown/pair-suffix UI **and** color. Live tiers never set
+those flags, so every tier rendered the standard blue. Fixed by separating the
+two concerns:
+
+- **New `src/lib/tierAccents.ts`** — shared palette + `resolveTierAccent(type)`
+  (explicit `accent` first, legacy flags fallback) and
+  `applyRankAccents(tiers)` (pure, unit-tested). Each accent carries `bright`
+  (dark mode) + adjacent `ink`/`inkRgb` (light mode) + `rgb`/`bg`.
+- **`src/lib/products.ts`** — after the price sort, `applyRankAccents`: cheapest
+  → **emerald**, priciest → **gold**, middles alternate **blue/violet**;
+  single-tier events stay unaccented (no false "deal"). Presentation only —
+  money/behavior still come from the backend.
+- **`src/types/event.ts`** — `TicketTier.accent?: 'emerald'|'rose'|'violet'|'gold'|'blue'`.
+- **`TicketTypeCard.tsx`** — uses `resolveTierAccent`; `isDark = pageIsDark`
+  (was hardcoded `true`), so light mode renders the ink shades.
+- **`useTicketPricing.ts`** — same resolver for the purchase-bar accent
+  (`rgb`/`inkRgb`), guarded for null `selectedTicket`.
+
+Verified: `tsc` clean, build ok, unit tests 18/18 (8 new tier-accent tests),
+e2e **14/14**. Runtime probe on `/events/on-on` (Early Bird/Regular/VIP):
+dark `rgb(52,211,153)/rgb(96,165,250)/rgb(250,200,60)` (emerald/blue/gold),
+light the adjacent inks `rgb(4,120,87)/rgb(29,78,216)/rgb(154,106,0)`. Semantic
+badges still only trigger on their explicit flags (live tiers never set them).
+
+### Live Chapa enabled in dev
+
+Backend `compose.yaml` now loads `.env.chapa` via `env_file` (see
+`digis_backend/docs/guides/chapa-integration.md` §5). `docker compose up -d`
+registers Chapa automatically (`Registry.available == ["chapa"]`). The old
+workaround note below ("`CHAPA_ENABLED=false` in the current compose") is
+**obsolete** — Chapa is live. A real/test-mode Chapa payment is now the
+remaining wallet-proof item.
+
 ## Phase progress
 
 | Phase | Description | Status |
@@ -14,7 +52,7 @@
 | 0 | Foundation + Money refactor | **COMPLETE** |
 | 1 | Events / Discovery / Event Detail | **COMPLETE** (detail-by-slug live, 2026-09-03) |
 | 2 | Auth | **COMPLETE** |
-| 3 | Checkout / Resale / Transfers | pending (needs registration step — see gaps below) |
+| 3 | Checkout / Resale / Transfers | in progress (A/B/C-fixes shipped 2026-09-04 — see Phase 3 notes below) |
 | — | Architecture review | **COMPLETE (all 7)** |
 | — | Deferred (backend gaps) | My Tickets, notifications, payouts, consumer promos |
 
@@ -111,12 +149,14 @@ Phase 1 blocker is gone. Wired:
    `allow_waitlist`/`public_guest_limit`; frontend needs featured/rating/tickets_left/
    seat_map/rsvp_* (grid silently falls back to mock).
 2. List serializer still lacks `price_from_minor` (detail-side has it).
-3. **Checkout blocker:** `order_quotes` → `422 registration_required` for ticket
-   products. Registration (`POST /events/:event_id/ticket_types/:ticket_type_id/
-   registrations`) requires an account + own **verified** phone — and signup returns
-   `verified_at: null` with no OTP path. Backend design question: how does a consumer
-   phone get verified? Guest checkout ("buy without account") has no backend path —
-   phone auto-create exists only for manager-issued complimentary tickets.
+3. **Checkout blocker (updated 2026-09-04):** registration is now PROVEN with the
+    seeded verified attendee (`identifier` login → consent_requirements →
+    `POST /ticket_types/:id/registrations` → 201 `pending_payment`/`requires_order`;
+    repeat submits → `422 active_registration_conflict`, expected). The wall moved
+    one step down: `POST /events/:id/order_quotes` → `422
+    commercial_terms_unavailable` — mock-mirror orgs have no commercial
+    program/assignment (see BACKEND_GAPS.md #15). The `verified_at`/guest-checkout
+    design question (#14) still stands for real new users.
 
 ## Phase 2 — Auth (complete, 2026-08-31)
 
@@ -416,10 +456,129 @@ calls it (pre-existing dead import — harmless).
 
 See `docs/superpowers/plans/2026-08-28-frontend-backend-integration.md` for details.
 
-## Backend gaps to flag to backend dev
+## Phase 3 — Checkout / Resale / Transfers (in progress, 2026-09-04)
 
-1. Public products endpoint: add `price_minor`, `available`, `metadata`(requires_ticket)
-2. Public event detail: add `venue { name, city }` and organizer name
-3. Resale listing serializer: add event/ticket/seller display fields
-4. `GET /tickets` (user ticket list) — needed for My Tickets
-5. Registration answers → how they map into order quotes (`registration_id`)
+### A-fixes (unblock real purchases)
+- **Free orders skip payment** — `useCheckoutFlow` calls `createOrder` and
+  short-circuits on `total_minor === 0` (the backend's `accept_zero_total!`
+  fulfills the order server-side; `StartPaymentAttempt` would reject
+  `payment_amount_invalid`).
+- **CBE Birr option disabled** — backend `PAYMENT_METHODS` is
+  `%w[telebirr card bank]`; "cbe" is rejected. Button rendered disabled with
+  "Coming soon" tag (BACKEND_GAPS #17).
+- **`crypto.randomUUID` fallback** — exported `randomUuid()` from `api.ts`
+  (same v4-from-getRandomValues path); used in `registration.ts` for
+  `requestUuid` and per-consent idempotency keys. Fixes the LAN-http crash
+  already fixed in `api.ts`.
+
+### C-fixes (flow correctness)
+- **`next_action` honored** — `awaiting_approval` → terminal "submission
+  received" state with no quote/order. `requires_confirmation` → same. Only
+  `requires_order` proceeds.
+- **Promo via quote** — mock `promoService.validate` removed; the code
+  is sent to `order_quotes.promotion_code` and `invalid_promotion_code` /
+  `promotion_unavailable` surface on the promo field.
+- **Quote-expiry retry** — `quote_expired` triggers one re-quote before
+  failing (10-minute `HOLD_DURATION`).
+- **Audience proof threaded** — `accessCode` / `invitationToken` flow from
+  `InviteOnlySection` → `Checkout` → `registrationModule.register` (top-level
+  params per `RegistrationsController`).
+
+### B-fixes (post-redirect confirmation)
+- **Chapa return handling** — new `usePaymentReturnConfirmation` polls the
+  wallet every 3s on `?status=return` until a ticket for the event appears
+  (the truthful buyer-visible completion signal; no `GET /orders/:id`
+  exists — BACKEND_GAPS #18).
+- **Mock issuance gated** — `ticketsService.issueTicketsForOrder` runs only
+  for non-live carts; live orders rely on the wallet poll.
+
+### Open Phase 3 work (separate pass)
+- Resale `purchaseListing` is still 100% mock (BACKEND_GAPS #4 is RESOLVED
+  on the backend; just needs wiring — note the public serializer now nests
+  event/product/ticket_type/event_dates+venue, so the browse read path can
+  be mapped; seller identity stays deliberately absent).
+- Transfers (`transferService`) are still 100% localStorage.
+- Per-slot registration answers + `form_version_id` blocked by #19.
+- ~~The `order_quotes.promotion_code` flow needs a seeded promo fixture~~ —
+  **DONE 2026-09-05** (see below).
+
+### e2e
+`e2e/checkout.spec.ts` proves the chain on the live backend (login → consent
+→ registration → quote → order → Chapa redirect OR typed error OR conflict
+choice sheet → View Tickets, for the polluted-buyer case — backend gaps
+#21/#22 leave fulfilled regs active, so a fresh-context GA re-buy lands on
+the sheet by design).
+
+### D-fixes — retry-safety (2026-09-05, overnight session)
+Two buyer-facing errors fixed without touching the backend:
+- **"Already registered" (`active_registration_conflict`)** — every Pay click
+  generated fresh random consent `request_uuid`s, changing the backend's
+  request digest so a retry looked like a *different* registration. Fixed with
+  a stable per-checkout key (`digis:checkout-key:<event>:<ticketType>` in
+  sessionStorage) used as both the `Idempotency-Key` header and the consent
+  `request_uuid` — a retried Pay now replays to the SAME registration.
+  (Also fixed a `useRef(fn)` bug that sent a non-UUID and tripped the
+  backend's "valid request UUID" validation.)
+- **"Payment in progress" (`checkout_restart_payment_in_progress`)** — the
+  hosted `checkout_url` is now persisted per order
+  (`digis:payment-url:<orderId>`); a retry resumes the payment page instead of
+  creating a duplicate order. `payment_already_accepted` /
+  `payment_succeeded_pending_acceptance` enter the pending-confirmation state
+  instead of erroring. A genuinely pre-existing registration from an earlier
+  checkout gets a friendly "check My Tickets" message.
+- New friendly codes in `errors.ts`: `payment_attempt_unavailable`,
+  `payment_idempotency_conflict`, `idempotency_conflict`.
+- `e2e/checkout.spec.ts` guest test fixed (placeholder-addressed Details
+  fields). Verified: `checkout.spec.ts` 2/2 + `wallet-audit.spec.ts` 1/1 green;
+  a temp VIP-tier proof spec (fresh registration, no prior state) ran the full
+  chain to payment and was removed afterwards.
+- Buyer `+251900123456` now holds active GA + VIP registrations with pending
+  Chapa payments — its `GET /tickets` is 0 until a payment is completed on the
+  Chapa hosted page. Paid-ticket wallet proof still needs one real or
+  test-mode Chapa payment.
+
+### E-fixes — suite hardening + promo fixture (2026-09-05, afternoon session)
+
+**Suite is green again: 14/14** (`npx playwright test`), tsc clean, build ok.
+
+- **Auth e2e was timing-marginal, not broken.** The signup+auto-login chain
+  takes ~5-10s under the single backend container (bcrypt + image-heavy
+  discovery page saturating the browser's 6-conn/host pool to `:3000`), and
+  the "Welcome to Digis" success screen self-closes after 1.4s — so a 10s
+  assertion window was flaky. Fixed by widening the event-driven timeouts in
+  `e2e/auth.spec.ts` (login 10→20s, invalid-credentials 5→15s, signup
+  10→25s). No fixed sleeps added.
+- **TEMP `zz-*.spec.ts` proof scripts are gated out of the default run**
+  (`playwright.config.ts` `testIgnore`). They are manual verification tools
+  that need a live-Chapa env (Chapa is now enabled in dev via `.env.chapa` —
+  see the 2026-09-05 (pm) session) and specific seed buyers/events; run them
+  explicitly: `npx playwright test e2e/zz-*.spec.ts`.
+- **Promo fixture shipped (seed-side TODO #15 DONE).** Added an active 10%
+  `Catalog::Promotion` + `LAUNCH10` `PromotionCode` on the checkout e2e event
+  (`on-on`, slug `on-on`) in the frontend-owned `db/seeds_events.rb`
+  (idempotent; empty product scope = all tiers eligible). Verified live:
+  quote without code → `discount_minor 0`, total 102500; with `LAUNCH10` →
+  `discount_minor 10000`, total 92500; unknown code → `422
+  invalid_promotion_code`. The frontend already sends `promotion_code` at
+  quote time (`order.ts`), so the promo field in checkout now has a real
+  fixture to validate against.
+- **Pre-existing tsc errors fixed (7 → 0):** AuthContext now threads
+  `fieldErrors` through `signUp` (the modal already surfaced them);
+  `RemoveListingSheet` takes a `ResaleListing` (was a stale `{ticket, price,
+  id}` shape — latent `undefined.price.toLocaleString()` crash on delist) and
+  renders via `Money`; gift extras typed `priceMinor` end-to-end;
+  SegmentedToggle `onValueChange` casts; `TicketTierFeature.icon` typed
+  `ReactElement` for `cloneElement`.
+
+---
+
+## Backend gaps to flag to backend dev (snapshot, see BACKEND_GAPS.md for full detail)
+
+Open blocking: #14 (no guest checkout), #17 (cbe method), #18 (no order read).
+Open degrading: #1 (config whitelist), #13 (price_from_minor), #3-nuance
+(`requires_ticket`), #19 (no public schema), #8 (no name), #9 (no
+profile-update), #10 (no signup validation), #12 (no rate-limit), #20
+(audience — backend ready, frontend work in progress).
+Deferred by design: #7 (consumer notifications/payouts/promos), #8-deferred
+(OTP/Google).
+Resolved: #1b, #2, #3 (main), #4, #5, #6, #15.

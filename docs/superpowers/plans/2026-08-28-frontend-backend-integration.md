@@ -8,7 +8,9 @@ backend's existing contract.
 **NO backend schema changes.** The backend is fixed; the frontend adapts. Backend
 features that don't exist are disabled/deferred in the UI and flagged for the backend dev.
 
-**Status:** PLANNING (approved decisions below; not yet implemented)
+**Status:** APPROVED. Phases 0–2 complete (see `docs/handoffs/INTEGRATION_STATUS.md`).
+Phase 3 in progress (A/B/C-fixes shipped 2026-09-04; resale + transfers + per-slot
+schema answers remain).
 
 ---
 
