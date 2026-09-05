@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, useLocation, useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogIn, UserCircle } from 'lucide-react';
 import { ticketsService, ticketKeys } from '@/lib/tickets';
 import { eventsModule } from '@/lib/events';
+import { productsModule } from '@/lib/products';
+import { orderModule } from '@/lib/order';
 import type { Event, UserTicket } from '@/types';
 import { EventDiscovery } from '@/features/discovery/pages/DiscoveryPage';
+import { EventDetailSkeleton } from '@/components/loading';
 import { TicketView } from '@/features/tickets/pages/TicketsPage';
 import { EventDetail } from '@/features/event-detail/pages/EventDetailPage';
 import { UserProfile } from '@/features/profile/pages/ProfilePage';
@@ -18,6 +21,8 @@ import { useTheme } from './components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { AuthModal } from '@/features/auth/components/AuthModal';
 import { TopBar } from '@/components/TopBar';
+import { usePaymentReturnConfirmation } from '@/lib/payment-return';
+import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 
 export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings';
 
@@ -99,6 +104,17 @@ function AppContent() {
     queryFn: () => eventsModule.fetchById(eventSlug!),
     enabled: !!eventSlug && !routeEvent,
   });
+  // Fire the ticket-types fetch in parallel with the detail fetch. Without
+  // this the products query lives in EventDetailPage and only starts once the
+  // detail resolves — a serial chain that adds ~700ms to deep-link loads.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!eventSlug || routeEvent) return;
+    void queryClient.prefetchQuery({
+      queryKey: productsModule.keys.forEvent(eventSlug),
+      queryFn: () => productsModule.fetchForEvent(eventSlug),
+    });
+  }, [queryClient, eventSlug, routeEvent]);
   const selectedEvent = routeEvent ?? (eventSlug && !routeEvent ? detailQuery.data ?? null : null);
   const detailLoading = !!eventSlug && !routeEvent && detailQuery.isPending;
   const detailMissing =
@@ -159,12 +175,121 @@ function AppContent() {
   // Owner wallet — GET /tickets (real). Keyed on auth state so signing in
   // fetches (the signed-out 401 must not poison the cache) and signing out
   // drops the previous user's tickets. Disabled while signed out.
-  const { data: userTickets = [] } = useQuery({
+  const {
+    data: userTickets = [],
+    isPending: walletPending,
+    isFetching: walletFetching,
+    isError: walletError,
+    refetch: refetchWallet,
+  } = useQuery({
     queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
     queryFn: ticketsService.fetchUserTickets,
     enabled: isAuthenticated,
-    staleTime: 60_000,
+    // Personal data is never "fresh" (ADR-0005: personal data staleTime 0) —
+    // the wallet must show the ticket the moment the backend issues it, not
+    // 60s later. The return-confirmation poll keeps it updating while a
+    // payment is settling.
+    staleTime: 0,
   });
+
+  // Post-Chapa return: CHAPA_RETURN_URL lands the browser on /?status=return
+  // (the checkout modal is closed by then, so modal-level detection can never
+  // run). Poll the wallet for the newly issued ticket — the webhook, not the
+  // redirect, is the authority — then take the buyer to their ticket.
+  const isPaymentReturn =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(location.search).get('status') === 'return';
+  // Event scope for the return confirmation: without it ANY fresh wallet
+  // ticket resolves the sheet — including an older purchase's ticket that
+  // landed first — so "View My Ticket" opens the wrong ticket.
+  const returnEventId = useMemo(() => {
+    try {
+      const urlEvent = new URLSearchParams(location.search).get('event_id');
+      if (urlEvent) return urlEvent;
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith('digis:payment-event:')) {
+          const v = sessionStorage.getItem(k);
+          if (v) return v;
+        }
+      }
+    } catch { /* ignore */ }
+    return undefined;
+  }, [location.search, isPaymentReturn]);
+  const returnController = usePaymentReturnConfirmation(
+    returnEventId,
+    userTickets,
+    isAuthenticated,
+  );
+  const { state: returnState, start: startReturnConfirm } = returnController;
+
+  // Local-dev return-URL verify: Chapa can't reach localhost, so replay
+  // each attempt tx_ref to the callback endpoint (verify-before-trust
+  // server-side), then poll the wallet for the issued ticket. Chapa appends
+  // `trx_ref` to the return URL, so use it directly when present (covers a
+  // reload/resume where the sessionStorage payment-keys may be gone); the
+  // stored keys cover attempts whose tx_ref Chapa did not echo back.
+  const kickReturnVerification = useCallback(() => {
+    try {
+      const keys: string[] = [];
+      const urlTxRef = new URLSearchParams(location.search).get('trx_ref');
+      if (urlTxRef) keys.push(urlTxRef);
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith('digis:payment-key:')) {
+          const v = sessionStorage.getItem(k);
+          if (v) keys.push(v);
+        }
+      }
+      const unique = [...new Set(keys)];
+      if (unique.length > 0) {
+        Promise.allSettled(unique.map((txRef) => orderModule.kickReturnVerification(txRef)));
+      }
+    } catch { /* storage unavailable — wallet poll still runs */ }
+  }, []);
+
+  useEffect(() => {
+    if (!isPaymentReturn || !isAuthenticated) return;
+    const sp = new URLSearchParams(location.search);
+    sp.delete('status');
+    const next = sp.toString();
+    navigate(location.pathname + (next ? `?${next}` : ''), { replace: true });
+    kickReturnVerification();
+    startReturnConfirm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaymentReturn, isAuthenticated]);
+
+  // Re-kick verification while confirming: a first verify can land while
+  // Chapa still reports the attempt pending (or the kick raced the receipt),
+  // and nothing else re-triggers it — without this the overlay spins until
+  // timeout on payments that would verify seconds later.
+  useEffect(() => {
+    if (returnState.kind !== 'confirming') return;
+    const id = window.setInterval(kickReturnVerification, 20_000);
+    return () => window.clearInterval(id);
+  }, [returnState.kind, kickReturnVerification]);
+
+  const confirmedTicket =
+    returnState.kind === 'confirmed' ? returnState.ticket : null;
+  const returnConfirming = returnState.kind === 'confirming';
+  const returnTimedOut = returnState.kind === 'timeout';
+  // Fresh wallet on every arrival at /tickets: a ticket the backend issued
+  // moments ago (webhook → outbox → issue) must show up, not a cached list
+  // from before the purchase.
+  useEffect(() => {
+    if (currentView === 'tickets' && isAuthenticated) {
+      void refetchWallet();
+    }
+  }, [currentView, isAuthenticated, refetchWallet]);
+
+  const closeReturn = () => {
+    // Dismissing the sheet does NOT stop the confirmation poll — the ticket
+    // may still be issuing server-side. Keep the wallet cache updating in the
+    // background so /tickets shows the ticket as soon as it lands.
+    if (returnConfirming) returnController.dismiss();
+    else returnController.stop();
+    navigateToView('tickets');
+  };
 
   return (
     <div
@@ -235,19 +360,8 @@ function AppContent() {
           ) : detailLoading ? (
             // Deep-link fetch in flight. Deliberately NOT the mock feed —
             // mock must never appear while loading (user rule).
-            <motion.div key="detail-loading" className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-              <motion.div
-                className="w-10 h-10 rounded-full"
-                style={{
-                  border: `3px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(214,249,5,0.35)'}`,
-                  borderTopColor: isDark ? '#d6f905' : '#7c9a00',
-                }}
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
-              />
-              <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
-                Loading event…
-              </p>
+            <motion.div key="detail-loading">
+              <EventDetailSkeleton />
             </motion.div>
           ) : (
             <motion.div
@@ -276,13 +390,23 @@ function AppContent() {
                   onSearchModeChange={setSearchMode}
                 />
               ) : currentView === 'tickets' ? (
-                <TicketView tickets={userTickets} onDiscover={() => navigateToView('discover')} onListForResale={(ticket) => {
+                <TicketView
+                  tickets={userTickets}
+                  loading={isAuthenticated && walletPending}
+                  refreshing={isAuthenticated && walletFetching && !walletPending}
+                  loadError={isAuthenticated && walletError}
+                  onRetry={() => void refetchWallet()}
+                  onDiscover={() => navigateToView('discover')} onListForResale={(ticket) => {
                   setResaleTicket(ticket);
                   navigateToView('resale');
                 }} />
               ) : currentView === 'profile' ? (
                 isAuthenticated ? (
-                  <UserProfile tickets={userTickets} onOpenSettings={() => navigateToView('settings')} />
+                  <UserProfile
+                    tickets={userTickets}
+                    loading={isAuthenticated && walletPending}
+                    onOpenSettings={() => navigateToView('settings')}
+                  />
                 ) : (
                   <SignInGate isDark={isDark} onSignIn={() => setAuthModal('signin')} />
                 )
@@ -317,6 +441,87 @@ function AppContent() {
       <AnimatePresence>
         {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
       </AnimatePresence>
+
+      {/* Returned from Chapa but the session died on the trip (15-minute
+          access tokens): say so and offer login instead of silently doing
+          nothing. Once signed in, the return effect above kicks verification
+          and starts the wallet poll. */}
+      <AnimatePresence>
+        {isPaymentReturn && !isAuthenticated && (
+          <motion.div
+            key="payment-return-login"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] flex items-center justify-center p-6"
+            style={{ background: 'rgba(4,4,4,0.7)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)' }}
+          >
+            <div
+              className="w-full max-w-sm rounded-[28px] px-7 py-12 flex flex-col items-center"
+              style={{
+                background: isDark ? '#0a0a0a' : '#ffffff',
+                border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.12)'}`,
+              }}
+            >
+              <h3
+                className="text-[20px] font-light mb-2 text-center"
+                style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}
+              >
+                Welcome back
+              </h3>
+              <p
+                className="text-[12px] max-w-[280px] text-center mb-6"
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)' }}
+              >
+                Your session expired while you were paying. Log in again and we&apos;ll confirm your payment and show
+                your ticket.
+              </p>
+              <button
+                onClick={() => setAuthModal('signin')}
+                className="w-full py-3.5 rounded-2xl cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
+                  color: '#000',
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              >
+                Log in
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+{/* Post-Chapa return — shown inside the SAME checkout modal the buyer left:
+          "Securing your spot" (checkout) → "Confirming your payment" →
+          "You're going!" all live in this sheet. */}
+      {(() => {
+        if (returnController.dismissed) return null;
+        if (!returnConfirming && !returnTimedOut && !confirmedTicket) return null;
+        return (
+          <Checkout
+            event={{ name: confirmedTicket?.eventName ?? '', date: confirmedTicket?.eventDate ?? '', time: confirmedTicket?.eventTime ?? '', venue: '' }}
+            ticketType={confirmedTicket?.ticketType ?? ''}
+            ticketLevel=""
+            basePrice={0}
+            returnMode={{
+              confirming: returnConfirming,
+              timedOut: returnTimedOut,
+              confirmedTicket,
+              onViewTicket: () => {
+                const id = confirmedTicket?.id;
+                returnController.stop();
+                navigate(`/tickets${id ? `?ticket=${id}` : ''}`);
+              },
+              onGoToTickets: closeReturn,
+            }}
+            onClose={closeReturn}
+            onComplete={closeReturn}
+          />
+        );
+      })()}
     </div>
   );
 }

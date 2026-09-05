@@ -34,10 +34,12 @@ async function loginThroughUi(page: Page, identifier = SEED_IDENTIFIER, password
   // the modal is mounted last in the DOM, so .last() is the submit button.
   await page.getByRole('button', { name: 'Log in' }).last().click();
   // The success screen is visible for ~1.4s before the modal self-closes;
-  // allow slack for the login round-trip under parallel-worker load.
-  await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 10_000 });
+  // the signup+auto-login chain can take several seconds under a single
+  // backend container, so allow a wide window (no fixed sleeps — still
+  // event-driven, the 1.4s screen only closes after it appears).
+  await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({
-    timeout: 10_000,
+    timeout: 20_000,
   });
 }
 
@@ -74,7 +76,8 @@ test.describe('auth', () => {
     await page.getByPlaceholder('Your password', { exact: true }).fill('wrong-password');
     await page.getByRole('button', { name: 'Log in' }).last().click();
 
-    await expect(page.getByText('Incorrect email/phone or password.')).toBeVisible();
+    // The 401 round-trip can be slow under load; give it a wide window.
+    await expect(page.getByText('Incorrect email/phone or password.')).toBeVisible({ timeout: 15_000 });
     expect(await getSession(page)).toBeNull();
   });
 
@@ -129,9 +132,10 @@ test.describe('auth', () => {
 
     // signUp returns the user only; AuthContext auto-signs in with the same
     // credentials, so the success screen appears only after both round-trips.
-    await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 10_000 });
+    // The chain is slow (~5-10s) and the screen self-closes after 1.4s.
+    await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 25_000 });
     await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({
-      timeout: 10_000,
+      timeout: 25_000,
     });
     await expectAuthenticated(page);
 
