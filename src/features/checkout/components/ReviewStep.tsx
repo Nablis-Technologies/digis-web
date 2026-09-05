@@ -6,7 +6,7 @@ import { Money } from '@/lib/money';
 
 export function ReviewStep({
   event, ticketType, ticketLevel, quantity, setQuantity,
-  basePrice, isDark, hasSeats, selectedSeats = [],
+  basePrice, isDark, hasSeats, selectedSeats = [], children,
 }: any) {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
@@ -64,6 +64,7 @@ export function ReviewStep({
           </h4>
           <p className="text-[10px]" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}>
             {Money.fromMinor(basePrice, "ETB").format()} each
+            {!hasSeats && ' · set quantity for your whole group here'}
           </p>
         </div>
         {hasSeats ? (
@@ -108,6 +109,9 @@ export function ReviewStep({
           </div>
         </>
       )}
+
+      {/* Backend-required buyer consents (Phase 3) — rendered inside the review card. */}
+      {children}
 
     </div>
   );

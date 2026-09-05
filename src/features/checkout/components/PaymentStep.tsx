@@ -16,9 +16,12 @@ export function PaymentStep({
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
 
-  const methods: { id: PaymentMethod; label: string; tag: string; icon: any; accent: string }[] = [
+  // BACKEND_GAPS.md: the backend's PAYMENT_METHODS are telebirr/card/bank —
+  // "cbe" is rejected (invalid_payment_method). CBE stays visible but disabled
+  // until the backend adds it; nothing here maps cbe → bank (ADR-0002).
+  const methods: { id: PaymentMethod; label: string; tag: string; icon: any; accent: string; disabled?: boolean; note?: string }[] = [
     { id: 'telebirr', label: 'Telebirr', tag: 'Mobile money', icon: <ProviderLogo kind="telebirr" size={40} />, accent: '#1aa64b' },
-    { id: 'cbe', label: 'CBE Birr', tag: 'Bank transfer', icon: <ProviderLogo kind="cbe" size={40} />, accent: '#7b2d8e' },
+    { id: 'cbe', label: 'CBE Birr', tag: 'Bank transfer', icon: <ProviderLogo kind="cbe" size={40} />, accent: '#7b2d8e', disabled: true, note: 'Coming soon' },
     { id: 'card', label: 'Credit / Debit Card', tag: 'Visa, Mastercard', icon: <CreditCard className="w-5 h-5" />, accent: '#d6f905' },
   ];
 
@@ -40,7 +43,7 @@ export function PaymentStep({
           <PaymentOption
             key={m.id} option={m}
             selected={method === m.id}
-            onClick={() => setMethod(m.id)}
+            onClick={() => { if (!m.disabled) setMethod(m.id); }}
             isDark={isDark}
           />
         ))}
@@ -111,13 +114,16 @@ export function PaymentStep({
 function PaymentOption({ option, selected, onClick, isDark }: any) {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(26,26,46,0.45)';
+  const disabled = !!option.disabled;
 
   return (
     <AppButton
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={disabled ? undefined : { scale: 1.01 }}
+      whileTap={disabled ? undefined : { scale: 0.99 }}
       onClick={onClick}
-      className="w-full p-4 rounded-2xl flex items-center gap-3.5 cursor-pointer relative overflow-hidden"
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      className="w-full p-4 rounded-2xl flex items-center gap-3.5 cursor-pointer relative overflow-hidden disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         background: selected
           ? (isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.06)')
@@ -138,9 +144,15 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
         {option.icon}
       </div>
       <div className="flex-1 text-left">
-        <p className="text-[14px] font-light"
+        <p className="text-[14px] font-light flex items-center gap-2"
           style={{ fontFamily: "'Inter', sans-serif", color: textPrimary, fontWeight: 500 }}>
           {option.label}
+          {option.note && (
+            <span className="text-[9px] tracking-[1px] uppercase px-1.5 py-0.5 rounded-full"
+              style={{ fontFamily: "'Inter', sans-serif", color: textDim, border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(26,26,46,0.15)'}` }}>
+              {option.note}
+            </span>
+          )}
         </p>
         <p className="text-[11px]"
           style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>

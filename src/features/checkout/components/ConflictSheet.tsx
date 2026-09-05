@@ -1,0 +1,131 @@
+import { motion, AnimatePresence } from 'motion/react';
+import { useTheme } from '@/app/components/ThemeContext';
+import { AppButton } from '@/components/primitives/AppButton';
+
+/**
+ * Bottom sheet shown when the buyer runs into a checkout they already
+ * started (active registration from an earlier checkout, or a finished
+ * stuck order). Never a bare error: every state offers at least one
+ * working action — continue that checkout, replace it, or view Tickets.
+ */
+export function ConflictSheet({
+  open,
+  canContinue,
+  canReplace,
+  onContinue,
+  onReplace,
+  onViewTickets,
+  onClose,
+}: {
+  open: boolean;
+  canContinue: boolean;
+  canReplace: boolean;
+  onContinue: () => void;
+  onReplace: () => void;
+  onViewTickets: () => void;
+  onClose: () => void;
+}) {
+  const { isDark } = useTheme();
+  const textPrimary = isDark ? '#fff' : '#1a1a1a';
+  const textMuted = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(26,26,46,0.6)';
+  const borderSoft = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="checkout-conflict"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center"
+          style={{ background: 'rgba(4,4,4,0.6)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ y: 60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 60, opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] px-6 pt-6 pb-6"
+            style={{
+              background: isDark ? '#0a0a0a' : '#ffffff',
+              border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.12)'}`,
+            }}
+          >
+            <p
+              className="text-[9px] tracking-[3px] uppercase mb-2"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}
+            >
+              Checkout in progress
+            </p>
+            <h3
+              className="text-[19px] font-light mb-2"
+              style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}
+            >
+              You already have this ticket in another checkout
+            </h3>
+            <p
+              className="text-[12.5px] leading-relaxed mb-6"
+              style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}
+            >
+              Pick up where you left off, replace it with the selections above, or check your tickets.
+            </p>
+
+            <div className="flex flex-col gap-2.5">
+              {canContinue && (
+                <AppButton
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onContinue}
+                  className="w-full py-4 rounded-2xl cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
+                    color: '#000',
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 500,
+                  }}
+                >
+                  Continue checkout
+                </AppButton>
+              )}
+              {canReplace && (
+                <AppButton
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onReplace}
+                  className="w-full py-4 rounded-2xl cursor-pointer"
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${borderSoft}`,
+                    color: textPrimary,
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 500,
+                  }}
+                >
+                  Discard &amp; start fresh
+                </AppButton>
+              )}
+              <AppButton
+                whileTap={{ scale: 0.98 }}
+                onClick={onViewTickets}
+                className="w-full py-4 rounded-2xl cursor-pointer"
+                style={{
+                  background: 'transparent',
+                  border: canContinue || canReplace ? 'none' : `1px solid ${borderSoft}`,
+                  color: textMuted,
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              >
+                View Tickets
+              </AppButton>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

@@ -8,6 +8,7 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.4)';
   const notchColor = isDark ? '#0f0f0f' : '#ffffff';
+  const hasTotal = typeof total === 'number';
 
   return (
     <div className="flex flex-col items-center text-center w-full">
@@ -92,8 +93,12 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
           <SummaryLine label="Event" value={event.name} isDark={isDark} />
           <SummaryLine label="Tier" value={ticketType} isDark={isDark} />
           <SummaryLine label="When" value={`${event.date} · ${event.time}`} isDark={isDark} />
-          <div className="h-px" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.1)' }} />
-          <SummaryLine label="Paid" value={Money.fromMinor(total, "ETB").format()} isDark={isDark} />
+          {hasTotal && (
+            <>
+              <div className="h-px" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.1)' }} />
+              <SummaryLine label="Paid" value={Money.fromMinor(total, "ETB").format()} isDark={isDark} />
+            </>
+          )}
         </div>
 
         {/* Vertical perforation + notches */}

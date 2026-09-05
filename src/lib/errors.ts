@@ -34,6 +34,41 @@ const CODE_MESSAGES: Record<string, string> = {
   missing_idempotency_key: 'Something went wrong — please try again.',
   account_deactivated: 'This account has been deactivated.',
   invalid_device: 'This device is no longer trusted. Please log in again.',
+  // Checkout / payment codes (Orders) — verified against the live API.
+  payment_provider_unavailable: 'Online payments are not configured yet. The backend needs CHAPA_ENABLED=true plus Chapa API keys.',
+  invalid_payment_provider: 'This payment provider is not supported.',
+  invalid_payment_method: 'This payment method is not supported.',
+  payment_method_unsupported: 'The provider does not support this payment method.',
+  payment_currency_unsupported: 'The provider does not support this currency.',
+  payment_already_accepted: 'This order was already paid.',
+  payment_attempt_limit_reached: 'Too many payment attempts. Please contact support.',
+  payment_attempt_expired: 'This checkout expired. Please start a new order.',
+  active_checkout_exists: 'You already have a checkout in progress for this event.',
+  registration_required: 'Please complete attendee registration first.',
+  active_registration_conflict: 'You already have an active registration for this ticket.',
+  commercial_terms_unavailable: 'The organizer’s fee terms are not configured — the backend needs a commercial fee schedule for this event.',
+  commercial_requote_required: 'The event’s pricing changed — your checkout was refreshed. Please review and try again.',
+  quote_expired: 'Your checkout quote expired. Please retry payment to refresh it.',
+  // Promo codes — validated server-side at quote time.
+  invalid_promotion_code: 'This promo code is not valid for this event.',
+  promotion_unavailable: 'This promo code cannot be applied to your tickets.',
+  // Order / payment ownership and state.
+  payment_order_not_owned: 'This order belongs to a different account.',
+  event_cancelled: 'This event has been cancelled and can no longer accept payments.',
+  payment_succeeded_pending_acceptance: 'A payment for this order is already being confirmed.',
+  checkout_restart_payment_in_progress: 'A payment is in progress for this checkout — please wait for it to finish.',
+  checkout_restart_unavailable: 'That earlier checkout is already finished. Please start a new order.',
+  payment_attempt_unavailable: 'This checkout can no longer take payment (it may have expired). Please start a new order.',
+  payment_idempotency_conflict: 'A different payment is already in progress for this order.',
+  idempotency_conflict: 'This checkout was already submitted — please wait a moment and check Tickets.',
+  // Registration / consent (Ticketing).
+  phone_identity_unverified: 'Your phone number needs to be verified before you can buy tickets.',
+  missing_required_buyer_consent: 'Please accept all required event terms to continue.',
+  consent_requirement_not_pending: 'This event’s terms changed — please review and accept them again.',
+  required_buyer_consent_missing: 'Please accept all required event terms to continue.',
+  invalid_submission: 'Some registration details were rejected — please check and try again.',
+  // Audience gating (invite-only / access-code events).
+  no_valid_code_or_invitation: 'This access code or invitation is not valid for this event.',
 };
 
 /** Map a known backend `code` to friendly text, else the fallback. */
@@ -59,12 +94,16 @@ export function toApiError(error: unknown): ApiError {
   if (anyError?.response) {
     const status = anyError.response.status ?? 0;
     const body = anyError.response.data as
-      | { error?: string; message?: string; code?: string; errors?: string[] }
+      | { error?: string | { error?: string; message?: string; code?: string; errors?: string[] }; message?: string; code?: string; errors?: string[] }
       | string
       | undefined;
     const data: { error?: string; message?: string; code?: string; errors?: string[] } =
-      body && typeof body === 'object' ? body : { error: body };
-    const message = data.error || data.message || `Request failed (${status})`;
+      body == null
+        ? {}
+        : typeof body === 'object' && typeof body.error === 'object' && body.error !== null
+          ? body.error
+          : (body as { error?: string; message?: string; code?: string; errors?: string[] });
+    const message = (typeof data.error === 'string' && data.error) || data.message || `Request failed (${status})`;
     return new ApiError(message, status, data.code, data.errors);
   }
 

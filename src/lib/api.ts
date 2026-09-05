@@ -54,6 +54,14 @@ function randomIdempotencyKey(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/**
+ * Caller-owned UUIDs (consent request_uuid, etc.) with the same
+ * non-secure-context fallback as the idempotency keys above.
+ */
+export function randomUuid(): string {
+  return randomIdempotencyKey();
+}
+
 apiClient.interceptors.request.use((config) => {
   const session = getSession();
   if (session?.access_token) {

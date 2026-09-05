@@ -4,7 +4,7 @@ import { getSession, setSession, clearSession, subscribe, getSnapshot } from "@/
 import { authService, toAuthUser } from "@/lib/auth";
 import type { AuthUser } from "@/types/auth";
 
-export type Result = { ok: boolean; error?: string };
+export type Result = { ok: boolean; error?: string; fieldErrors?: string[] };
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -47,7 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp: AuthContextValue["signUp"] = async (data) => {
     const up = await authService.signUp(data);
-    if (!up.ok) return { ok: false, error: up.error };
+    if (!up.ok) {
+      return {
+        ok: false,
+        error: up.error,
+        fieldErrors: "fieldErrors" in up ? up.fieldErrors : undefined,
+      };
+    }
     const si = await authService.signIn({ identifier: data.phone, password: data.password });
     if (!si.ok) return { ok: false, error: si.error };
     setSession({
