@@ -9,6 +9,7 @@ import { useProminentHue } from "@/lib/hooks/useProminentHue";
 import { PosterCarousel } from "./PosterCarousel";
 import { FeaturedEventCard } from "./FeaturedEventCard";
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 function MagazineMeta({
   label,
@@ -97,9 +98,10 @@ export function FeaturedMagazine({
           background: isDark
             ? `radial-gradient(ellipse 60% 80% at 0% 0%, rgba(${hued},0.22) 0%, rgba(${hued},0.06) 45%, transparent 75%), #0a0a0a`
             : `radial-gradient(ellipse 60% 80% at 0% 0%, rgba(${hued},0.18) 0%, rgba(${hued},0.05) 45%, transparent 75%), #ffffff`,
-          border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
+          border: "none",
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Ticker strip across top */}
         <div
           className="relative overflow-hidden border-b"
@@ -153,14 +155,14 @@ export function FeaturedMagazine({
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-0 h-[560px] xl:h-[600px]">
+        <div className="grid grid-cols-12 gap-0 h-[560px] lg:h-[600px]">
           {/* LEFT — typography column with stylized date */}
           <motion.div
             key={`text-${hero.id}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="col-span-12 xl:col-span-7 relative px-8 xl:px-12 py-8 flex flex-col justify-center gap-6 h-full"
+            className="col-span-12 lg:col-span-7 relative px-8 lg:px-12 py-8 flex flex-col justify-center gap-6 h-full"
           >
             {/* TOP — square date stamp (dynamic color, mobile-style) */}
             <div className="flex items-start">
@@ -337,7 +339,7 @@ export function FeaturedMagazine({
           </motion.div>
 
           {/* RIGHT — poster coverflow slider (same interaction as mobile) */}
-          <div className="col-span-12 xl:col-span-5 relative h-full py-8 xl:py-12 px-4">
+          <div className="col-span-12 lg:col-span-5 relative h-full py-8 lg:py-12 px-4">
             <PosterCarousel
               events={events}
               onSelectEvent={onSelectEvent}
@@ -398,23 +400,18 @@ export function FeaturedMagazine({
                 onClick={() => { setActiveIdx(i); onActiveIdxChange?.(i); }}
                 onMouseEnter={() => { setActiveIdx(i); onActiveIdxChange?.(i); }}
                 whileTap={{ scale: 0.98 }}
-                className="relative flex-1 min-w-0 flex items-center gap-2.5 px-2 py-2 rounded-xl transition-colors"
+                className="relative flex-1 min-w-0 flex items-center gap-2.5 overflow-hidden px-2 py-2 rounded-xl transition-colors"
                 style={{
                   background: isActive
                     ? isDark
                       ? "rgba(255,255,255,0.08)"
                       : "rgba(0,0,0,0.05)"
                     : "transparent",
-                  border: `1px solid ${
-                    isActive
-                      ? isDark
-                        ? "rgba(255,255,255,0.12)"
-                        : "rgba(0,0,0,0.08)"
-                      : "transparent"
-                  }`,
+                  border: "none",
                 }}
               >
-                <div className="relative w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
+                {isActive && <GlassReflection isDark={isDark} />}
+                <div className="relative z-10 w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
                   <img
                     src={e.image}
                     alt=""
@@ -429,7 +426,7 @@ export function FeaturedMagazine({
                     />
                   )}
                 </div>
-                <div className="flex flex-col items-start min-w-0">
+                <div className="relative z-10 flex flex-col items-start min-w-0">
                   <span
                     className="text-[9px] tracking-[1.5px] uppercase leading-none"
                     style={{
@@ -470,5 +467,3 @@ export function FeaturedMagazine({
     </div>
   );
 }
-
-

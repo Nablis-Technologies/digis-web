@@ -7,6 +7,7 @@ import { formatETB } from "@/lib/utils/format";
 import { readableAccent } from "@/lib/utils/color";
 import { useProminentHue } from "@/lib/hooks/useProminentHue";
 import { EventDateBadge } from "@/components/EventDateBadge";
+import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { AppButton } from '@/components/primitives/AppButton';
 
 export function FeaturedEventCard({
@@ -45,12 +46,12 @@ export function FeaturedEventCard({
         className="relative cursor-pointer group rounded-[28px] overflow-hidden h-full"
         style={{
           background: isDark ? "#0a0a0a" : "#fff",
-          border: `1px solid ${isDark ? `rgba(${rgb},0.28)` : "rgba(0,0,0,0.08)"}`,
           boxShadow: isDark
             ? "0 24px 60px -30px rgba(0,0,0,0.5)"
             : "0 24px 60px -30px rgba(0,0,0,0.25)",
         }}
       >
+        <GlassReflection isDark={isDark} />
         <div
           className="relative overflow-hidden"
           style={{ aspectRatio: "16/11" }}
@@ -191,13 +192,13 @@ export function FeaturedEventCard({
       style={{
         background: surface,
         borderRadius: "28px",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
         overflow: "hidden",
         boxShadow: isDark
           ? undefined
           : "0 24px 55px -34px rgba(0,0,0,0.42)",
       }}
     >
+      <GlassReflection isDark={isDark} />
       {/* Poster image + title overlay */}
       <div
         className="relative overflow-hidden"
@@ -331,5 +332,4 @@ export function FeaturedEventCard({
     </motion.div>
   );
 }
-
 

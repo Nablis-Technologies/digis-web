@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import Slider from "react-slick";
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function ImageCarousel({
   images,
@@ -108,7 +109,7 @@ export function CarouselDots({
             onChange(i);
           }}
           aria-label={`Go to image ${i + 1}`}
-          className="rounded-full transition-all"
+          className="relative overflow-hidden rounded-full transition-all"
           style={{
             width: i === idx ? 20 : 6,
             height: 6,
@@ -121,7 +122,9 @@ export function CarouselDots({
                   ? "rgba(255,255,255,0.25)"
                   : "rgba(0,0,0,0.2)",
           }}
-        />
+        >
+          {i === idx && <GlassReflection isDark={isDark} />}
+        </AppButton>
       ))}
     </div>
   );

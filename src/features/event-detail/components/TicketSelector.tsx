@@ -1,5 +1,6 @@
 import type { Event, TicketTier } from '@/types';
 import { TicketTypeCard } from './TicketTypeCard';
+import type { GlassReflectionSettings } from '@/lib/ui/glass';
 
 export function TicketSelector({
   event,
@@ -8,6 +9,7 @@ export function TicketSelector({
   onSelectTicketType,
   isSoldOut,
   isDark,
+  reflectionSettings,
 }: {
   event: Event;
   ticketTypes: TicketTier[];
@@ -15,6 +17,7 @@ export function TicketSelector({
   onSelectTicketType: (ticketType: string) => void;
   isSoldOut: boolean;
   isDark: boolean;
+  reflectionSettings?: GlassReflectionSettings;
 }) {
   return (
     <>
@@ -58,7 +61,7 @@ export function TicketSelector({
       <div className={`space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:gap-5 transition-opacity duration-300 ${isSoldOut ? 'opacity-40 pointer-events-none select-none' : ''}`}>
         {ticketTypes.map((type, index) => (
           <TicketTypeCard key={type.name} type={type} selected={selectedTicketType === type.name}
-            onSelect={() => !isSoldOut && onSelectTicketType(type.name)} index={index} />
+            onSelect={() => !isSoldOut && onSelectTicketType(type.name)} index={index} reflectionSettings={reflectionSettings} />
         ))}
       </div>
 

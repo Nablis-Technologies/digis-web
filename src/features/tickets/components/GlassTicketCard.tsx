@@ -5,6 +5,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { useImageColor } from '@/lib/hooks/useImageColor';
 import { tierTheme } from '@/lib/utils/tierTheme';
 import { EventDateBadge } from '@/components/EventDateBadge';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import type { UserTicket } from '@/types';
 
 export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onClick: () => void }) {
@@ -45,19 +46,20 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
       className="relative cursor-pointer group rounded-[22px] overflow-hidden"
       style={{
         background: isDark ? '#101010' : '#fff',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+        border: 'none',
         boxShadow: isDark
           ? `0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 32px -16px rgba(0,0,0,0.6)`
           : `0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,0.18)`,
       }}
     >
+      <GlassReflection isDark={isDark} />
       {/* Accent line — pulled from image color */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        className="absolute z-10 left-0 top-0 bottom-0 w-[3px]"
         style={{ background: `rgb(${rgb})`, opacity: 0.85 }}
       />
 
-      <div className="flex gap-0">
+      <div className="relative z-10 flex gap-0">
         {/* Image — left */}
         <div className="relative flex-shrink-0 overflow-hidden" style={{ width: 132, aspectRatio: '1/1' }}>
           {ticket.image ? (
@@ -147,24 +149,25 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
             <div className="flex items-center gap-2 flex-shrink-0">
               {countdown && (
                 <span
-                  className="inline-flex items-center gap-1 text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
+                  className="relative inline-flex items-center gap-1 overflow-hidden text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontWeight: 600,
                     background: countdownStyle.bg,
                     color: countdownStyle.fg,
-                    border: `1px solid ${countdownStyle.border}`,
+                    border: 'none',
                   }}
                 >
+                  <GlassReflection isDark={isDark} />
                   {countdown.tone === 'live' && (
                     <motion.span
                       animate={{ opacity: [0.3, 1, 0.3] }}
                       transition={{ duration: 1.4, repeat: Infinity }}
-                      className="w-1 h-1 rounded-full"
+                      className="relative z-10 w-1 h-1 rounded-full"
                       style={{ background: countdownStyle.fg }}
                     />
                   )}
-                  {countdown.label}
+                  <span className="relative z-10">{countdown.label}</span>
                 </span>
               )}
               <motion.div

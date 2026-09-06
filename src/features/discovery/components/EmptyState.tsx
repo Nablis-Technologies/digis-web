@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeContext";
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 const categoryIcons: Record<string, typeof Music> = {
   All: LayoutGrid,
@@ -120,11 +121,12 @@ export function EmptyState({
           background: isDark
             ? "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.012) 100%)"
             : "linear-gradient(180deg, #edecf7 0%, #f4f3ee 42%, #e7e6f1 100%)",
-          border: `1px solid ${ring(isDark ? 0.08 : 0.09)}`,
+          border: 'none',
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Drifting aurora blobs */}
         <motion.div
           className="absolute -top-32 -left-20 w-[360px] h-[360px] rounded-full pointer-events-none"

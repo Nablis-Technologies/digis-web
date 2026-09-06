@@ -7,6 +7,7 @@ import { tierTheme } from '@/lib/utils/tierTheme';
 import type { UserTicket } from '@/types';
 import { TicketQRCode } from './TicketQRCode';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 const extraIconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
 
@@ -178,16 +179,17 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[1.8px] uppercase"
+              <span className="relative inline-flex items-center gap-1 overflow-hidden px-2 py-0.5 rounded-md text-[9px] tracking-[1.8px] uppercase"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   background: isDark ? `rgba(${tier.rgb},0.14)` : `rgba(${tier.rgb},0.18)`,
-                  border: `1px solid rgba(${tier.rgb},${isDark ? 0.3 : 0.45})`,
+                  border: 'none',
                   color: tier.color,
                   fontWeight: 600,
                 }}>
-                {isVIP && <Sparkles className="w-2.5 h-2.5" strokeWidth={2.5} />}
-                {tier.label}
+                <GlassReflection isDark={isDark} />
+                {isVIP && <Sparkles className="relative z-10 w-2.5 h-2.5" strokeWidth={2.5} />}
+                <span className="relative z-10">{tier.label}</span>
               </span>
               <h2 className="mt-2 text-[17px] sm:text-[21px] leading-tight font-light truncate"
                 style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", letterSpacing: '-0.3px', color: t.text }}>

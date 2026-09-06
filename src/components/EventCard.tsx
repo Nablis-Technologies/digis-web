@@ -7,6 +7,8 @@ import type { Event } from "@/types";
 import { formatETB } from "@/lib/utils/format";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { EventDateBadge } from "@/components/EventDateBadge";
+import { glassShadow } from "@/lib/ui/glass";
+import { GlassReflection } from "@/components/primitives/GlassReflection";
 
 /** Combine an event's date ("June 29, 2026") + time ("8:00 PM") into a Date. */
 export function getEventStart(dateStr: string, timeStr?: string): Date {
@@ -238,18 +240,18 @@ export function EventCard({
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.985 }}
       onClick={onClick}
-      className="relative cursor-pointer group rounded-[24px] overflow-hidden flex flex-col"
+      className="relative isolate cursor-pointer group rounded-[24px] overflow-hidden flex flex-col"
       style={{
         background: isDark ? "#101010" : "#fff",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
-        boxShadow: isDark
-          ? `0 1px 0 rgba(255,255,255,0.03) inset, 0 16px 40px -20px rgba(0,0,0,0.7)`
-          : `0 1px 0 rgba(255,255,255,0.6) inset, 0 12px 32px -18px rgba(0,0,0,0.2)`,
+        // Glass reflection instead of a full hairline: a lit top edge only,
+        // no bottom/side outline. Drop shadow still lifts the card.
+        ...glassShadow(isDark),
       }}
     >
+      <GlassReflection isDark={isDark} />
       {/* Image — dominant, full-bleed */}
       <div
-        className="relative overflow-hidden"
+        className="relative z-10 overflow-hidden"
         style={{
           aspectRatio: "343/429",
         }}
@@ -367,44 +369,44 @@ export function EventCard({
             const c = getCategoryColor(event.category, rgb);
             return (
               <span
-                className="inline-flex items-center h-[22px] px-2.5 rounded-full text-[9px] tracking-[1.5px] uppercase leading-none"
+                className="relative inline-flex items-center h-[22px] overflow-hidden px-2.5 rounded-full text-[9px] tracking-[1.5px] uppercase leading-none"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   background: `linear-gradient(${c.scrim}, ${c.scrim}), rgba(${c.rgb},${c.tint})`,
                   backdropFilter: "blur(10px)",
                   color: `rgba(${c.rgb},${c.text})`,
-                  border: `1px solid rgba(${c.rgb},${c.border})`,
                   fontWeight: 600,
                 }}
               >
-                {event.category}
+                <GlassReflection isDark={isDark} />
+                <span className="relative z-10">{event.category}</span>
               </span>
             );
           })()}
           {event.eventType === "inviteOnly" && (
             <span
-              className="inline-flex items-center h-[22px] gap-1 px-2 rounded-full text-[9px] tracking-[1.4px] uppercase leading-none"
+              className="relative inline-flex items-center h-[22px] gap-1 overflow-hidden px-2 rounded-full text-[9px] tracking-[1.4px] uppercase leading-none"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 background: "rgba(0,0,0,0.55)",
                 backdropFilter: "blur(10px)",
                 color: "#fff",
                 fontWeight: 600,
-                border: "1px solid rgba(255,255,255,0.2)",
               }}
             >
+              <GlassReflection isDark={isDark} />
               {event.inviteWaitlistOnly ? (
                 <Hourglass
-                  className="w-2.5 h-2.5"
+                  className="relative z-10 w-2.5 h-2.5"
                   strokeWidth={2.25}
                 />
               ) : (
                 <Lock
-                  className="w-2.5 h-2.5"
+                  className="relative z-10 w-2.5 h-2.5"
                   strokeWidth={2.5}
                 />
               )}
-              {event.inviteWaitlistOnly ? "Waitlist" : "Invite"}
+              <span className="relative z-10">{event.inviteWaitlistOnly ? "Waitlist" : "Invite"}</span>
             </span>
           )}
         </div>
@@ -414,7 +416,7 @@ export function EventCard({
       </div>
 
       {/* Footer */}
-      <div className="px-3.5 pt-3 pb-3 flex flex-col gap-2">
+      <div className="relative z-10 px-3.5 pt-3 pb-3 flex flex-col gap-2">
         <h3
           className="text-[14px] tracking-[-0.2px] leading-[1.2] line-clamp-1"
           style={{
@@ -515,5 +517,3 @@ export function EventCard({
     </motion.div>
   );
 }
-
-

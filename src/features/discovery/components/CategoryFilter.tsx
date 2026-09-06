@@ -8,6 +8,7 @@ import {
 import { useTheme } from "@/app/components/ThemeContext";
 import { CATEGORIES, hexToRgba, readableCategoryRgb } from "@/lib/categoryColors";
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from "@/components/primitives/GlassReflection";
 
 export function CategoryFilter({
   selectedCategory,
@@ -156,26 +157,27 @@ export function CategoryFilter({
                 stiffness: 420,
                 damping: 26,
               }}
-              className="relative flex items-center gap-2 rounded-full px-4 py-2 whitespace-nowrap flex-shrink-0"
+              className="relative flex items-center gap-2 overflow-hidden rounded-full px-4 py-2 whitespace-nowrap flex-shrink-0"
               style={{
                 background: active
                   ? `linear-gradient(135deg, ${hexToRgba(color, isDark ? 0.34 : 0.28)}, ${hexToRgba(color, isDark ? 0.1 : 0.08)})`
                   : isDark
                     ? `linear-gradient(135deg, ${hexToRgba(color, 0.1)}, ${hexToRgba(color, 0.025)})`
                     : `linear-gradient(135deg, ${hexToRgba(color, 0.09)}, ${hexToRgba(color, 0.03)})`,
-                border: `1px solid ${active ? hexToRgba(color, isDark ? 0.6 : 0.5) : hexToRgba(color, isDark ? 0.22 : 0.2)}`,
+                border: active ? `1px solid ${hexToRgba(color, isDark ? 0.6 : 0.5)}` : "none",
                 boxShadow: "none",
               }}
             >
+              <GlassReflection isDark={isDark} />
               <Icon
-                className="w-[16px] h-[16px] flex-shrink-0"
+                className="relative z-10 w-[16px] h-[16px] flex-shrink-0"
                 strokeWidth={active ? 2.4 : 2.1}
                 style={{
                   color: `rgba(${hue},${active ? 1 : 0.85})`,
                 }}
               />
               <span
-                className="text-[13px] tracking-[0.2px] transition-colors duration-200"
+                className="relative z-10 text-[13px] tracking-[0.2px] transition-colors duration-200"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: active ? 600 : 500,

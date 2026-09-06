@@ -5,6 +5,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { useImageColor } from '@/lib/hooks/useImageColor';
 import type { UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming' | 'past'; isDark: boolean; onDiscover?: () => void }) {
   const isUpcoming = tab === 'upcoming';
@@ -37,13 +38,14 @@ export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming'
           background: isDark
             ? 'linear-gradient(165deg, rgba(40,40,20,0.55) 0%, rgba(18,18,10,0.75) 100%)'
             : 'linear-gradient(165deg, rgba(255,255,255,0.8) 0%, rgba(250,250,235,0.9) 100%)',
-          border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.15)'}`,
+          border: 'none',
           backdropFilter: 'blur(40px) saturate(1.4)',
           boxShadow: isDark
             ? '0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)'
             : 'none',
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Animated colorful Digis ticket passes */}
         <div className="relative flex items-center justify-center mb-7" style={{ height: '170px' }}>
           {[

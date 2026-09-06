@@ -9,6 +9,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { useNotifications, notificationsStore } from '@/services/notifications.service';
 import type { NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 interface TopBarProps {
   currentView?: string;
@@ -80,7 +81,6 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
       : 'linear-gradient(165deg, rgba(255,255,255,0.97), rgba(248,247,252,0.99))',
     backdropFilter: 'blur(60px) saturate(1.5)',
     WebkitBackdropFilter: 'blur(60px) saturate(1.5)',
-    border: `1px solid ${isDark ? 'rgba(214,249,5,0.15)' : 'rgba(0,0,0,0.08)'}`,
     boxShadow: isDark ? '0 20px 60px rgba(0,0,0,0.5)' : '0 20px 60px rgba(0,0,0,0.1)',
   };
 
@@ -94,13 +94,15 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
           className="relative w-10 h-10 rounded-full flex items-center justify-center transition-colors box-border"
           style={{
             background: openMenu === 'notif' ? accentSoft : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-            border: `1px solid ${openMenu === 'notif' ? accentBorder : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+            border: 'none',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
           }}
           aria-label="Notifications"
         >
+          <GlassReflection isDark={isDark} />
           <motion.div
+            className="relative z-10"
             animate={unreadCount > 0 ? { rotate: [0, -12, 10, -6, 4, 0] } : { rotate: 0 }}
             transition={{ duration: 1.2, repeat: unreadCount > 0 ? Infinity : 0, repeatDelay: 4 }}
           >
@@ -111,7 +113,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center"
+              className="absolute z-10 -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center"
               style={{
                 background: '#ef4444',
                 color: '#fff',
@@ -134,12 +136,13 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
           onClick={() => setOpenMenu(openMenu === 'profile' ? 'none' : 'profile')}
           className="relative w-10 h-10 rounded-full flex items-center justify-center box-border overflow-hidden"
           style={{
-            border: `1px solid ${openMenu === 'profile' ? accentBorder : (isAuthenticated ? 'transparent' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'))}`,
+            border: 'none',
             background: isAuthenticated ? 'transparent' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
             transition: 'border-color 0.25s ease',
           }}
           aria-label="Profile"
         >
+          {!isAuthenticated && <GlassReflection isDark={isDark} />}
           {isAuthenticated && user ? (
             <UserAvatar user={user} size={40} style={{ borderRadius: '50%' }} />
           ) : (
@@ -162,8 +165,9 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             className="absolute top-12 right-0 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden"
             style={panelStyle}
           >
+            <GlassReflection isDark={isDark} />
             <div
-              className="px-4 py-3 flex items-center justify-between"
+              className="relative z-10 px-4 py-3 flex items-center justify-between"
               style={{ borderBottom: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
             >
               <div className="flex items-center gap-2">
@@ -198,7 +202,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
               )}
             </div>
 
-            <div className="max-h-[380px] overflow-y-auto scrollbar-hide py-1">
+            <div className="relative z-10 max-h-[380px] overflow-y-auto scrollbar-hide py-1">
               {notifications.length === 0 && (
                 <div
                   className="px-4 py-10 text-center text-[12px]"
@@ -287,8 +291,9 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             className="absolute top-12 right-0 w-64 max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden"
             style={panelStyle}
           >
+            <GlassReflection isDark={isDark} />
             <div
-              className="p-4 pb-3 flex items-center gap-3"
+              className="relative z-10 p-4 pb-3 flex items-center gap-3"
               style={{ borderBottom: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
             >
               <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
@@ -314,7 +319,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
 
             {/* Signed-out: single log in / create account button */}
             {!isAuthenticated && (
-              <div className="p-2 pb-0">
+              <div className="relative z-10 p-2 pb-0">
                 <AppButton
                   onClick={() => openAuth('signin')}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl cursor-pointer"
@@ -330,7 +335,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
               </div>
             )}
 
-            <div className="p-2">
+            <div className="relative z-10 p-2">
               <div
                 className="relative grid grid-cols-2 p-1 rounded-xl"
                 style={{
@@ -437,7 +442,6 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             : 'rgba(245,243,252,0.56)',
           backdropFilter: 'blur(48px) saturate(1.8)',
           WebkitBackdropFilter: 'blur(48px) saturate(1.8)',
-          borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)'}`,
           boxShadow: isDark
             ? 'inset 0 -1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.35)'
             : 'inset 0 -1px 0 rgba(255,255,255,0.8), 0 8px 24px rgba(20,18,40,0.08)',
@@ -465,7 +469,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
 
           {/* Center slot — nav pills always visible */}
           {currentView && onNavigate && (
-            <nav className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <nav className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center gap-1 pointer-events-none">
               {NAV_ITEMS.map(({ id, label, Icon }) => {
                 const active = currentView === id;
                 return (
@@ -473,12 +477,12 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                     key={id}
                     whileTap={{ scale: 0.96 }}
                     onClick={() => onNavigate(id)}
-                    className="relative flex items-center gap-2 px-3.5 lg:px-4 py-2 rounded-full transition-colors"
+                    className="relative pointer-events-auto flex items-center gap-2 px-3.5 lg:px-4 py-2 rounded-full overflow-hidden transition-colors"
                     style={{
                       background: active
                         ? (isDark ? 'rgba(214,249,5,0.14)' : '#d6f905')
                         : 'transparent',
-                      border: `1px solid ${active && isDark ? 'rgba(214,249,5,0.35)' : 'transparent'}`,
+                      border: 'none',
                       backdropFilter: active && isDark ? 'blur(12px)' : 'none',
                       WebkitBackdropFilter: active && isDark ? 'blur(12px)' : 'none',
                       color: active
@@ -489,9 +493,10 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                         : 'none',
                     }}
                   >
-                    <Icon className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                    {active && <GlassReflection isDark={isDark} />}
+                    <Icon className="relative z-10 w-[15px] h-[15px]" strokeWidth={1.75} />
                     <span
-                      className="text-[12px] tracking-[0.5px] hidden lg:inline"
+                      className="relative z-10 text-[12px] tracking-[0.5px] hidden lg:inline"
                       style={{ fontFamily: "'Inter', sans-serif", fontWeight: active ? 600 : 500 }}
                     >
                       {label}
@@ -518,13 +523,14 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                   className="relative h-10 rounded-full flex items-center justify-center box-border overflow-hidden"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                    border: 'none',
                     backdropFilter: 'blur(20px)',
                     WebkitBackdropFilter: 'blur(20px)',
                   }}
                   aria-label="Search events"
                 >
-                  <Search className="w-[17px] h-[17px]" strokeWidth={1.75} style={{ color: isDark ? '#f4ff66' : '#0a0a0a' }} />
+                  <GlassReflection isDark={isDark} />
+                  <Search className="relative z-10 w-[17px] h-[17px]" strokeWidth={1.75} style={{ color: isDark ? '#f4ff66' : '#0a0a0a' }} />
                 </AppButton>
               )}
             </AnimatePresence>

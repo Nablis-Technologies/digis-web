@@ -13,6 +13,7 @@ import { UserProfile } from '@/features/profile/pages/ProfilePage';
 import { SettingsView } from '@/features/profile/pages/SettingsPage';
 import { ResaleMarketplace } from '@/features/resale/pages/ResalePage';
 import { ClaimTicketPage } from '@/features/tickets/pages/ClaimTicketPage';
+import { UIPreviewPage } from '@/features/ui-preview/pages/UIPreviewPage';
 import { Navigation } from '@/components/Navigation';
 import { useTheme } from './components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -367,6 +368,7 @@ export function AppRouterProvider() {
       { path: '/create', Component: CreateRedirect },
       { path: '/settings', Component: AppContent },
       { path: '/claim/:token', Component: ClaimRoute },
+      { path: '/ui-preview', Component: UIPreviewPage },
     ])
   );
   return <RouterProvider router={router} />;

@@ -3,6 +3,7 @@ import { ArrowRight, Gift } from 'lucide-react';
 import { formatETB } from '@/lib/utils/format';
 import type { TicketTier } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function PurchaseBar({
   isDark,
@@ -27,7 +28,7 @@ export function PurchaseBar({
   const [priceAmount, priceCurrency] = priceLabel.split(' ');
 
   return (
-    <div className="relative flex items-center gap-3 min-[380px]:gap-4 px-4 min-[380px]:px-5 py-3 rounded-2xl"
+    <div className="relative flex items-center gap-3 min-[380px]:gap-4 overflow-hidden px-4 min-[380px]:px-5 py-3 rounded-2xl"
       style={{
         background: isDark ? 'transparent' : 'rgba(255,255,255,0.72)',
         backdropFilter: isDark
@@ -36,9 +37,9 @@ export function PurchaseBar({
         WebkitBackdropFilter: isDark
           ? 'blur(60px) saturate(2) brightness(1.15)'
           : 'blur(24px) saturate(1.8)',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
       }}>
-      <div className="flex flex-col flex-shrink-0 overflow-hidden" style={{ width: 78 }}>
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 flex flex-col flex-shrink-0 overflow-hidden" style={{ width: 78 }}>
         <span className="text-[9px] tracking-[1.8px] uppercase leading-none mb-1.5"
           style={{
             fontFamily: "'Inter', sans-serif",
@@ -68,16 +69,15 @@ export function PurchaseBar({
           </span>
         </div>
       </div>
-      <div className="w-px self-stretch my-1"
+      <div className="relative z-10 w-px self-stretch my-1"
         style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
       <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}
         onClick={onGift}
         aria-label="Gift this ticket"
         title="Gift this ticket"
-        className="relative h-10 w-10 min-[380px]:w-auto rounded-xl flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0 min-[380px]:px-[10px]"
+        className="relative z-10 h-10 w-10 min-[380px]:w-auto rounded-xl flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0 min-[380px]:px-[10px]"
         style={{
           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         }}>
         <Gift className="w-[16px] h-[16px]"
           style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={1.75} />
@@ -91,7 +91,7 @@ export function PurchaseBar({
         </span>
       </AppButton>
       <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onPurchase}
-        className="relative flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer"
+        className="relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer"
         style={{
           background: 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)',
           color: '#0a0a0a',

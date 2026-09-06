@@ -5,6 +5,7 @@ import type { Event } from "@/types";
 import { EventInfoRail } from "./EventInfoRail";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function EventHero({
   event,
@@ -54,23 +55,23 @@ export function EventHero({
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 rounded-full"
+              className="relative flex items-center gap-2 overflow-hidden px-4 py-2 rounded-full"
               style={{
                 background: isDark
                   ? "rgba(255,255,255,0.05)"
                   : "rgba(0,0,0,0.04)",
-                border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
                 color: isDark
                   ? "rgba(255,255,255,0.8)"
                   : "rgba(0,0,0,0.7)",
               }}
             >
+              <GlassReflection isDark={isDark} />
               <ArrowLeft
-                className="w-4 h-4"
+                className="relative z-10 w-4 h-4"
                 strokeWidth={1.75}
               />
               <span
-                className="text-[12px] tracking-[0.5px]"
+                className="relative z-10 text-[12px] tracking-[0.5px]"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 500,
@@ -84,16 +85,16 @@ export function EventHero({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.92 }}
                 onClick={() => onLikedChange(!liked)}
-                className="w-11 h-11 rounded-full flex items-center justify-center"
+                className="relative w-11 h-11 overflow-hidden rounded-full flex items-center justify-center"
                 style={{
                   background: isDark
                     ? "rgba(255,255,255,0.05)"
                     : "rgba(0,0,0,0.04)",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
                 }}
               >
+                <GlassReflection isDark={isDark} />
                 <Heart
-                  className={`w-4 h-4 ${liked ? "fill-red-400 text-red-400" : ""}`}
+                  className={`relative z-10 w-4 h-4 ${liked ? "fill-red-400 text-red-400" : ""}`}
                   strokeWidth={1.75}
                   style={{
                     color: liked
@@ -108,19 +109,19 @@ export function EventHero({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.92 }}
                 onClick={() => onShare()}
-                className="w-11 h-11 rounded-full flex items-center justify-center"
+                className="relative w-11 h-11 overflow-hidden rounded-full flex items-center justify-center"
                 style={{
                   background: isDark
                     ? "rgba(255,255,255,0.05)"
                     : "rgba(0,0,0,0.04)",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
                   color: isDark
                     ? "rgba(255,255,255,0.7)"
                     : "rgba(0,0,0,0.6)",
                 }}
               >
+                <GlassReflection isDark={isDark} />
                 <Share2
-                  className="w-4 h-4"
+                  className="relative z-10 w-4 h-4"
                   strokeWidth={1.75}
                 />
               </AppButton>
@@ -139,12 +140,12 @@ export function EventHero({
               className="relative rounded-[28px] overflow-hidden"
               style={{
                 aspectRatio: "4/5",
-                border: `1px solid ${isDark ? `rgba(${rgb},0.22)` : `rgba(${rgb},0.28)`}`,
                 boxShadow: isDark
                   ? `0 30px 80px -24px rgba(${rgb},0.5), 0 10px 40px -20px rgba(0,0,0,0.7)`
                   : `0 30px 70px -26px rgba(${rgb},0.45), 0 14px 40px -24px rgba(20,18,40,0.35)`,
               }}
             >
+              <GlassReflection isDark={isDark} />
               <ImageCarousel
                 images={carouselImages}
                 alt={event.name}
