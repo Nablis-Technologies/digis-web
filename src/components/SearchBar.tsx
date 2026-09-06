@@ -3,6 +3,7 @@ import { Search, X, SlidersHorizontal } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 interface SearchBarProps {
   value: string;
@@ -43,44 +44,52 @@ export function SearchBar({
 
   return (
     <div className="relative w-full group">
-      <Search
-        size={16}
-        strokeWidth={2}
-        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+      <div
+        className="relative overflow-hidden rounded-2xl"
         style={{
-          width: 16,
-          height: 16,
-          color: value
-            ? '#d6f905'
-            : (isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)'),
-        }}
-      />
-      <AppInput
-        ref={inputRef}
-        type="text"
-        placeholder="Search events, venues, artists..."
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={onFocus}
-        onBlur={onBlur}
-        className={`w-full rounded-2xl pl-11 ${rightPad} focus:outline-none transition-all ${
-          isNav ? 'py-2.5 text-[13px]' : 'py-3.5 lg:py-4 text-[13px] lg:text-[14px]'
-        }`}
-        style={{
-          // More substantial backing so typed text + the overlaid icon stay
           background: isDark ? 'rgba(30,30,34,0.40)' : 'rgba(255,255,255,0.68)',
           backdropFilter: 'blur(40px) saturate(1.5)',
           WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
-          fontFamily: "'Inter', sans-serif",
-          color: isDark ? '#fff' : '#1a1a1a',
-          border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.09)"}`,
           boxShadow: isNav
             ? 'none'
             : (isDark
-              ? '0 8px 32px -12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)'
-              : '0 8px 32px -14px rgba(20,18,40,0.22), inset 0 1px 0 rgba(255,255,255,0.85)'),
+              ? '0 12px 36px -16px rgba(0,0,0,0.48)'
+              : '0 12px 36px -18px rgba(20,18,40,0.18)'),
         }}
-      />
+      >
+        <GlassReflection isDark={isDark} />
+        <Search
+          size={16}
+          strokeWidth={2}
+          className="absolute left-4 top-1/2 z-10 -translate-y-1/2 pointer-events-none"
+          style={{
+            width: 16,
+            height: 16,
+            color: value
+              ? '#d6f905'
+              : (isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)'),
+          }}
+        />
+        <AppInput
+          ref={inputRef}
+          type="text"
+          placeholder="Search events, venues, artists..."
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          className={`relative z-10 w-full rounded-2xl bg-transparent pl-11 ${rightPad} focus:outline-none transition-all ${
+            isNav ? 'py-2.5 text-[13px]' : 'py-3.5 lg:py-4 text-[13px] lg:text-[14px]'
+          }`}
+          style={{
+            background: 'transparent',
+            fontFamily: "'Inter', sans-serif",
+            color: isDark ? '#fff' : '#1a1a1a',
+            border: 'none',
+            boxShadow: 'none',
+          }}
+        />
+      </div>
 
 
       <AnimatePresence>
@@ -115,16 +124,15 @@ export function SearchBar({
             color: filterActive
               ? (isDark ? '#0a0a0a' : '#fff')
               : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)'),
-            border: `1px solid ${filterActive
-              ? 'transparent'
-              : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')}`,
+            border: 'none',
           }}
           aria-label="Filters"
         >
-          <SlidersHorizontal className="w-[15px] h-[15px]" strokeWidth={2} />
+          <GlassReflection isDark={isDark} />
+          <SlidersHorizontal className="relative z-10 w-[15px] h-[15px]" strokeWidth={2} />
           {activeFilterCount > 0 && (
             <span
-              className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9.5px]"
+              className="absolute z-10 -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9.5px]"
               style={{
                 background: isDark ? '#0a0a0a' : '#d6f905',
                 color: isDark ? '#d6f905' : '#0a0a0a',

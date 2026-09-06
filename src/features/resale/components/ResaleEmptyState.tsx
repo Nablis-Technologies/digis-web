@@ -4,6 +4,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 const RESALE_PARTICLES = [
   { left: '12%', top: '70%', size: 5, delay: 0, dur: 7, kind: 'dot' },
@@ -34,11 +35,12 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
           background: isDark
             ? 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.012) 100%)'
             : 'linear-gradient(180deg, #edecf7 0%, #f4f3ee 42%, #e7e6f1 100%)',
-          border: `1px solid ${ring(isDark ? 0.08 : 0.09)}`,
+          border: 'none',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Dual drifting aurora blobs (brand lime + violet) */}
         <motion.div
           className="absolute -top-28 -left-16 w-[360px] h-[360px] rounded-full pointer-events-none"

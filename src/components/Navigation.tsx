@@ -4,6 +4,7 @@ import { Compass, Ticket, User, ArrowUpDown, LogIn } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 interface NavigationProps {
   currentView: string;
@@ -67,33 +68,21 @@ export function Navigation({ currentView, onNavigate, onRequestAuth }: Navigatio
             it feels detached from the page surface. Opacity and blur
             intensify smoothly once the user starts scrolling. */}
         <div
-          className="absolute inset-0 transition-all duration-300"
+          className="absolute inset-0 z-0 transition-all duration-300"
           style={{
             background: isDark
               ? `rgba(10,10,12,${scrolled ? 0.72 : 0.7})`
               : `rgba(245,243,252,${scrolled ? 0.76 : 0.7})`,
             backdropFilter: `blur(${scrolled ? 32 : 20}px) saturate(${scrolled ? 1.8 : 1.5})`,
             WebkitBackdropFilter: `blur(${scrolled ? 32 : 20}px) saturate(${scrolled ? 1.8 : 1.5})`,
-            borderTop: `1px solid ${isDark
-              ? `rgba(255,255,255,${scrolled ? 0.1 : 0.06})`
-              : `rgba(0,0,0,${scrolled ? 0.09 : 0.05})`}`,
-            // Subtle inner light edge so the glass reads as a lifted surface
             boxShadow: isDark
-              ? `inset 0 1px 0 rgba(255,255,255,${scrolled ? 0.08 : 0.04}), 0 -8px 32px rgba(0,0,0,${scrolled ? 0.5 : 0.25})`
-              : `inset 0 1px 0 rgba(255,255,255,${scrolled ? 0.95 : 0.7}), 0 -8px 32px rgba(20,18,40,${scrolled ? 0.12 : 0.06})`,
+              ? `0 -8px 32px rgba(0,0,0,${scrolled ? 0.5 : 0.25})`
+              : `0 -8px 32px rgba(20,18,40,${scrolled ? 0.12 : 0.06})`,
           }}
         />
+        <GlassReflection isDark={isDark} />
 
-        {/* Brand accent hairline */}
-        <div
-          className="absolute top-0 left-[15%] right-[15%] h-px transition-opacity duration-300"
-          style={{
-            background: 'linear-gradient(to right, transparent, rgba(214,249,5,0.6), transparent)',
-            opacity: scrolled ? 1 : 0.45,
-          }}
-        />
-
-        <div className="relative px-4 py-3">
+        <div className="relative z-10 px-4 py-3">
           <div className="flex items-center justify-around max-w-lg mx-auto">
             {items.map(({ id, label, Icon }) => (
               <NavItem

@@ -7,8 +7,9 @@ import { resolveTierAccent } from '@/lib/tierAccents';
 import { InlineCountdown } from './InlineCountdown';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
+import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
 
-export function TicketTypeCard({ type, selected, onSelect, index }: { type: TicketTier; selected: boolean; onSelect: () => void; index: number }) {
+export function TicketTypeCard({ type, selected, onSelect, index, reflectionSettings }: { type: TicketTier; selected: boolean; onSelect: () => void; index: number; reflectionSettings?: GlassReflectionSettings }) {
   const { isDark: pageIsDark } = useTheme();
   const isPremium = type.isPremium;
   const isElite = type.isElite;
@@ -69,6 +70,8 @@ export function TicketTypeCard({ type, selected, onSelect, index }: { type: Tick
                     : 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(96,165,250,0.16) 0%, transparent 58%), linear-gradient(155deg, #255f9f 0%, #1a4778 50%, #0c233d 100%)')        
         }}
       />
+      <span aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none rounded-[22px]" style={glassReflection(pageIsDark, undefined, reflectionSettings)} />
+      <span aria-hidden="true" className="absolute inset-0 z-[1] pointer-events-none rounded-[22px]" style={glassEdgeReflection(pageIsDark, reflectionSettings)} />
       {/* VVIP — corner Sparkles */}
       {isElite && (
         <div className="absolute top-2.5 right-9 pointer-events-none z-10">
@@ -82,66 +85,20 @@ export function TicketTypeCard({ type, selected, onSelect, index }: { type: Tick
       />
 
       {/* Border */}
-      <motion.div
+      {selected && <motion.div
         className="absolute inset-0 rounded-[22px] pointer-events-none transition-all duration-400"
         style={{
-          border: selected
-            ? pageIsDark
+          border: pageIsDark
               ? `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.55' : '0.25'})`
               : isElite
                 ? `1.5px solid rgba(${accentRgb}, 0.58)`
-                : `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.48' : '0.38'})`
-            : pageIsDark
-              ? `1px solid rgba(${accentRgb}, 0.1)`
-              : isElite
-                ? `1px solid rgba(${accentRgb}, 0.28)`
-                : `1px solid rgba(${accentRgb}, 0.2)`,
+                : `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.48' : '0.38'})`,
         }}
       />
+      }
 
-      {/* Top highlight line */}
-      <div
-        className="absolute inset-0 pointer-events-none rounded-[22px]"
-        style={{
-          maskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
-          WebkitMaskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
-          background: pageIsDark
-            ? `linear-gradient(90deg, transparent 8%, rgba(${accentRgb}, ${isPremium ? '0.5' : '0.2'}) 50%, transparent 92%)`
-            : isElite
-              ? `linear-gradient(90deg, transparent 8%, rgba(255,255,255,0.30) 28%, rgba(${accentRgb}, 0.72) 50%, transparent 92%)`
-              : `linear-gradient(90deg, transparent 8%, rgba(255,255,255,0.16) 28%, rgba(${accentRgb}, ${isPremium ? '0.48' : '0.34'}) 50%, transparent 92%)`,
-        }}
-      />
-
-      {/* Shimmer for premium */}
-      {isPremium && (
-        <div
-          className="absolute inset-0 pointer-events-none rounded-[22px] overflow-hidden"
-          style={{
-            maskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
-            WebkitMaskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
-          }}
-        >
-          <motion.div
-            className="absolute top-0 h-[2px]"
-            style={{
-              background: pageIsDark
-                ? isElite
-                  ? 'radial-gradient(ellipse at center, rgba(244,255,128,0.8), transparent 70%)'
-                  : 'radial-gradient(ellipse at center, rgba(250,255,150,0.7), transparent 70%)'
-                : isElite
-                  ? 'radial-gradient(ellipse at center, rgba(244,255,128,0.8), transparent 70%)'
-                  : 'radial-gradient(ellipse at center, rgba(255,235,140,0.5), transparent 72%)',
-              width: pageIsDark ? '35%' : isElite ? '35%' : '28%',
-            }}
-            animate={{ left: ['-35%', '100%'] }}
-            transition={{ duration: 4, repeat: Infinity, repeatDelay: 3, ease: 'easeInOut' }}
-          />
-        </div>
-      )}
-      
       {/* Card content */}
-      <div className="relative px-4 py-3.5">
+      <div className="relative z-10 px-4 py-3.5">
         {/* Top: level chip + selection */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -300,4 +257,3 @@ export function TicketTypeCard({ type, selected, onSelect, index }: { type: Tick
     </motion.div>
   );
 }
-

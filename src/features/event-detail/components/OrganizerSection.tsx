@@ -6,6 +6,7 @@ import { flatAvatarColor } from '@/lib/utils/avatarColor';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
+import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
 
 export function resolveOrganizers(event: any): any[] {
   if (Array.isArray(event.organizers) && event.organizers.length > 0) {
@@ -50,7 +51,7 @@ export function resolveOrganizers(event: any): any[] {
   ];
 }
 
-export function OrganizerCard({ organizers, isDark, compact = false }: { organizers: any[]; isDark: boolean; compact?: boolean }) {
+export function OrganizerCard({ organizers, isDark, compact = false, reflectionSettings }: { organizers: any[]; isDark: boolean; compact?: boolean; reflectionSettings?: GlassReflectionSettings }) {
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
   const [profileTarget, setProfileTarget] = useState<any | null>(null);
   const [listOpen, setListOpen] = useState(false);
@@ -80,19 +81,17 @@ export function OrganizerCard({ organizers, isDark, compact = false }: { organiz
           whileTap={{ scale: 0.99 }}
           onClick={() => setListOpen(true)}
           aria-label="View all organizers"
-          className="w-full flex items-center gap-3 pl-4 pr-4 py-3.5 rounded-2xl text-left cursor-pointer"
+          className="relative w-full overflow-hidden flex items-center gap-3 pl-4 pr-4 py-3.5 rounded-2xl text-left cursor-pointer"
           style={{
             background: isDark
               ? 'linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))'
               : 'linear-gradient(145deg, rgba(255,255,255,0.72), rgba(234,231,242,0.58))',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.72)'}`,
-            boxShadow: isDark
-              ? 'inset 0 1px 0 rgba(255,255,255,0.025)'
-              : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(54,47,70,0.05)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
           }}>
-          <div className="flex items-center flex-shrink-0">
+          <span aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none rounded-[inherit]" style={glassReflection(isDark, undefined, reflectionSettings)} />
+          <span aria-hidden="true" className="absolute inset-0 z-[1] pointer-events-none rounded-[inherit]" style={glassEdgeReflection(isDark, reflectionSettings)} />
+          <div className="relative z-10 flex items-center flex-shrink-0">
             {stack.map((o, idx) => (
               <div key={o.handle} className="relative"
                 style={{ marginLeft: idx === 0 ? 0 : -9, zIndex: stack.length - idx }}>
@@ -131,7 +130,7 @@ export function OrganizerCard({ organizers, isDark, compact = false }: { organiz
             )}
           </div>
 
-          <div className="min-w-0 flex-1">
+          <div className="relative z-10 min-w-0 flex-1">
             <span className="block text-[9px] tracking-[1.6px] uppercase leading-none"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.38)' : 'rgba(0,0,0,0.38)', fontWeight: 600 }}>
               {coHosts.length > 0 ? 'Hosted by' : 'Organizer'}
@@ -142,7 +141,7 @@ export function OrganizerCard({ organizers, isDark, compact = false }: { organiz
             </span>
           </div>
 
-          <ChevronRight className="w-4 h-4 flex-shrink-0" strokeWidth={2}
+          <ChevronRight className="relative z-10 w-4 h-4 flex-shrink-0" strokeWidth={2}
             style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }} />
         </AppButton>
 
@@ -685,4 +684,3 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
 
   return typeof document !== 'undefined' ? createPortal(sheet, document.body) : sheet;
 }
-

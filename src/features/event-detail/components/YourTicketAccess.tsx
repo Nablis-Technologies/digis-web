@@ -12,6 +12,7 @@ import { DownloadableTicketCard } from '@/features/tickets/components/Downloadab
 import type { UserTicket } from '@/types';
 import { tierTheme } from '@/lib/utils/tierTheme';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 /**
  * Second access point for a ticket the user already owns.
@@ -158,16 +159,18 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
             type="button"
             whileTap={{ scale: 0.99 }}
             onClick={() => setOpenTicket(ticket)}
-            className="w-full flex items-center gap-3.5 py-3.5 pl-5 pr-3.5 text-left cursor-pointer rounded-[14px]"
+            className="relative w-full flex items-center gap-3.5 overflow-hidden py-3.5 pl-5 pr-3.5 text-left cursor-pointer rounded-[14px]"
             style={{
-              background: isDark ? 'rgba(214,249,5,0.05)' : 'rgba(255,255,255,0.78)',
+              // Keep the owned-ticket access card neutral; lime is reserved for
+              // its small status cues so it does not compete with event cards.
+              background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.78)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
             }}
           >
+            <GlassReflection isDark={isDark} />
 
-
-            <div className="min-w-0 flex-1">
+            <div className="relative z-10 min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span
                   className="text-[8.5px] tracking-[1.6px] uppercase px-1.5 py-0.5 rounded-md leading-none"
@@ -198,7 +201,7 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
             </div>
 
             <div
-              className="shrink-0 w-9 h-9 rounded-full grid place-items-center"
+              className="relative z-10 shrink-0 w-9 h-9 rounded-full grid place-items-center"
               style={{
                 background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(20,18,40,0.05)',
                   color: accent,
@@ -206,7 +209,7 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
             >
               <QrCode className="w-4 h-4" strokeWidth={1.9} />
             </div>
-            <ChevronRight className="w-3.5 h-3.5 shrink-0 -ml-1.5" strokeWidth={2.5} style={{ color: inkSoft }} />
+            <ChevronRight className="relative z-10 w-3.5 h-3.5 shrink-0 -ml-1.5" strokeWidth={2.5} style={{ color: inkSoft }} />
           </AppButton>
         );
         })}

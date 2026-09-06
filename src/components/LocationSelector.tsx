@@ -3,6 +3,7 @@ import { ChevronDown, MapPin, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 const LOCATIONS = [
   { city: 'Addis Ababa', region: 'Ethiopia', events: 142 },
@@ -38,27 +39,24 @@ export function LocationSelector() {
     <div ref={ref} className="relative inline-block">
       <AppButton
         onClick={() => setOpen((v) => !v)}
-        className="group inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full transition-all duration-300"
+        className="group relative inline-flex items-center gap-1.5 h-10 overflow-hidden px-3.5 rounded-full transition-all duration-300"
         style={{
           fontFamily: "'Inter', sans-serif",
           color: triggerColor,
           background: open
             ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.13)')
             : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.52)'),
-          border: `1px solid ${open
-            ? (isDark ? 'rgba(214,249,5,0.3)' : 'rgba(164,190,0,0.35)')
-            : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.72)')}`,
-          boxShadow: isDark ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 20px rgba(54,47,70,0.045)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <MapPin className="w-3 h-3" strokeWidth={2.5} />
-        <span className="text-[11px] tracking-[3px] uppercase">{selected}</span>
+        <GlassReflection isDark={isDark} />
+        <MapPin className="relative z-10 w-3 h-3" strokeWidth={2.5} />
+        <span className="relative z-10 text-[11px] tracking-[3px] uppercase">{selected}</span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.25 }}
-          className="inline-flex"
+          className="relative z-10 inline-flex"
         >
           <ChevronDown className="w-3 h-3" strokeWidth={2.5} />
         </motion.span>
@@ -76,16 +74,13 @@ export function LocationSelector() {
               background: isDark
                 ? 'linear-gradient(180deg, rgba(20,20,22,0.92), rgba(12,12,14,0.92))'
                 : 'linear-gradient(145deg, rgba(255,255,255,0.84), rgba(234,231,242,0.76))',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.78)'}`,
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
-              boxShadow: isDark
-                ? '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(214,249,5,0.04) inset'
-                : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 20px 60px rgba(54,47,70,0.13)',
             }}
           >
+            <GlassReflection isDark={isDark} />
             <div
-              className="px-4 pt-3 pb-2 text-[10px] tracking-[2.5px] uppercase"
+              className="relative z-10 px-4 pt-3 pb-2 text-[10px] tracking-[2.5px] uppercase"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
@@ -94,7 +89,7 @@ export function LocationSelector() {
             >
               Choose your city
             </div>
-            <div className="max-h-[280px] overflow-y-auto py-1 scrollbar-hide">
+            <div className="relative z-10 max-h-[280px] overflow-y-auto py-1 scrollbar-hide">
               {LOCATIONS.map((loc) => {
                 const active = loc.city === selected;
                 return (

@@ -1,6 +1,7 @@
 import type { Event, TicketTier } from '@/types';
 import { TicketTypeCard } from './TicketTypeCard';
 import { Spinner, LoadErrorCard } from '@/components/loading';
+import type { GlassReflectionSettings } from '@/lib/ui/glass';
 
 export function TicketSelector({
   event,
@@ -12,6 +13,7 @@ export function TicketSelector({
   loading = false,
   loadError = false,
   onRetry,
+  reflectionSettings,
 }: {
   event: Event;
   ticketTypes: TicketTier[];
@@ -23,6 +25,7 @@ export function TicketSelector({
   loading?: boolean;
   loadError?: boolean;
   onRetry?: () => void;
+  reflectionSettings?: GlassReflectionSettings;
 }) {
   if (loadError) {
     return <LoadErrorCard message="Tickets for this event could not be loaded." onRetry={onRetry ?? (() => {})} />;
@@ -84,7 +87,7 @@ export function TicketSelector({
       <div className={`space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:gap-5 transition-opacity duration-300 ${isSoldOut ? 'opacity-40 pointer-events-none select-none' : ''}`}>
         {ticketTypes.map((type, index) => (
           <TicketTypeCard key={type.name} type={type} selected={selectedTicketType === type.name}
-            onSelect={() => !isSoldOut && onSelectTicketType(type.name)} index={index} />
+            onSelect={() => !isSoldOut && onSelectTicketType(type.name)} index={index} reflectionSettings={reflectionSettings} />
         ))}
       </div>
 

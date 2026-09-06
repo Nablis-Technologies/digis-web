@@ -7,12 +7,14 @@ import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
+import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
 
-export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFollow }: {
+export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFollow, reflectionSettings }: {
   venue: string; isDark: boolean;
   onOpenProfile?: () => void;
   following?: boolean;
   onToggleFollow?: () => void;
+  reflectionSettings?: GlassReflectionSettings;
 }) {
   const { lat, lng, address } = getVenueCoords(venue);
   const venueName = venue.split(',')[0].trim();
@@ -31,15 +33,13 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
         background: isDark
           ? 'linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))'
           : 'linear-gradient(145deg, rgba(255,255,255,0.72), rgba(234,231,242,0.58))',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.72)'}`,
-        boxShadow: isDark
-          ? 'inset 0 1px 0 rgba(255,255,255,0.025)'
-          : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 14px 32px rgba(54,47,70,0.055)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
       }}>
+      <span aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none rounded-[inherit]" style={glassReflection(isDark, undefined, reflectionSettings)} />
+      <span aria-hidden="true" className="absolute inset-0 z-[1] pointer-events-none rounded-[inherit]" style={glassEdgeReflection(isDark, reflectionSettings)} />
       {/* Map iframe */}
-      <div className="relative h-[200px] overflow-hidden">
+      <div className="relative z-10 h-[200px] overflow-hidden">
         {/*
           The map is a cross-origin frame, so it stays presentational: any event
           raised inside it would surface in our document with a target React
@@ -70,7 +70,7 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 gap-3"
+      <div className="relative z-10 flex items-center justify-between px-4 py-3 gap-3"
         style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(81,72,101,0.075)'}` }}>
         <AppButton
           onClick={onOpenProfile}
@@ -136,7 +136,7 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
   );
 }
 
-export function VenueSection({ venue, isDark }: { venue: string; isDark: boolean }) {
+export function VenueSection({ venue, isDark, reflectionSettings }: { venue: string; isDark: boolean; reflectionSettings?: GlassReflectionSettings }) {
   const [following, setFollowing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   return (
@@ -154,6 +154,7 @@ export function VenueSection({ venue, isDark }: { venue: string; isDark: boolean
         following={following}
         onToggleFollow={() => setFollowing((f) => !f)}
         onOpenProfile={() => setSheetOpen(true)}
+        reflectionSettings={reflectionSettings}
       />
       <AnimatePresence>
         {sheetOpen && (
@@ -596,4 +597,3 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
     </motion.div>
   );
 }
-
