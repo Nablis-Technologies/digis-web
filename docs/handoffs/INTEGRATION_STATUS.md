@@ -7,6 +7,245 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-09 — backend fast-forward (`d67e132`); #29/#32 resolved, transfer OTP surface recorded
+
+Fast-forwarded `digis_backend` `91063d8 → d67e132` (wallet `add_ons`, ticket-only
+min price, public ticket-transfer + OTP acceptance, phone-proof `purpose`,
+BrandedUrl ticket-transfer links). Local dev-env work preserved via stash
+(Dockerfile dev stage, compose.yaml, SolidQueue-in-Puma, seeds). Resolved a
+`structure.sql` conflict (kept upstream `ticket_transfer` target-type); the two
+in-place migration edits (`token_ciphertext` on `ticketing_ticket_transfers`,
+4-value `links_short_links_target_type_check`) were NOT applied to the dev DB, so
+added the column + recreated the constraint via SQL. Recreated the `web` container
+so `SOLID_QUEUE_IN_PUMA=true` actually reaches Puma — the SolidQueue supervisor
+(Supervisor/Dispatcher/Worker) now runs in dev and drains the outbox (stale
+pre-restart parking jobs still fail loudly but are the OLD crash — current
+`Parking::FulfillOrderItem#error(key, status:)` is correct).
+
+**Resolved this run:**
+- **#32** `price_from_minor` filtered to `active && ticket?` products
+  (`event_list_serializer.rb`). Verified live: `on-on` 60000, `euphoria` 70000
+  (both were 10000 — a cheap extra). Frontend discovery grid/filter/sort already
+  read the field — zero code change, just correct now.
+- **#29** wallet `add_ons` projected (`TicketWalletSerializer#add_ons` walks
+  `order_item.order.order_items`, non-ticket) + eager-load added to
+  `TicketsController#index` and `PaymentRefresh`. Frontend `mapWalletTicket`
+  already maps `add_ons` → `UserTicket.addOns`, so `DetailedTicket` "Your extras"
+  renders. Code-verified; live paid proof needs a Chapa sandbox-paid attempt
+  (dev `verify` returns `payment.pending` for unpaid attempts).
+
+**Live guest drill (drive-by):** fresh guest chain on `on-on` Regular + "Drink
+tokens x4" — registration → quote (112750/153750 incl. fee) → order
+(pending_payment) → payment_attempt (Chapa `checkout_url`) → callback replay
+(verified, `payment_event` created) → refresh `pending` until the outbox drains.
+Blocked at the Chapa step only by the unpaid-sandbox `payment.pending` (the
+earlier `ready` proof at 12:17 UTC stands). Early Bird inventory was temporarily
+exhausted by repeated quote holds during the drill (`inventory_unavailable` 409 —
+holds release after the 10-min `HOLD_DURATION`).
+
+**New backend surface (recorded, not yet wired — frontend `transferService`
+remains 100% localStorage):** `GET/POST /public/ticket_transfers/:id`
+(landing / `request_otp` / `accept_guest`), returning transfer + ticket +
+`ticket_view_url` + optional auth tokens. `TicketTransfer` now stores
+`token_ciphertext`; proof tokens carry `purpose`. Recipient OTP wiring tracked in
+`.scratch/`.
+
+**WIRED 2026-09-09 (same run) — live ticket transfer.** `src/lib/transfer.ts`
+rewritten off the localStorage mock onto the live endpoints (initiate nested at
+`POST /tickets/:ticket_id/transfers`); `ClaimTicketPage` rebuilt for
+`/claim/:id?token=` → phone → OTP → accept → claimed ticket (rotated QR) +
+signed `ticket_view_url`; `TransferTicketDialog` is phone-only and surfaces send
+errors; demo transfer seed removed. Unit tests 8 new (`transfer.test.ts`), 90/90,
+tsc clean, build ok. **Live E2E proven** (Chapa Test Event ticket,
+`+251911000003` → `+251900000000`): initiate 201 → landing 200 → request_otp 201
+→ verify 200 (`purpose: ticket_transfer`) → accept_guest 200 (credential
+generation rotated v1→v2, new signed QR, `ticket_view_url` 200). Follow-ups:
+authenticated recipient accept/decline/cancel and password-set on accept are
+supported by the backend but not yet surfaced in the UI (`.scratch/` note).
+
+**Docs:** BACKEND_GAPS.md (re-verify note, #29/#32 → resolved archive, new
+transfer-endpoints section), AGENTS.md open/resolved lists, this snapshot.
+
+## Session 2026-09-08 — backend branch merged forward; gap batch verified resolved
+
+Merged `origin/feat/launch-hardening-telemetry` (edbe945 → 2a8c417; local dev
+files preserved via stash/merge — AGENTS.md, `config/recurring.yml` outbox drain,
+`db/structure.sql` resolved to the merged/authoritative version). Restarted the
+web container (code changed; dev reload disabled). Then verified every filed gap
+against the new code + live API:
+
+**Resolved (verified live 2026-09-08):** #13 `price_from_minor` on the list
+(`on-on` → 10000 — the grid now prices real, not zeros); #19 public
+`registration_schema` (200); #24 `resale_listings/mine` (200); #25 wallet
+`ticket_type` now carries all five resale-policy fields; #10 signup validation
+(weak password → 422 with message); #7 notifications (`GET /notifications` 200,
+empty inbox); #3-nuance `requires_ticket` (code). **Resolved (code read):** #21
+(`AcceptPayment → ConfirmPaid`), #22 (`POST /registrations/:id/release` +
+`ReleasePending`), #12 (`Core::AuthThrottle` 10/min wired to auth endpoints).
+
+**Partial:** #26 registry is
+fixed (no more `payout_account_provider_unavailable`), but Chapa tokenization is
+unimplemented so creates still fail closed (honest 422) by design.
+
+**Still open:** #14 (guest checkout / verified_at), #17 (`cbe` still absent from
+`PAYMENT_METHODS`), #23 (`confirmed` still in `Registration.active` — re-buy of
+the same tier still conflicts; quantity stepper + choice sheet stand), #8/#9
+(no name / no profile update), #27 (RSVP).
+
+**#20 RESOLVED 2026-09-08 — audience gating wired.** `POST
+ticketing/audience_authorizations` is now called by the frontend: a ticketed
+event with gated tiers (`ticket_type.audience != "public"`) shows a
+`GatedTierGate` before the ticket selector — the entered code is validated
+server-side against every gated tier (`audienceModule.authorize`), wrong codes
+show a typed error, and only an authorized code reveals the ticketed flow.
+Config-driven invite events (`event_type: inviteOnly`) keep `InviteOnlySection`,
+which now also authorizes server-side. Verified live on `ifest-events`; unit
+58/58, e2e 14/14, tsc clean.
+
+**#29 RESOLVED 2026-09-08 — extras now display + Add-Extras pays.** Backend:
+`TicketWalletSerializer` gained an `add_ons` attribute (walks
+`ticket.order_item.order.order_items`, non-ticket items) with eager loading in
+`TicketsController#index` + `Orders::PaymentRefresh`. Frontend: `mapWalletTicket`
+maps `add_ons` → `UserTicket.addOns`, so `DetailedTicket` shows "Your extras"
+after any purchase (verified live: "Event tee" displays). The "Add extras" action
+in the tickets view now opens a real `ExtrasOnlyCheckout` (extras-only backend
+order → Chapa payment, verified live: quote/order/payment all work) instead of
+the mock `purchaseTicketExtras`. Caveat: post-purchase extras attach to a NEW
+order (not the ticket's original order), so they may not link back to a ticket
+row on the wallet until the backend associates them. The primary case — extras
+bought WITH the ticket at checkout — is fully fixed. See docs/BACKEND_GAPS.md #29.
+
+**#28 RESOLVED 2026-09-08 — dev DB re-synced (payment 500 fixed).** Root cause:
+`config.active_record.schema_format = :sql` + a **stale `db/structure.sql`** made
+every fresh `db:prepare`/`db:migrate` load the old schema (missing
+`billing_purchase_id`/`billing_purchase_price_digest` on `orders_payments`,
+and the retention `messaging_notification` category), so every
+`POST /orders/:id/payment_attempts` 500'd with `NoMethodError` → "Request
+failed (500)", no purchase could complete. Fix: moved `structure.sql` aside,
+dropped + recreated the dev DB, ran real `db:migrate` (27-col table, constraints
+correct), loaded the SolidQueue schema (11 tables), `db:seed`, and regenerated
+`structure.sql`. Verified: registration → quote → order → payment_attempt →
+**201** with a live Chapa `checkout_url`; e2e **14/14** green. No backend code
+changed — only the stale dump + dev DB.
+
+**#28 follow-up 2026-09-08 — two checkout UX gaps fixed (frontend):**
+
+1. **`active_checkout_exists` 409 no longer a dead end.** Root cause: the resume
+   state (`digis:stuck-order:`, `digis:payment-url:`) lived in **sessionStorage**,
+   which dies with the tab — a buyer returning to a checkout they'd started got
+   no order id and no resume link, so the conflict sheet only offered "View
+   Tickets" (no action). Chapa's docs confirm continuation is valid: the hosted
+   `checkout_url` stays reopenable and failed payments retry up to 10× within a
+   configurable window (default 60 min). Fix: resume keys are now written to
+   **localStorage** too (read/cleared in both stores), so a returning buyer's
+   conflict sheet offers **Continue**, which redirects to their stored Chapa
+   page. (A returning buyer with no prior session state still only gets View
+   Tickets — the backend hold is 10 min and there's no buyer-scoped order-lookup
+   endpoint; #18's `payments/:id/refresh` is payment-scoped reconciliation, not
+   an order discovery endpoint.)
+
+2. **Sold-out/available discrepancy.** Two sub-fixes:
+   - Per-tier sold-out tiers (backend `available:false` → `available:0`) were
+     still clickable because `isSoldOut` only fired when *all* tiers were zero.
+     `TicketTypeCard` now dims a sold-out tier, labels it **"Sold Out"**, and
+     makes it non-selectable (`useTicketPricing` + card gating).
+   - Event-level `event_setting.config.sold_out=true` could lock out buyable
+     tiers (seed snapshot can lag inventory — e.g. `dnkuan-fest-1-0` config says
+     sold_out but its Regular tier has 206 left). `useTicketPricing` now treats
+     live tier availability as authoritative when tier data is present; the
+     config flag only drives the all-sold-out label when there are no tiers.
+   Verified: `dnkuan` Regular selectable despite config sold_out; `on-on` Early
+   Bird gated + labeled Sold Out while Regular/VIP stay buyable. e2e 14/14, unit
+   55/55, tsc clean.
+
+Frontend: wired `requires_ticket` from live products (`products.ts`) — extras
+gating can use it now; adapter already read `price_from_minor`, so the discovery
+grid prices became real with zero code change. Docs updated: BACKEND_GAPS.md
+(statuses + archive table), AGENTS.md (open/resolved lists), INTEGRATION_STATUS
+snapshot. Verified: tsc clean, vitest 44/44, build ok.
+
+## Session 2026-09-08 (pm) — five resolved gaps wired into the frontend
+
+Per the earlier session's "wiring is frontend work" note, all five now
+implemented + tested (unit 55/55, tsc clean, build ok, e2e 14/14):
+
+- **#24 `resale_listings/mine`**: `fetchMyListings` now calls the seller-scoped
+  endpoint (authoritative, cross-session) and joins display from the browse
+  list — the session-storage id-matching (`trackOwnListing`/`readOwnIds`/
+  `clearTrackedOwnListings`/`isOwnListing`) is **deleted**. Ownership for the
+  listing-detail buy-hide flows from the live my-listings query via a new
+  `isOwn` prop on `ListingDetailSheet`. Tests rewritten for the mine endpoint.
+- **#25 wallet resale policy**: `mapWalletTicket` projects the five policy
+  fields (`resale_enabled`, cap, cutoff, max resales) from the wire's
+  `ticket_type`; `SellTicketSheet` pre-gates — blocks listing when resale is
+  disabled or the cutoff passed, clamps the price stepper to a fixed cap, shows
+  the reason inline. Tests in `tickets.test.ts`.
+- **#7 live notifications**: `fetchNotifications` (`GET /notifications`) maps the
+  backend wire (`notification_type`, `data`, `read_at`, `created_at`) onto the
+  UI shape; TopBar hydrates the store from it when authenticated (guests keep
+  the seed/simulated store). Fixed an infinite-render bug in the hydration
+  effect (React Query array identity → guard in `replace`).
+- **#22 registration release**: `registrationModule.release` calls
+  `POST /registrations/:id/release`; `replaceConflictCheckout` ("Discard &
+  start fresh") now releases our own pending registration + drops the stable
+  checkout key before retrying, so a fresh submit no longer re-conflicts.
+- **#19 registration schema**: `registrationModule.fetchRegistrationSchema` hits
+  the public endpoint; the checkout hook loads the applicable form version and
+  attaches `form_version_id` to each answer at submit (stale-version detection).
+  Per-slot answers (`package_unit_number`/`admission_position`) still need
+  slot-aware UI — noted, not wired.
+
+**e2e fixes exposed by the merge:** the new auth throttle (#12) and signup
+validation (#10) made two tests use invalid fixtures — the signup test's random
+phone (`+251912...`) failed the Ethiopian-mobile format, so it now generates a
+valid `+2519XXXXXXXX`. A `Maximum update depth exceeded` crash came from my
+notifications hydration loop (fixed above). Checkout: an order-create 409
+`active_checkout_exists` (stuck active checkout accumulated across runs) now
+opens the conflict sheet (View Tickets) instead of silently dropping the modal.
+
+**Wired 2026-09-08 (follow-up run):** **#18 `payment_refresh` is now wired.**
+The Chapa return screen calls `POST /payments/:payment_id/refresh` on mount
+(`orderModule.refreshPayment` → `usePaymentReturnConfirmation`):
+- `state: ready` → confirms instantly with the returned wallet ticket.
+- `state: terminal` → shows "Payment failed" (no more spinning to a 5-min
+  timeout on a payment that already failed).
+- `state: pending` → re-polls refresh every 3s alongside the wallet poll, so
+  `ready` is picked up the moment the backend verifies (webhook/callback →
+  outbox) — not after a 20s callback kick + drain.
+The payment id is persisted at redirect time (`digis:payment-id:<orderId>` in
+`order.ts` `startPayment`, cleared with the other resume keys) so the return
+screen can resolve it. A refresh failure falls back to the wallet poll
+best-effort. Verified live: ready payment confirms in ~3.7s; pending payment
+re-polls; e2e 14/14, unit 55/55, tsc clean.
+
+## Session 2026-09-07 — config whitelist verified resolved, docs reconciled
+
+Gap #1 is resolved in backend code, not just promised: `EventSettingSerializer::PUBLIC_CONFIG_KEYS`
+is a 17-key projection (featured/rating/sold_out/tickets_left/foreign-price/event_type/seat_map/
+answer-edit-window/rsvp_*/access_mode/invite flags; `access_codes`/`guest_name`/`invite_tickets`
+stay private), served identically on list and detail (detail adds only `created_at`) — verified in
+serializer code + live HTTP. Moved to BACKEND_GAPS resolved archive; AGENTS.md snapshot updated.
+
+Two corrections to what the docs previously claimed:
+- Discovery/detail use **zero mock event records** (`events.ts` merges nothing; `fetchById`
+  returns null; products are live-only). Grid prices are not "mock-fed" — the absent
+  `price_from_minor` (#13, still open) coerces to `0` in the adapter, so cards render zero.
+- The adapter maps only `featured` + `tickets_left`. The other 15 served config keys
+  (`sold_out`, `event_type`, `seat_map`, `rsvp_*`, `access_mode`, `rating`, …) arrive on the
+  wire and are dropped — so `eventType`/`seatMap`/`accessMode` branches never trigger on live
+  data, on click or deep link. Mapping them is frontend-only follow-up work, no backend needed.
+
+**Follow-up done same session:** the adapter now maps all 17 served keys with strict
+parsing (wrong-typed/unknown enum values map to absent; `seat_map`/`rsvp_requirements`
+validated by shape; explicit-null edit window preserved; `foreign_currency` intentionally
+unmapped — no domain field; seed snake_case `stage_label` translated to `stageLabel`). Pinned by `src/lib/events-adapter.test.ts` (6 tests, red→green).
+Verified: full vitest 41/41, `tsc` clean, `vite build` ok, `e2e/event-detail.spec.ts` 4/4
+after fixing a seed-drift failure the run exposed (card-click test hardcoded a title whose
+live form gained a colon — it now reads a non-featured event from the live API and asserts
+the backend slug in the URL). Note: every live event is currently `ticketed`, so the newly
+mapped `eventType`/`seatMap`/`accessMode` paths render identically until a non-ticketed
+event is seeded.
+
 ## Session 2026-09-05 (pm) — price-rank tier accents + live Chapa
 
 ### Tier colors are now rank-based and theme-aware (no longer all blue)
@@ -42,8 +281,10 @@ Backend `compose.yaml` now loads `.env.chapa` via `env_file` (see
 `digis_backend/docs/guides/chapa-integration.md` §5). `docker compose up -d`
 registers Chapa automatically (`Registry.available == ["chapa"]`). The old
 workaround note below ("`CHAPA_ENABLED=false` in the current compose") is
-**obsolete** — Chapa is live. A real/test-mode Chapa payment is now the
-remaining wallet-proof item.
+**obsolete** — Chapa is live. ~~A real/test-mode Chapa payment is now the
+remaining wallet-proof item.~~ **PROVEN 2026-09-07** — `e2e/zz-live-payment.spec.ts`
+ran the full real chain (login → registration → quote → order → Chapa test-mode
+pay → return → wallet poll → "You're going!" → ticket QR), 2.6 min, green.
 
 ## Phase progress
 
@@ -60,8 +301,8 @@ remaining wallet-proof item.
 
 **Products wired into the purchase path (2026-09-03):** `src/lib/products.ts` fetches
 `GET /public/events/:slug/products` and maps `price_options` (lowest active, cents)
-→ `TicketTier[]` + `EventProduct[]` extras; EventDetailPage prefers live tiers/extras
-with mock fallback. The quote line now carries the **real backend product UUID**
+→ `TicketTier[]` + `EventProduct[]` extras; EventDetailPage renders live tiers/extras
+with no mock fallback (nothing purchasable when the backend serves none). The quote line now carries the **real backend product UUID**
 (`ticketProductId` threaded EventDetail → Checkout → `useCheckoutFlow`, replacing the
 synthetic `ticket:<name>` id). GiftTicket extras `price` bug fixed (now `priceMinor`).
 e2e: detail page asserts the products request fires (11/11 suite green).
@@ -88,10 +329,15 @@ Phase 1 blocker is gone. Wired:
   (in-app clicks still ship the event through state for an instant paint). Loading
   shows a spinner (never the mock feed); unknown slugs redirect to `/`.
 - **Adapter reads the real nested data** — `venue`/`city` from
-  `event_dates[0].venue {name, city}`, `organizer` from `organization.name`, images
-  from Active Storage variants (`file.medium ?? thumbnail ?? url` — the backend never
-  served `file.url`). Mock remains only for what the backend doesn't serve
-  (config flags, rich products/seat maps, `price_from_minor` on list).
+   `event_dates[0].venue {name, city}`, `organizer` from `organization.name`, images
+   from Active Storage variants (`file.medium ?? thumbnail ?? url` — the backend never
+   served `file.url`). `featured` + `tickets_left` map from the (now expanded)
+   `event_setting.config` — the other served config keys (`sold_out`, `event_type`,
+   `seat_map`, `rsvp_*`, `access_mode`, `rating`, …) are still unmapped, so
+   `eventType`/`seatMap`/`accessMode` branches don't trigger on live data (frontend
+   follow-up, no backend needed). No mock records anywhere: absent data renders as
+   absent (`price_from_minor` coerces to `0` until #13 lands; lineup/organizer avatars
+   remain hardcoded placeholders — no backend surface).
 - **e2e added (`e2e/event-detail.spec.ts`, 3 tests):** deep-link-by-slug, card click
   → `/events/:slug`, unknown-slug redirect. Full suite: **8/8 passing**.
 - **e2e stability fixes:** `workers: 2` (single-container backend saturates above
@@ -145,9 +391,12 @@ Phase 1 blocker is gone. Wired:
   waits with a 10s window, no fixed sleeps.
 
 ### New backend asks (this branch) — update BACKEND_GAPS.md next
-1. `event_setting.config` returns `{}` — `EventSettingSerializer` whitelists only
+1. ~~`event_setting.config` returns `{}` — `EventSettingSerializer` whitelists only
    `allow_waitlist`/`public_guest_limit`; frontend needs featured/rating/tickets_left/
-   seat_map/rsvp_* (grid silently falls back to mock).
+   seat_map/rsvp_* (grid silently falls back to mock).~~ **RESOLVED 2026-09-07** —
+   the whitelist is now a 17-key projection serving all of these on list and detail
+   (BACKEND_GAPS #1, verified in serializer code + live HTTP). Remaining frontend
+   follow-up: map the served-but-unmapped keys in the adapter.
 2. List serializer still lacks `price_from_minor` (detail-side has it).
 3. **Checkout blocker (updated 2026-09-04):** registration is now PROVEN with the
     seeded verified attendee (`identifier` login → consent_requirements →
@@ -485,18 +734,24 @@ See `docs/superpowers/plans/2026-08-28-frontend-backend-integration.md` for deta
   params per `RegistrationsController`).
 
 ### B-fixes (post-redirect confirmation)
-- **Chapa return handling** — new `usePaymentReturnConfirmation` polls the
-  wallet every 3s on `?status=return` until a ticket for the event appears
-  (the truthful buyer-visible completion signal; no `GET /orders/:id`
-  exists — BACKEND_GAPS #18).
+- **Chapa return handling** — `usePaymentReturnConfirmation` calls
+  `POST /payments/:payment_id/refresh` on mount (#18, wired): `ready` confirms
+  instantly with the returned ticket, `terminal` shows "Payment failed", and
+  only `pending` falls back to polling the wallet every 3s on
+  `?status=return` until a ticket for the event appears.
 - **Mock issuance gated** — `ticketsService.issueTicketsForOrder` runs only
   for non-live carts; live orders rely on the wallet poll.
 
 ### Open Phase 3 work (separate pass)
-- Resale `purchaseListing` is still 100% mock (BACKEND_GAPS #4 is RESOLVED
-  on the backend; just needs wiring — note the public serializer now nests
-  event/product/ticket_type/event_dates+venue, so the browse read path can
-  be mapped; seller identity stays deliberately absent).
+- Resale integration (2026-09-06, `.scratch/resale-integration/`, tickets
+  01–07 implemented, 08 drilled): browse/detail/my-listings, create,
+  cancel, purchase→checkout handoff, payout list/create, and error copy
+  are live against the backend (unit 35/35, tsc/build green). Live drill:
+  reseed clean (resale enabled on `on-on` / Early Bird), reads 200,
+  payout-create 422 proves gap #26, write routes reach the domain layer.
+  Full chain awaits a paid ticket (manual Chapa step). Gaps filed: #24
+  (no owner filter on browse), #25 (no buyer-visible resale policy),
+  #26 (no marketplace provider adapter registered — create always 422).
 - Transfers (`transferService`) are still 100% localStorage.
 - Per-slot registration answers + `form_version_id` blocked by #19.
 - ~~The `order_quotes.promotion_code` flow needs a seeded promo fixture~~ —
@@ -533,9 +788,11 @@ Two buyer-facing errors fixed without touching the backend:
   a temp VIP-tier proof spec (fresh registration, no prior state) ran the full
   chain to payment and was removed afterwards.
 - Buyer `+251900123456` now holds active GA + VIP registrations with pending
-  Chapa payments — its `GET /tickets` is 0 until a payment is completed on the
-  Chapa hosted page. Paid-ticket wallet proof still needs one real or
-  test-mode Chapa payment.
+  Chapa payments on `on-on` — plus, since 2026-09-07, a PAID Final Wave ticket on
+  `avenida-desperados-pregame-edition` (full live payment proven by
+  `e2e/zz-live-payment.spec.ts`: test-mode pay → return → wallet poll →
+  "You're going!" → QR, ~2 min). Wallet proof closed; the paid ticket unblocks
+  the resale list→purchase→cancel drill (ticket 08).
 
 ### E-fixes — suite hardening + promo fixture (2026-09-05, afternoon session)
 
@@ -574,11 +831,56 @@ Two buyer-facing errors fixed without touching the backend:
 
 ## Backend gaps to flag to backend dev (snapshot, see BACKEND_GAPS.md for full detail)
 
-Open blocking: #14 (no guest checkout), #17 (cbe method), #18 (no order read).
-Open degrading: #1 (config whitelist), #13 (price_from_minor), #3-nuance
-(`requires_ticket`), #19 (no public schema), #8 (no name), #9 (no
-profile-update), #10 (no signup validation), #12 (no rate-limit), #20
-(audience — backend ready, frontend work in progress).
-Deferred by design: #7 (consumer notifications/payouts/promos), #8-deferred
-(OTP/Google).
-Resolved: #1b, #2, #3 (main), #4, #5, #6, #15.
+Updated 2026-09-09 after re-verifying every gap against the pulled
+`feat/launch-hardening-telemetry` branch (`91063d8` → `d67e132`); resolved items
+moved to the Resolved archive in BACKEND_GAPS.md.
+
+Open blocking: #17 (cbe method), #23 (re-buy same tier — `confirmed` still in
+`active` scope), #26 (payout create fail-closed — Chapa tokenization
+unimplemented, honest 422).
+Open degrading: #8 (no name), #9 (no
+profile-update), #27 (no consumer RSVP submit — display-only), #30 (parking
+seed zones missing — crash fixed), #31 (no JSON endpoint returns a guest ticket
+`view_token`; in-app OTP claim unreachable without a signed link), #33 (guest
+payment-refresh re-validates the quote token even for accepted payments — a
+paid guest can be told "payment failed"; frontend mitigates by correlating
+creds per payment + stopping on terminal errors, see BACKEND_GAPS.md), #34
+(past events remain purchasable — quote/order ignores the event date and the
+product `sales_end_at` window; frontend disables buying on ended events via
+`eventEnded()` and flags them "Ended" on the grid).
+Resolved this run: #32 (`price_from_minor` ticket-only — live `on-on` 60000,
+`euphoria` 70000), #29 (wallet `add_ons` projected — `DetailedTicket` "Your
+extras" renders on live wallet tickets).
+New surface recorded: public ticket-transfer landing + OTP acceptance
+(`GET/POST /public/ticket_transfers/:id`) — frontend `transferService` is still
+100% localStorage; recipient OTP wiring tracked in `.scratch/`.
+
+**Frontend 2026-09-09 — guest device wallet:** the guest return screen now
+persists issued tickets into an encrypted IndexedDB wallet
+(`src/lib/guest-wallet.ts`, AES-GCM) before clearing resume keys; signed-out
+`/tickets` shows a "Tickets on this device" section (QR re-openable). Covers
+same-device re-entry; cross-device still needs backend #31 (view-token endpoint
+for the OTP claim flow).
+
+**Frontend 2026-09-09 — guest return hardening (#33):** `findGuestReturnCreds`
+now correlates the stored quote_token/phone to the payment being reconciled via
+the `digis:payment-id:<orderId>` mapping (`src/lib/order.ts`), so a stale/crossed
+`digis:guest:*` set can no longer cause `invalid_guest_quote`; the reconcile loop
+stops polling on terminal refresh errors (honest copy instead of "payment
+failed") and backs off 60s on 429 instead of hammering the guest throttle.
+
+**Frontend 2026-09-09 — ended-event purchase gate (#34):** `eventEnded()` in
+`src/lib/eventDates.ts` (a date is purchasable when `status ∈ {scheduled,
+postponed}` and `ends_at`/`starts_at` is in the future). The event detail page
+hides the ticket selector + purchase bar and shows an "Event ended" state;
+`choose_one` checkout offers only future dates; the discovery grid keeps past
+events visible with an "Ended" badge. Backend remains authoritative once it
+enforces the date/sales window.
+Informational: #11 (partial — short-link reserved slugs exist; event
+slug_history 301 remains), #16 (Chapa v1 only).
+Deferred by design: #8-deferred (Google / password-reset; phone OTP now exists
+via guest claim).
+Resolved (archive): #1, #1b, #2, #3 (main), #3-nuance, #4, #5, #6, #7
+(notifications + promos), #10, #12, #13, #14 (guest checkout — backend
+complete, frontend slices 1–3 wired), #15, #18, #19, #20, #21, #22, #24, #25,
+#28, #30-crash.

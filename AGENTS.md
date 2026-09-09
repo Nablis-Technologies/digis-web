@@ -66,23 +66,65 @@ Single source of truth: **`docs/BACKEND_GAPS.md`** (reorganized
 2026-09-04: blocking → degrading → informational → deferred → resolved
 archive). Open items that matter for new work:
 
-- **#14** No guest checkout + no `verified_at` path → new users can't buy
+**When you discover a backend gap** (during verification, a live API probe, a
+code read, or a route grep) — **file it yourself in `docs/BACKEND_GAPS.md`
+immediately, without asking or re-explaining it in chat.** Give it the next
+free number, one of the five statuses, the evidence (route/serializer/code +
+verification date), why it matters, and a concrete fix. Then update the status
+snapshot in `docs/handoffs/INTEGRATION_STATUS.md` and this list if the entry
+changes the open/resolved picture. Do not let a confirmed gap live only in the
+conversation — the docs are the single source of truth.
+
+**Frontend-wiring sweep — a backend status change is not "done" until the
+frontend consumes it.** Every run that verifies backend fixes (a merge, a live
+probe, a code read) MUST sweep the FULL gap list for status changes — "resolved"
+AND "partial" — and for each one ask: "is there a frontend code path that should
+now use this backend surface?" Wire it, or file it as a tracked follow-up in
+`.scratch/`, before the run ends. **A "partial" backend fix is still a frontend
+obligation** — e.g. #18's `POST /payments/:payment_id/refresh` exists so the
+Chapa return screen should call it instead of blind wallet-polling; that wiring
+is frontend work, not optional. Do not report "aligned with backend gap fixes"
+unless every status change was swept and either wired or tracked. History: the
+2026-09-08 wiring run wired the five _resolved_ gaps (#24/#25/#7/#22/#19) and
+missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
+sweep is the rule that prevents that.
+
 - **#17** `cbe` payment method not in backend `PAYMENT_METHODS` (CBE option
   is currently disabled in the UI)
-- **#18** No buyer-scoped `GET /orders/:id` (Chapa return uses wallet-poll)
-- **#19** No public registration-schema endpoint (per-slot answers + version
-  staleness can't be wired)
-- **#1** `event_setting.config` is `{}` for the public list (featured/rating/
-  tickets_left/seat_map fall back to mock)
-- **#13** List lacks `price_from_minor` (grid prices mock-fed)
-- **#7** No consumer notifications / payout-methods / consumer promo endpoints
-  (deferred by product)
-- **#8/9/10/12** No `name`/self-service update/signup validation/rate-limit
+- **#23** One active registration per identity+ticket type (`confirmed` still
+  blocks a fresh submit; quantity stepper + choice sheet stand)
+- **#26** Payout create fail-closed: registry fixed, but Chapa tokenization
+  unimplemented → creates still 422 (honest)
+- **#27** No consumer RSVP submit endpoint (RSVP events display-only)
+- **#30** Parking fulfillment blocked by missing seed zones (crash fixed, but
+  zero parking access zones in seed → parking orders still can't fulfill)
+- **#31** No JSON endpoint returns a signed guest ticket `view_token` — the
+  in-app OTP claim flow can't start without a signed link
+- **#33** Guest payment-refresh re-validates the quote token even for accepted
+  payments (a guest can be told "payment failed" after paying; frontend now
+  correlates creds per payment + stops on terminal errors — see BACKEND_GAPS.md)
+- **#34** Past events remain purchasable — quote/order never checks the event
+  date (`EventDate` ends_at/status) or the product `sales_end_at` window; the
+  frontend disables buying on ended events (eventEnded) until the backend
+  enforces it
+- **#8/9** No `name` on user / no self-service profile update
 
-Resolved (do NOT keep mocks against): #1b (detail-by-slug), #2 (venue/organizer
-nested), #3 (product `price_options` + `available`), #4 (resale display fields),
-#5 (`GET /tickets` wallet), #6 (free orders fulfill), #15 (commercial terms
-seeded).
+Resolved (do NOT keep mocks against): #1 (config whitelist), #1b (detail-by-slug),
+#2 (venue/organizer nested), #3 (product `price_options` + `available`),
+#3-nuance (`requires_ticket`), #4 (resale display fields), #5 (`GET /tickets`
+wallet), #6 (free orders fulfill), #7 (notifications — inbox live), #10 (signup
+validation), #12 (auth throttle), #13 (`price_from_minor`), #14 (guest shadow
+checkout — OTP, guest reg, quote/order/payment, claim-guest, public ticket
+views), #15 (commercial terms seeded), #19 (registration schema), #21 (paid regs
+confirmed), #22 (buyer release), #24 (`resale_listings/mine`), #25 (wallet resale
+policy), #28 (dev DB re-synced to the edited `create_payments` migration), #18
+(payment refresh wired on the Chapa return screen), #20 (audience gating wired —
+gated-tier events gate the ticket selector behind server-validated access codes),
+#30-crash (parking `FulfillOrderItem` keyword-arg crash fixed; seed zones still
+missing — see open #30), #29 (wallet `add_ons` now projected from the ticket's
+order — `DetailedTicket` "Your extras" renders on live wallet tickets), #32
+(`price_from_minor` filtered to ticket products — discovery grid/filter/sort show
+the true ticket "from" price).
 
 ## Agent skills
 
