@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createBrowserRouter, RouterProvider, useLocation, useNavigate } from 'react-router';
+import { createBrowserRouter, RouterProvider, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogIn, UserCircle } from 'lucide-react';
@@ -22,7 +22,7 @@ import { useTheme } from './components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { AuthModal } from '@/features/auth/components/AuthModal';
 import { TopBar } from '@/components/TopBar';
-import { usePaymentReturnConfirmation } from '@/lib/payment-return';
+import { usePaymentReturnConfirmation, useGuestPaymentReturnConfirmation } from '@/lib/payment-return';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 
 export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings';
@@ -217,12 +217,32 @@ function AppContent() {
     } catch { /* ignore */ }
     return undefined;
   }, [location.search, isPaymentReturn]);
+  // Buyer-owned attempt id persisted at redirect time (order.ts startPayment).
+  // Drives the POST /payments/:id/refresh reconciliation on the return screen.
+  const returnPaymentId = useMemo(() => {
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith('digis:payment-id:')) {
+          const v = sessionStorage.getItem(k) ?? window.localStorage.getItem(k);
+          if (v) return v;
+        }
+      }
+    } catch { /* ignore */ }
+    return undefined;
+  }, [location.search, isPaymentReturn]);
   const returnController = usePaymentReturnConfirmation(
     returnEventId,
     userTickets,
     isAuthenticated,
+    returnPaymentId,
+  );
+  const guestReturnController = useGuestPaymentReturnConfirmation(
+    returnEventId,
+    returnPaymentId,
   );
   const { state: returnState, start: startReturnConfirm } = returnController;
+  const { state: guestReturnState, start: startGuestReturnConfirm } = guestReturnController;
 
   // Local-dev return-URL verify: Chapa can't reach localhost, so replay
   // each attempt tx_ref to the callback endpoint (verify-before-trust
@@ -250,13 +270,17 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!isPaymentReturn || !isAuthenticated) return;
+    if (!isPaymentReturn) return;
     const sp = new URLSearchParams(location.search);
     sp.delete('status');
     const next = sp.toString();
     navigate(location.pathname + (next ? `?${next}` : ''), { replace: true });
-    kickReturnVerification();
-    startReturnConfirm();
+    if (isAuthenticated) {
+      kickReturnVerification();
+      startReturnConfirm();
+    } else {
+      startGuestReturnConfirm();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPaymentReturn, isAuthenticated]);
 
@@ -272,8 +296,20 @@ function AppContent() {
 
   const confirmedTicket =
     returnState.kind === 'confirmed' ? returnState.ticket : null;
-  const returnConfirming = returnState.kind === 'confirming';
-  const returnTimedOut = returnState.kind === 'timeout';
+  const guestConfirmedTicket =
+    guestReturnState.kind === 'confirmed' ? guestReturnState.ticket : null;
+  // Snapshot of the last confirmed purchase — survives `returnController.stop()`
+  // so the tickets view can open the ticket QR without waiting for the wallet.
+  const lastConfirmedTicketRef = useRef<UserTicket | null>(null);
+  const returnConfirming = isAuthenticated
+    ? returnState.kind === 'confirming'
+    : guestReturnState.kind === 'confirming';
+  const returnTimedOut = isAuthenticated
+    ? returnState.kind === 'timeout'
+    : guestReturnState.kind === 'timeout';
+  const returnTerminal = isAuthenticated
+    ? returnState.kind === 'terminal'
+    : guestReturnState.kind === 'terminal';
   // Fresh wallet on every arrival at /tickets: a ticket the backend issued
   // moments ago (webhook → outbox → issue) must show up, not a cached list
   // from before the purchase.
@@ -284,11 +320,13 @@ function AppContent() {
   }, [currentView, isAuthenticated, refetchWallet]);
 
   const closeReturn = () => {
-    // Dismissing the sheet does NOT stop the confirmation poll — the ticket
-    // may still be issuing server-side. Keep the wallet cache updating in the
-    // background so /tickets shows the ticket as soon as it lands.
-    if (returnConfirming) returnController.dismiss();
-    else returnController.stop();
+    if (isAuthenticated) {
+      if (returnConfirming) returnController.dismiss();
+      else returnController.stop();
+    } else {
+      if (returnConfirming) guestReturnController.dismiss();
+      else guestReturnController.stop();
+    }
     navigateToView('tickets');
   };
 
@@ -393,10 +431,13 @@ function AppContent() {
               ) : currentView === 'tickets' ? (
                 <TicketView
                   tickets={userTickets}
+                  initialOpenTicket={lastConfirmedTicketRef.current ?? confirmedTicket}
                   loading={isAuthenticated && walletPending}
                   refreshing={isAuthenticated && walletFetching && !walletPending}
                   loadError={isAuthenticated && walletError}
                   onRetry={() => void refetchWallet()}
+                  isAuthenticated={isAuthenticated}
+                  onRequestAuth={() => setAuthModal('signin')}
                   onDiscover={() => navigateToView('discover')} onListForResale={(ticket) => {
                   setResaleTicket(ticket);
                   navigateToView('resale');
@@ -443,12 +484,11 @@ function AppContent() {
         {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
       </AnimatePresence>
 
-      {/* Returned from Chapa but the session died on the trip (15-minute
-          access tokens): say so and offer login instead of silently doing
-          nothing. Once signed in, the return effect above kicks verification
-          and starts the wallet poll. */}
+      {/* Returned from Chapa as an unauthenticated user. If guest credentials
+          are stored (guest checkout flow), the guest return confirmation starts
+          automatically. Otherwise the session probably expired — offer login. */}
       <AnimatePresence>
-        {isPaymentReturn && !isAuthenticated && (
+        {isPaymentReturn && !isAuthenticated && guestReturnState.kind === 'idle' && (
           <motion.div
             key="payment-return-login"
             initial={{ opacity: 0 }}
@@ -499,21 +539,35 @@ function AppContent() {
           "Securing your spot" (checkout) → "Confirming your payment" →
           "You're going!" all live in this sheet. */}
       {(() => {
-        if (returnController.dismissed) return null;
-        if (!returnConfirming && !returnTimedOut && !confirmedTicket) return null;
+        const activeConfirmed = isAuthenticated ? confirmedTicket : guestConfirmedTicket;
+        const activeDismissed = isAuthenticated
+          ? returnController.dismissed
+          : guestReturnController.dismissed;
+        if (activeDismissed) return null;
+        if (!returnConfirming && !returnTimedOut && !returnTerminal && !activeConfirmed) return null;
         return (
           <Checkout
-            event={{ name: confirmedTicket?.eventName ?? '', date: confirmedTicket?.eventDate ?? '', time: confirmedTicket?.eventTime ?? '', venue: '' }}
-            ticketType={confirmedTicket?.ticketType ?? ''}
+            event={{ name: activeConfirmed?.eventName ?? '', date: activeConfirmed?.eventDate ?? '', time: activeConfirmed?.eventTime ?? '', venue: '' }}
+            ticketType={activeConfirmed?.ticketType ?? ''}
             ticketLevel=""
             basePrice={0}
             returnMode={{
               confirming: returnConfirming,
               timedOut: returnTimedOut,
-              confirmedTicket,
+              terminal: returnTerminal,
+              // A guest return that couldn't be verified (stale checkout creds,
+              // throttled, or storage cleared) must not be told "payment failed /
+              // nothing was charged" — the payment may well have succeeded. Point
+              // them at the SMS link and the on-device wallet instead.
+              terminalMessage: !isAuthenticated && returnTerminal
+                ? "We couldn't verify this purchase from here. If you completed the payment, your ticket was sent by SMS and is available under Tickets on this device."
+                : undefined,
+              confirmedTicket: activeConfirmed,
               onViewTicket: () => {
-                const id = confirmedTicket?.id;
-                returnController.stop();
+                const id = activeConfirmed?.id;
+                const controller = isAuthenticated ? returnController : guestReturnController;
+                lastConfirmedTicketRef.current = activeConfirmed;
+                controller.stop();
                 navigate(`/tickets${id ? `?ticket=${id}` : ''}`);
               },
               onGoToTickets: closeReturn,
@@ -576,6 +630,9 @@ function ClaimRoute() {
   const navigate = useNavigate();
   const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
   const { isDark } = useTheme();
+  const { id = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') ?? '';
   return (
     <div
       className="relative min-h-screen"
@@ -586,6 +643,8 @@ function ClaimRoute() {
       }}
     >
       <ClaimTicketPage
+        id={id}
+        token={token}
         onRequestAuth={() => setAuthModal('signin')}
         onNavigateHome={() => navigate(VIEW_PATHS.discover)}
         onNavigateTickets={() => navigate(VIEW_PATHS.tickets)}
@@ -611,7 +670,7 @@ export function AppRouterProvider() {
       { path: '/resale', Component: AppContent },
       { path: '/create', Component: CreateRedirect },
       { path: '/settings', Component: AppContent },
-      { path: '/claim/:token', Component: ClaimRoute },
+      { path: '/claim/:id', Component: ClaimRoute },
       { path: '/ui-preview', Component: UIPreviewPage },
     ])
   );

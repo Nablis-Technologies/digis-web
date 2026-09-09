@@ -12,6 +12,7 @@ import { flatAvatarColor } from '@/lib/utils/avatarColor';
 import { CancelBtn, Divider, EditField, PickerList, Row, SaveBtn, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill } from '@/features/profile/components/SettingsPrimitives';
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 interface SettingsViewProps {
   onBack: () => void;
@@ -81,10 +82,13 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         <AppButton
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }}
           onClick={onBack}
-          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+          className="relative w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
+          style={{ background: cardBg }}
         >
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} style={{ color: value }} />
+          <GlassReflection isDark={isDark} />
+          <span className="relative z-10 flex items-center justify-center">
+            <ArrowLeft className="w-4 h-4" strokeWidth={1.75} style={{ color: value }} />
+          </span>
         </AppButton>
         <h1
           className="text-[28px] lg:text-[34px] font-light tracking-[-0.5px]"
@@ -335,10 +339,13 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
                         { label: 'WhatsApp', value: '+251 91 234 5678' },
                         { label: 'Hours', value: 'Mon–Sat, 8 AM – 8 PM EAT' },
                       ].map(({ label, value }) => (
-                        <div key={label} className="flex items-center justify-between p-3 rounded-xl"
-                          style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: `1px solid ${cardBorder}` }}>
-                          <span style={{ color: heading, fontWeight: 500 }}>{label}</span>
-                          <span>{value}</span>
+                        <div key={label} className="relative flex items-center justify-between p-3 rounded-xl overflow-hidden"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                          <GlassReflection isDark={isDark} />
+                          <div className="relative z-10 flex items-center justify-between w-full">
+                            <span style={{ color: heading, fontWeight: 500 }}>{label}</span>
+                            <span>{value}</span>
+                          </div>
                         </div>
                       ))}
                     </div>

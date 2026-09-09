@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Check, ChevronRight, Loader2, Moon, Sun, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { Switch } from '@/components/ui/switch';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
@@ -96,14 +97,14 @@ export function Section({ title, isDark, children }: { title: string; isDark: bo
         {title}
       </h2>
       <div
-        className="rounded-2xl overflow-hidden"
+        className="relative rounded-2xl overflow-hidden"
         style={{
           background: isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.7)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}`,
           backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
         }}
       >
-        {children}
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10">{children}</div>
       </div>
     </motion.div>
   );
@@ -218,15 +219,16 @@ export function SettingsSheet({ title, onClose, isDark, brand, cardBorder, child
         className="relative rounded-[24px] overflow-hidden px-5 pt-6 pb-5"
         style={{
           background: isDark ? 'rgba(18,18,22,0.96)' : 'rgba(255,255,255,0.98)',
-          border: `1px solid ${cardBorder}`,
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
           boxShadow: isDark ? '0 -20px 60px rgba(0,0,0,0.6)' : '0 -16px 48px rgba(20,18,40,0.16)',
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Handle */}
-        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full"
+        <div className="absolute z-10 top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full"
           style={{ background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }} />
         {/* Header */}
+        <div className="relative z-10">
         <div className="flex items-center justify-between mb-5">
           <p className="text-[17px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: heading }}>{title}</p>
           <AppButton whileTap={{ scale: 0.9 }} onClick={onClose}
@@ -236,6 +238,7 @@ export function SettingsSheet({ title, onClose, isDark, brand, cardBorder, child
           </AppButton>
         </div>
         {children}
+        </div>
       </div>
     </motion.div>
   );

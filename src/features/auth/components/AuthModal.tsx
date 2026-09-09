@@ -9,6 +9,7 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import type { CSSProperties } from 'react';
 
 /* ─── Country data ─────────────────────────────────────────── */
@@ -143,12 +144,13 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
         className="relative w-full sm:max-w-md max-h-[94vh] overflow-hidden flex flex-col rounded-t-[32px] sm:rounded-[32px]"
         style={{
           background: bgPanel,
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(20,18,40,0.1)'}`,
           boxShadow: isDark
             ? '0 -20px 80px rgba(0,0,0,0.5)'
             : '0 -20px 80px rgba(20,18,40,0.18)',
         }}
       >
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
         {/* Mobile grab handle */}
         <div className="sm:hidden relative flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)' }} />
@@ -282,6 +284,7 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
             <span className="text-[10px] tracking-[1px] uppercase" style={{ fontFamily: "'Inter', sans-serif" }}>Encrypted &amp; secure</span>
           </div>
         )}
+        </div>
       </motion.div>
     </motion.div>
   );

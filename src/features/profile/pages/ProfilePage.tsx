@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
 import type { UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { ProfileRowSkeleton, useShowSkeleton } from '@/components/loading';
 
 interface UserProfileProps {
@@ -126,31 +127,35 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
           className="flex gap-2 mt-4"
         >
           <AppButton
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] tracking-[0.5px] transition-colors"
+            className="relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl overflow-hidden text-[12px] tracking-[0.5px] transition-colors"
             style={{
               fontFamily: "'Inter', sans-serif",
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
-              border: `1px solid ${cardBorder}`,
               color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)',
               fontWeight: 500,
             }}
           >
-            <Share2 className="w-3.5 h-3.5" strokeWidth={2} />
-            Share profile
+            <GlassReflection isDark={isDark} />
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              <Share2 className="w-3.5 h-3.5" strokeWidth={2} />
+              Share profile
+            </span>
           </AppButton>
           <AppButton
             onClick={onOpenSettings}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] tracking-[0.5px] transition-colors cursor-pointer"
+            className="relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl overflow-hidden text-[12px] tracking-[0.5px] transition-colors cursor-pointer"
             style={{
               fontFamily: "'Inter', sans-serif",
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
-              border: `1px solid ${cardBorder}`,
               color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)',
               fontWeight: 500,
             }}
           >
-            <Settings className="w-3.5 h-3.5" strokeWidth={2} />
-            Settings
+            <GlassReflection isDark={isDark} />
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              <Settings className="w-3.5 h-3.5" strokeWidth={2} />
+              Settings
+            </span>
           </AppButton>
         </motion.div>
       </div>
@@ -160,8 +165,10 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
         className="px-4 sm:px-6 lg:px-8 mb-6"
       >
-        <div className="rounded-2xl p-4"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}`, backdropFilter: 'blur(30px)' }}>
+        <div className="relative rounded-2xl overflow-hidden p-4"
+          style={{ background: cardBg, backdropFilter: 'blur(30px)' }}>
+          <GlassReflection isDark={isDark} />
+          <div className="relative z-10">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5" style={{ color: accent }} strokeWidth={2} />
@@ -191,6 +198,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
             style={{ fontFamily: "'Inter', sans-serif", color: mutedText }}>
             {user.xpToNext - user.xp} XP to unlock <span style={{ color: accent }}>Platinum</span> perks
           </p>
+          </div>
         </div>
       </motion.div>
 
@@ -200,8 +208,10 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
           <motion.div key={stat.label}
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 + index * 0.05 }}
-            className="rounded-2xl p-4"
-            style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+            className="relative rounded-2xl overflow-hidden p-4"
+            style={{ background: cardBg }}>
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10">
             <div className="flex items-center gap-1.5 mb-3" style={{ color: accent }}>
               {stat.icon}
               <span className="text-[10px] tracking-[1.5px] uppercase"
@@ -217,6 +227,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
               style={{ fontFamily: "'Inter', sans-serif", color: mutedText }}>
               {stat.sub}
             </p>
+            </div>
           </motion.div>
         ))}
       </div>
@@ -284,8 +295,10 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
           style={{ fontFamily: "'Inter', sans-serif", color: accent }}>
           Taste Breakdown
         </h2>
-        <div className="rounded-2xl p-5 space-y-3.5"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+        <div className="relative rounded-2xl overflow-hidden p-5"
+          style={{ background: cardBg }}>
+          <GlassReflection isDark={isDark} />
+          <div className="relative z-10 space-y-3.5">
           {genres.map((g, i) => {
             const pct = (g.count / maxGenre) * 100;
             return (
@@ -316,6 +329,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
               </div>
             );
           })}
+          </div>
         </div>
       </motion.div>
 
@@ -337,8 +351,10 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
               initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.55 + index * 0.06 }}
               whileHover={{ scale: 1.005 }}
-              className="rounded-2xl overflow-hidden flex items-center gap-3 p-2.5 cursor-pointer"
-              style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+              className="relative rounded-2xl overflow-hidden flex items-center gap-3 p-2.5 cursor-pointer"
+              style={{ background: cardBg }}>
+              <GlassReflection isDark={isDark} />
+              <div className="relative z-10 flex items-center gap-3 w-full min-w-0">
               {ticket.image ? (
                 <img src={ticket.image} alt={ticket.eventName}
                   className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
@@ -373,6 +389,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
               )}
               <ChevronRight className="w-4 h-4 flex-shrink-0"
                 style={{ color: mutedText }} strokeWidth={1.75} />
+              </div>
             </motion.div>
           ))
           )}

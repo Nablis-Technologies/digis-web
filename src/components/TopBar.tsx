@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bell, Settings, LogOut, HelpCircle, Globe, Ticket, Tag, Sparkles, Calendar, Search, User, LogIn, Send } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { NAV_ITEMS } from '@/components/Navigation';
 import { UserAvatar } from '@/components/UserAvatar';
-import { useNotifications, notificationsStore } from '@/lib/notifications';
+import { useNotifications, notificationsStore, fetchNotifications } from '@/lib/notifications';
 import type { NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -42,6 +43,20 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   const mobileWrapRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
+
+  // Live inbox when authenticated (#7 resolved): hydrate the store so the bell,
+  // badge, and panel all read backend rows. Guests keep the local seed/simulated
+  // store (no auth — the endpoint would 401).
+  const { data: liveNotifications = [] } = useQuery({
+    queryKey: ['notifications', isAuthenticated] as const,
+    queryFn: fetchNotifications,
+    enabled: isAuthenticated,
+    staleTime: 0,
+  });
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    notificationsStore.replace(liveNotifications);
+  }, [liveNotifications, isAuthenticated]);
 
   useEffect(() => {
     if (openMenu === 'none') return;
