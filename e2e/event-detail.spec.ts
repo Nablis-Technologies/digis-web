@@ -15,24 +15,39 @@ test.describe('event detail', () => {
 
   test('clicking a discovery card opens detail via the backend slug', async ({ page }) => {
     await page.goto('/');
-    // The first grid card (the featured carousel's embla drag layer swallows
-    // synthetic clicks). The same title exists in both carousel and grid —
-    // .last() is the grid instance, which sits near the top of the feed.
-    // Card titles are h3; on the detail page the title becomes the page
-    // heading with the feed unmounted, so it is unique there.
+    // Pick a non-featured event from the live API. Seed titles drift across
+    // reseeds (e.g. a colon appeared in one title and broke the hardcoded
+    // name), so never hardcode one — read it instead. Non-featured keeps the
+    // card out of the featured carousel, whose embla drag layer swallows
+    // synthetic clicks. The same title exists once in the grid —
+    // .last() guards against any duplicate.
+    const listRes = await page.request.get('http://localhost:3000/public/events');
+    const listBody = (await listRes.json()) as {
+      data?: {
+        slug: string;
+        title: string;
+        event_setting?: { config?: { featured?: boolean } };
+      }[];
+    };
+    const target = (listBody.data ?? []).find(
+      (e) => e?.title && e?.slug && e.event_setting?.config?.featured !== true,
+    );
+    expect(target).toBeDefined();
     const gridCard = page
-      .getByRole('heading', { level: 3, name: 'Avenida Desperados Pregame Edition' })
+      .getByRole('heading', { level: 3, name: target!.title })
       .last();
     await expect(gridCard).toBeVisible({ timeout: 15_000 });
     await gridCard.click();
-    await page.waitForURL(/\/events\//, { timeout: 15_000 });
+    // Card titles are h3; on the detail page the title becomes the page
+    // heading with the feed unmounted, so it is unique there.
+    await page.waitForURL(new RegExp(`/events/${target!.slug}`), { timeout: 15_000 });
     // AnimatePresence mode="wait" keeps the exiting feed mounted briefly and
     // its two same-titled h3s would trip the strict-mode check (not retried
     // by expect) — wait for the discovery hero to unmount first.
     await expect(page.getByRole('heading', { name: 'Worth showing up for.' })).toBeHidden({
       timeout: 15_000,
     });
-    await expect(page.getByRole('heading', { name: 'Avenida Desperados Pregame Edition' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: target!.title })).toBeVisible({
       timeout: 15_000,
     });
   });

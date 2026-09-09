@@ -2,8 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 
 const BUYER = '+251900123456';
 const PASS = 'password123';
-const EVENT_NAME = 'Avenida Desperados Pregame Edition';
-const TIER = 'First Wave';
+// Seed-drift note (2026-09-07): the second avenida event is gone — one remains,
+// titled with a colon — and its only ticket tier is now 'Final Wave'. Verified
+// against GET /public/events before running; update these if the seed changes.
+const EVENT_SLUG = 'avenida-desperados-pregame-edition';
+const TIER = 'Final Wave';
 
 async function login(page: Page) {
   await page.goto('/');
@@ -18,9 +21,9 @@ test('LIVE: full real payment → ticket lands in wallet (no mocks)', async ({ p
   test.setTimeout(300_000);
   await login(page);
 
-  await page.goto('/events/avenida-desperados-pregame-edition-2');
-  await page.getByText('First Wave').first().waitFor({ timeout: 20_000 });
-  await page.getByText('First Wave').first().click().catch(() => {});
+  await page.goto(`/events/${EVENT_SLUG}`);
+  await page.getByText(TIER).first().waitFor({ timeout: 20_000 });
+  await page.getByText(TIER).first().click().catch(() => {});
   await page.getByRole('button', { name: /Buy Now|Get Tickets/ }).first().click();
   await page.waitForTimeout(1500);
 

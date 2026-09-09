@@ -11,7 +11,7 @@ export default defineConfig({
   // of the deterministic regression suite. Exclude them from default runs
   // (run explicitly with `npx playwright test e2e/zz-*.spec.ts` when Chapa is
   // enabled and the seed is loaded).
-  testIgnore: ['e2e/zz-*.spec.ts'],
+  testIgnore: process.env.RUN_ZZ === '1' ? [] : ['e2e/zz-*.spec.ts'],
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],

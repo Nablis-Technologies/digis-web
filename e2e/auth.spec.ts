@@ -116,7 +116,9 @@ test.describe('auth', () => {
   });
 
   test('signup creates an account and signs in', async ({ page }) => {
-    const phone = `+251912${Math.floor(1_000_000 + Math.random() * 9_000_000)}`;
+    // Must satisfy the backend's Ethiopian-mobile format (`+2519` + 8 digits,
+    // enforced since BACKEND_GAPS #10) — a random but valid number.
+    const phone = `+2519${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
 
     await page.goto('/');
     await page.getByRole('button', { name: 'Log in' }).click();

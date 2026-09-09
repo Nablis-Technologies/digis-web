@@ -2,8 +2,13 @@ import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Checkout e2e — the real purchase chain through the UI against the live
- * backend: login → event detail → tier → checkout → accept consent → pay →
- * registration → quote → order → payment attempt.
+ * backend: login → event detail → tier → checkout → consent (when the
+ * event publishes terms) → pay → registration → quote → order →
+ * payment attempt.
+ *
+ * Consent documents are optional per event, so the suite never assumes the
+ * box exists: acceptConsentIfPresent ticks it when one renders and moves
+ * on when the event has no terms.
  *
  * With Chapa test keys the attempt returns a hosted checkout_url and the
  * browser navigates to chapa.co — the pass condition. Without keys the typed
@@ -38,6 +43,21 @@ async function openCheckoutForTier(page: Page, tierName: string) {
   await expect(page.getByText('Review', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
 }
 
+/**
+ * Terms consent is its own box on the review step — but only when the event
+ * publishes consent documents (they are optional). Wait briefly for a box;
+ * when none renders, the event has no terms and checkout proceeds without.
+ */
+async function acceptConsentIfPresent(page: Page) {
+  const consentToggle = page.locator('[role="checkbox"]').first();
+  try {
+    await consentToggle.waitFor({ state: 'visible', timeout: 5_000 });
+    await consentToggle.click();
+  } catch {
+    /* no terms on this event — nothing to accept */
+  }
+}
+
 test('full purchase chain reaches payment (Chapa hosted checkout or typed error)', async ({ page }) => {
   test.setTimeout(90_000);
 
@@ -57,9 +77,7 @@ test('full purchase chain reaches payment (Chapa hosted checkout or typed error)
   await expect(page.getByText('Details', { exact: true })).toHaveCount(0);
 
   // Terms consent is its own box on the review step, below the order summary.
-  const consentToggle = page.locator('[role="checkbox"]').first();
-  await expect(consentToggle).toBeVisible({ timeout: 10_000 });
-  await consentToggle.click();
+  await acceptConsentIfPresent(page);
 
   // Review → (extras) → payment. Extras exist only if the backend serves them.
   await page.getByRole('button', { name: /Continue/i }).click();
@@ -108,9 +126,7 @@ test('guest is asked to log in before payment', async ({ page }) => {
   await openCheckoutForTier(page, 'Regular');
 
   // Terms consent is its own box on the review step, below the order summary.
-  const consentToggle = page.locator('[role="checkbox"]').first();
-  await expect(consentToggle).toBeVisible({ timeout: 10_000 });
-  await consentToggle.click();
+  await acceptConsentIfPresent(page);
 
   // Guests walk the same step path as the (passing) logged-in test, plus the
   // Details form. Keep clicking Continue; the Pay button appears at the end.
