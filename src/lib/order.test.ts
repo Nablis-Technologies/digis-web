@@ -1,5 +1,77 @@
-import { describe, it, expect } from 'vitest';
-import { orderModule } from '@/lib/order';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { orderModule, findGuestReturnCreds, guestReturnKey } from '@/lib/order';
+
+class MemoryStorage {
+  data = new Map<string, string>();
+  get length() { return this.data.size; }
+  key(i: number) { return [...this.data.keys()][i] ?? null; }
+  getItem(k: string) { return this.data.get(k) ?? null; }
+  setItem(k: string, v: string) { this.data.set(k, v); }
+  removeItem(k: string) { this.data.delete(k); }
+  clear() { this.data.clear(); }
+}
+
+const session = new MemoryStorage();
+const local = new MemoryStorage();
+
+const writeCreds = (orderId: string, paymentId: string, eventId: string, phone: string) => {
+  for (const store of [session, local]) {
+    store.setItem(`digis:payment-id:${orderId}`, paymentId);
+    store.setItem(`digis:payment-event:${orderId}`, eventId);
+    store.setItem(`${guestReturnKey('quoteToken')}${orderId}`, `qt-${orderId}`);
+    store.setItem(`${guestReturnKey('phone')}${orderId}`, phone);
+  }
+};
+
+beforeEach(() => {
+  session.clear();
+  local.clear();
+  Object.defineProperty(globalThis, 'sessionStorage', { value: session, configurable: true });
+  Object.defineProperty(globalThis, 'localStorage', { value: local, configurable: true });
+  Object.defineProperty(globalThis, 'window', { value: { localStorage: local }, configurable: true });
+});
+
+afterEach(() => {
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true });
+  Object.defineProperty(globalThis, 'window', { configurable: true });
+});
+
+describe('findGuestReturnCreds correlation (BACKEND_GAPS #14 return flow)', () => {
+  it('returns the creds for the payment being reconciled, not an arbitrary set', () => {
+    writeCreds('order-a', 'pay-1', 'evt-1', '+251900000001');
+    writeCreds('order-b', 'pay-2', 'evt-2', '+251900000002');
+    // First key in storage is order-a, but the payment we reconcile is pay-2.
+    const creds = findGuestReturnCreds('pay-2');
+    expect(creds).toEqual({ quoteToken: 'qt-order-b', phone: '+251900000002', orderId: 'order-b' });
+  });
+
+  it('returns null when the payment id maps to no stored checkout', () => {
+    writeCreds('order-a', 'pay-1', 'evt-1', '+251900000001');
+    expect(findGuestReturnCreds('pay-unknown')).toBeNull();
+  });
+
+  it('prefers an event-correlated set when paymentId is unknown', () => {
+    writeCreds('order-a', 'pay-1', 'evt-1', '+251900000001');
+    writeCreds('order-b', 'pay-2', 'evt-2', '+251900000002');
+    const creds = findGuestReturnCreds(undefined, 'evt-2');
+    expect(creds).toEqual({ quoteToken: 'qt-order-b', phone: '+251900000002', orderId: 'order-b' });
+  });
+
+  it('falls back to the first set with no payment/event scope', () => {
+    writeCreds('order-a', 'pay-1', 'evt-1', '+251900000001');
+    writeCreds('order-b', 'pay-2', 'evt-2', '+251900000002');
+    const creds = findGuestReturnCreds();
+    expect(creds?.orderId).toBe('order-a');
+  });
+
+  it('reads creds persisted in localStorage when sessionStorage is empty', () => {
+    writeCreds('order-a', 'pay-1', 'evt-1', '+251900000001');
+    session.clear();
+    const creds = findGuestReturnCreds('pay-1');
+    expect(creds?.orderId).toBe('order-a');
+  });
+});
 
 describe('orderModule.quote', () => {
   it('computes subtotal as unit cents × quantity', async () => {

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 /**
  * Bottom sheet shown when the buyer runs into a checkout they already
@@ -28,7 +29,6 @@ export function ConflictSheet({
   const { isDark } = useTheme();
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(26,26,46,0.6)';
-  const borderSoft = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
 
   return (
     <AnimatePresence>
@@ -94,33 +94,33 @@ export function ConflictSheet({
                 <AppButton
                   whileTap={{ scale: 0.98 }}
                   onClick={onReplace}
-                  className="w-full py-4 rounded-2xl cursor-pointer"
+                  className="w-full py-4 rounded-2xl cursor-pointer relative overflow-hidden"
                   style={{
                     background: 'transparent',
-                    border: `1px solid ${borderSoft}`,
                     color: textPrimary,
                     fontFamily: "'Inter', sans-serif",
                     fontSize: '14px',
                     fontWeight: 500,
                   }}
                 >
-                  Discard &amp; start fresh
+                  <GlassReflection isDark={isDark} />
+                  <span className="relative z-10">Discard &amp; start fresh</span>
                 </AppButton>
               )}
               <AppButton
                 whileTap={{ scale: 0.98 }}
                 onClick={onViewTickets}
-                className="w-full py-4 rounded-2xl cursor-pointer"
+                className="w-full py-4 rounded-2xl cursor-pointer relative overflow-hidden"
                 style={{
                   background: 'transparent',
-                  border: canContinue || canReplace ? 'none' : `1px solid ${borderSoft}`,
                   color: textMuted,
                   fontFamily: "'Inter', sans-serif",
                   fontSize: '14px',
                   fontWeight: 500,
                 }}
               >
-                View Tickets
+                <GlassReflection isDark={isDark} />
+                <span className="relative z-10">View Tickets</span>
               </AppButton>
             </div>
           </motion.div>

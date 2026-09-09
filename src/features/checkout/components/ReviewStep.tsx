@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { readableCategoryRgb } from '@/lib/categoryColors';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { Money } from '@/lib/money';
 
 export function ReviewStep({
@@ -12,13 +13,14 @@ export function ReviewStep({
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
   const textDim = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(26,26,46,0.4)';
   const cardBg = isDark ? 'rgba(217,255,0,0.06)' : 'rgba(214,249,5,0.05)';
-  const cardBorder = isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.12)';
 
   const divider = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)';
 
   return (
-    <div className="rounded-2xl border overflow-hidden"
-      style={{ borderColor: cardBorder, background: cardBg, backdropFilter: 'blur(30px)' }}>
+    <div className="relative rounded-2xl overflow-hidden"
+      style={{ background: cardBg, backdropFilter: 'blur(30px)' }}>
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10">
 
       {/* Event row — compact thumb + meta */}
       <div className="flex gap-3 p-4">
@@ -113,6 +115,7 @@ export function ReviewStep({
       {/* Backend-required buyer consents (Phase 3) — rendered inside the review card. */}
       {children}
 
+      </div>
     </div>
   );
 }

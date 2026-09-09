@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, Mail, Phone, Shield, User } from 'lucide-react';
 import type { ContactDetails } from '@/features/checkout/hooks/useCheckoutFlow';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
 export function DetailsStep({
@@ -70,17 +71,19 @@ export function DetailsStep({
         )}
       </div>
 
-      <div className="flex items-start gap-2.5 rounded-xl p-3.5 mt-2"
+      <div className="relative flex items-start gap-2.5 rounded-xl overflow-hidden p-3.5 mt-2"
         style={{
           background: isDark ? 'rgba(217,255,0,0.06)' : 'rgba(214,249,5,0.05)',
-          border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.12)'}`,
         }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 flex items-start gap-2.5">
         <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={1.5}
           style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
         <p className="text-[11px] leading-relaxed"
           style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
           Your details are encrypted and used only for your ticket. We never share with third parties.
         </p>
+        </div>
       </div>
     </div>
   );

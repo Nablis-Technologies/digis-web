@@ -18,8 +18,8 @@
  *   - TicketTier extras the backend doesn't model stay minimal: no early-bird /
  *     couples / elite flags, no perks (features: []). The level chip gets a
  *     neutral "GENERAL" — the backend has no tier hierarchy to mirror.
- *   - `requiresTicket` is NOT serialized by the backend yet (BACKEND_GAPS.md #3
- *     nuance) and stays undefined — extras gating treats it as not required.
+ *   - `requiresTicket` is projected from product metadata (BACKEND_GAPS #3-nuance
+ *     resolved 2026-09-08) — extras gating can use it from live products.
  */
 
 import { apiFetch } from "@/lib/api";
@@ -48,7 +48,13 @@ export interface BackendProduct {
   sort_order?: number;
   price_options: BackendPriceOption[];
   available: boolean;
-  ticket_type?: { id?: string; admission?: unknown } | null;
+  requires_ticket?: boolean;
+  ticket_type?: {
+    id?: string;
+    admission?: unknown;
+    audience?: string | null;
+    date_selection?: string | null;
+  } | null;
 }
 
 export interface EventProducts {
@@ -87,6 +93,7 @@ function toExtra(p: BackendProduct): EventProduct | null {
     priceMinor,
     available: purchasableCap(p),
     maxPerOrder: p.max_per_order ?? undefined,
+    ...(p.requires_ticket === true ? { requiresTicket: true } : {}),
   };
 }
 
@@ -99,6 +106,8 @@ function toTier(p: BackendProduct): TicketTier | null {
     // The nested Ticketing::TicketType id — consent_requirements and the
     // registration submit both address it, not the product id.
     ticketTypeId: p.ticket_type?.id ?? undefined,
+    audience: (p.ticket_type?.audience as TicketTier['audience']) ?? undefined,
+    dateSelection: (p.ticket_type?.date_selection === 'choose_one' ? 'choose_one' : 'fixed'),
     name: p.name,
     level: "GENERAL",
     priceMinor,

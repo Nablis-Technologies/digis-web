@@ -18,6 +18,14 @@ import { ConflictSheet } from '@/features/checkout/components/ConflictSheet';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
+import { isoToDisplayDate } from '@/lib/mappers';
+
+function formatDateLabel(startsAt: string): string {
+  const base = isoToDisplayDate(startsAt);
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return base;
+  return `${base} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+}
 
 interface CheckoutEvent {
   name: string;
@@ -34,6 +42,12 @@ interface CheckoutEvent {
 export interface CheckoutReturnMode {
   confirming: boolean;
   timedOut: boolean;
+  /** Backend reconciled the payment as failed/cancelled/reversed (refresh `terminal`). */
+  terminal?: boolean;
+  /** Optional honest explanation when `terminal` — e.g. a guest return that
+   *  could not be verified (stale checkout creds) but whose payment may have
+   *  actually succeeded. Overrides the generic "payment failed" copy. */
+  terminalMessage?: string;
   confirmedTicket: UserTicket | null;
   onViewTicket: () => void;
   onGoToTickets: () => void;
@@ -63,6 +77,10 @@ interface CheckoutProps {
   seatMap?: SeatMapConfig;
   /** Ticket-tier seat entitlement, e.g. 2 for a couples bundle. */
   requiredSeatCount?: number;
+  /** Ticket-type date_selection mode — choose_one tiers require a selected date. */
+  dateSelection?: 'fixed' | 'choose_one';
+  /** Backend event dates (id + startsAt) for the choose_one date step. */
+  eventDates?: { id: string; startsAt: string; name?: string }[];
   /** When set, this sheet renders the post-Chapa return confirmation instead
    *  of the purchase flow. */
   returnMode?: CheckoutReturnMode;
@@ -81,7 +99,7 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
   const { isDark } = useTheme();
   const m = returnMode!;
   const confirmedTicket = m.confirmedTicket;
-  const title = confirmedTicket ? 'Confirmed' : m.timedOut ? 'Still confirming' : 'Confirming your payment';
+  const title = confirmedTicket ? 'Confirmed' : m.terminal ? 'Payment failed' : m.timedOut ? 'Still confirming' : 'Confirming your payment';
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -103,6 +121,10 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
         confirmedTicket ? (
           <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
             <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={m.onViewTicket} className="w-full py-4 rounded-2xl cursor-pointer" style={{ background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)', color: '#000', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>View My Ticket</AppButton>
+          </div>
+        ) : m.terminal ? (
+          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+            <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={m.onGoToTickets} className="w-full py-4 rounded-2xl cursor-pointer flex items-center justify-center gap-2" style={{ background: isDark ? 'rgba(248,113,113,0.18)' : 'rgba(190,18,60,0.1)', color: isDark ? '#fca5a5' : '#b91c1c', border: `1px solid ${isDark ? 'rgba(248,113,113,0.3)' : 'rgba(190,18,60,0.25)'}`, fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>Go to Tickets</AppButton>
           </div>
         ) : m.timedOut ? (
           <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
@@ -127,6 +149,13 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
               isDark={isDark}
             />
           </motion.div>
+        ) : m.terminal ? (
+          <motion.div key="terminal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-center py-16">
+            <h3 className="text-[20px] font-light mb-2" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>Payment failed</h3>
+            <p className="text-[12px] max-w-[300px]" style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
+              {m.terminalMessage ?? 'This payment was not completed. Nothing was charged — you can safely try the checkout again.'}
+            </p>
+          </motion.div>
         ) : m.timedOut ? (
           <motion.div key="timeout" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-center py-16">
             <h3 className="text-[20px] font-light mb-2" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>Still confirming</h3>
@@ -145,9 +174,9 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
   );
 }
 
-function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProductId, ticketTypeId, accessCode, invitationToken, basePrice, eventId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, onClose, onComplete }: CheckoutProps) {
+function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProductId, ticketTypeId, accessCode, invitationToken, basePrice, eventId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, dateSelection, eventDates, onClose, onComplete }: CheckoutProps) {
   const { isDark } = useTheme();
-  const flow = useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, onClose });
+  const flow = useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, dateSelection, eventDates, onClose });
   const {
     step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats, requiredSeats,
     promoApplied, promoCodeInput, setPromoCodeInput,
@@ -162,6 +191,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
     reloadConsents, acceptedConsents, toggleConsent,
     consentError, registrationError, paymentError, pendingNotice,
     conflict, closeConflictSheet, continueConflictCheckout, replaceConflictCheckout,
+    eventDates: flowDates, selectedEventDateId, setSelectedEventDateId,
   } = flow;
 
   // Post-Chapa confirmation lives in the router (AppContent): the return URL
@@ -225,6 +255,37 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
     >
       <AnimatePresence mode="wait">
         {step === 'seat' && <StepFrame key="seat"><SeatMapStep sections={seatSections} stageLabel={seatMap?.stageLabel} basePrice={basePrice} selectedSeats={selectedSeats} toggleSeat={toggleSeat} maxSeats={maxSeats} requiredSeats={requiredSeats} isDark={isDark} /></StepFrame>}
+        {step === 'date' && (
+          <StepFrame key="date">
+            <div className="space-y-3">
+              <p className="text-[10px] tracking-[1.6px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Pick a date</p>
+              {flowDates.map((d) => {
+                const active = selectedEventDateId === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => setSelectedEventDateId(d.id)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-pointer text-left"
+                    style={{
+                      background: active ? (isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.14)') : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)'),
+                      border: `1px solid ${active ? (isDark ? 'rgba(217,255,0,0.35)' : 'rgba(214,249,5,0.5)') : borderSoft}`,
+                    }}
+                  >
+                    <div>
+                      <p className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", color: textPrimary, fontWeight: 500 }}>
+                        {formatDateLabel(d.startsAt)}
+                      </p>
+                      {d.name ? <p className="text-[11px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>{d.name}</p> : null}
+                    </div>
+                    <div className="w-5 h-5 rounded-full grid place-items-center" style={{ border: `1px solid ${active ? '#d6f905' : borderSoft}` }}>
+                      {active && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#d6f905' }} />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </StepFrame>
+        )}
         {step === 'review' && (
           <StepFrame key="review">
             <div className="space-y-4">

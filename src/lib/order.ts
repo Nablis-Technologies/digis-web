@@ -132,11 +132,19 @@ export interface QuoteInput {
   provider?: string;
   paymentMethod?: string;
   promotionCode?: string;
+  /** Guest phone (BACKEND_GAPS #14). When set, routes through the guest
+   *  quote endpoint POST /guest/events/:id/order_quotes with
+   *  phone_confirmation: true. */
+  guestPhone?: string;
 }
 
 export interface CreateOrderInput {
   eventId?: string;
   quoteToken: string;
+  /** Guest phone (BACKEND_GAPS #14). When set, routes through the guest
+   *  create-order endpoint POST /guest/events/:id/orders with quote_token
+   *  + phone in the body. */
+  guestPhone?: string;
 }
 
 export interface RestartOrderInput {
@@ -152,6 +160,98 @@ export interface StartPaymentInput {
   /** Backend event id — persisted so the post-Chapa return sheet can match the
    *  newly issued wallet ticket to THIS purchase instead of any fresh ticket. */
   eventId?: string;
+  /** Guest credentials (BACKEND_GAPS #14). When set (unauthenticated buyer),
+   *  the quote_token + phone are persisted beside the payment id so the guest
+   *  return screen can reconcile via POST /guest/payments/:id/refresh. */
+  guest?: { quoteToken: string; phone: string };
+}
+
+/** Storage-key helpers (mirroring digis:payment-id:* / digis:payment-event:*). */
+export const guestReturnKey = (suffix: 'quoteToken' | 'phone'): string =>
+  `digis:guest:${suffix}:`;
+
+/** Read the persisted guest credentials for a completed payment attempt. */
+export function readGuestReturnCreds(orderId: string): { quoteToken: string; phone: string } | null {
+  try {
+    const qt = sessionStorage.getItem(`${guestReturnKey('quoteToken')}${orderId}`)
+      ?? window.localStorage.getItem(`${guestReturnKey('quoteToken')}${orderId}`);
+    const ph = sessionStorage.getItem(`${guestReturnKey('phone')}${orderId}`)
+      ?? window.localStorage.getItem(`${guestReturnKey('phone')}${orderId}`);
+    return qt && ph ? { quoteToken: qt, phone: ph } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find the guest credentials that belong to a specific checkout, so the return
+ * screen never pairs a payment with a quote_token/phone from a DIFFERENT order.
+ *
+ * The `digis:guest:*` keys are written per ORDER and multiple guest checkouts
+ * can accumulate in storage (abandoned sessions, multi-order purchases, stale
+ * localStorage). Grabbing "the first set" feeds the wrong quote_token/phone to
+ * the guest payment refresh, which the backend rejects with `invalid_guest_quote`
+ * (the token binds event_id + a phone digest) — and each failed retry counts
+ * against the 10/minute guest throttle, eventually 429 `rate_limited`.
+ *
+ * Resolution order:
+ *  1. paymentId → the `digis:payment-id:<orderId>` key whose value matches
+ *     (written at redirect time, mirrors the authenticated path).
+ *  2. eventId (no paymentId) → prefer a set whose orderId's
+ *     `digis:payment-event:<orderId>` matches the return event.
+ *  3. fallback → first matching set (legacy, best-effort).
+ */
+export function findGuestReturnCreds(
+  paymentId?: string,
+  eventId?: string,
+): { quoteToken: string; phone: string; orderId: string } | null {
+  try {
+    if (paymentId) {
+      for (const store of [sessionStorage, window.localStorage]) {
+        for (let i = 0; i < store.length; i++) {
+          const k = store.key(i);
+          if (k?.startsWith('digis:payment-id:') && store.getItem(k) === paymentId) {
+            const orderId = k.slice('digis:payment-id:'.length);
+            const creds = readGuestReturnCreds(orderId);
+            if (creds) return { ...creds, orderId };
+          }
+        }
+      }
+      return null;
+    }
+    if (eventId) {
+      const matches: Array<{ quoteToken: string; phone: string; orderId: string }> = [];
+      for (const store of [sessionStorage, window.localStorage]) {
+        for (let i = 0; i < store.length; i++) {
+          const k = store.key(i);
+          if (k?.startsWith(guestReturnKey('quoteToken'))) {
+            const orderId = k.slice(guestReturnKey('quoteToken').length);
+            const creds = readGuestReturnCreds(orderId);
+            if (!creds) continue;
+            const mapped = { ...creds, orderId };
+            const evKey = `digis:payment-event:${orderId}`;
+            const ev = (store === sessionStorage ? sessionStorage.getItem(evKey) : null)
+              ?? window.localStorage.getItem(evKey);
+            if (ev === eventId) return mapped;
+            matches.push(mapped);
+          }
+        }
+      }
+      if (matches.length) return matches[0];
+      return null;
+    }
+    for (const store of [sessionStorage, window.localStorage]) {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k?.startsWith(guestReturnKey('quoteToken'))) {
+          const orderId = k.slice(guestReturnKey('quoteToken').length);
+          const creds = readGuestReturnCreds(orderId);
+          if (creds) return { ...creds, orderId };
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
 }
 
 export interface StartedPayment {
@@ -163,6 +263,21 @@ export interface StartedPayment {
    * backend's verify-before-trust itself.
    */
   idempotencyKey: string;
+}
+
+/**
+ * POST /payments/:payment_id/refresh projection
+ * (Orders::PaymentRefresh → PaymentSerializer + OrderSerializer +
+ * TicketWalletSerializer). `state` tells the return screen how to behave:
+ *  - ready    → accepted AND ticket issued — confirm immediately.
+ *  - pending  → still settling server-side — keep polling the wallet.
+ *  - terminal → failed/cancelled/reversed — surface the failure, don't spin.
+ */
+export interface PaymentRefreshResult {
+  state: 'ready' | 'pending' | 'terminal';
+  payment: PaymentAttempt;
+  order: CheckoutOrder;
+  tickets: import('./tickets').TicketWalletWire[];
 }
 
 /* ─── Mock price lookup (mock tiers / draft events only) ─── */
@@ -243,20 +358,32 @@ export const orderModule = {
       !input.eventId || input.items.some((i) => i.eventProductId.includes(":"));
     if (isMockCart) return mockQuote(input);
 
+    const baseBody = {
+      charge_currency: input.chargeCurrency,
+      promotion_code: input.promotionCode,
+      items: input.items.map((i) => ({
+        event_product_id: i.eventProductId,
+        quantity: i.quantity,
+        ...(i.registrationId ? { registration_id: i.registrationId } : {}),
+      })),
+    };
+    if (input.guestPhone) {
+      const { data } = await apiFetch<OrderQuote>(
+        `guest/events/${input.eventId}/order_quotes`,
+        {
+          method: "POST",
+          body: {
+            ...baseBody,
+            phone: input.guestPhone,
+            phone_confirmation: true,
+          },
+        },
+      );
+      return data;
+    }
     const { data } = await apiFetch<OrderQuote>(
       `events/${input.eventId}/order_quotes`,
-      {
-        method: "POST",
-        body: {
-          charge_currency: input.chargeCurrency,
-          promotion_code: input.promotionCode,
-          items: input.items.map((i) => ({
-            event_product_id: i.eventProductId,
-            quantity: i.quantity,
-            ...(i.registrationId ? { registration_id: i.registrationId } : {}),
-          })),
-        },
-      },
+      { method: "POST", body: baseBody },
     );
     return data;
   },
@@ -270,6 +397,16 @@ export const orderModule = {
   async createOrder(input: CreateOrderInput): Promise<CheckoutOrder> {
     if (!input.eventId || input.quoteToken.startsWith("mock_quote_")) {
       throw new Error("orderModule.createOrder requires a live backend quote");
+    }
+    if (input.guestPhone) {
+      const { data } = await apiFetch<CheckoutOrder>(
+        `guest/events/${input.eventId}/orders`,
+        {
+          method: "POST",
+          body: { order: { quote_token: input.quoteToken, phone: input.guestPhone } },
+        },
+      );
+      return data;
     }
     const { data } = await apiFetch<CheckoutOrder>(
       `events/${input.eventId}/orders`,
@@ -312,27 +449,41 @@ export const orderModule = {
    * error so the UI can explain "payments not configured" instead of hanging.
    */
   async startPayment(input: StartPaymentInput): Promise<StartedPayment> {
-    // Explicit key (not the interceptor's auto one) so the tx_ref survives
-    // the Chapa redirect: persisted per order, replayed to the callback
-    // endpoint on return to kick server-side verification.
     const idempotencyKey = randomUuid();
+    const path = input.guest
+      ? `guest/orders/${input.orderId}/payment_attempts`
+      : `orders/${input.orderId}/payment_attempts`;
+    const bodyPayload: Record<string, unknown> = {
+      payment_attempt: {
+        provider: input.provider,
+        payment_method: input.paymentMethod,
+        ...(input.guest
+          ? { quote_token: input.guest.quoteToken, phone: input.guest.phone }
+          : {}),
+      },
+    };
     const { data } = await apiFetch<PaymentAttempt>(
-      `orders/${input.orderId}/payment_attempts`,
+      path,
       {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey },
-        body: {
-          payment_attempt: {
-            provider: input.provider,
-            payment_method: input.paymentMethod,
-          },
-        },
+        body: bodyPayload,
       },
     );
     try {
       sessionStorage.setItem(`digis:payment-key:${input.orderId}`, idempotencyKey);
+      sessionStorage.setItem(`digis:payment-id:${input.orderId}`, data.id);
+      window.localStorage.setItem(`digis:payment-id:${input.orderId}`, data.id);
       if (input.eventId) sessionStorage.setItem(`digis:payment-event:${input.orderId}`, input.eventId);
-    } catch { /* storage unavailable — return-verify just won't fire */ }
+      if (input.guest) {
+        const k = `${guestReturnKey('quoteToken')}${input.orderId}`;
+        sessionStorage.setItem(k, input.guest.quoteToken);
+        window.localStorage.setItem(k, input.guest.quoteToken);
+        const pk = `${guestReturnKey('phone')}${input.orderId}`;
+        sessionStorage.setItem(pk, input.guest.phone);
+        window.localStorage.setItem(pk, input.guest.phone);
+      }
+    } catch { /* storage unavailable */ }
     return { payment: data, idempotencyKey };
   },
 
@@ -349,6 +500,45 @@ export const orderModule = {
       `payments/chapa/callback?provider=chapa&trx_ref=${encodeURIComponent(txRef)}&status=success`,
       { method: "GET" },
     );
+  },
+
+  /**
+   * POST /payments/:payment_id/refresh (Idempotency-Key auto-injected).
+   * Buyer-scoped reconciliation (payment_refresh#create): verifies a pending
+   * attempt server-side and returns payment + order + wallet tickets + a
+   * `state` attribute in one response. `ready` = accepted + ticket issued,
+   * `pending` = still settling (keep polling the wallet), `terminal` =
+   * failed/cancelled/reversed — the buyer is told instead of spinning.
+   */
+  async refreshPayment(paymentId: string): Promise<PaymentRefreshResult> {
+    const { data } = await apiFetch<PaymentRefreshResult>(
+      `payments/${paymentId}/refresh`,
+      { method: "POST" },
+    );
+    return data;
+  },
+
+  /**
+   * POST /guest/payments/:payment_id/refresh (BACKEND_GAPS #14 resolved
+   * 2026-09-09). Guest-scoped reconciliation requiring the original
+   * quote_token + phone to authenticate the request. Same response shape as
+   * refreshPayment (payment + order + wallet tickets + state).
+   */
+  async guestRefreshPayment(paymentId: string, quoteToken: string, phone: string): Promise<PaymentRefreshResult> {
+    const { data } = await apiFetch<PaymentRefreshResult>(
+      `guest/payments/${paymentId}/refresh`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": randomUuid() },
+        body: {
+          payment_refresh: {
+            phone,
+            quote_token: quoteToken,
+          },
+        },
+      },
+    );
+    return data;
   },
 };
 

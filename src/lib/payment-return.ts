@@ -12,10 +12,19 @@
  * submitter (Chapa webhook → `orders.payment.fulfilled` →
  * `Ticketing::Packages::Issue`) puts a ticket in the wallet, so ticket
  * appearance is the truthful confirmation.
+ *
+ * For unauthenticated buyers (guest checkout, BACKEND_GAPS #14), the
+ * POST /guest/payments/:id/refresh endpoint is called instead, using the
+ * quote_token + phone persisted alongside the payment attempt id at redirect
+ * time. A wallet poll is not available for guests — the refresh endpoint is
+ * the sole confirmation signal.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ticketsService, ticketKeys } from '@/lib/tickets';
+import { ticketsService, ticketKeys, mapWalletTicket } from '@/lib/tickets';
+import { orderModule, findGuestReturnCreds } from '@/lib/order';
+import { guestWallet } from '@/lib/guest-wallet';
+import { toApiError } from '@/lib/errors';
 import type { UserTicket } from '@/types';
 
 /**
@@ -27,13 +36,17 @@ import type { UserTicket } from '@/types';
  */
 export function clearCheckoutResumeKeys(): void {
   try {
-    const prefixes = ['digis:checkout-key:', 'digis:stuck-order:', 'digis:payment-url:', 'digis:payment-key:', 'digis:payment-event:'];
-    const doomed: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i);
-      if (k && prefixes.some((p) => k.startsWith(p))) doomed.push(k);
-    }
-    doomed.forEach((k) => sessionStorage.removeItem(k));
+    const prefixes = ['digis:checkout-key:', 'digis:stuck-order:', 'digis:payment-url:', 'digis:payment-key:', 'digis:payment-event:', 'digis:payment-id:', 'digis:guest:'];
+    const clearStore = (store: Storage) => {
+      const doomed: string[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && prefixes.some((p) => k.startsWith(p))) doomed.push(k);
+      }
+      doomed.forEach((k) => store.removeItem(k));
+    };
+    clearStore(sessionStorage);
+    clearStore(window.localStorage);
   } catch { /* storage unavailable — nothing to clear */ }
 }
 
@@ -42,6 +55,7 @@ export type PaymentReturnState =
   | { kind: 'idle' }
   | { kind: 'confirming' }
   | { kind: 'confirmed'; ticket: UserTicket }
+  | { kind: 'terminal' }
   | { kind: 'timeout' }
   | { kind: 'error'; message: string };
 
@@ -58,6 +72,130 @@ export interface PaymentReturnController {
   stop: () => void;
 }
 
+/**
+ * Guest variant of usePaymentReturnConfirmation. Calls
+ * POST /guest/payments/:id/refresh (not the wallet poll) using the
+ * quote_token + phone that were persisted alongside payment-id at redirect
+ * time. No wallet poll is available for guests — the refresh endpoint is
+ * the sole confirmation signal.
+ */
+export function useGuestPaymentReturnConfirmation(
+  eventId: string | undefined,
+  paymentId?: string,
+  { pollMs = 3_000, timeoutMs = 300_000 }: { pollMs?: number; timeoutMs?: number } = {},
+): PaymentReturnController {
+  const [state, setState] = useState<PaymentReturnState>({ kind: 'idle' });
+  const [dismissed, setDismissed] = useState(false);
+  const seen = useRef<ReadonlySet<string>>(new Set());
+  const queryClient = useQueryClient();
+  // Guest refresh failures count against a 10/minute IP+phone throttle on the
+  // backend. On a 429 we pause polling for the 1-minute window instead of
+  // hammering it (which would lock the phone out and never recover).
+  const throttleBackoffUntil = useRef(0);
+
+  // Reconcile via POST /guest/payments/:payment_id/refresh. This is the
+  // sole confirmation signal for guests (no wallet poll).
+  useEffect(() => {
+    if (state.kind !== 'confirming' || !paymentId) return;
+    let alive = true;
+    const reconcile = async () => {
+      if (Date.now() < throttleBackoffUntil.current) return;
+      // Creds are keyed per ORDER; find the set that belongs to THIS payment
+      // (via the digis:payment-id:<orderId> mapping written at redirect time).
+      // Grabbing an arbitrary set sends the wrong quote_token/phone to the
+      // backend → invalid_guest_quote, and each retry burns the guest throttle.
+      const guestCreds = findGuestReturnCreds(paymentId);
+      if (!guestCreds) {
+        // No stored creds to reconcile with (storage cleared/expired) — this
+        // won't self-heal, so stop spinning and tell the buyer honestly.
+        if (alive) setState({ kind: 'terminal' });
+        return;
+      }
+      try {
+        const result = await orderModule.guestRefreshPayment(
+          paymentId, guestCreds.quoteToken, guestCreds.phone,
+        );
+        if (!alive) return;
+        if (result.state === 'ready') {
+          const scoped = (result.tickets ?? [])
+            .filter((w) => !eventId || w.event.id === eventId)
+            .map(mapWalletTicket);
+          const fresh = scoped.filter((t) => !seen.current.has(t.id)).sort(
+            (a, b) => Date.parse(b.purchased || '') - Date.parse(a.purchased || ''),
+          )[0] ?? scoped[0];
+          if (fresh) {
+            // Persist the issued tickets into the encrypted device guest wallet
+            // BEFORE the checkout resume keys are cleared — this is the only
+            // moment the full wire (with per-credential QR) is available to an
+            // unauthenticated buyer. AWAITED so the write is durable before the
+            // confirmed screen lets the buyer navigate to /tickets.
+            const wired = (result.tickets ?? []).filter(
+              (w) => !eventId || w.event.id === eventId,
+            );
+            try {
+              await guestWallet.saveTickets(wired);
+            } catch (saveError) {
+              console.error('[guest-wallet] save failed — device tickets will not persist', saveError);
+            }
+            queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+            clearCheckoutResumeKeys();
+            setState({ kind: 'confirmed', ticket: fresh });
+          }
+        } else if (result.state === 'terminal') {
+          clearCheckoutResumeKeys();
+          setState({ kind: 'terminal' });
+        }
+      } catch (error) {
+        if (!alive) return;
+        const api = toApiError(error);
+        // These will never self-heal — stop polling so the buyer isn't left
+        // spinning to the 5-minute timeout, and stop feeding the throttle.
+        if (
+          api.status === 403 ||
+          api.status === 404 ||
+          api.code === 'invalid_guest_quote' ||
+          api.code === 'payment_order_not_owned' ||
+          api.code === 'payment_not_found'
+        ) {
+          setState({ kind: 'terminal' });
+          return;
+        }
+        // Backend throttle (429): pause for its 1-minute window, then resume —
+        // a transient lockout shouldn't kill a payment that may still settle.
+        if (api.code === 'rate_limited' || api.status === 429) {
+          throttleBackoffUntil.current = Date.now() + 60_000;
+          return;
+        }
+        // Transient — retry on the next interval.
+      }
+    };
+    void reconcile();
+    const id = window.setInterval(() => { void reconcile(); }, pollMs);
+    return () => { alive = false; window.clearInterval(id); };
+  }, [state.kind, paymentId, eventId, queryClient, pollMs]);
+
+  // Timeout watchdog.
+  useEffect(() => {
+    if (state.kind !== 'confirming') return;
+    const id = window.setTimeout(() => {
+      setState((cur) => (cur.kind === 'confirming' ? { kind: 'timeout' } : cur));
+    }, timeoutMs);
+    return () => window.clearTimeout(id);
+  }, [state.kind, timeoutMs]);
+
+  const start = () => {
+    setDismissed(false);
+    throttleBackoffUntil.current = 0;
+    setState((s) => {
+      if (s.kind !== 'idle') return s;
+      return { kind: 'confirming' };
+    });
+  };
+  const dismiss = () => setDismissed(true);
+  const stop = () => setState({ kind: 'idle' });
+  return { state, dismissed, start, dismiss, stop };
+}
+
 /** A new (not-yet-known) wallet ticket is the success signal. `seen` lets
  *  callers pass the ticket set they already have on screen, so the very first
  *  poll that includes a new ticket resolves the confirmation. */
@@ -65,6 +203,11 @@ export function usePaymentReturnConfirmation(
   eventId: string | undefined,
   knownTicketIds: ReadonlySet<string> | UserTicket[],
   isAuthenticated: boolean,
+  // Buyer-owned attempt id persisted at redirect time. When present, the
+  // return screen reconciles via POST /payments/:id/refresh FIRST (backend
+  // verifies the attempt and returns a `state`): ready → confirm instantly,
+  // terminal → surface the failure, pending → wallet-poll as before.
+  paymentId?: string,
   // 5-minute ceiling: verification runs through two per-minute outbox drains
   // (accept, then fulfill → issue), so a 2-minute timeout fires on healthy
   // payments that simply queued behind the drain.
@@ -113,6 +256,46 @@ export function usePaymentReturnConfirmation(
     refetchIntervalInBackground: true,
     staleTime: 0,
   });
+
+  // Reconcile via POST /payments/:id/refresh while we know the attempt. This is
+  // the primary completion signal (backend-verified): `ready` → confirm now,
+  // `terminal` → surface the failure. `pending` → keep re-checking on the same
+  // cadence as the wallet poll — a fresh refresh picks up `ready` the moment the
+  // backend verifies (webhook/callback → outbox), instead of waiting for the
+  // wallet to gain the ticket. A refresh failure must NOT block confirmation —
+  // the wallet poll below remains the safety net.
+  useEffect(() => {
+    if (state.kind !== 'confirming' || !paymentId || !isAuthenticated) return;
+    let alive = true;
+    const reconcile = async () => {
+      try {
+        const result = await orderModule.refreshPayment(paymentId);
+        if (!alive) return;
+        if (result.state === 'ready') {
+          const scoped = (result.tickets ?? [])
+            .filter((w) => !eventId || w.event.id === eventId)
+            .map(mapWalletTicket);
+          const fresh = scoped.filter((t) => !seen.current.has(t.id)).sort(
+            (a, b) => Date.parse(b.purchased || '') - Date.parse(a.purchased || ''),
+          )[0] ?? scoped[0];
+          if (fresh) {
+            queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+            clearCheckoutResumeKeys();
+            setState({ kind: 'confirmed', ticket: fresh });
+          }
+          // No scoped ticket yet — keep reconciling/polling.
+        } else if (result.state === 'terminal') {
+          clearCheckoutResumeKeys();
+          setState({ kind: 'terminal' });
+        }
+        // pending → next interval re-checks.
+      } catch { /* refresh is best-effort — wallet poll still resolves */ }
+    };
+    void reconcile();
+    const id = window.setInterval(() => { void reconcile(); }, pollMs);
+    return () => { alive = false; window.clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.kind, paymentId, eventId, isAuthenticated, queryClient, pollMs]);
 
   useEffect(() => {
     if (state.kind !== 'confirming') return;

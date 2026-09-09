@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import type { SeatSection, SelectedSeat } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { Money } from '@/lib/money';
 
 interface SeatMapStepProps {
@@ -122,8 +123,10 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
       </div>
 
       {/* Selection summary */}
-      <div className="mt-5 rounded-2xl p-4"
-        style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(26,26,46,0.02)' }}>
+      <div className="relative mt-5 rounded-2xl overflow-hidden p-4"
+        style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(26,26,46,0.02)' }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
           <p className="text-[10px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
             {selectedSeats.length === 0 ? (requiredSeats ? `Select ${requiredSeats} seats` : 'Select your seats') : `${selectedSeats.length} of ${maxSeats} selected`}
@@ -152,6 +155,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

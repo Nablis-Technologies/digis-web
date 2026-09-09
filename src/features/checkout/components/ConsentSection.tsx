@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 import { Check, RefreshCw } from 'lucide-react';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { Pulse } from '@/components/loading';
 import type { ConsentDocument } from '@/lib/registration';
 
@@ -33,10 +34,11 @@ export function ConsentSection({
 
   if (loading && consents.length === 0) {
     return (
-      <div className="rounded-2xl px-4 py-3"
-        style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+      <div className="relative rounded-2xl overflow-hidden px-4 py-3"
+        style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+        <GlassReflection isDark={isDark} />
         {loadError ? (
-          <div className="flex items-center justify-between gap-3">
+          <div className="relative z-10 flex items-center justify-between gap-3">
             <span className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
               {loadError}
             </span>
@@ -48,7 +50,7 @@ export function ConsentSection({
             </AppButton>
           </div>
         ) : (
-          <div className="flex items-start gap-2.5">
+          <div className="relative z-10 flex items-start gap-2.5">
             <Pulse className="w-4 h-4 rounded-[5px] mt-0.5 flex-shrink-0" />
             <div className="flex-1 space-y-1.5">
               <Pulse className="h-[12px] w-1/2 rounded" />
@@ -63,13 +65,14 @@ export function ConsentSection({
   if (consents.length === 0) return null;
 
   return (
-    <div className="rounded-2xl px-4 py-3 flex flex-col gap-3"
-      style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+    <div className="relative rounded-2xl overflow-hidden px-4 py-3 flex flex-col gap-3"
+      style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+      <GlassReflection isDark={isDark} />
       {consents.map((c) => (
         <div
           key={c.versionId}
           onClick={() => onToggle(c.versionId)}
-          className="flex items-start gap-2.5 cursor-pointer select-none"
+          className="relative z-10 flex items-start gap-2.5 cursor-pointer select-none"
         >
           <AppButton
             whileTap={{ scale: 0.85 }}
@@ -103,7 +106,7 @@ export function ConsentSection({
         </div>
       ))}
       {error && (
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px]"
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 text-[11px]"
           style={{ fontFamily: "'Inter', sans-serif", color: errorColor }}>
           {error}
         </motion.p>
