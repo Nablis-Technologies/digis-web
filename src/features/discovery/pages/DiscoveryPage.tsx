@@ -2,6 +2,8 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { eventsModule } from "@/lib/events";
+import { eventEnded } from "@/lib/eventDates";
+import { eventSoldOut } from "@/lib/eventAvailability";
 import { useTheme } from "@/app/components/ThemeContext";
 import { FeaturedCarousel } from "@/features/discovery/components/FeaturedCarousel";
 import { FeaturedEventCard } from "@/features/discovery/components/FeaturedEventCard";
@@ -87,7 +89,10 @@ export function EventDiscovery({
     (priceRange ? 1 : 0);
   const filtersActive =
     showFilters || activeFilterCount > 0 || selectedCategory !== "All";
-  const featuredEvents = filteredEvents.filter((e) => e.featured);
+  // Ended AND sold-out events are excluded from the featured carousel (they
+  // must never lead discovery); they remain in the grid, sorted behind live /
+  // available events.
+  const featuredEvents = filteredEvents.filter((e) => e.featured && !eventEnded(e) && !eventSoldOut(e));
 
   return (
     <div className="min-h-screen pb-28 lg:pb-10">

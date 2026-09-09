@@ -9,6 +9,7 @@ import { useProminentHue } from "@/lib/hooks/useProminentHue";
 import { EventDateBadge } from "@/components/EventDateBadge";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { AppButton } from '@/components/primitives/AppButton';
+import { eventActionLabel } from "@/lib/eventAction";
 
 export function FeaturedEventCard({
   event,
@@ -321,7 +322,7 @@ export function FeaturedEventCard({
                 fontWeight: 700,
               }}
             >
-              {event.eventType === "rsvp" ? "RSVP" : "Tickets"}
+              {eventActionLabel(event.eventType)}
             </span>
             <span
               className="flex items-center justify-center w-7 h-7 rounded-full"

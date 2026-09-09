@@ -255,16 +255,17 @@ export function FeaturedMagazine({
                   constant across events and the switch animation is consistent.
                   Venue flexes + truncates within so it never hogs the row. */}
               <div
-                className="flex items-stretch self-start rounded-2xl overflow-hidden"
+                className="relative flex items-stretch self-start rounded-2xl overflow-hidden"
                 style={{
                   width: 440,
                   maxWidth: "100%",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
                   background: isDark
                     ? "rgba(255,255,255,0.02)"
                     : "rgba(0,0,0,0.015)",
                 }}
               >
+                <GlassReflection isDark={isDark} />
+                <div className="relative z-10 flex items-stretch flex-1">
                 <MagazineMeta
                   label="Doors"
                   value={hero.time}
@@ -303,6 +304,7 @@ export function FeaturedMagazine({
                     />
                   </>
                 )}
+                </div>
               </div>
 
               {/* CTA */}
