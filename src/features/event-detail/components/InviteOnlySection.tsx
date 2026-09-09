@@ -5,8 +5,10 @@ import { useTheme } from '@/app/components/ThemeContext';
 import type { InviteUnlockState } from '@/types';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { Money } from '@/lib/money';
+import { audienceModule } from '@/lib/audience';
 
 interface InviteOnlySectionProps {
   event: any;
@@ -14,9 +16,14 @@ interface InviteOnlySectionProps {
   onUnlockChange: (s: InviteUnlockState) => void;
   rsvpConfirmed: boolean;
   onConfirmRsvp: () => void;
+  /** Backend Ticketing::TicketType ids for tiers whose audience is NOT public.
+   *  When present, the code/invitation is validated against ALL of them via
+   *  POST /ticketing/audience_authorizations (backend-authoritative unlock).
+   *  When empty (no live gated tiers — mock/draft events), unlock stays local. */
+  gatedTicketTypeIds?: string[];
 }
 
-export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed, onConfirmRsvp }: InviteOnlySectionProps) {
+export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed, onConfirmRsvp, gatedTicketTypeIds = [] }: InviteOnlySectionProps) {
   const { isDark } = useTheme();
   const accent = isDark ? '#d6f905' : '#d6f905';
   const accentRgb = isDark ? '214,249,5' : '214,249,5';
@@ -34,21 +41,46 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
 
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState(false);
+  const [codeErrorMessage, setCodeErrorMessage] = useState('Invalid code. Check the invite you received.');
+  const [checkingCode, setCheckingCode] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [showRequest, setShowRequest] = useState(accessMode === 'request');
   const [requestMsg, setRequestMsg] = useState('');
   const [waitlistJoined, setWaitlistJoined] = useState(false);
 
-  const tryCode = () => {
-    // The code is stored on the unlock state and threaded into registration
-    // as audience proof (the backend's Audience::Authorize consumes it).
-    // Local unlock is display-only — the server re-validates at registration.
-    if (code.trim().length > 0) {
-      onUnlockChange({ unlocked: true, method: 'code', code: code.trim() });
-      setCodeError(false);
-    } else {
-      setCodeError(true);
-      setTimeout(() => setCodeError(false), 1400);
+  const failCode = (message?: string) => {
+    if (message) setCodeErrorMessage(message);
+    setCodeError(true);
+    setTimeout(() => setCodeError(false), 2200);
+  };
+
+  const tryCode = async () => {
+    const trimmed = code.trim();
+    if (trimmed.length === 0) { failCode(); return; }
+    // No live gated tiers to validate against (mock/draft event) — keep the
+    // display-only unlock. The backend re-validates at registration regardless.
+    if (gatedTicketTypeIds.length === 0) {
+      onUnlockChange({ unlocked: true, method: 'code', code: trimmed });
+      return;
+    }
+    setCheckingCode(true);
+    try {
+      // Authorize against EVERY gated tier: a code valid for any of them opens
+      // the gate (tiers may share one code or carry distinct ones).
+      const results = await Promise.all(
+        gatedTicketTypeIds.map((id) =>
+          audienceModule.authorize({ ticketTypeId: id, accessCode: trimmed }).then((r) => r.authorized).catch(() => false),
+        ),
+      );
+      if (results.some((ok) => ok)) {
+        onUnlockChange({ unlocked: true, method: 'code', code: trimmed });
+      } else {
+        failCode('This access code is not valid for this event.');
+      }
+    } catch {
+      failCode('Could not verify that code. Please try again.');
+    } finally {
+      setCheckingCode(false);
     }
   };
 
@@ -84,10 +116,10 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
             className="relative rounded-3xl overflow-hidden"
             style={{
               background: isDark ? 'rgba(255,255,255,0.025)' : '#fff',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
             }}>
+            <GlassReflection isDark={isDark} />
             {/* Decorative top */}
-            <div className="relative h-28 overflow-hidden flex items-center justify-center"
+            <div className="relative z-10 h-28 overflow-hidden flex items-center justify-center"
               style={{
                 background: isDark
                   ? `radial-gradient(ellipse at center, rgba(${accentRgb},0.18) 0%, rgba(${accentRgb},0.04) 40%, transparent 70%)`
@@ -116,7 +148,7 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
               </motion.div>
             </div>
 
-            <div className="px-6 pt-2 pb-5 text-center">
+            <div className="relative z-10 px-6 pt-2 pb-5 text-center">
               <h3 className="text-[18px] mb-1.5"
                 style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
                 {isWaitlistOnly
@@ -231,16 +263,16 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
               {!isWaitlistOnly && accessMode === 'guestlist' && !onGuestList && (
                 <motion.div
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
-                  className="rounded-2xl p-4 mb-4 text-left flex items-start gap-3"
+                  className="relative rounded-2xl overflow-hidden p-4 mb-4 text-left flex items-start gap-3"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                   }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  <GlassReflection isDark={isDark} />
+                  <div className="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
                     <UserPlus className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }} strokeWidth={2} />
                   </div>
-                  <div className="flex-1">
+                  <div className="relative z-10 flex-1">
                     <p className="text-[13px] mb-0.5"
                       style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 500 }}>
                       Not on the list
@@ -281,10 +313,10 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                       style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
                     <AppButton whileTap={{ scale: 0.95 }}
                       onClick={tryCode}
-                      disabled={!code.trim()}
+                      disabled={!code.trim() || checkingCode}
                       className="flex-shrink-0 px-4 py-2 rounded-xl disabled:cursor-not-allowed"
                       style={
-                        code.trim()
+                        code.trim() && !checkingCode
                           ? {
                               background: isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a',
                               color: isDark ? '#0a0a0a' : '#fff',
@@ -292,7 +324,7 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                           : disabledSurface(isDark)
                       }>
                       <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                        Unlock
+                        {checkingCode ? 'Checking…' : 'Unlock'}
                       </span>
                     </AppButton>
                   </motion.div>
@@ -302,7 +334,7 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                         initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                         className="text-[11px] mt-2 ml-1"
                         style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
-                        Invalid code. Check the invite you received.
+                        {codeErrorMessage}
                       </motion.p>
                     )}
                   </AnimatePresence>

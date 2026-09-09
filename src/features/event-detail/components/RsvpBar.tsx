@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, Check, Share2 } from 'lucide-react';
 import type { RsvpStatus } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 interface RsvpBarProps {
   rsvpStatus: RsvpStatus;
@@ -13,14 +14,14 @@ interface RsvpBarProps {
 
 export function RsvpBar({ rsvpStatus, isDark, onShare, onRegister, onPurchase }: RsvpBarProps) {
   return (
-    <div className="relative flex items-center gap-3 px-4 py-3 rounded-2xl"
+    <div className="relative flex items-center gap-3 overflow-hidden px-4 py-3 rounded-2xl"
       style={{
         background: isDark ? 'rgba(20,20,20,0.7)' : 'rgba(255,255,255,0.6)',
         backdropFilter: 'blur(60px) saturate(1.6)',
         WebkitBackdropFilter: 'blur(60px) saturate(1.6)',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
       }}>
-      <div className="flex flex-col min-w-0 flex-shrink-0">
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 flex flex-col min-w-0 flex-shrink-0">
         <span className="text-[9px] tracking-[1.8px] uppercase leading-none mb-1.5"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
           Status
@@ -31,18 +32,18 @@ export function RsvpBar({ rsvpStatus, isDark, onShare, onRegister, onPurchase }:
         </span>
       </div>
 
-      <div className="w-px self-stretch my-1"
+      <div className="relative z-10 w-px self-stretch my-1"
         style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
 
       <AppButton whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }}
         onClick={onShare}
         aria-label="Share event"
-        className="relative w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0"
+        className="relative z-10 w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center cursor-pointer flex-shrink-0"
         style={{
           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         }}>
-        <Share2 className="w-[17px] h-[17px]"
+        <GlassReflection isDark={isDark} />
+        <Share2 className="relative z-10 w-[17px] h-[17px]"
           style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }} strokeWidth={1.75} />
       </AppButton>
 
@@ -54,7 +55,7 @@ export function RsvpBar({ rsvpStatus, isDark, onShare, onRegister, onPurchase }:
             onRegister();
           }
         }}
-        className="relative flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer"
+        className="relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer"
         style={{
           background: rsvpStatus === 'going'
             ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.1)')

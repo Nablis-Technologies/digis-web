@@ -17,12 +17,41 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
   const isCouples = type.isCouples;
   const isDark = pageIsDark;
   const [expanded, setExpanded] = useState(false);
+  // Backend "available: false" → purchasableCap 0 (products.ts). A sold-out
+  // TIER is dimmed + non-selectable even when other tiers on the event remain
+  // buyable — clicking it would otherwise sail through checkout to a 409
+  // inventory_unavailable at order creation.
+  const soldOut = type.available === 0;
 
   // Rank-based accent (cheapest→emerald, priciest→gold; legacy semantic flags
   // as fallback). Dark mode uses the bright shade; light mode the adjacent ink.
   const { rgb: accentRgb, bright: accentBright, ink: accentInk, bg: accentBg } = resolveTierAccent(type);
   const accentColor = isDark ? accentBright : accentInk;
   const mutedInk = 'rgba(0,0,0,0.55)';
+
+  // Full-card background keyed by the RESOLVED accent (rank `accent`, semantic
+  // flags fallback). Live backend tiers only carry `accent` — never the legacy
+  // isEarlyBird/isCouples/isPremium/isElite flags — so the body must derive from
+  // the accent, or every card falls through to the standard blue gradient.
+  const cardAccent =
+    type.accent ??
+    (isEarlyBird ? 'emerald' : isCouples ? 'rose' : isElite ? 'violet' : isPremium ? 'gold' : 'blue');
+  const cardBackground =
+    isDark
+      ? ({
+          emerald: 'linear-gradient(155deg, #0a2218 0%, #060f0c 100%)',
+          rose: 'linear-gradient(155deg, #2a0f1a 0%, #140709 100%)',
+          violet: 'radial-gradient(ellipse 120% 80% at 100% 0%, rgba(217,178,89,0.22) 0%, transparent 55%), radial-gradient(ellipse 100% 70% at 0% 110%, rgba(124,58,237,0.32) 0%, transparent 60%), linear-gradient(160deg, #1d0f44 0%, #0a0420 55%, #050108 100%)',
+          gold: 'linear-gradient(155deg, #1e1a0a 0%, #0e0c08 100%)',
+          blue: 'linear-gradient(155deg, #101a2d 0%, #0a0e14 100%)',
+        } as const)[cardAccent]
+      : ({
+          emerald: 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(52,211,153,0.16) 0%, transparent 58%), linear-gradient(155deg, #17724f 0%, #0f543a 48%, #08271d 100%)',
+          rose: 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.10) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(251,113,133,0.16) 0%, transparent 58%), linear-gradient(155deg, #84304f 0%, #5d1d37 50%, #270d18 100%)',
+          violet: 'radial-gradient(ellipse 120% 80% at 100% 0%, rgba(232,200,122,0.32) 0%, transparent 55%), radial-gradient(ellipse 100% 70% at 0% 110%, rgba(139,92,246,0.38) 0%, transparent 60%), linear-gradient(160deg, #3c2182 0%, #241154 58%, #100628 100%)',
+          gold: 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(250,200,60,0.18) 0%, transparent 58%), linear-gradient(155deg, #765817 0%, #4c350d 50%, #211506 100%)',
+          blue: 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(96,165,250,0.16) 0%, transparent 58%), linear-gradient(155deg, #255f9f 0%, #1a4778 50%, #0c233d 100%)',
+        } as const)[cardAccent];
 
   const savingsPct = isEarlyBird && type.originalPriceMinor
     ? Math.round((1 - type.priceMinor / type.originalPriceMinor) * 100)
@@ -33,10 +62,10 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08 * index, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-      whileHover={{ scale: 1.01, y: -2 }}
-      whileTap={{ scale: 0.99 }}
-      onClick={onSelect}
-      className="relative rounded-[22px] cursor-pointer overflow-visible"
+      whileHover={soldOut ? undefined : { scale: 1.01, y: -2 }}
+      whileTap={soldOut ? undefined : { scale: 0.99 }}
+      onClick={() => { if (!soldOut) onSelect(); }}
+      className={`relative rounded-[22px] overflow-visible ${soldOut ? 'opacity-45 grayscale-[0.55] pointer-events-auto select-none' : 'cursor-pointer'}`}
       style={{
         boxShadow: pageIsDark
           ? undefined
@@ -48,27 +77,7 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
       {/* Glass body — dark mode stays original, light mode gets fixed solid colored cards */}
       <div
         className="absolute inset-0 rounded-[22px]"
-        style={{
-          background: pageIsDark
-            ? (isEarlyBird
-                ? 'linear-gradient(155deg, #0a2218 0%, #060f0c 100%)'
-                : isCouples
-                  ? 'linear-gradient(155deg, #2a0f1a 0%, #140709 100%)'
-                  : isPremium
-                    ? isElite
-                      ? 'radial-gradient(ellipse 120% 80% at 100% 0%, rgba(217,178,89,0.22) 0%, transparent 55%), radial-gradient(ellipse 100% 70% at 0% 110%, rgba(124,58,237,0.32) 0%, transparent 60%), linear-gradient(160deg, #1d0f44 0%, #0a0420 55%, #050108 100%)'
-                      : 'linear-gradient(155deg, #1e1a0a 0%, #0e0c08 100%)'
-                    : 'linear-gradient(155deg, #101a2d 0%, #0a0e14 100%)')
-            : (isEarlyBird
-                ? 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(52,211,153,0.16) 0%, transparent 58%), linear-gradient(155deg, #17724f 0%, #0f543a 48%, #08271d 100%)'
-                : isCouples
-                  ? 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.10) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(251,113,133,0.16) 0%, transparent 58%), linear-gradient(155deg, #84304f 0%, #5d1d37 50%, #270d18 100%)'
-                  : isPremium
-                    ? isElite
-                      ? 'radial-gradient(ellipse 120% 80% at 100% 0%, rgba(232,200,122,0.32) 0%, transparent 55%), radial-gradient(ellipse 100% 70% at 0% 110%, rgba(139,92,246,0.38) 0%, transparent 60%), linear-gradient(160deg, #3c2182 0%, #241154 58%, #100628 100%)'
-                      : 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(250,200,60,0.18) 0%, transparent 58%), linear-gradient(155deg, #765817 0%, #4c350d 50%, #211506 100%)'
-                    : 'radial-gradient(ellipse 82% 58% at 10% 0%, rgba(255,255,255,0.11) 0%, transparent 52%), radial-gradient(ellipse 90% 70% at 88% 18%, rgba(96,165,250,0.16) 0%, transparent 58%), linear-gradient(155deg, #255f9f 0%, #1a4778 50%, #0c233d 100%)')        
-        }}
+        style={{ background: cardBackground }}
       />
       <span aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none rounded-[22px]" style={glassReflection(pageIsDark, undefined, reflectionSettings)} />
       <span aria-hidden="true" className="absolute inset-0 z-[1] pointer-events-none rounded-[22px]" style={glassEdgeReflection(pageIsDark, reflectionSettings)} />
@@ -84,18 +93,64 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
         style={{ background: `linear-gradient(165deg, ${accentBg} 0%, transparent 40%)` }}
       />
 
-      {/* Border */}
-      {selected && <motion.div
+      {/* Border — accent edge always on, stronger when selected */}
+      <motion.div
         className="absolute inset-0 rounded-[22px] pointer-events-none transition-all duration-400"
         style={{
-          border: pageIsDark
+          border: selected
+            ? pageIsDark
               ? `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.55' : '0.25'})`
               : isElite
                 ? `1.5px solid rgba(${accentRgb}, 0.58)`
-                : `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.48' : '0.38'})`,
+                : `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.48' : '0.38'})`
+            : pageIsDark
+              ? `1px solid rgba(${accentRgb}, 0.1)`
+              : isElite
+                ? `1px solid rgba(${accentRgb}, 0.28)`
+                : `1px solid rgba(${accentRgb}, 0.2)`,
         }}
       />
-      }
+
+      {/* Top highlight line */}
+      <div
+        className="absolute inset-0 pointer-events-none rounded-[22px]"
+        style={{
+          maskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
+          WebkitMaskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
+          background: pageIsDark
+            ? `linear-gradient(90deg, transparent 8%, rgba(${accentRgb}, ${isPremium ? '0.5' : '0.2'}) 50%, transparent 92%)`
+            : isElite
+              ? `linear-gradient(90deg, transparent 8%, rgba(255,255,255,0.30) 28%, rgba(${accentRgb}, 0.72) 50%, transparent 92%)`
+              : `linear-gradient(90deg, transparent 8%, rgba(255,255,255,0.16) 28%, rgba(${accentRgb}, ${isPremium ? '0.48' : '0.34'}) 50%, transparent 92%)`,
+        }}
+      />
+
+      {/* Shimmer for premium */}
+      {isPremium && (
+        <div
+          className="absolute inset-0 pointer-events-none rounded-[22px] overflow-hidden"
+          style={{
+            maskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
+            WebkitMaskImage: 'linear-gradient(to bottom, white 0%, white 1.5px, transparent 1.5px)',
+          }}
+        >
+          <motion.div
+            className="absolute top-0 h-[2px]"
+            style={{
+              background: pageIsDark
+                ? isElite
+                  ? 'radial-gradient(ellipse at center, rgba(244,255,128,0.8), transparent 70%)'
+                  : 'radial-gradient(ellipse at center, rgba(250,255,150,0.7), transparent 70%)'
+                : isElite
+                  ? 'radial-gradient(ellipse at center, rgba(244,255,128,0.8), transparent 70%)'
+                  : 'radial-gradient(ellipse at center, rgba(255,235,140,0.5), transparent 72%)',
+              width: pageIsDark ? '35%' : isElite ? '35%' : '28%',
+            }}
+            animate={{ left: ['-35%', '100%'] }}
+            transition={{ duration: 4, repeat: Infinity, repeatDelay: 3, ease: 'easeInOut' }}
+          />
+        </div>
+      )}
 
       {/* Card content */}
       <div className="relative z-10 px-4 py-3.5">
@@ -124,22 +179,39 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
               <Heart className="w-3 h-3" strokeWidth={2} style={{ fill: `rgba(${accentRgb}, 0.45)`, color: accentColor }} />
             )}
           </div>
-          <motion.div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{
-              border: selected ? 'none' : `1.5px solid rgba(${accentRgb}, 0.3)`,
-              backgroundColor: selected ? accentColor : 'transparent',
-            }}
-            animate={{ scale: selected ? [1, 1.15, 1] : 1 }}
-            transition={{ duration: 0.3 }}>
-            <AnimatePresence>
-              {selected && (
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}>
-                  <Check className="w-3 h-3" strokeWidth={2.75} style={{ color: isDark ? 'rgba(0,0,0,0.8)' : '#fff' }} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
+          {soldOut ? (
+            <span className="flex-shrink-0 text-[9px] tracking-[1.5px] uppercase px-2 py-0.5 rounded-md"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                color: isDark ? 'rgba(255,110,100,0.95)' : 'rgba(190,18,60,0.9)',
+                border: isDark
+                  ? '1px solid rgba(248,113,113,0.35)'
+                  : '1px solid rgba(190,18,60,0.4)',
+                background: isDark
+                  ? 'rgba(248,113,113,0.12)'
+                  : 'rgba(248,113,113,0.1)',
+              }}>
+              Sold Out
+            </span>
+          ) : (
+            <motion.div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{
+                border: selected ? 'none' : `1.5px solid rgba(${accentRgb}, 0.3)`,
+                backgroundColor: selected ? accentColor : 'transparent',
+              }}
+              animate={{ scale: selected ? [1, 1.15, 1] : 1 }}
+              transition={{ duration: 0.3 }}>
+              <AnimatePresence>
+                {selected && (
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}>
+                    <Check className="w-3 h-3" strokeWidth={2.75} style={{ color: isDark ? 'rgba(0,0,0,0.8)' : '#fff' }} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
         </div>
 
         {/* Name + price */}
@@ -164,10 +236,12 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : 'rgba(0,0,0,0.88)' }}>
               {Money.fromMinor(type.priceMinor, "ETB").formatNumber()}
             </span>
-            <span className="text-[10px]"
-              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.55)` : mutedInk }}>
-              {isCouples ? '/ pair' : '/ ea'}
-            </span>
+            {isCouples && (
+              <span className="text-[10px]"
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.55)` : mutedInk }}>
+                / pair
+              </span>
+            )}
           </div>
         </div>
 
@@ -175,10 +249,12 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
         <div className="flex items-center justify-between gap-2 mt-1.5">
           <div className="flex items-center gap-1.5 text-[10.5px] min-w-0"
             style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.6)` : mutedInk }}>
-            <span className="flex-shrink-0">{type.available} left</span>
+            {!soldOut && (
+              <span className="flex-shrink-0">{type.available} left</span>
+            )}
             {type.features?.length > 0 && (
               <>
-                <span style={{ opacity: 0.4 }}>·</span>
+                {!soldOut && <span style={{ opacity: 0.4 }}>·</span>}
                 <span className="truncate min-w-0">{type.features[0].text}</span>
               </>
             )}

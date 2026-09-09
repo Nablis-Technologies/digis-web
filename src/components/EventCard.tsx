@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronRight, Clock, Hourglass, Lock, MapPin, Radio } from "lucide-react";
+import { ChevronRight, Clock, Hourglass, Lock, MapPin, Radio, CalendarX } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
@@ -9,6 +9,8 @@ import { getCategoryColor } from "@/lib/categoryColors";
 import { EventDateBadge } from "@/components/EventDateBadge";
 import { glassShadow } from "@/lib/ui/glass";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
+import { eventEnded } from "@/lib/eventDates";
+import { eventActionLabel } from "@/lib/eventAction";
 
 /** Combine an event's date ("June 29, 2026") + time ("8:00 PM") into a Date. */
 export function getEventStart(dateStr: string, timeStr?: string): Date {
@@ -143,6 +145,34 @@ export function CountdownBadge({ event }: { event: Event }) {
     return () => clearInterval(id);
   }, [urgency]);
 
+  // BACKEND_GAPS #34 mitigation: a past event stays on the grid but is flagged
+  // Ended (the backend still accepts orders for it; purchase is disabled on the
+  // detail page).
+  if (eventEnded(event)) {
+    return (
+      <div className="absolute bottom-3 right-3 z-20">
+        <motion.span
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-flex items-center h-[22px] gap-1.5 px-2.5 rounded-full text-[9px] tracking-[1.2px] uppercase leading-none tabular-nums"
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 700,
+            color: "#fff",
+            background: "rgba(10,10,10,0.55)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
+          }}
+        >
+          <CalendarX className="w-2.5 h-2.5" strokeWidth={2.5} style={{ color: "#d6f905" }} />
+          <span style={{ color: "#d6f905" }}>Ended</span>
+        </motion.span>
+      </div>
+    );
+  }
+
   if (!urgency) return null;
 
   const diff = start.getTime() - now;
@@ -226,7 +256,7 @@ export function EventCard({
   const { rgb } = useImageColor(event.image);
   const { isDark } = useTheme();
   // Sold out only when the backend says so — a missing tickets_left value
-  // (config not serialized yet) must not read as zero left.
+  // must not read as zero left.
   const isSoldOut = event.soldOut === true || event.ticketsLeft === 0;
   const isLow =
     typeof event.ticketsLeft === "number" && event.ticketsLeft > 0 && event.ticketsLeft <= 45;
@@ -514,7 +544,7 @@ export function EventCard({
                 fontWeight: 700,
               }}
             >
-              {isSoldOut ? "Sold Out" : "Tickets"}
+              {isSoldOut ? "Sold Out" : eventActionLabel(event.eventType)}
             </span>
             <ChevronRight
               className="w-2.5 h-2.5"

@@ -36,6 +36,12 @@ export interface TicketTier {
   /** Backend Ticketing::TicketType id (nested in the product payload) —
    *  consent_requirements + registration submit address this id. Mock tiers omit it. */
   ticketTypeId?: string;
+  /** Backend audience gate for this tier (public | access_code | invitation |
+   *  code_or_invitation). Present only for live products; `public` = no gate. */
+  audience?: 'public' | 'access_code' | 'invitation' | 'code_or_invitation';
+  /** Backend ticket-type date selection mode. `choose_one` tiers require a
+   *  selected event date at registration (invalid_registration without it). */
+  dateSelection?: 'fixed' | 'choose_one';
   name: string;
   level: string;
   /** Integer cents (backend `*_minor`). */
@@ -168,9 +174,13 @@ export interface Event {
   /** Lowest starting price in integer cents (backend `*_minor`). */
   priceFromMinor: number;
   currency: "ETB";
-  /** Backend `config.tickets_left` — 0 when unserved until the serializer expands. */
+  /** Backend `config.tickets_left` — absent when the backend omits it. */
   ticketsLeft?: number;
   ticketTypes?: TicketTier[];
+  /** Backend event dates with ids (choose_one ticket types need a selected
+   *  event_date_id at registration). Display date/time derive from [0].
+   *  `endsAt`/`status` drive the "event ended" purchase gate (eventEnded). */
+  eventDates?: { id: string; startsAt: string; endsAt?: string; status?: string; name?: string }[];
   /** Purchasable event extras such as parking, merchandise, food, or digital access. */
   products?: EventProduct[];
   /** When set, buyers pick assigned seats during checkout. */

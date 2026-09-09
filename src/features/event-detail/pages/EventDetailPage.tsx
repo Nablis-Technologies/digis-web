@@ -1,6 +1,6 @@
 ﻿import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Users, Ticket as TicketIcon, Heart, Sparkles, Gift, Crown, Zap } from 'lucide-react';
-import { useState, useLayoutEffect, useRef } from 'react';
+import { Calendar, MapPin, Clock, Users, Ticket as TicketIcon, Heart, Sparkles, Gift, Crown, Zap, Lock, CalendarX } from 'lucide-react';
+import { useState, useLayoutEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { productsModule } from '@/lib/products';
 import 'slick-carousel/slick/slick.css';
@@ -12,6 +12,7 @@ import { ShareCard } from '@/features/tickets/components/ShareCard';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 import { RsvpRegistrationSheet, RsvpSection } from '@/features/event-detail/components/RsvpSection';
 import { InviteOnlySection } from '@/features/event-detail/components/InviteOnlySection';
+import { GatedTierGate } from '@/features/event-detail/components/GatedTierGate';
 import type { Event, RsvpStatus, InviteUnlockState } from '@/types';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
 import { OrganizerCard, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
@@ -27,6 +28,8 @@ import { InviteOnlyBar } from '@/features/event-detail/components/InviteOnlyBar'
 import { RsvpBar } from '@/features/event-detail/components/RsvpBar';
 import { useDominantColor } from '@/features/event-detail/hooks/useDominantColor';
 import { useTicketPricing } from '@/features/event-detail/hooks/useTicketPricing';
+import { EndedBar } from '@/features/event-detail/components/EndedBar';
+import { eventEnded } from '@/lib/eventDates';
 
 interface EventDetailProps {
   event: Event;
@@ -51,12 +54,16 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   const [rsvpGuests, setRsvpGuests] = useState(0);
   const [showRsvpRegistration, setShowRsvpRegistration] = useState(false);
   const [inviteUnlock, setInviteUnlock] = useState<InviteUnlockState>({ unlocked: false, method: null });
+  const [gatedUnlocked, setGatedUnlocked] = useState(false);
   const [inviteRsvpConfirmed, setInviteRsvpConfirmed] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const carouselImages = event.images && event.images.length > 0 ? event.images : [event.image];
   const posterRgb = useDominantColor(carouselImages[0]);
   const isRsvp = event.eventType === 'rsvp';
   const isInvite = event.eventType === 'inviteOnly';
+  // BACKEND_GAPS #34 mitigation: the backend still quotes/orders for past
+  // events, so the frontend disables the buy entry once every date has ended.
+  const ended = useMemo(() => eventEnded(event), [event]);
   const { isDark } = useTheme();
   const { rgb } = useImageColor(event.image);
 
@@ -75,12 +82,23 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   const live = productsQuery.data;
   const displayTicketTypes = live?.tiers ?? [];
   const displayProducts = live?.extras ?? [];
+  // Tier-level audience gate (BACKEND_GAPS #20): a live ticketed event whose
+  // tiers are NOT public still lets buyers reach the ticket selector + checkout
+  // without proving access. When any tier is gated, the selector is hidden
+  // behind a code/invitation gate; the code is validated server-side against
+  // every gated tier, then the normal ticketed flow is revealed.
+  const gatedTicketTypeIds = displayTicketTypes
+    .filter((t) => t.audience && t.audience !== 'public')
+    .map((t) => t.ticketTypeId)
+    .filter((id): id is string => !!id);
+  const hasGatedTiers = gatedTicketTypeIds.length > 0;
   const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes: displayTicketTypes, selectedTicketType, event, isDark });
  const scrollToTicketSelection = () => {
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handlePurchase = () => {
+    if (ended) return;
     if (!selectedTicketType) {
       scrollToTicketSelection();
       return;
@@ -89,6 +107,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   };
 
   const handleGift = () => {
+    if (ended) return;
     if (!selectedTicketType) {
       scrollToTicketSelection();
       return;
@@ -188,6 +207,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               event={event}
               unlock={inviteUnlock}
               onUnlockChange={setInviteUnlock}
+              gatedTicketTypeIds={gatedTicketTypeIds}
               rsvpConfirmed={inviteRsvpConfirmed}
               onConfirmRsvp={() => setInviteRsvpConfirmed(true)}
             />
@@ -201,8 +221,31 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               onRegister={() => setShowRsvpRegistration(true)}
               onRequestAuth={onRequestAuth}
             />
+          ) : ended ? (
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="rounded-3xl p-6 text-center"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+              }}
+            >
+              <CalendarX className="w-5 h-5 mx-auto mb-3" style={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.8} />
+              <p className="text-[16px] font-light mb-1" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                Event ended
+              </p>
+              <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)' }}>
+                Tickets are no longer available — this event has finished.
+              </p>
+            </motion.div>
           ) : (
-          <>
+          <GatedTierGate
+            gatedTicketTypeIds={gatedTicketTypeIds}
+            unlocked={!hasGatedTiers || gatedUnlocked}
+            onUnlocked={() => setGatedUnlocked(true)}
+          >
           <TicketSelector
             event={event}
             ticketTypes={displayTicketTypes}
@@ -214,7 +257,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
             loadError={productsQuery.isError}
             onRetry={() => void productsQuery.refetch()}
           />
-          </>
+          </GatedTierGate>
           )}
         </motion.div>
       </div>
@@ -242,8 +285,18 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
               onRegister={() => setShowRsvpRegistration(true)}
               onPurchase={onPurchase}
             />
+          ) : ended ? (
+            <EndedBar isDark={isDark} />
           ) : isSoldOut ? (
             <SoldOutBar isDark={isDark} onNavigate={onNavigate} />
+          ) : hasGatedTiers && !gatedUnlocked ? (
+            <div className="flex items-center justify-center gap-1.5 py-4">
+              <Lock className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }} strokeWidth={2} />
+              <span className="text-[11px] tracking-[1px] uppercase"
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }}>
+                Unlock with access code above
+              </span>
+            </div>
           ) : (
             <PurchaseBar
               isDark={isDark}
@@ -318,6 +371,8 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
             answerEditWindowHours={event.answerEditWindowHours}
             seatMap={event.seatMap}
             requiredSeatCount={selectedTicket?.seats ?? (selectedTicket?.isCouples ? 2 : undefined)}
+            dateSelection={selectedTicket?.dateSelection}
+            eventDates={event.eventDates?.filter((d) => Date.parse(d.startsAt) > Date.now())}
             onClose={() => setShowCheckout(false)}
             onComplete={() => { setShowCheckout(false); onPurchase(); }}
           />

@@ -30,7 +30,9 @@ export function PurchaseBar({
   return (
     <div className="relative flex items-center gap-3 min-[380px]:gap-4 overflow-hidden px-4 min-[380px]:px-5 py-3 rounded-2xl"
       style={{
-        background: isDark ? 'transparent' : 'rgba(255,255,255,0.72)',
+        // Translucent night/paper tint — blur alone over a transparent fill
+        // lets page text ghost through behind the price.
+        background: isDark ? 'rgba(8,9,11,0.62)' : 'rgba(255,255,255,0.72)',
         backdropFilter: isDark
           ? 'blur(60px) saturate(2) brightness(1.15)'
           : 'blur(24px) saturate(1.8)',

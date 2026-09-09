@@ -8,6 +8,7 @@ import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './Brand
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFollow, reflectionSettings }: {
   venue: string; isDark: boolean;
@@ -215,20 +216,20 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
           background: isDark ? '#101010' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
           maxHeight: '90vh',
         }}>
+        <GlassReflection isDark={isDark} />
         <AppButton onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
           style={{
             background: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.85)',
             backdropFilter: 'blur(14px)',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
           }}>
-          <X className="w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
+          <GlassReflection isDark={isDark} />
+          <X className="relative z-10 w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
         </AppButton>
 
-        <div className="overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Banner */}
           <div className="relative h-28"
             style={{
@@ -288,17 +289,17 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
             </div>
 
             {/* Stats */}
-            <div className="flex items-stretch py-3.5 mb-5 rounded-2xl"
+            <div className="relative flex items-stretch overflow-hidden py-3.5 mb-5 rounded-2xl"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
               }}>
+              <GlassReflection isDark={isDark} />
               {[
                 { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Events', value: `${eventsCount}` },
                 { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(followers) },
                 { icon: <Sparkle className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Capacity', value: formatCount(capacity) },
               ].map((s, i) => (
-                <div key={s.label} className="flex-1 flex items-stretch">
+                  <div key={s.label} className="relative z-10 flex-1 flex items-stretch">
                   {i > 0 && (
                     <div className="w-px self-stretch my-1"
                       style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
@@ -350,14 +351,14 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                     (navigator as any).share({ title: venueName, text: `${venueName} — ${address}` }).catch(() => {});
                   }
                 }}
-                className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl cursor-pointer"
+                className="relative flex-shrink-0 flex items-center justify-center gap-2 overflow-hidden px-4 py-3 rounded-2xl cursor-pointer"
                 style={{
                   background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                   color: isDark ? '#fff' : '#1a1a1a',
                 }}>
-                <Share2 className="w-4 h-4" strokeWidth={2} />
-                <span className="text-[12.5px] tracking-[0.3px]"
+                <GlassReflection isDark={isDark} />
+                <Share2 className="relative z-10 w-4 h-4" strokeWidth={2} />
+                <span className="relative z-10 text-[12.5px] tracking-[0.3px]"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                   Share
                 </span>
@@ -408,14 +409,14 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                   { label: 'A/C', icon: <Snowflake className="w-3.5 h-3.5" strokeWidth={1.75} /> },
                 ].map((a) => (
                   <div key={a.label}
-                    className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl"
+                    className="relative flex items-center gap-1.5 overflow-hidden px-2.5 py-2 rounded-xl"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                       color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)',
                     }}>
-                    <span style={{ color: isDark ? accent : '#0a0a0a' }}>{a.icon}</span>
-                    <span className="text-[11px] tracking-[0.2px] truncate"
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10" style={{ color: isDark ? accent : '#0a0a0a' }}>{a.icon}</span>
+                    <span className="relative z-10 text-[11px] tracking-[0.2px] truncate"
                       style={{ fontFamily: "'Inter', sans-serif" }}>
                       {a.label}
                     </span>
@@ -440,13 +441,13 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                 ].map((s) => (
                   <AppButton key={s.label} whileTap={{ scale: 0.95 }}
                     className="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer">
-                    <div className="w-[60px] h-[60px] rounded-2xl flex items-center justify-center"
+                    <div className="relative w-[60px] h-[60px] rounded-2xl overflow-hidden flex items-center justify-center"
                       style={{
                         background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                         color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(20,18,40,0.85)',
                       }}>
-                      {s.icon}
+                      <GlassReflection isDark={isDark} />
+                      <span className="relative z-10 flex items-center justify-center">{s.icon}</span>
                     </div>
                     <span className="text-[10px] tracking-[0.2px]"
                       style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)' }}>
@@ -491,8 +492,8 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                             width: isFeatured ? 200 : 120,
                             height: 150,
                             scrollSnapAlign: 'start',
-                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                           }}>
+                          <GlassReflection isDark={isDark} />
                           <ImageWithFallback
                             src={src}
                             alt={`${venueName} photo ${i + 1}`}

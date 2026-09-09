@@ -7,6 +7,7 @@ import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './Brand
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function resolveOrganizers(event: any): any[] {
   if (Array.isArray(event.organizers) && event.organizers.length > 0) {
@@ -176,16 +177,16 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
           background: isDark
             ? 'linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))'
             : 'linear-gradient(145deg, rgba(255,255,255,0.72), rgba(234,231,242,0.58))',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.72)'}`,
           boxShadow: isDark
             ? 'inset 0 1px 0 rgba(255,255,255,0.025)'
             : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 14px 32px rgba(54,47,70,0.055)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
         }}>
+        <GlassReflection isDark={isDark} />
         {organizers.map((o, idx) => (
           <div key={o.handle}
-            className="flex items-center gap-3 px-4 py-2.5"
+            className="relative z-10 flex items-center gap-3 px-4 py-2.5"
             style={{
               borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(81,72,101,0.075)'}`,
             }}>
@@ -285,10 +286,10 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
           background: isDark ? '#101010' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
           maxHeight: '85vh',
         }}>
-        <div className="flex items-center justify-between px-6 pt-5 pb-4"
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 flex items-center justify-between px-6 pt-5 pb-4"
           style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
           <div>
             <p className="text-[9px] tracking-[3px] uppercase"
@@ -301,16 +302,16 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
             </p>
           </div>
           <AppButton onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+            className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
             style={{
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
             }}>
-            <X className="w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
+            <GlassReflection isDark={isDark} />
+            <X className="relative z-10 w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
           </AppButton>
         </div>
 
-        <div className="overflow-y-auto overscroll-contain p-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="relative z-10 overflow-y-auto overscroll-contain p-3" style={{ WebkitOverflowScrolling: 'touch' }}>
           {organizers.map((o) => {
             const following = followingMap[o.handle] || false;
             return (
@@ -400,23 +401,23 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
           background: isDark ? '#101010' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
           maxHeight: '90vh',
         }}>
+        <GlassReflection isDark={isDark} />
         {/* Close — sticky top-right, always reachable */}
         <AppButton onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
           style={{
             background: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.85)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
           }}>
-          <X className="w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
+          <GlassReflection isDark={isDark} />
+          <X className="relative z-10 w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
         </AppButton>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* Banner */}
         <div className="relative h-24"
@@ -459,16 +460,16 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
           </p>
 
           {/* Stats */}
-          <div className="flex items-stretch py-3.5 mb-5 rounded-2xl"
+          <div className="relative flex items-stretch overflow-hidden py-3.5 mb-5 rounded-2xl"
             style={{
               background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
             }}>
+            <GlassReflection isDark={isDark} />
             {[
               { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Events', value: `${organizer.eventsHosted}` },
               { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(organizer.followers) },
             ].map((s, i) => (
-              <div key={s.label} className="flex-1 flex items-stretch">
+              <div key={s.label} className="relative z-10 flex-1 flex items-stretch">
                 {i > 0 && (
                   <div className="w-px self-stretch my-1"
                     style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
@@ -520,14 +521,14 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                   (navigator as any).share({ title: organizer.name, text: organizer.bio || organizer.name }).catch(() => {});
                 }
               }}
-              className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl cursor-pointer"
+              className="relative flex-shrink-0 flex items-center justify-center gap-2 overflow-hidden px-4 py-3 rounded-2xl cursor-pointer"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                 color: isDark ? '#fff' : '#1a1a1a',
               }}>
-              <Share2 className="w-4 h-4" strokeWidth={2} />
-              <span className="text-[12.5px] tracking-[0.3px]"
+              <GlassReflection isDark={isDark} />
+              <Share2 className="relative z-10 w-4 h-4" strokeWidth={2} />
+              <span className="relative z-10 text-[12.5px] tracking-[0.3px]"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                 Share
               </span>
@@ -550,13 +551,13 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
               ].map((s) => (
                 <AppButton key={s.label} whileTap={{ scale: 0.95 }}
                   className="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer">
-                  <div className="w-[60px] h-[60px] rounded-2xl flex items-center justify-center"
+                  <div className="relative w-[60px] h-[60px] rounded-2xl overflow-hidden flex items-center justify-center"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                       color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(20,18,40,0.85)',
                     }}>
-                    {s.icon}
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10 flex items-center justify-center">{s.icon}</span>
                   </div>
                   <span className="text-[10px] tracking-[0.2px]"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)' }}>
@@ -606,12 +607,12 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                 <div className="space-y-2">
                   {active.map((ev: any, i: number) => (
                     <AppButton key={ev.name + i} whileTap={{ scale: 0.99 }}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-2xl text-left cursor-pointer"
+                      className="relative w-full flex items-center gap-3 overflow-hidden p-2.5 rounded-2xl text-left cursor-pointer"
                       style={{
                         background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                       }}>
-                      <div className="relative w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
+                      <GlassReflection isDark={isDark} />
+                      <div className="relative z-10 w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
                         style={{ background: ev.image ? undefined : ev.gradient, filter: isPast ? 'saturate(0.7)' : undefined }}>
                         {ev.image && <img src={ev.image} alt={ev.name} className="w-full h-full object-cover" />}
                         <div className="absolute inset-0"
@@ -627,7 +628,7 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                           {ev.date.split(' ')[1]?.replace(',', '')}
                         </span>
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="relative z-10 flex-1 min-w-0">
                         <p className="text-[13px] truncate leading-tight"
                           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? (isPast ? 'rgba(255,255,255,0.85)' : '#fff') : (isPast ? 'rgba(0,0,0,0.8)' : '#1a1a1a'), fontWeight: 500 }}>
                           {ev.name}
@@ -649,7 +650,7 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                           )}
                         </div>
                       </div>
-                      <ArrowRight className="w-3.5 h-3.5 flex-shrink-0"
+                      <ArrowRight className="relative z-10 w-3.5 h-3.5 flex-shrink-0"
                         style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }} strokeWidth={2} />
                     </AppButton>
                   ))}

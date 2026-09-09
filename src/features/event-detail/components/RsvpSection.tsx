@@ -6,6 +6,7 @@ import type { CustomQuestion, RsvpStatus } from '@/types';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { disabledSurface, disabledInk } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
 interface RsvpSectionProps {
@@ -113,12 +114,12 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
         className="relative rounded-3xl overflow-hidden mb-4"
         style={{
           background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
         }}>
+        <GlassReflection isDark={isDark} />
         <div className="absolute inset-0 pointer-events-none"
           style={{ background: `radial-gradient(circle at 100% 0%, rgba(${accentRgb},0.08), transparent 50%)` }} />
 
-        <div className="relative p-5">
+        <div className="relative z-10 p-5">
           {/* Top row */}
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -220,11 +221,11 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
       {/* RSVP pill selector */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.05 }}
-        className="rounded-3xl p-1.5 grid grid-cols-3 gap-1.5 mb-4"
+        className="relative rounded-3xl overflow-hidden p-1.5 grid grid-cols-3 gap-1.5 mb-4"
         style={{
           background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
         }}>
+        <GlassReflection isDark={isDark} />
         <RsvpPill
           label="Going" icon={<Check className="w-4 h-4" strokeWidth={2.5} />}
           active={status === 'going'} accent={accent} accentRgb={accentRgb}
@@ -247,19 +248,19 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
             animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
             transition={{ duration: 0.3 }}>
-            <div className="rounded-3xl p-4 flex items-center gap-3"
+            <div className="relative rounded-3xl overflow-hidden p-4 flex items-center gap-3"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
               }}>
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              <GlassReflection isDark={isDark} />
+              <div className="relative z-10 w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{
                   background: `rgba(${accentRgb},0.1)`,
                   border: `1px solid rgba(${accentRgb},0.18)`,
                 }}>
                 <UserPlus className="w-4 h-4" style={{ color: isDark ? accent : "#0a0a0a" }} strokeWidth={2} />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="relative z-10 flex-1 min-w-0">
                 <p className="text-[13px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 500 }}>
                   Bringing guests?
@@ -270,26 +271,26 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
                 </p>
               </div>
 
-              <div className="flex items-center gap-1 p-1 rounded-full"
+              <div className="relative z-10 flex items-center gap-1 overflow-hidden p-1 rounded-full"
                 style={{
                   background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                 }}>
+                <GlassReflection isDark={isDark} />
                 <AppButton whileTap={{ scale: 0.9 }}
                   onClick={() => onGuestsChange(Math.max(0, guests - 1))}
                   disabled={guests <= 0}
-                  className="w-7 h-7 rounded-full flex items-center justify-center disabled:cursor-not-allowed"
+                  className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center disabled:cursor-not-allowed"
                   style={{ background: 'transparent' }}>
                   <Minus className="w-3 h-3" style={{ color: guests <= 0 ? disabledInk(isDark) : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') }} strokeWidth={2.5} />
                 </AppButton>
-                <span className="w-5 text-center text-[13px] tabular-nums"
+                <span className="relative z-10 w-5 text-center text-[13px] tabular-nums"
                   style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
                   {guests}
                 </span>
                 <AppButton whileTap={{ scale: 0.9 }}
                   onClick={() => onGuestsChange(Math.min(maxGuests, guests + 1))}
                   disabled={guests >= maxGuests}
-                  className="w-7 h-7 rounded-full flex items-center justify-center disabled:cursor-not-allowed"
+                  className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center disabled:cursor-not-allowed"
                   style={guests >= maxGuests ? disabledSurface(isDark) : { background: accent }}>
                   <Plus className="w-3 h-3" style={{ color: guests >= maxGuests ? disabledInk(isDark) : (isDark ? '#000' : '#fff') }} strokeWidth={2.5} />
                 </AppButton>
@@ -338,17 +339,17 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
                 download={`${(event.name || 'event').replace(/\s+/g, '-').toLowerCase()}.ics`}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => { setCalAdded(true); setTimeout(() => setCalAdded(false), 2200); }}
-                className="flex items-center justify-center gap-2 py-2.5 rounded-2xl cursor-pointer"
+                className="relative flex items-center justify-center gap-2 overflow-hidden py-2.5 rounded-2xl cursor-pointer"
                 style={{
                   background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
                 }}>
+                <GlassReflection isDark={isDark} />
                 {calAdded ? (
-                  <Check className="w-3.5 h-3.5" style={{ color: isDark ? accent : "#0a0a0a" }} strokeWidth={2.5} />
+                  <Check className="relative z-10 w-3.5 h-3.5" style={{ color: isDark ? accent : "#0a0a0a" }} strokeWidth={2.5} />
                 ) : (
-                  <CalendarPlus className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' }} strokeWidth={2} />
+                  <CalendarPlus className="relative z-10 w-3.5 h-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' }} strokeWidth={2} />
                 )}
-                <span className="text-[12px]"
+                <span className="relative z-10 text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif",
                     color: calAdded ? accent : (isDark ? '#fff' : '#1a1a1a'), fontWeight: 500 }}>
                   {calAdded ? 'Added' : 'Add to Calendar'}
@@ -374,16 +375,16 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
         {status === 'maybe' && (
           <motion.div
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-            className="rounded-3xl p-4 flex items-start gap-3"
+            className="relative rounded-3xl overflow-hidden p-4 flex items-start gap-3"
             style={{
               background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
             }}>
-            <div className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0"
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
               <HelpCircle className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.5)' }} strokeWidth={2} />
             </div>
-            <div className="flex-1">
+            <div className="relative z-10 flex-1">
               <p className="text-[13px] mb-0.5"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 500 }}>
                 Marked as maybe
@@ -412,15 +413,15 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
               className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden"
               style={{
                 background: isDark ? '#101010' : '#fff',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
               }}>
+              <GlassReflection isDark={isDark} />
               {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-1">
+              <div className="relative z-10 flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full"
                   style={{ background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }} />
               </div>
 
-              <div className="px-6 pt-3 pb-6">
+              <div className="relative z-10 px-6 pt-3 pb-6">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-[18px] leading-tight"
                     style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
@@ -504,18 +505,18 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1800);
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer"
+                  className="relative w-full flex items-center gap-3 overflow-hidden px-4 py-3 rounded-2xl cursor-pointer"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                   }}>
-                  <Copy className="w-3.5 h-3.5 flex-shrink-0"
+                  <GlassReflection isDark={isDark} />
+                  <Copy className="relative z-10 w-3.5 h-3.5 flex-shrink-0"
                     style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }} strokeWidth={2} />
-                  <span className="flex-1 truncate text-[12px] text-left"
+                  <span className="relative z-10 flex-1 truncate text-[12px] text-left"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)' }}>
                     {buildShareUrl(event)}
                   </span>
-                  <span className="text-[11px] tracking-[0.5px]"
+                  <span className="relative z-10 text-[11px] tracking-[0.5px]"
                     style={{ fontFamily: "'Inter', sans-serif",
                       color: copied ? accent : (isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)'),
                       fontWeight: 600 }}>
@@ -560,7 +561,6 @@ export function RsvpRegistrationSheet({ event, guests, onClose, onComplete, onRe
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
   const surface = isDark ? '#101115' : '#fff';
-  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
   const requireName = requirements.requireName !== false;
   const requireEmail = Boolean(requirements.requireEmail);
   const requirePhone = Boolean(requirements.requirePhone);
@@ -596,11 +596,12 @@ export function RsvpRegistrationSheet({ event, guests, onClose, onComplete, onRe
         initial={{ y: 44, opacity: 0, scale: 0.985 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 44, opacity: 0, scale: 0.985 }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
         onClick={(event) => event.stopPropagation()}
-        className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-[28px] sm:rounded-[28px]"
-        style={{ background: surface, border: `1px solid ${border}` }}
+        className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-t-[28px] sm:rounded-[28px]"
+        style={{ background: surface }}
       >
-        <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.14)' }} /></div>
-        <div className="px-5 sm:px-6 pt-4 pb-6">
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.14)' }} /></div>
+        <div className="relative z-10 px-5 sm:px-6 pt-4 pb-6">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -714,25 +715,24 @@ function ShareChannel({ label, icon, color, href, onClick, isDark }: {
 }) {
   const inner = (
     <>
-      <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-1.5"
+      <div className="relative z-10 w-10 h-10 rounded-2xl flex items-center justify-center mb-1.5"
         style={{ background: `${color}1f`, border: `1px solid ${color}33`, color }}>
         {icon}
       </div>
-      <span className="text-[10px] tracking-[0.5px]"
+      <span className="relative z-10 text-[10px] tracking-[0.5px]"
         style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>
         {label}
       </span>
     </>
   );
-  const baseClass = "flex flex-col items-center justify-center py-3 rounded-2xl cursor-pointer";
+  const baseClass = "relative flex flex-col items-center justify-center overflow-hidden py-3 rounded-2xl cursor-pointer";
   const baseStyle: React.CSSProperties = {
     background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
   };
   if (href) {
-    return <a href={href} target="_blank" rel="noopener noreferrer" className={baseClass} style={baseStyle}>{inner}</a>;
+    return <a href={href} target="_blank" rel="noopener noreferrer" className={baseClass} style={baseStyle}><GlassReflection isDark={isDark} />{inner}</a>;
   }
-  return <AppButton onClick={onClick} className={baseClass} style={baseStyle}>{inner}</AppButton>;
+  return <AppButton onClick={onClick} className={baseClass} style={baseStyle}><GlassReflection isDark={isDark} />{inner}</AppButton>;
 }
 
 function Share2Icon() {
@@ -752,7 +752,7 @@ function RsvpPill({ label, icon, active, neutral, accent, accentRgb, onClick, is
     <AppButton
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className="relative flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-2xl cursor-pointer transition-colors"
+      className="relative z-10 flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-2xl cursor-pointer transition-colors"
       style={{
         background: active
           ? (neutral
