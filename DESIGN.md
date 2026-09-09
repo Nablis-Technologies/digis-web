@@ -70,6 +70,11 @@ components:
     textColor: "{colors.night-text}"
     rounded: "{rounded.xl}"
     padding: "12px 16px"
+  glass-overlay:
+    backgroundColor: "transparent (light-only overlay pair, never a fill)"
+    textColor: "n/a — aria-hidden"
+    rounded: "inherit"
+    padding: "0"
 ---
 
 # Design System: Digis
@@ -88,6 +93,7 @@ Density is thumb-first: full-width CTAs, bottom sheets, a bottom nav with safe-a
 - Ticket-stub geometry: dashes, notches, perforation, barcodes.
 - Tactile motion: scale taps, spring sheets, staggered entrances.
 - Glass chrome: navigation and menus float on blur, not shadow.
+- Non-invasive light: reflection overlays add bloom and hairline without touching fills.
 
 ## Colors
 
@@ -108,6 +114,7 @@ One accent on near-black (or paper), with data hues kept strictly in their lane.
 ### Named Rules
 **The One Accent Rule.** Digis Lime is the only accent. Category and tier hues carry data; they never paint chrome, buttons, or navigation.
 **The Lime Legibility Rule.** Lime text lives on dark. On light, lime becomes ink (#0a0a0a): nav icons, ticket accents, and active states all make the swap. Never set lime type on paper.
+**The Quiet Ownership Rule.** Surfaces for tickets already owned stay neutral (white 4.5% on dark); lime appears only in their small status cues, so owned tickets never compete with event cards.
 
 ## Typography
 
@@ -146,7 +153,21 @@ Depth is blur plus translucency, not shadow. Navigation bars, search fields, men
 - **Badges** (`0 8px 20px rgba(0,0,0,0.3)`): Countdown and date badges lift off artwork so type stays readable.
 
 ### Named Rules
-**The Layered Glass Rule.** Blur and translucency are the depth system; shadow is the exception. If a surface needs to float, reach for glass first.
+**The Layered Glass Rule.** Blur and translucency are the depth system; shadow is the exception. If a surface needs to float, reach for glass first. On top of the blur, a
+calibrated reflection layer adds the light: every glass host carries an
+overlay pair — a `glassReflection()` bloom (radial pool + directional wash +
+top edge fade) at `z-0`, and a `glassEdgeReflection()` one-pixel conic
+hairline at `z-1` whose mask removes the center so it can never tint the
+surface. Content always sits at `z-10`. The approved balance
+(`src/lib/ui/glass.ts`) is deliberately quiet on broad panels — hairline
+0.05, edge light 0.02, bloom 0.145 — with light-mode multipliers so the same
+settings read on paper. Overlays never replace a card's own color, image,
+transparency, or blur; shadow is computed separately (`glassShadow()`) so
+elevation never changes a fill. Compact elements that cannot host an overlay
+get only the restrained inset hairline (`glassEdge()`). Overlays accept three
+tints — none (white light), accent lime, danger — and the `/ui-preview`
+calibration page exists so new surfaces are tuned against the real
+event-detail modules, not guessed.
 **The Quiet Shadow Rule.** Primary CTAs carry no shadow at all. Shadows answer only to state — hover lift, open sheets, floating chrome.
 
 ## Shapes
@@ -186,7 +207,10 @@ Tactile and confident: chunky, lime, begging to be pressed.
 - **States:** Taps compress to 0.88; scroll past 12px deepens the glass. Notification dots are red `#ef4444` pills with a page-background ring.
 
 ### Ticket Stub (signature component)
-The system's signature: dashed perforation dividers, punched side notches over page background, faux barcodes, deterministic serials, countdown badges, and three share-card finishes (spotlight mesh, after-dark full-bleed, ticket-cut stub). QR entry codes sit on 8–12px radius beds; zoom and foil sweeps are celebratory, never structural.
+The system's signature: dashed perforation dividers, punched side notches over page background, faux barcodes, deterministic serials, countdown badges, and three share-card finishes (spotlight mesh, after-dark full-bleed, ticket-cut stub). QR entry codes sit on 8–12px radius beds; zoom and foil sweeps are celebratory, never structural. The event-detail "your ticket" access card is the exception that proves the accent's rarity: neutral fill, lime only in its status cues.
+
+### Glass Overlay (reflection pair)
+Non-invasive light for `relative overflow-hidden` hosts: the `GlassReflection` primitive (`src/components/primitives/GlassReflection.tsx`) renders a bloom/wash/fade layer at `z-0` plus a masked one-pixel conic hairline at `z-1`; content stays at `z-10`. Approved defaults live in `src/lib/ui/glass.ts` (hairline 0.05, edge 0.02, bloom 0.145; light-mode multipliers included). It never replaces the host's color, image, transparency, or blur — tune new surfaces on the `/ui-preview` calibration page against the real modules, never by guessing values.
 
 ## Do's and Don'ts
 
@@ -197,6 +221,7 @@ The system's signature: dashed perforation dividers, punched side notches over p
 - **Do** keep touch targets at 36–44px and CTAs full-width on phones.
 - **Do** default to dark; persist the visitor's theme choice.
 - **Do** honor `prefers-reduced-motion` for loops (pulse, shimmer, countdown blink) — the system animates constantly and currently has no reduced-motion handling; new work must not extend that gap.
+- **Do** tune new reflective surfaces on the `/ui-preview` calibration page against the real modules — never guess reflection values.
 
 ### Don't:
 - **Don't** use purple-to-blue gradients or cyan-on-dark washes — the system's most recognizable anti-pattern (flagged by the detector in legacy mock files).
@@ -205,3 +230,5 @@ The system's signature: dashed perforation dividers, punched side notches over p
 - **Don't** fake disabled states with `opacity-50` — use the flat translucent disabled surfaces.
 - **Don't** invent testimonials, press, pricing, or partner claims — no such evidence exists.
 - **Don't** paint chrome (buttons, nav, inputs) in category or tier hues — data colors stay on data.
+- **Don't** wash owned-ticket surfaces in lime — neutral fill, lime only in status cues.
+- **Don't** let a reflection overlay replace a fill, image, blur, or transparency — it adds light, nothing else.
