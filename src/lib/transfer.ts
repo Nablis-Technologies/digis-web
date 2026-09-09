@@ -1,179 +1,184 @@
-import { notificationsStore, DEMO_TRANSFER_TOKEN } from '@/lib/notifications';
-import { ticketsService } from '@/lib/tickets';
+import { apiFetch } from '@/lib/api';
+import { mapWalletTicket, type TicketWalletWire } from '@/lib/tickets';
 import { getEventImage } from '@/lib/utils/eventImages';
 import type { UserTicket } from '@/types/ticket';
 
-export type TransferContactMethod = 'phone' | 'email';
+export type TransferStatus = 'pending' | 'accepted' | 'expired' | 'declined' | 'cancelled';
 
-/** A ticket snapshot carried by a transfer link / notification until claimed. */
-export interface TicketTransfer {
-  token: string;
-  status: 'pending' | 'claimed';
-  fromName: string;
-  recipientName: string;
-  contactMethod: TransferContactMethod;
-  contactValue: string;
-  note: string;
-  createdAt: string;
-  /** The scannable pass code — available to the recipient whether or not they have an account. */
-  qrCode: string;
+/** Recipient-safe landing projection — Ticketing::PublicTicketTransferSerializer. */
+export interface PublicTransferWire {
+  id: string;
+  status: string;
+  expires_at: string;
+  event: { id: string; slug: string; title: string; timezone: string; currency: string };
   ticket: {
-    id?: string;
-    eventId?: string;
-    eventName: string;
-    eventDate: string;
-    eventTime?: string;
-    venue: string;
-    ticketType: string;
-    ticketLevel?: string;
-    image?: string;
-    seat?: string;
+    id: string;
+    status: string;
+    unit_number: number;
+    product: { id: string; name: string; type: string };
   };
+  recipient: { phone: string; email_present: boolean };
 }
 
-export interface SendTransferInput {
-  fromName: string;
-  recipientName: string;
-  contactMethod: TransferContactMethod;
-  contactValue: string;
-  note: string;
-  ticket: TicketTransfer['ticket'];
+export interface PublicTransfer {
+  id: string;
+  status: TransferStatus;
+  expiresAt: string;
+  event: { id: string; slug: string; title: string; timezone: string; currency: string };
+  ticket: { id: string; status: string; unitNumber: number; product: { id: string; name: string; type: string } };
+  recipient: { phone: string; emailPresent: boolean };
+  /** Cover resolved the same way the wallet does (public detail → local fallback). */
+  image?: string;
 }
 
-export interface SendTransferResult {
+export interface InitiateTransferInput {
+  ticketId: string;
+  phone: string;
+  note?: string;
+}
+
+export interface InitiateTransferResult {
+  transferId: string;
+  /** The secret the recipient must present to land + accept — goes in the claim link. */
   token: string;
-  /** A shareable deep link to send over email / SMS. */
-  link: string;
-  /** Whether the recipient has a Digis account (they get an in-app notification). */
-  recipientHasAccount: boolean;
 }
 
-const STORAGE_KEY = 'digis.transfers.v1';
+export interface AcceptedTransfer {
+  /** The claimed ticket (PublicTicketViewSerializer → wallet mapping, incl. QR). */
+  ticket: UserTicket;
+  /** Backend-signed public ticket view URL — durable cross-device fallback. */
+  ticketViewUrl: string;
+  user: { id: string } | null;
+  accessToken?: string;
+  refreshToken?: string;
+}
 
-function loadTransfers(): Map<string, TicketTransfer> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw) as Record<string, TicketTransfer>));
-  } catch {
-    return new Map();
+/** The shareable claim route for a live transfer: `/claim/:id?token=<secret>`. */
+export function buildClaimLink(transferId: string, token: string): string {
+  const params = new URLSearchParams({ token });
+  return `/claim/${transferId}?${params.toString()}`;
+}
+
+async function resolveTransferImage(slug: string | undefined, title: string): Promise<string | undefined> {
+  if (slug) {
+    try {
+      const { eventsModule } = await import('@/lib/events');
+      const event = await eventsModule.fetchById(slug);
+      if (event?.image) return event.image;
+    } catch {
+      /* fall through to the local name-matched cover */
+    }
   }
-}
-
-const transfers = loadTransfers();
-
-// Seed a claimable demo transfer so the "You received a ticket" notification
-// resolves to a fully populated claim page out of the box.
-if (!transfers.has(DEMO_TRANSFER_TOKEN)) {
-  transfers.set(DEMO_TRANSFER_TOKEN, {
-    token: DEMO_TRANSFER_TOKEN,
-    status: 'pending',
-    fromName: 'Selam',
-    recipientName: 'You',
-    contactMethod: 'phone',
-    contactValue: '+251 91 234 5678',
-    note: 'Couldn’t make it — enjoy the coffee ceremony! ☕',
-    createdAt: new Date().toISOString(),
-    qrCode: 'DIGIS-TRANSFER-DEMO-COFFEE',
-    ticket: {
-      eventId: '2',
-      eventName: 'Ethiopian Coffee Culture Night',
-      eventDate: 'March 20, 2026',
-      eventTime: '6:00 PM',
-      venue: 'Sheraton Addis',
-      ticketType: 'Regular',
-      seat: 'Balcony · F4',
-      image: getEventImage('Ethiopian Coffee Culture Night'),
-    },
-  });
-}
-
-function persistTransfers() {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(transfers)));
-  } catch {
-    /* keep in-memory only */
-  }
-}
-
-const genToken = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-
-/**
- * Mock heuristic for "does this contact already have a Digis account?". A real
- * backend would look the recipient up; here we treat any Ethiopian mobile number
- * or gmail address as an existing account so the notification path is demoable.
- */
-function recipientHasAccount(method: TransferContactMethod, value: string): boolean {
-  const v = value.trim().toLowerCase();
-  if (method === 'email') return v.endsWith('@gmail.com') || v.endsWith('@digis.app');
-  const digits = v.replace(/\D/g, '');
-  return digits.startsWith('2519') || digits.startsWith('09');
-}
-
-/** Build a claim deep link that survives the hash router. */
-function buildLink(token: string): string {
-  const path = `/claim/${token}`;
-  if (typeof window === 'undefined') return `#${path}`;
-  return `${window.location.origin}${window.location.pathname}#${path}`;
+  return getEventImage(title) || undefined;
 }
 
 export const transferService = {
-  sendTransfer(input: SendTransferInput): SendTransferResult {
-    const token = genToken();
-    const transfer: TicketTransfer = {
-      token,
-      status: 'pending',
-      fromName: input.fromName || 'A friend',
-      recipientName: input.recipientName,
-      contactMethod: input.contactMethod,
-      contactValue: input.contactValue,
-      note: input.note,
-      createdAt: new Date().toISOString(),
-      // The pass code is minted now and travels with the link — the recipient
-      // can scan it in without ever creating an account.
-      qrCode: `DIGIS-TRANSFER-${token.toUpperCase()}`,
-      ticket: input.ticket,
-    };
-    transfers.set(token, transfer);
-    persistTransfers();
-
-    const hasAccount = recipientHasAccount(input.contactMethod, input.contactValue);
-    const link = `/claim/${token}`;
-
-    // The recipient always gets an in-app notification that deep-links straight
-    // to the claim page. (In this single-account demo it lands in the current
-    // user's bell so the flow is visible end to end.)
-    notificationsStore.push({
-      type: 'transfer',
-      title: 'You received a ticket',
-      body: `${transfer.fromName} sent you a ticket to ${input.ticket.eventName}. Tap to view it and get your QR code.`,
-      link,
-    });
-
-    return { token, link: buildLink(token), recipientHasAccount: hasAccount };
-  },
-
-  getTransfer(token: string): TicketTransfer | undefined {
-    return transfers.get(token);
+  /**
+   * POST /tickets/:ticket_id/transfers (authenticated). Opens a pending package
+   * transfer bound to the recipient phone; returns the transfer id + the bearer
+   * secret the sender shares. Ownership only changes when the recipient accepts
+   * with a phone OTP.
+   */
+  async initiate(input: InitiateTransferInput): Promise<InitiateTransferResult> {
+    const { data } = await apiFetch<{ transfer: { id: string }; token: string }>(
+      `tickets/${input.ticketId}/transfers`,
+      {
+        method: 'POST',
+        body: {
+          phone: input.phone,
+          ...(input.note ? { reason: input.note } : {}),
+        },
+      },
+    );
+    return { transferId: data.transfer.id, token: data.token };
   },
 
   /**
-   * Claim a pending transfer. The ticket + QR belong to the recipient regardless
-   * of whether they have an account — the pass code is returned either way. When
-   * they're signed in we also drop a copy into their in-app wallet so it shows up
-   * under My Tickets across sessions.
+   * GET /public/ticket_transfers/:id?token= — recipient-safe landing. 404
+   * `invalid_transfer` for a wrong/expired token.
    */
-  claimTransfer(token: string, addToWallet: boolean): { qrCode: string; ticket?: UserTicket } {
-    const transfer = transfers.get(token);
-    if (!transfer) throw new Error('This transfer link is invalid or has expired.');
-    let ticket: UserTicket | undefined;
-    if (addToWallet && transfer.status !== 'claimed') {
-      ticket = ticketsService.addReceivedTicket({ ...transfer.ticket, qrCode: transfer.qrCode });
-    }
-    transfers.set(token, { ...transfer, status: 'claimed' });
-    persistTransfers();
-    return { qrCode: transfer.qrCode, ticket };
+  async fetchPublic(id: string, token: string): Promise<PublicTransfer> {
+    const { data } = await apiFetch<PublicTransferWire>(
+      `public/ticket_transfers/${id}?token=${encodeURIComponent(token)}`,
+    );
+    const mapped: PublicTransfer = {
+      id: data.id,
+      status: data.status as TransferStatus,
+      expiresAt: data.expires_at,
+      event: data.event,
+      ticket: {
+        id: data.ticket.id,
+        status: data.ticket.status,
+        unitNumber: data.ticket.unit_number,
+        product: data.ticket.product,
+      },
+      recipient: { phone: data.recipient.phone, emailPresent: data.recipient.email_present },
+    };
+    mapped.image = await resolveTransferImage(data.event.slug, data.event.title);
+    return mapped;
+  },
+
+  /**
+   * POST /public/ticket_transfers/:id/request_otp — sends a transfer-scoped OTP
+   * to the recipient phone (purpose `ticket_transfer`). Returns the challenge
+   * to verify against.
+   */
+  async requestOtp(id: string, token: string, phone: string): Promise<{ challengeId: string; expiresAt: string }> {
+    const { data } = await apiFetch<{ challenge_id: string; expires_at: string }>(
+      `public/ticket_transfers/${id}/request_otp`,
+      { method: 'POST', body: { phone, token } },
+    );
+    return { challengeId: data.challenge_id, expiresAt: data.expires_at };
+  },
+
+  /**
+   * POST /phone_verifications/:challenge_id/verify — trades the OTP code for a
+   * short-lived signed proof the accept step requires.
+   */
+  async verifyOtp(challengeId: string, code: string): Promise<{ verificationToken: string }> {
+    const { data } = await apiFetch<{ verification_token: string }>(
+      `phone_verifications/${challengeId}/verify`,
+      { method: 'POST', body: { code } },
+    );
+    return { verificationToken: data.verification_token };
+  },
+
+  /**
+   * POST /public/ticket_transfers/:id/accept_guest — claims the ticket into the
+   * recipient's (shadow) identity, rotates the credential generation, and
+   * returns the wallet-shaped ticket + a signed public view URL.
+   */
+  async accept(input: {
+    id: string;
+    token: string;
+    phone: string;
+    verificationToken: string;
+    password?: string;
+    passwordConfirmation?: string;
+  }): Promise<AcceptedTransfer> {
+    const { data } = await apiFetch<{
+      ticket: TicketWalletWire;
+      ticket_view_url: string;
+      user?: { id: string } | null;
+      access_token?: string;
+      refresh_token?: string;
+    }>(`public/ticket_transfers/${input.id}/accept_guest`, {
+      method: 'POST',
+      body: {
+        token: input.token,
+        phone: input.phone,
+        verification_token: input.verificationToken,
+        ...(input.password
+          ? { password: input.password, password_confirmation: input.passwordConfirmation ?? input.password }
+          : {}),
+      },
+    });
+    return {
+      ticket: mapWalletTicket(data.ticket),
+      ticketViewUrl: data.ticket_view_url,
+      user: data.user ?? null,
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    };
   },
 };
