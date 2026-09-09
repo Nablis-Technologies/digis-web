@@ -6,7 +6,10 @@ import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRi
 import type { ResaleListing, UserTicket } from '@/types';
 import { resaleModule } from '@/lib/resale';
 import { orderModule } from '@/lib/order';
+import type { CheckoutOrder } from '@/lib/order';
+import { mapApiError } from '@/lib/errors';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 function getInitials(name: string): string {
   return name.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
@@ -26,20 +29,45 @@ function getAvatarColor(name: string): string {
   return palette[Math.abs(hash) % palette.length];
 }
 
-export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListing; onClose: () => void }) {
+export function ListingDetailSheet({ listing, isOwn, onClose, onViewTickets }: { listing: ResaleListing; isOwn?: boolean; onClose: () => void; onViewTickets?: () => void }) {
   const { isDark } = useTheme();
   const isVIP = listing.ticketType === 'VIP';
   const [purchasing, setPurchasing] = useState(false);
-  const [purchased, setPurchased] = useState(false);
+  const [purchasedOrder, setPurchasedOrder] = useState<CheckoutOrder | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   const handlePurchase = async () => {
     setPurchasing(true);
+    setPurchaseError(null);
     try {
-      // Mirror POST /resale_listings/:id/purchase (returns an Order) then pay via
-      // the Order module — the backend's purchase → payment_attempts flow.
+      // Mirror POST /resale_listings/:id/purchase (returns a pending-payment
+      // Order), then pay exactly like checkout: Chapa hosted page when the
+      // attempt is processing, with the existing return-verify + wallet-poll
+      // path as the completion signal. Ownership is never claimed in-sheet —
+      // the wallet proves fulfillment.
       const order = await resaleModule.purchaseListing(listing.id);
-      await orderModule.startPayment({ orderId: order.id, provider: 'chapa', paymentMethod: 'telebirr' });
-      setPurchased(true);
+      const { payment } = await orderModule.startPayment({
+        orderId: order.id,
+        provider: 'chapa',
+        paymentMethod: 'telebirr',
+        eventId: order.event_id,
+      });
+      if (payment && payment.status === 'processing' && payment.checkout_url) {
+        try {
+          sessionStorage.setItem(
+            `digis:payment-url:${order.id}`,
+            JSON.stringify({ url: payment.checkout_url, at: Date.now() }),
+          );
+        } catch { /* storage unavailable — resume link just won't exist */ }
+        window.location.href = payment.checkout_url;
+        return;
+      }
+      // No hosted redirect: the payment was already accepted server-side.
+      // Show a pending-confirmation state (never a premature "Purchased!")
+      // until the wallet proves fulfillment.
+      setPurchasedOrder(order);
+    } catch (e) {
+      setPurchaseError(mapApiError(e, 'Purchase failed. Please try again.'));
     } finally {
       setPurchasing(false);
     }
@@ -55,13 +83,14 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="absolute bottom-0 left-0 right-0 max-h-[88vh] rounded-t-3xl flex flex-col"
+        className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-hidden rounded-t-3xl flex flex-col"
         style={{
           background: isDark ? '#101115' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
           overscrollBehavior: 'contain',
         }}
         onClick={e => e.stopPropagation()}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
@@ -70,9 +99,15 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
 
         {/* Scrollable content */}
         <div className="overflow-y-auto scrollbar-hide flex-1">
-          {/* Hero image */}
+          {/* Hero image (gradient placeholder when no cover resolved) */}
           <div className="relative h-[180px] mx-5 rounded-2xl overflow-hidden mb-5">
-            <img src={listing.image} alt="" className="w-full h-full object-cover" />
+            {listing.image ? (
+              <img src={listing.image} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full"
+                style={{ background: 'linear-gradient(135deg, #23252d, #101115)' }}
+              />
+            )}
             <div className="absolute inset-0"
               style={{ background: 'linear-gradient(to bottom, transparent 40%, rgba(10,10,20,0.8))' }}
             />
@@ -84,14 +119,6 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                   <Crown className="w-3 h-3" style={{ color: '#d6f905' }} strokeWidth={1.5} />
                   <span className="text-[9px] tracking-[1.5px] uppercase"
                     style={{ fontFamily: "'Inter', sans-serif", color: '#d6f905' }}>VIP</span>
-                </div>
-              )}
-              {listing.verified && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                  style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.25)', backdropFilter: 'blur(10px)' }}>
-                  <Shield className="w-3 h-3 text-yellow-300" strokeWidth={1.5} />
-                  <span className="text-[9px] tracking-[1.5px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", color: '#34d399' }}>Verified</span>
                 </div>
               )}
             </div>
@@ -114,13 +141,15 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                 { icon: <MapPin className="w-4 h-4" />, label: 'Venue', value: listing.venue },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center"
                     style={{
                       background: isDark ? 'rgba(214,249,5,0.06)' : 'rgba(0,0,0,0.04)',
-                      border: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.06)'}`,
                       color: isDark ? '#d6f905' : '#0a0a0a',
                     }}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10 flex items-center justify-center">
                     {item.icon}
+                    </span>
                   </div>
                   <div>
                     <p className="text-[10px] tracking-[0.5px] uppercase"
@@ -142,11 +171,13 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
             />
 
             {/* Price breakdown */}
-            <div className="rounded-2xl p-4 mb-6"
+            <div className="relative rounded-2xl overflow-hidden p-4 mb-6"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
               }}>
+              <GlassReflection isDark={isDark} />
+              <div className="relative z-10">
+              {listing.originalPriceMinor != null && (
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
@@ -157,14 +188,15 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                   {Money.fromMinor(listing.originalPriceMinor, "ETB").format()}
                 </span>
               </div>
+              )}
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                  Service fee
+                  Asking price
                 </span>
                 <span className="text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
-                  {Money.fromMinor(Math.round(listing.askingPriceMinor * listing.fee_terms.rate_bps / 10000), "ETB").format()}
+                  {Money.fromMinor(listing.askingPriceMinor, listing.currency).format()}
                 </span>
               </div>
               <div className="h-px w-full my-2.5"
@@ -177,8 +209,9 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                 </span>
                 <span className="text-[18px] font-light"
                   style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-{Money.fromMinor(listing.askingPriceMinor + Math.round(listing.askingPriceMinor * listing.fee_terms.rate_bps / 10000), "ETB").format()}
+                  {Money.fromMinor(listing.askingPriceMinor, listing.currency).format()}
                 </span>
+              </div>
               </div>
             </div>
 
@@ -200,17 +233,53 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
 
         {/* CTA - sticky at bottom */}
         <div className="px-6 pb-10 pt-4 flex-shrink-0" style={{ background: isDark ? '#101115' : '#fff', borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
-          {purchased ? (
+          {purchaseError && !purchasedOrder && (
+            <p className="text-[11px] mb-3 leading-[1.5]"
+              style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+              {purchaseError}
+            </p>
+          )}
+          {purchasedOrder ? (
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+              className="w-full"
+              style={{}}>
+              <div className="w-full h-[56px] rounded-2xl flex items-center justify-center gap-2.5"
+                style={{
+                  background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.1)',
+                  border: `1px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(180,210,0,0.3)'}`,
+                }}>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  className="w-4 h-4 border-2 rounded-full"
+                  style={{ borderColor: isDark ? 'rgba(214,249,5,0.2)' : 'rgba(180,210,0,0.3)', borderTopColor: '#d6f905' }} />
+                <span className="text-[14px] font-medium"
+                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#5a6b00' }}>
+                  Confirming your payment…
+                </span>
+              </div>
+              <p className="text-[11px] mt-3 text-center"
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
+                Your ticket appears in My Tickets once the payment is confirmed.
+              </p>
+              {onViewTickets && (
+                <AppButton onClick={onViewTickets} className="w-full h-[44px] rounded-2xl mt-2 flex items-center justify-center cursor-pointer"
+                  style={{ background: 'transparent', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` }}>
+                  <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                    View My Tickets
+                  </span>
+                </AppButton>
+              )}
+            </motion.div>
+          ) : isOwn ? (
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
               className="w-full h-[56px] rounded-2xl flex items-center justify-center gap-2.5"
               style={{
-                background: isDark ? 'rgba(52,211,153,0.1)' : 'rgba(5,150,105,0.08)',
-                border: `1px solid ${isDark ? 'rgba(52,211,153,0.2)' : 'rgba(5,150,105,0.15)'}`,
+                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
               }}>
-              <Check className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={2} />
+              <Tag className="w-5 h-5" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
               <span className="text-[14px] font-medium"
-                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#34d399' : '#059669' }}>
-                Ticket Purchased!
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
+                Your listing
               </span>
             </motion.div>
           ) : (
@@ -233,12 +302,13 @@ export function ListingDetailSheet({ listing, onClose }: { listing: ResaleListin
                   <DollarSign className="w-5 h-5" style={{ color: isDark ? '#f4ff66' : '#fff' }} strokeWidth={1.5} />
                   <span className="text-[14px] font-medium tracking-[0.3px]"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#f4ff66' : '#fff' }}>
-                    Buy Ticket · {Money.fromMinor(listing.askingPriceMinor + Math.round(listing.askingPriceMinor * listing.fee_terms.rate_bps / 10000), "ETB").format()}
+                    Buy Ticket · {Money.fromMinor(listing.askingPriceMinor, listing.currency).format()}
                   </span>
                 </>
               )}
             </AppButton>
           )}
+        </div>
         </div>
       </motion.div>
     </motion.div>

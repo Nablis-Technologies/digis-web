@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Money } from '@/lib/money';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -8,17 +9,15 @@ import {
   AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket
 } from 'lucide-react';
 import { ResaleEventCard } from '@/features/resale/components/ResaleEventCard';
-import type { Event, ResaleListing, UserTicket } from '@/types';
+import type { ResaleListing, UserTicket } from '@/types';
 import { resaleModule } from '@/lib/resale';
-import { MOCK_CURRENT_USER } from '@/lib/mock/current-user';
 import { FilterPanel } from '@/features/resale/components/FilterPanel';
 import { ListingDetailSheet } from '@/features/resale/components/ListingDetailSheet';
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
 import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSheet';
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
 import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
-import { PayoutMethodsSheet, PAYOUT_PROVIDERS } from '@/features/resale/components/PayoutMethodsSheet';
-import { payoutService, payoutKeys } from '@/lib/payout';
+import { PayoutMethodsSheet } from '@/features/resale/components/PayoutMethodsSheet';
 import { ticketKeys } from '@/lib/tickets';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
@@ -36,6 +35,7 @@ interface ResaleMarketplaceProps {
    ═══════════════════════════════════════════════════════ */
 export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMarketplaceProps) {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'browse' | 'myListings'>('browse');
   const [selectedListing, setSelectedListing] = useState<ResaleListing | null>(null);
@@ -49,40 +49,36 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [removedFlashId, setRemovedFlashId] = useState<string | null>(null);
   const [showPayoutSheet, setShowPayoutSheet] = useState(false);
-  // Browse + my-listings read through the Resale module (mirrors the backend's
-  // Pundit scope: active OR seller_user_id == current user). No page-local state.
+  // Browse + my-listings read through the Resale module (live backend: browse
+  // serves active listings; my-listings are the active rows created in this
+  // session — the backend exposes no owner identifier on browse).
   const {
     data: browseListings = [],
     isPending: browsePending,
     isError: browseError,
     refetch: refetchBrowse,
-  } = useQuery({ queryKey: resaleModule.keys.all, queryFn: () => resaleModule.fetchListings(MOCK_CURRENT_USER.id) });
+  } = useQuery({ queryKey: resaleModule.keys.all, queryFn: () => resaleModule.fetchListings() });
   const {
     data: myListings = [],
     isPending: myPending,
     isError: myError,
     refetch: refetchMine,
-  } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings(MOCK_CURRENT_USER.id) });
-  // Mock stores resolve in a tick — skeletons only appear if loading persists.
+  } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings() });
+  // Skeletons only appear if loading persists.
   const showBrowseLoading = useShowSkeleton(browsePending);
   const showMyLoading = useShowSkeleton(myPending);
-  const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
-  const defaultPayout = payoutMethods.find(m => m.isDefault) ?? payoutMethods[0];
   const [showFilters, setShowFilters] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'VIP' | 'Regular'>('all');
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [priceFilter, setPriceFilter] = useState<'any' | 'belowFace' | 'atFace' | 'aboveFace'>('any');
-  const activeFilterCount =
-    (typeFilter !== 'all' ? 1 : 0) + (verifiedOnly ? 1 : 0) + (priceFilter !== 'any' ? 1 : 0);
+  // Ticket-type options come from the live data (backend type names are
+  // arbitrary — no hardcoded VIP/Regular). Verified and face-value filters
+  // are cut: the backend serves neither seller metadata nor buyer face value.
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const typeOptions = Array.from(new Set(browseListings.map((l) => l.ticketType))).sort();
+  const activeFilterCount = typeFilter !== 'all' ? 1 : 0;
   const matchesFilters = (l: ResaleListing) => {
     if (typeFilter !== 'all' && l.ticketType !== typeFilter) return false;
-    if (verifiedOnly && !l.verified) return false;
-    if (priceFilter === 'belowFace' && l.askingPriceMinor >= l.originalPriceMinor) return false;
-    if (priceFilter === 'atFace' && l.askingPriceMinor !== l.originalPriceMinor) return false;
-    if (priceFilter === 'aboveFace' && l.askingPriceMinor <= l.originalPriceMinor) return false;
     return true;
   };
-  const resetFilters = () => { setTypeFilter('all'); setVerifiedOnly(false); setPriceFilter('any'); };
+  const resetFilters = () => { setTypeFilter('all'); };
   const createListingMutation = useMutation({
     mutationKey: ['resale', 'createListing'],
     mutationFn: ({ ticket, price }: { ticket: UserTicket; price: number }) =>
@@ -121,42 +117,43 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     return () => { document.body.style.overflow = ''; };
   }, [selectedListing, showListSheet]);
 
-  // Group browse listings by eventName (mirrors the browse view's "Events with Resale").
+  // Group browse listings by event (mirrors the browse view's "Events with Resale").
   const eventGroups = (() => {
     const map = new Map<string, {
+      eventId: string;
       eventName: string;
       eventDate: string;
       eventTime: string;
       venue: string;
+      city: string;
       image: string;
       count: number;
       minPrice: number;
       maxPrice: number;
       hasVIP: boolean;
-      hasVerified: boolean;
       listings: ResaleListing[];
     }>();
     for (const l of browseListings.filter(matchesFilters)) {
-      const g = map.get(l.eventName);
+      const g = map.get(l.event_id);
       if (g) {
         g.count += 1;
         g.minPrice = Math.min(g.minPrice, l.askingPriceMinor);
         g.maxPrice = Math.max(g.maxPrice, l.askingPriceMinor);
         g.hasVIP = g.hasVIP || l.ticketType === 'VIP';
-        g.hasVerified = g.hasVerified || l.verified;
         g.listings.push(l);
       } else {
-        map.set(l.eventName, {
+        map.set(l.event_id, {
+          eventId: l.event_id,
           eventName: l.eventName,
           eventDate: l.eventDate,
           eventTime: l.eventTime,
           venue: l.venue,
+          city: l.city,
           image: l.image,
           count: 1,
           minPrice: l.askingPriceMinor,
           maxPrice: l.askingPriceMinor,
           hasVIP: l.ticketType === 'VIP',
-          hasVerified: l.verified,
           listings: [l],
         });
       }
@@ -172,16 +169,17 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
         if (!all.length) return null;
         const first = all[0];
         return {
+          eventId: first.event_id,
           eventName: first.eventName,
           eventDate: first.eventDate,
           eventTime: first.eventTime,
           venue: first.venue,
+          city: first.city,
           image: first.image,
           count: all.length,
           minPrice: Math.min(...all.map(l => l.askingPriceMinor)),
           maxPrice: Math.max(...all.map(l => l.askingPriceMinor)),
           hasVIP: all.some(l => l.ticketType === 'VIP'),
-          hasVerified: all.some(l => l.verified),
           listings: all,
         };
       })()
@@ -353,9 +351,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                     <FilterPanel
                       open={showFilters}
                       isDark={isDark}
+                      typeOptions={typeOptions}
                       typeFilter={typeFilter} setTypeFilter={setTypeFilter}
-                      verifiedOnly={verifiedOnly} setVerifiedOnly={setVerifiedOnly}
-                      priceFilter={priceFilter} setPriceFilter={setPriceFilter}
                       onReset={resetFilters}
                     />
                   </div>
@@ -374,28 +371,13 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
 
                   {/* Event Cards — matching Discover page */}
                   <div className="px-5 pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {eventGroups.map((group, index) => {
-                      const asEvent: Event = {
-                        id: group.eventName,
-                        name: group.eventName,
-                        date: group.eventDate,
-                        time: group.eventTime,
-                        venue: group.venue,
-                        city: '',
-                        image: group.image,
-                        category: group.hasVIP ? 'Resale · VIP' : 'Resale',
-                        priceFromMinor: group.minPrice,
-                        currency: "ETB",
-                        ticketsLeft: group.count,
-                      };
-                      return (
-                        <motion.div key={group.eventName}
-                          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.08, duration: 0.35 }}>
-                          <ResaleEventCard event={asEvent} onClick={() => setSelectedEventName(group.eventName)} />
-                        </motion.div>
-                      );
-                    })}
+                    {eventGroups.map((group, index) => (
+                      <motion.div key={group.eventName}
+                        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.08, duration: 0.35 }}>
+                        <ResaleEventCard group={group} onClick={() => setSelectedEventName(group.eventName)} />
+                      </motion.div>
+                    ))}
                     {browseError ? (
                       <div className="col-span-full">
                         <LoadErrorCard onRetry={() => void refetchBrowse()} />
@@ -518,9 +500,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                     <FilterPanel
                       open={showFilters}
                       isDark={isDark}
+                      typeOptions={typeOptions}
                       typeFilter={typeFilter} setTypeFilter={setTypeFilter}
-                      verifiedOnly={verifiedOnly} setVerifiedOnly={setVerifiedOnly}
-                      priceFilter={priceFilter} setPriceFilter={setPriceFilter}
                       onReset={resetFilters}
                     />
                     {eventListings.length === 0 && (
@@ -539,9 +520,14 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                     {/* Flat sales list */}
                     <div className="flex flex-col gap-2">
                       {eventListings.map((listing, index) => {
-                        const above = listing.askingPriceMinor > listing.originalPriceMinor;
-                        const below = listing.askingPriceMinor < listing.originalPriceMinor;
-                        const deltaPct = Math.round(Math.abs(listing.askingPriceMinor - listing.originalPriceMinor) / listing.originalPriceMinor * 100);
+                        // Face value exists only in the seller view; buyer rows
+                        // show the asking price without a delta.
+                        const face = listing.originalPriceMinor;
+                        const above = face != null && listing.askingPriceMinor > face;
+                        const below = face != null && listing.askingPriceMinor < face;
+                        const deltaPct = face != null && face > 0
+                          ? Math.round(Math.abs(listing.askingPriceMinor - face) / face * 100)
+                          : 0;
                         const isVIP = listing.ticketType === 'VIP';
                         const accent = isDark ? '#d6f905' : '#0a0a0a';
                         return (
@@ -580,11 +566,13 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                               </p>
                               <p className="text-[11px] leading-none"
                                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-                                Face value · {Money.fromMinor(listing.originalPriceMinor, "ETB").format()}
+                                {face != null
+                                  ? <>Face value · {Money.fromMinor(face, "ETB").format()}</>
+                                  : <>{listing.ticketType}</>}
                               </p>
                             </div>
 
-                            {/* Price + delta */}
+                            {/* Price + delta (delta only with a face value) */}
                             <div className="flex-shrink-0 text-right">
                               <p className="text-[18px] font-light leading-none tracking-[-0.3px]"
                                 style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#0a0a0a' }}>
@@ -595,7 +583,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                                 </span>
                               </p>
                               <div className="flex items-center justify-end gap-1 mt-1.5">
-                                {above ? (
+                                {face == null ? null : above ? (
                                   <>
                                     <TrendingUp className="w-3 h-3" style={{ color: '#f87171' }} strokeWidth={2} />
                                     <span className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>
@@ -745,7 +733,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                 </div>
               </div>
               <div className="space-y-2.5">
-                {userTickets.map(ticket => (
+                {userTickets.filter((t) => t.status === 'active').map(ticket => (
                   <AppButton key={ticket.id} whileTap={{ scale: 0.985 }}
                     onClick={() => handleListTicket(ticket)}
                     className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-pointer text-left"
@@ -788,9 +776,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                     Payout methods
                   </p>
                   <p className="text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                    {defaultPayout
-                      ? `${PAYOUT_PROVIDERS[defaultPayout.kind].full} · default`
-                      : 'Add where you get paid'}
+                    Manage where you get paid
                   </p>
                 </div>
                 <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} strokeWidth={1.5} />
@@ -812,7 +798,12 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
       {/* Listing Detail Sheet */}
       <AnimatePresence>
         {selectedListing && (
-          <ListingDetailSheet listing={selectedListing} onClose={() => setSelectedListing(null)} />
+          <ListingDetailSheet
+            listing={selectedListing}
+            isOwn={myListings.some((l) => l.id === selectedListing.id)}
+            onClose={() => setSelectedListing(null)}
+            onViewTickets={() => navigate('/tickets')}
+          />
         )}
       </AnimatePresence>
 

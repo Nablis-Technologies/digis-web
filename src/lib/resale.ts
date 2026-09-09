@@ -3,7 +3,8 @@
  *
  * Backend endpoints (all mutating ones require Idempotency-Key):
  *   - POST   /tickets/:ticket_id/resale           → create listing (asking_amount_minor only)
- *   - GET    /resale_listings                     → browse (buyer-visible fields only)
+ *   - GET    /resale_listings                     → browse active (buyer-visible fields only)
+ *   - GET    /resale_listings/:id                 → detail (seller view for the seller, public otherwise)
  *   - POST   /resale_listings/:id/purchase        → returns Orders::OrderSerializer (pending_payment)
  *   - POST   /resale_listings/:id/cancel          → { reason: "seller_requested" }
  *
@@ -12,68 +13,97 @@
  * backend's purchase endpoint returns an Order, and the buyer pays via
  * POST /orders/:id/payment_attempts exactly like checkout.
  *
- * Current bodies are MOCK: they return backend-shaped data so the UI can be built
- * before wiring. Display fields (eventName/venue/...) are enriched from the mock
- * because the backend does not return them yet (BACKEND_GAPS.md #4).
+ * Reads and writes are LIVE. Display fields come from the backend's nested
+ * serializer (event / product / ticket-type / event-dates + venue). Anything
+ * the backend does not serve (seller identity, ratings, verified flags,
+ * images) is absent, never fabricated. Images resolve through the events
+ * module's backend cover with a local fallback.
+ *
+ * My-listings come from `GET /resale_listings/mine` (seller-scoped — the
+ * backend answers ownership; no client-side id bookkeeping).
  */
 
+import { apiFetch } from "@/lib/api";
+import { eventsModule } from "@/lib/events";
+import { isoToDisplayDate, isoToDisplayTime, formatRelativeTime } from "@/lib/mappers";
 import type { CheckoutOrder } from "@/lib/order";
-import { RESALE_FEE_BPS, type ResaleListing, type ResaleListingWire } from "@/types/resale";
+import type { ResaleListing, PublicResaleListingWire, SellerResaleListingWire } from "@/types/resale";
 import type { UserTicket } from "@/types/ticket";
 import { getEventImage } from "@/lib/utils/eventImages";
 
-/* ─── Mock seed (display-enriched listings) ─── */
-const seedListings: ResaleListing[] = [
-  { id: 'r1', event_id: 'e1', ticket_type_id: 't1', status: 'active', asking_amount_minor: 420000, currency: 'ETB', resale_cutoff_at: null, fee_terms: { calculation_type: 'percentage', refund_policy: 'non_refundable', rate_bps: RESALE_FEE_BPS, currency: 'ETB' }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sellerUserId: 'u-seller', 
-    eventName: 'Addis Vibes Festival', eventDate: 'March 15, 2026', eventTime: '8:00 PM', venue: 'Millennium Hall, Addis Ababa', ticketType: 'VIP', originalPriceMinor: 350000, askingPriceMinor: 420000, sellerRating: 4.8, sellerName: 'Abebe M.', listedAgo: '2h ago', image: getEventImage('Addis Vibes Festival'), verified: true },
-  { id: 'r2', event_id: 'e1', ticket_type_id: 't2', status: 'active', asking_amount_minor: 230000, currency: 'ETB', resale_cutoff_at: null, fee_terms: { calculation_type: 'percentage', refund_policy: 'non_refundable', rate_bps: RESALE_FEE_BPS, currency: 'ETB' }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sellerUserId: 'u-seller', 
-    eventName: 'Addis Vibes Festival', eventDate: 'March 15, 2026', eventTime: '8:00 PM', venue: 'Millennium Hall, Addis Ababa', ticketType: 'Regular', originalPriceMinor: 250000, askingPriceMinor: 230000, sellerRating: 4.6, sellerName: 'Hanna G.', listedAgo: '4h ago', image: getEventImage('Addis Vibes Festival'), verified: true },
-  { id: 'r3', event_id: 'e2', ticket_type_id: 't3', status: 'active', asking_amount_minor: 95000, currency: 'ETB', resale_cutoff_at: null, fee_terms: { calculation_type: 'percentage', refund_policy: 'non_refundable', rate_bps: RESALE_FEE_BPS, currency: 'ETB' }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sellerUserId: 'u-seller', 
-    eventName: 'Ethiopian Coffee Culture Night', eventDate: 'March 20, 2026', eventTime: '6:00 PM', venue: 'Sheraton Addis', ticketType: 'Regular', originalPriceMinor: 120000, askingPriceMinor: 95000, sellerRating: 4.5, sellerName: 'Sara T.', listedAgo: '5h ago', image: getEventImage('Ethiopian Coffee Culture Night'), verified: true },
-  { id: 'r4', event_id: 'e3', ticket_type_id: 't4', status: 'active', asking_amount_minor: 80000, currency: 'ETB', resale_cutoff_at: null, fee_terms: { calculation_type: 'percentage', refund_policy: 'non_refundable', rate_bps: RESALE_FEE_BPS, currency: 'ETB' }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sellerUserId: 'u-seller', 
-    eventName: 'Contemporary Art Exhibition', eventDate: 'March 28, 2026', eventTime: '5:00 PM', venue: 'Addis Fine Art Gallery', ticketType: 'VIP', originalPriceMinor: 80000, askingPriceMinor: 80000, sellerRating: 4.9, sellerName: 'Daniel K.', listedAgo: '1d ago', image: getEventImage('Contemporary Art Exhibition'), verified: false },
-  { id: 'r5', event_id: 'e4', ticket_type_id: 't5', status: 'active', asking_amount_minor: 380000, currency: 'ETB', resale_cutoff_at: null, fee_terms: { calculation_type: 'percentage', refund_policy: 'non_refundable', rate_bps: RESALE_FEE_BPS, currency: 'ETB' }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sellerUserId: 'u-seller', 
-    eventName: 'Tech Summit Ethiopia 2026', eventDate: 'March 25, 2026', eventTime: '9:00 AM', venue: 'Hyatt Regency', ticketType: 'VIP', originalPriceMinor: 350000, askingPriceMinor: 380000, sellerRating: 4.7, sellerName: 'Mikael B.', listedAgo: '8h ago', image: getEventImage('Tech Summit Ethiopia 2026'), verified: true },
-];
-
-const resaleListings = new Map<string, ResaleListing>(seedListings.map((l) => [l.id, l]));
-const genListingId = () => `my-${Date.now()}`;
-
-/** Mirror POST /tickets/:ticket_id/resale — body { asking_amount_minor }. */
-async function activateListing(ticket: UserTicket, askingAmountMinor: number): Promise<ResaleListing> {
-  const listing: ResaleListing = {
-    id: genListingId(),
-    event_id: 'e-live',
-    ticket_type_id: 't-live',
-    status: 'active',
-    asking_amount_minor: askingAmountMinor,
-    currency: 'ETB',
-    resale_cutoff_at: null,
-    fee_terms: { calculation_type: 'percentage', refund_policy: 'non_refundable', rate_bps: RESALE_FEE_BPS, currency: 'ETB' },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    // Display enrichment — replaced by FK joins when the backend nests these (GAPS #4)
-    sellerUserId: 'u-current',
-    eventName: ticket.eventName,
-    eventDate: ticket.eventDate,
-    eventTime: ticket.eventTime,
-    venue: ticket.venue,
-    ticketType: ticket.ticketType,
-    originalPriceMinor: askingAmountMinor,
-    askingPriceMinor: askingAmountMinor,
-    sellerRating: 5,
-    sellerName: 'You',
-    listedAgo: 'just now',
-    image: ticket.image || getEventImage(ticket.eventName),
-    verified: true,
-    ticket,
+/** Map the buyer-visible wire shape to display fields. No invention. */
+export function mapPublicListing(wire: PublicResaleListingWire, image: string): ResaleListing {
+  const firstDate = wire.event_dates?.[0];
+  const venue = firstDate?.venue ?? null;
+  const sellerExtras = wire as PublicResaleListingWire & { seller_acquisition_product_value_minor?: number };
+  return {
+    id: wire.id,
+    status: wire.status,
+    asking_amount_minor: wire.asking_amount_minor,
+    currency: wire.currency,
+    resale_cutoff_at: wire.resale_cutoff_at,
+    fee_terms: wire.fee_terms,
+    event_id: wire.event.id,
+    ticket_type_id: wire.ticket_type?.id ?? wire.product.id,
+    eventSlug: wire.event.slug,
+    eventName: wire.event.title,
+    eventDate: isoToDisplayDate(firstDate?.starts_at),
+    eventTime: isoToDisplayTime(firstDate?.starts_at),
+    venue: venue ? (venue.city ? `${venue.name}, ${venue.city}` : venue.name) : '',
+    city: venue?.city ?? '',
+    ticketType: wire.ticket_type?.name ?? wire.product.name,
+    askingPriceMinor: wire.asking_amount_minor,
+    ...(typeof sellerExtras.seller_acquisition_product_value_minor === 'number'
+      ? { originalPriceMinor: sellerExtras.seller_acquisition_product_value_minor }
+      : {}),
+    image,
+    listedAgo: formatRelativeTime(wire.created_at),
+    created_at: wire.created_at,
+    updated_at: wire.updated_at,
   };
-  resaleListings.set(listing.id, listing);
-  return listing;
+}
+
+/** Seller-scoped wire → economics + identity fields (create/cancel responses). */
+function sellerWireToListing(wire: SellerResaleListingWire): ResaleListing {
+  return {
+    id: wire.id,
+    status: wire.status,
+    asking_amount_minor: wire.asking_amount_minor,
+    currency: wire.currency,
+    resale_cutoff_at: wire.resale_cutoff_at,
+    fee_terms: wire.fee_terms,
+    event_id: wire.event_id,
+    ticket_type_id: wire.ticket_type_id,
+    eventSlug: '',
+    eventName: '',
+    eventDate: '',
+    eventTime: '',
+    venue: '',
+    city: '',
+    ticketType: '',
+    askingPriceMinor: wire.asking_amount_minor,
+    originalPriceMinor: wire.seller_acquisition_product_value_minor,
+    image: '',
+    listedAgo: '',
+    created_at: wire.created_at,
+    updated_at: wire.updated_at,
+  };
+}
+
+/** Resolve a backend event cover per distinct slug; failures fall back locally. */
+async function resolveImages(wires: PublicResaleListingWire[]): Promise<Map<string, string>> {
+  const slugs = Array.from(new Set(wires.map((w) => w.event.slug).filter(Boolean)));
+  const entries = await Promise.all(
+    slugs.map(async (slug) => {
+      const event = await eventsModule.fetchById(slug).catch(() => null);
+      const wire = wires.find((w) => w.event.slug === slug)!;
+      return [slug, event?.image || getEventImage(wire.event.title)] as const;
+    }),
+  );
+  return new Map(entries);
 }
 
 export const resaleModule = {
-  initialListings: seedListings,
   keys: {
     all: ['resale', 'listings'] as const,
     myListings: ['resale', 'listings', 'mine'] as const,
@@ -81,96 +111,110 @@ export const resaleModule = {
   },
 
   /**
-   * Reset the store to its seed state — mirrors the backend's wipable,
-   * re-seedable Postgres state (BACKEND_GAPS.md / dev workflow). Tests and
-   * dev reloads call this to get a clean slate.
+   * Mirror GET /resale_listings (active, buyer-visible fields). The backend
+   * scopes to active; no client-side status filtering.
    */
-  resetToSeed(): void {
-    resaleListings.clear();
-    for (const l of seedListings) resaleListings.set(l.id, { ...l });
+  async fetchListings(): Promise<ResaleListing[]> {
+    const { data } = await apiFetch<PublicResaleListingWire[]>("resale_listings");
+    const wires = Array.isArray(data) ? data : [];
+    const images = await resolveImages(wires);
+    return wires.map((w) => mapPublicListing(w, images.get(w.event.slug) ?? getEventImage(w.event.title)));
   },
 
   /**
-   * Mirror GET /resale_listings (active, buyer-visible fields).
-   * Mirrors the backend's ResaleListingPolicy::Scope:
-   *   scope.where(status: "active").or(scope.where(seller_user_id: user.id))
-   * So buyers see active listings; a seller also sees their own.
+   * Own active listings via `GET /resale_listings/mine` (seller-scoped, the
+   * authoritative source — BACKEND_GAPS #24 resolved). The seller wire is
+   * flat (ids + economics, no display nesting), so display context comes from
+   * the browse list keyed by id. Cross-session and after-storage-clear both
+   * work — nothing depends on ids captured at creation time.
    */
-  async fetchListings(sellerUserId?: string): Promise<ResaleListing[]> {
-    return Array.from(resaleListings.values()).filter(
-      (l) => l.status === 'active' || (sellerUserId && l.sellerUserId === sellerUserId),
-    );
+  async fetchMyListings(): Promise<ResaleListing[]> {
+    const { data } = await apiFetch<SellerResaleListingWire[]>("resale_listings/mine");
+    const mineWires = Array.isArray(data) ? data : [];
+    if (mineWires.length === 0) return [];
+    const mineIds = new Set(mineWires.map((w) => w.id));
+    const all = await resaleModule.fetchListings();
+    return all.filter((l) => mineIds.has(l.id));
   },
 
   /**
-   * Mirror the ownership branch of the policy scope: listings where
-   * seller_user_id == currentUser.id. Kills the page's second source of truth.
+   * Mirror GET /resale_listings/:id. Seller view carries the acquisition
+   * value (mapped to originalPriceMinor); buyer view does not.
    */
-  async fetchMyListings(sellerUserId: string): Promise<ResaleListing[]> {
-    return Array.from(resaleListings.values()).filter(
-      (l) => l.status !== 'sold' && l.sellerUserId === sellerUserId,
-    );
+  async fetchListingDetail(id: string): Promise<ResaleListing> {
+    const { data } = await apiFetch<PublicResaleListingWire>(`resale_listings/${id}`);
+    const image = (await resolveImages([data])).get(data.event.slug) ?? getEventImage(data.event.title);
+    return mapPublicListing(data, image);
   },
 
   /**
-   * Mirror POST /tickets/:ticket_id/resale. Takes the asking price in CENTS
-   * (backend `asking_amount_minor`). Returns the created listing.
+   * Mirror POST /tickets/:ticket_id/resale. Takes the wallet ticket and the
+   * asking price in CENTS (backend `asking_amount_minor`). The 201 seller
+   * response is flat, so display is enriched from the detail endpoint
+   * (spec decision 3) — never assumed from nested fields that aren't there.
+   *
+   * Client-side enforcement is limited to what the buyer can know: an active
+   * ticket and a positive integer amount. Resale policy (enabled flag, cap,
+   * cutoff) is not buyer-visible (BACKEND_GAPS #25), so violations surface as
+   * typed backend errors, mapped to friendly copy.
    */
   async createListing(ticket: UserTicket, askingAmountMinor: number): Promise<ResaleListing> {
-    return activateListing(ticket, askingAmountMinor);
-  },
-
-  /** Mirror POST /resale_listings/:id/cancel — body { reason }. */
-  async cancelListing(listingId: string, reason = 'seller_requested'): Promise<ResaleListing> {
-    const listing = resaleListings.get(listingId);
-    if (listing) {
-      resaleListings.set(listingId, { ...listing, status: 'cancelled' });
-      return resaleListings.get(listingId)!;
+    if (ticket.status != null && ticket.status !== 'active') {
+      throw new Error('Only active tickets can be listed for resale.');
     }
-    throw new Error('Listing not found');
+    if (!Number.isInteger(askingAmountMinor) || askingAmountMinor <= 0) {
+      throw new Error('Asking price must be a positive amount.');
+    }
+    const { data } = await apiFetch<SellerResaleListingWire>(`tickets/${ticket.id}/resale`, {
+      method: 'POST',
+      body: { resale_listing: { asking_amount_minor: askingAmountMinor } },
+    });
+    // Enrich the flat create response via the detail endpoint (buyer/seller
+    // shape with nested event context + acquisition value).
+    const listing = await resaleModule.fetchListingDetail(data.id);
+    return { ...listing, ticket };
   },
 
   /**
-   * Mirror POST /resale_listings/:id/purchase — returns an Orders::OrderSerializer
-   * (pending_payment). The buyer then pays via orderModule.startPayment, exactly
-   * like checkout. MOCK (marketplace data is not wired to the backend yet, see
-   * BACKEND_GAPS.md #4): returns a backend-shaped pending order locally. It
-   * must NOT call orderModule.createOrder — that posts to the real backend and
-   * requires a real quote token.
+   * Mirror POST /resale_listings/:id/cancel. Returns a narrow confirmation
+   * (id + status + economics) — the seller wire is flat with no display
+   * context, and callers re-read the lists, so the return is confirmation,
+   * not render data.
    */
-  async purchaseListing(listingId: string): Promise<CheckoutOrder> {
-    const listing = resaleListings.get(listingId);
-    if (!listing) throw new Error('Listing not found');
-    const now = new Date().toISOString();
-    return {
-      id: `mock-resale-order-${listingId}`,
-      event_id: listing.event_id,
-      status: 'pending_payment',
-      sales_channel: 'resale',
-      charge_currency: listing.currency,
-      subtotal_minor: listing.asking_amount_minor,
-      discount_minor: 0,
-      subsidy_minor: 0,
-      fee_minor: Math.round((listing.asking_amount_minor * listing.fee_terms.rate_bps) / 10000),
-      tax_minor: 0,
-      adjustment_minor: 0,
-      total_minor: listing.asking_amount_minor,
-      expires_at: null,
-      paid_at: null,
-      created_at: now,
-      updated_at: now,
-      items: [],
-      adjustments: [],
-    };
+  async cancelListing(listingId: string, reason = 'seller_requested'): Promise<ResaleListing> {
+    const { data } = await apiFetch<SellerResaleListingWire>(`resale_listings/${listingId}/cancel`, {
+      method: 'POST',
+      body: { resale_listing: { reason } },
+    });
+    return sellerWireToListing(data);
   },
 
-  /** Convenience for the UI — converts major input to cents at the boundary. */
+  /**
+   * Mirror POST /resale_listings/:id/purchase — returns the pending-payment
+   * order. The buyer then pays via orderModule.startPayment, exactly like
+   * checkout; answers/consents ride empty (optional) and registration
+   * requirements surface as typed errors.
+   */
+  async purchaseListing(listingId: string): Promise<CheckoutOrder> {
+    const { data } = await apiFetch<CheckoutOrder>(`resale_listings/${listingId}/purchase`, {
+      method: 'POST',
+      body: { purchase: {} },
+    });
+    return data;
+  },
+
+  /**
+   * Convenience for id-only callers: resolve the wallet ticket first (the
+   * wallet is live), then create. Converts major input to cents at the
+   * boundary.
+   */
   async createTicketListingReference(ticketId: UserTicket['id'], priceMajor: number): Promise<{ ok: true; listingId: string }> {
-    const askingMinor = Math.round(priceMajor * 100);
-    const listing = await activateListing(
-      { id: ticketId } as UserTicket,
-      askingMinor,
-    );
+    // Dynamic import: tickets.ts imports this module at top level.
+    const { ticketsService } = await import('@/lib/tickets');
+    const wallet = await ticketsService.fetchUserTickets();
+    const ticket = wallet.find((t) => t.id === ticketId);
+    if (!ticket) throw new Error('Ticket not found in your wallet.');
+    const listing = await resaleModule.createListing(ticket, Math.round(priceMajor * 100));
     return { ok: true, listingId: listing.id };
   },
 };

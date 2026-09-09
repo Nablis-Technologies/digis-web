@@ -4,27 +4,41 @@ import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
 import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket, Wallet } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
-import { RESALE_FEE_BPS } from '@/types/resale';
 import { payoutService, payoutKeys } from '@/lib/payout';
-import { PayoutMethodsSheet, maskAccount, ProviderLogo, PAYOUT_PROVIDERS } from './PayoutMethodsSheet';
+import { PayoutMethodsSheet } from './PayoutMethodsSheet';
 import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false }: { ticket: UserTicket; onClose: () => void; onConfirm: (price: number) => void; submitting?: boolean }) {
   const { isDark } = useTheme();
   const [step, setStep] = useState<'price' | 'confirm'>('price');
   const [price, setPrice] = useState(2000);
   const [payoutOpen, setPayoutOpen] = useState(false);
-  // MOCK estimate using the shared seller fee rate. The real rate comes from the
-  // created listing's fee_terms.rate_bps (backend resolves it at ActivateListing).
-  const platformFee = Math.round(price * RESALE_FEE_BPS / 10000);
-  const youReceive = price - platformFee;
 
   const { data: payoutMethods = [], isPending, isError, refetch } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
   const showLoading = useShowSkeleton(isPending);
-  const payoutReady = !showLoading && !isError;
-  const defaultPayout = payoutReady ? payoutMethods.find(m => m.isDefault) ?? payoutMethods[0] : undefined;
-  const hasPayout = !!defaultPayout;
+
+  // Resale policy from the wallet ticket_type projection (#25 resolved).
+  // Anything the backend doesn't serve is treated as closed, never assumed open.
+  const policy = ticket.resalePolicy;
+  const policyBlocked = policy && !policy.enabled;
+  const cutoffPassed = (() => {
+    if (!policy || !policy.cutoffSecondsBeforeStart) return false;
+    const starts = ticket.eventStartsAt; // raw ISO when available
+    if (!starts) return false;
+    return Date.now() >= new Date(starts).getTime() - policy.cutoffSecondsBeforeStart * 1000;
+  })();
+  // Fixed cap is the only cap expressible without a face value on the wallet wire.
+  const fixedCapMajor = policy?.capType === 'fixed' && policy.fixedCapMinor != null
+    ? policy.fixedCapMinor / 100
+    : null;
+  const overCap = fixedCapMajor != null && price > fixedCapMajor;
+  const blockedReason = policyBlocked
+    ? 'Resale is disabled for this ticket.'
+    : cutoffPassed
+      ? 'The resale window for this event has closed.'
+      : null;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -38,12 +52,13 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.98 }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-        className="relative w-full lg:max-w-[440px] lg:mx-4 rounded-t-3xl lg:rounded-3xl max-h-[90vh] lg:max-h-[85vh] overflow-y-auto"
+        className="relative w-full lg:max-w-[440px] lg:mx-4 rounded-t-3xl lg:rounded-3xl max-h-[90vh] lg:max-h-[85vh] overflow-y-auto overflow-x-hidden"
         style={{
           background: isDark ? '#101115' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
         }}
         onClick={e => e.stopPropagation()}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-2 lg:hidden">
@@ -67,12 +82,15 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                 <div className="flex items-center justify-center gap-6 mb-6">
                   <AppButton whileTap={{ scale: 0.9 }}
                     onClick={() => setPrice(p => Math.max(100, p - 100))}
-                    className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer"
+                    disabled={Boolean(blockedReason)}
+                    className="relative w-12 h-12 rounded-full overflow-hidden flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                     }}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10 flex items-center justify-center">
                     <Minus className="w-5 h-5" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
+                    </span>
                   </AppButton>
                   <div className="text-center">
                     <p className="text-[10px] tracking-[1.5px] uppercase mb-1"
@@ -83,55 +101,76 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                       style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
                       ETB {price.toLocaleString()}
                     </p>
+                    {overCap && fixedCapMajor != null && (
+                      <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+                        Max {fixedCapMajor.toLocaleString()} (resale cap)
+                      </p>
+                    )}
                   </div>
                   <AppButton whileTap={{ scale: 0.9 }}
-                    onClick={() => setPrice(p => p + 100)}
-                    className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer"
+                    onClick={() => setPrice(p => (fixedCapMajor != null ? Math.min(fixedCapMajor, p + 100) : p + 100))}
+                    disabled={Boolean(blockedReason) || overCap}
+                    className="relative w-12 h-12 rounded-full overflow-hidden flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                     }}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10 flex items-center justify-center">
                     <Plus className="w-5 h-5" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
+                    </span>
                   </AppButton>
                 </div>
 
-                {/* Fee breakdown */}
-                <div className="rounded-2xl p-4 mb-6"
+                {blockedReason && (
+                  <div className="flex items-start gap-3 mb-6 p-3 rounded-xl"
+                    style={{
+                      background: isDark ? 'rgba(229,72,77,0.08)' : 'rgba(229,72,77,0.06)',
+                      border: `1px solid ${isDark ? 'rgba(229,72,77,0.2)' : 'rgba(229,72,77,0.18)'}`,
+                    }}>
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#ff6b70' : '#c0392b' }} strokeWidth={1.5} />
+                    <p className="text-[11px] leading-[1.5]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : '#8a1f1f' }}>
+                      {blockedReason}
+                    </p>
+                  </div>
+                )}
+
+                {/* Fee note — the rate is resolved server-side at listing time
+                    (fee_terms on the created listing), so no estimate is shown. */}
+                <div className="relative rounded-2xl overflow-hidden p-4 mb-6"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                   }}>
+                  <GlassReflection isDark={isDark} />
+                  <div className="relative z-10">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                      Platform fee (8%)
+                      Your asking price
                     </span>
                     <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
-                      - ETB {platformFee.toLocaleString()}
+                      ETB {price.toLocaleString()}
                     </span>
                   </div>
                   <div className="h-px w-full my-2.5" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }} />
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#34d399' : '#059669' }}>
-                      You receive
-                    </span>
-                    <span className="text-[18px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#34d399' : '#059669' }}>
-                      ETB {youReceive.toLocaleString()}
-                    </span>
+                  <p className="text-[11px] leading-[1.5]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }}>
+                    The event's resale fee is applied when you list — you'll see the exact amount on your live listing.
+                  </p>
                   </div>
                 </div>
 
-                <AppButton whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                <AppButton whileHover={!blockedReason ? { scale: 1.02 } : undefined} whileTap={!blockedReason ? { scale: 0.97 } : undefined}
                   onClick={() => setStep('confirm')}
-                  className="w-full h-[56px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer"
+                  disabled={Boolean(blockedReason) || overCap}
+                  className="w-full h-[56px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
                   style={{
                     background: isDark
                       ? 'linear-gradient(135deg, rgba(214,249,5,0.2), rgba(217,255,0,0.1))'
                       : 'linear-gradient(135deg, rgba(214,249,5,0.9), rgba(109,40,217,0.85))',
                     border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.3)'}`,
+                    opacity: blockedReason || overCap ? 0.5 : 1,
                   }}>
                   <span className="text-[14px] font-medium tracking-[0.3px]"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#f4ff66' : '#fff' }}>
-                    Continue
+                    {blockedReason ? 'Cannot list' : 'Continue'}
                   </span>
                   <ArrowRight className="w-4 h-4" style={{ color: isDark ? '#f4ff66' : '#fff' }} strokeWidth={1.5} />
                 </AppButton>
@@ -147,11 +186,12 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                   Review your listing details
                 </p>
 
-                <div className="rounded-2xl p-4 mb-4"
+                <div className="relative rounded-2xl overflow-hidden p-4 mb-4"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                   }}>
+                  <GlassReflection isDark={isDark} />
+                  <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-3">
                     {ticket.image && <img src={ticket.image} alt="" className="w-12 h-12 rounded-xl object-cover" />}
                     <div>
@@ -172,19 +212,22 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                       ETB {price.toLocaleString()}
                     </span>
                   </div>
+                  </div>
                 </div>
 
                 {/* Payout destination */}
                 {showLoading ? (
-                  <div className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3"
+                  <div className="relative w-full rounded-2xl overflow-hidden p-4 mb-4 flex items-center gap-3"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                     }}>
+                    <GlassReflection isDark={isDark} />
+                    <div className="relative z-10 contents">
                     <Pulse className="w-10 h-10 rounded-xl flex-shrink-0" />
                     <div className="min-w-0 flex-1 space-y-2">
                       <Pulse className="h-[10px] w-20 rounded-md" />
                       <Pulse className="h-[13px] w-32 rounded-md" />
+                    </div>
                     </div>
                   </div>
                 ) : isError ? (
@@ -209,29 +252,19 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                   className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 text-left cursor-pointer"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                    border: `1px solid ${hasPayout ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : (isDark ? 'rgba(214,249,5,0.25)' : 'rgba(109,40,217,0.25)')}`,
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
                   }}>
-                  {hasPayout ? (
-                    <ProviderLogo kind={defaultPayout.kind} />
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                      <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={1.5} />
-                    </div>
-                  )}
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+                    <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={1.5} />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] tracking-[1px] uppercase mb-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
-                      Payout to
+                      Payout
                     </p>
-                    {hasPayout ? (
-                      <p className="text-[13px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                        {PAYOUT_PROVIDERS[defaultPayout.kind].full} · {maskAccount(defaultPayout.accountNumber)}
-                      </p>
-                    ) : (
-                      <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#6d28d9' }}>
-                        Add a payout method
-                      </p>
-                    )}
+                    <p className="text-[13px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                      {payoutMethods.length ? `${payoutMethods.length} destination${payoutMethods.length > 1 ? 's' : ''} set up` : 'Manage payout methods'}
+                    </p>
                   </div>
                   <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }} strokeWidth={1.5} />
                 </AppButton>
@@ -252,17 +285,19 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                 <div className="flex gap-3">
                   <AppButton whileTap={{ scale: 0.97 }}
                     onClick={() => setStep('price')}
-                    className="flex-1 h-[56px] rounded-2xl flex items-center justify-center cursor-pointer"
+                    className="relative flex-1 h-[56px] rounded-2xl overflow-hidden flex items-center justify-center cursor-pointer"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                     }}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10">
                     <span className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
                       Back
                     </span>
+                    </span>
                   </AppButton>
-                  <AppButton whileHover={hasPayout ? { scale: 1.02 } : undefined} whileTap={hasPayout ? { scale: 0.97 } : undefined}
-                    onClick={() => { if (showLoading || submitting) return; if (hasPayout) onConfirm(price); else setPayoutOpen(true); }}
+                  <AppButton whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => { if (showLoading || submitting) return; onConfirm(price); }}
                     disabled={submitting || showLoading}
                     className="flex-1 h-[56px] rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                     style={{
@@ -270,17 +305,17 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                         ? 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(16,185,129,0.08))'
                         : 'linear-gradient(135deg, rgba(5,150,105,0.9), rgba(4,120,87,0.85))',
                       border: `1px solid ${isDark ? 'rgba(52,211,153,0.2)' : 'rgba(5,150,105,0.3)'}`,
-                      opacity: hasPayout ? 1 : 0.55,
                     }}>
                     <Check className="w-4 h-4" style={{ color: isDark ? '#34d399' : '#fff' }} strokeWidth={2} />
                     <span className="text-[14px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#34d399' : '#fff' }}>
-                      {hasPayout ? 'List Ticket' : 'Add payout'}
+                      List Ticket
                     </span>
                   </AppButton>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
         </div>
       </motion.div>
 

@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
-import { X, Plus, Check, Trash2, ArrowLeft } from 'lucide-react';
-import { payoutService, payoutKeys } from '@/lib/payout';
+import { X, Plus, Check, ArrowLeft, Wallet } from 'lucide-react';
+import { payoutService, payoutKeys, statusLabel } from '@/lib/payout';
 import type { PayoutMethod, PayoutMethodKind, AddPayoutMethodInput } from '@/types';
 import { ProviderLogo as SharedProviderLogo } from '@/components/ProviderLogo';
 import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 /* Provider metadata shared by payout forms and selection states. */
 export const PAYOUT_PROVIDERS: Record<PayoutMethodKind, {
@@ -26,11 +27,6 @@ export const PAYOUT_PROVIDERS: Record<PayoutMethodKind, {
 };
 
 const KIND_ORDER: PayoutMethodKind[] = ['telebirr', 'cbe', 'boa'];
-
-export function maskAccount(value: string) {
-  if (value.length <= 4) return value;
-  return `•••• ${value.slice(-4)}`;
-}
 
 export function ProviderLogo({ kind, size = 40 }: { kind: PayoutMethodKind; size?: number }) {
   return <SharedProviderLogo kind={kind} size={size} />;
@@ -52,23 +48,11 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
       onMethodAdded?.(method);
     },
   });
-  const removeMutation = useMutation({
-    mutationFn: (id: string) => payoutService.removeMethod(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: payoutKeys.all }),
-  });
-  const defaultMutation = useMutation({
-    mutationFn: (id: string) => payoutService.setDefault(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: payoutKeys.all }),
-  });
 
+  // No default flag and no removal endpoint exist server-side, so selection
+  // is notification-only (the sheet's caller closes / continues).
   const selectMethod = (method: PayoutMethod) => {
-    if (method.isDefault) {
-      onMethodSelected?.(method);
-      return;
-    }
-    defaultMutation.mutate(method.id, {
-      onSuccess: () => onMethodSelected?.({ ...method, isDefault: true }),
-    });
+    onMethodSelected?.(method);
   };
 
   const text = isDark ? '#fff' : '#1a1a1a';
@@ -90,10 +74,12 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.98 }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-        className="relative w-full lg:max-w-[440px] lg:mx-4 rounded-t-3xl lg:rounded-3xl max-h-[85vh] lg:max-h-[80vh] overflow-y-auto"
-        style={{ background: isDark ? '#101115' : '#fff', border: `1px solid ${cardBorder}`,
+        className="relative w-full lg:max-w-[440px] lg:mx-4 rounded-t-3xl lg:rounded-3xl max-h-[85vh] lg:max-h-[80vh] overflow-y-auto overflow-x-hidden"
+        style={{ background: isDark ? '#101115' : '#fff',
           boxShadow: 'none' }}
         onClick={e => e.stopPropagation()}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
 
         <div className="flex justify-center pt-3 pb-2 lg:hidden">
           <div className="w-10 h-1 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' }} />
@@ -133,8 +119,10 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
                     <PayoutRowSkeleton isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} />
                   </div>
                 ) : isError ? (
-                  <div className="rounded-2xl p-4 mb-4 text-center"
-                    style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                  <div className="relative rounded-2xl overflow-hidden p-4 mb-4 text-center"
+                    style={{ background: cardBg }}>
+                    <GlassReflection isDark={isDark} />
+                    <div className="relative z-10">
                     <p className="text-[13px] mb-3" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
                       Couldn't load payout methods.
                     </p>
@@ -142,21 +130,24 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
                       style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
                       Retry
                     </AppButton>
+                    </div>
                   </div>
                 ) : methods.length === 0 ? (
-                  <div className="rounded-2xl p-6 mb-4 text-center"
-                    style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                  <div className="relative rounded-2xl overflow-hidden p-6 mb-4 text-center"
+                    style={{ background: cardBg }}>
+                    <GlassReflection isDark={isDark} />
+                    <div className="relative z-10">
                     <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
                       No payout methods yet. Add one to start receiving payments.
                     </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2.5 mb-4">
                     {methods.map(m => (
                       <PayoutRow key={m.id} method={m} isDark={isDark} text={text} muted={muted}
                         cardBg={cardBg} cardBorder={cardBorder}
-                        onSelect={() => selectMethod(m)}
-                        onRemove={() => removeMutation.mutate(m.id)} />
+                        onSelect={() => selectMethod(m)} />
                     ))}
                   </div>
                 )}
@@ -175,6 +166,7 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
             )}
           </AnimatePresence>
         </div>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -182,39 +174,41 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
   return typeof document !== 'undefined' ? createPortal(sheet, document.body) : sheet;
 }
 
-function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect, onRemove }: {
+function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect }: {
   method: PayoutMethod; isDark: boolean; text: string; muted: string; cardBg: string; cardBorder: string;
-  onSelect: () => void; onRemove: () => void;
+  onSelect: () => void;
 }) {
-  const p = PAYOUT_PROVIDERS[method.kind];
+  const verified = method.status === 'verified';
   return (
-    <div className="rounded-2xl p-1.5 flex items-center gap-1.5" style={{ background: cardBg, border: `1px solid ${method.isDefault ? (isDark ? 'rgba(214,249,5,0.3)' : 'rgba(109,40,217,0.25)') : cardBorder}` }}>
-      <AppButton onClick={onSelect} aria-pressed={method.isDefault}
+    <div className="rounded-2xl p-1.5 flex items-center gap-1.5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      <AppButton onClick={onSelect}
         className="min-w-0 flex-1 flex items-center gap-3 p-2.5 rounded-xl text-left cursor-pointer"
-        style={{ background: method.isDefault ? (isDark ? 'rgba(214,249,5,0.06)' : 'rgba(109,40,217,0.05)') : 'transparent' }}>
-        <ProviderLogo kind={method.kind} />
+        style={{ background: 'transparent' }}>
+        {method.type === 'mobile_money' ? (
+          <ProviderLogo kind="telebirr" />
+        ) : (
+          <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+            <Wallet className="w-5 h-5" style={{ color: muted }} strokeWidth={1.5} />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="text-[14px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
-              {p.full}
+              {method.displayName}
             </p>
-            {method.isDefault && (
-              <span className="text-[9px] tracking-[0.5px] uppercase px-1.5 py-0.5 rounded-md"
-                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#6d28d9', background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(109,40,217,0.08)' }}>
-                Selected
-              </span>
-            )}
+            <span className="text-[9px] tracking-[0.5px] uppercase px-1.5 py-0.5 rounded-md"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                color: verified ? (isDark ? '#34d399' : '#059669') : muted,
+                background: verified
+                  ? (isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)')
+                  : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+              }}>
+              {statusLabel(method.status)}
+            </span>
           </div>
-          <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
-            {method.holderName} · {maskAccount(method.accountNumber)}
-          </p>
         </div>
-        <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ border: `1px solid ${method.isDefault ? (isDark ? '#d6f905' : '#6d28d9') : cardBorder}`, background: method.isDefault ? (isDark ? '#d6f905' : '#6d28d9') : 'transparent' }}>
-          {method.isDefault && <Check className="w-3 h-3" style={{ color: isDark ? '#101115' : '#fff' }} strokeWidth={2.5} />}
-        </span>
-      </AppButton>
-      <AppButton onClick={onRemove} aria-label={`Remove ${p.full} payout method`} className="cursor-pointer p-2.5 rounded-xl">
-        <Trash2 className="w-4 h-4" style={{ color: muted }} strokeWidth={1.5} />
       </AppButton>
     </div>
   );
@@ -222,7 +216,9 @@ function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect, 
 
 function PayoutRowSkeleton({ isDark, cardBg, cardBorder }: { isDark: boolean; cardBg: string; cardBorder: string }) {
   return (
-    <div className="rounded-2xl p-1.5 flex items-center gap-1.5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+    <div className="relative rounded-2xl overflow-hidden p-1.5 flex items-center gap-1.5" style={{ background: cardBg }}>
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 contents">
       <div className="min-w-0 flex-1 flex items-center gap-3 p-2.5 rounded-xl">
         <Pulse className="w-10 h-10 rounded-xl flex-shrink-0" />
         <div className="flex-1 min-w-0 space-y-2">
@@ -230,6 +226,7 @@ function PayoutRowSkeleton({ isDark, cardBg, cardBorder }: { isDark: boolean; ca
           <Pulse className="h-[11px] w-32 rounded-md" />
         </div>
         <Pulse className="w-5 h-5 rounded-full flex-shrink-0" />
+      </div>
       </div>
     </div>
   );

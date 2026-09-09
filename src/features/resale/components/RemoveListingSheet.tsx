@@ -5,6 +5,7 @@ import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRi
 import type { ResaleListing } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function RemoveListingSheet({
   listing,
@@ -75,11 +76,12 @@ export function RemoveListingSheet({
           </div>
 
           {/* Listing preview card */}
-          <div className="flex items-center gap-3 p-3 rounded-2xl mb-6"
+          <div className="relative flex items-center gap-3 p-3 rounded-2xl overflow-hidden mb-6"
             style={{
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}`,
             }}>
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 contents">
             {listing.ticket?.image && (
               <img src={listing.ticket.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
             )}
@@ -100,6 +102,7 @@ export function RemoveListingSheet({
                 </span>
               </div>
             </div>
+            </div>
           </div>
 
           {/* Actions */}
@@ -108,16 +111,16 @@ export function RemoveListingSheet({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={onCancel}
-              className="flex-1 py-3.5 rounded-2xl cursor-pointer text-[13px]"
+              className="relative flex-1 py-3.5 rounded-2xl overflow-hidden cursor-pointer text-[13px]"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 600,
                 background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
                 color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)',
               }}
             >
-              Keep listed
+              <GlassReflection isDark={isDark} />
+              <span className="relative z-10">Keep listed</span>
             </AppButton>
             <AppButton
               whileHover={{ scale: 1.02 }}
