@@ -7,14 +7,16 @@ import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
-export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onConfirm }: {
+export function AddExtrasDialog({ ticket, products, isSaving = false, done = false, onClose, onConfirm, isLoading = false }: {
   ticket: UserTicket;
   products: EventProduct[];
-  isSaving: boolean;
-  done: boolean;
+  isSaving?: boolean;
+  done?: boolean;
   onClose: () => void;
   onConfirm: (items: SelectedEventProduct[]) => void;
+  isLoading?: boolean;
 }) {
   const { isDark } = useTheme();
   const [selected, setSelected] = useState<SelectedEventProduct[]>([]);
@@ -41,7 +43,9 @@ export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onC
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col rounded-t-[32px] sm:rounded-[32px]"
-        style={{ background: bgPanel, border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.12)'}` }}>
+        style={{ background: bgPanel }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
         <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${borderSoft}` }}>
           <div>
             <p className="text-[9px] tracking-[3px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add extras</p>
@@ -53,7 +57,9 @@ export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onC
         </div>
 
         <div className="relative flex-1 overflow-y-auto scrollbar-hide px-6 py-5">
-          {products.length ? (
+          {isLoading ? (
+            <p className="text-[13px] py-8 text-center" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Loading extras…</p>
+          ) : products.length ? (
             <ExtrasStep products={products} selected={selected} onChange={setSelected} isDark={isDark} compact />
           ) : (
             <p className="text-[13px] py-8 text-center" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>No extras are available for this event.</p>
@@ -85,6 +91,7 @@ export function AddExtrasDialog({ ticket, products, isSaving, done, onClose, onC
             </AppButton>
           </div>
         )}
+        </div>
       </motion.div>
     </motion.div>
   );

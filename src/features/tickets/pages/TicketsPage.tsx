@@ -11,14 +11,17 @@ import { GlassTicketCard } from '@/features/tickets/components/GlassTicketCard';
 import { TicketsEmptyState } from '@/features/tickets/components/TicketsEmptyState';
 import { EditTicketAnswersDialog } from '@/features/tickets/components/EditTicketAnswersDialog';
 import { AddExtrasDialog } from '@/features/tickets/components/AddExtrasDialog';
+import { ExtrasOnlyCheckout } from '@/features/checkout/components/ExtrasOnlyCheckout';
 import { useTicketGroups } from '@/features/tickets/hooks/useTicketGroups';
 import { toPng } from 'html-to-image';
 import { ticketsService, ticketKeys } from '@/lib/tickets';
+import { productsModule } from '@/lib/products';
 import { LoadErrorCard, TicketRowSkeleton, useShowSkeleton } from '@/components/loading';
-import { transferService } from '@/lib/transfer';
+import { transferService, buildClaimLink } from '@/lib/transfer';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { useGuestDeviceTickets } from '@/features/tickets/hooks/useGuestDeviceTickets';
 
 interface TicketViewProps {
   tickets: UserTicket[];
@@ -29,9 +32,16 @@ interface TicketViewProps {
   refreshing?: boolean;
   loadError?: boolean;
   onRetry?: () => void;
+  /** Just-confirmed purchase (post-Chapa). Open its QR immediately instead of
+   *  waiting for the wallet refetch to settle the ticket into `tickets`. */
+  initialOpenTicket?: UserTicket | null;
+  /** Signed out — the wallet query is disabled; show the device guest wallet. */
+  isAuthenticated?: boolean;
+  /** Opens the auth modal (claim path for durable cross-device tickets). */
+  onRequestAuth?: () => void;
 }
 
-export function TicketView({ tickets, onListForResale, onDiscover, loading = false, refreshing = false, loadError = false, onRetry }: TicketViewProps) {
+export function TicketView({ tickets, onListForResale, onDiscover, loading = false, refreshing = false, loadError = false, onRetry, initialOpenTicket, isAuthenticated = true, onRequestAuth }: TicketViewProps) {
   const [selectedTicket, setSelectedTicket] = useState<UserTicket | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [transferringTicket, setTransferringTicket] = useState<UserTicket | null>(null);
@@ -39,29 +49,50 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   const [editingAnswersTicket, setEditingAnswersTicket] = useState<UserTicket | null>(null);
   const [answerSaveError, setAnswerSaveError] = useState('');
   const [addingExtrasTicket, setAddingExtrasTicket] = useState<UserTicket | null>(null);
-  const [extrasDone, setExtrasDone] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
   const { isDark } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  // Signed-out buyers see tickets purchased on this device (encrypted at rest)
+  // merged into the normal upcoming/past list, not a separate section.
+  const guestDevice = useGuestDeviceTickets();
+  // When signed out, the account wallet is empty and the on-device guest
+  // tickets ARE the collection — render them like any other ticket.
+  const combinedTickets: UserTicket[] = isAuthenticated
+    ? tickets
+    : [...tickets, ...guestDevice.tickets];
+  const deviceCount = guestDevice.tickets.length;
   const updateAnswersMutation = useMutation({
     mutationKey: ['tickets', 'answers'],
     mutationFn: ({ ticketId, answers }: { ticketId: string; answers: Record<string, unknown> }) => ticketsService.updateTicketAnswers(ticketId, answers),
     onSuccess: () => { setAnswerSaveError(''); setEditingAnswersTicket(null); queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets }); },
     onError: (error: Error) => setAnswerSaveError(error.message),
   });
-  const addExtrasMutation = useMutation({
-    mutationKey: ['tickets', 'extras'],
-    mutationFn: ({ ticketId, items }: { ticketId: string; items: SelectedEventProduct[] }) => ticketsService.purchaseTicketExtras(ticketId, items),
-    onSuccess: () => {
-      setExtrasDone(true);
-      queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
-      setTimeout(() => { setAddingExtrasTicket(null); setExtrasDone(false); }, 1200);
-    },
-  });
-  const extrasProducts: EventProduct[] = [];
+  // Real extras-only checkout: opens the Chapa payment flow for just the extras
+  // (no ticket) instead of the mock purchaseTicketExtras (which only mutates the
+  // in-memory store and fails for live wallet tickets).
+  const [extrasCheckout, setExtrasCheckout] = useState<{ ticket: UserTicket; products: EventProduct[] } | null>(null);
+  const [extrasProducts, setExtrasProducts] = useState<EventProduct[]>([]);
+  const [extrasLoading, setExtrasLoading] = useState(false);
+  // Fetch the ticket's event extras when the Add Extras dialog opens — the
+  // dialog offers what the backend actually sells for that event (parking,
+  // merch, food, ...). Empty = no extras available (backend has none or none
+  // priced), which the dialog renders as "No extras are available".
+  useEffect(() => {
+    if (!addingExtrasTicket?.eventSlug) {
+      setExtrasProducts([]);
+      return;
+    }
+    let alive = true;
+    setExtrasLoading(true);
+    productsModule.fetchForEvent(addingExtrasTicket.eventSlug)
+      .then(({ extras }) => { if (alive) setExtrasProducts(extras); })
+      .catch(() => { if (alive) setExtrasProducts([]); })
+      .finally(() => { if (alive) setExtrasLoading(false); });
+    return () => { alive = false; };
+  }, [addingExtrasTicket]);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   // Just-returned-from-Chapa: the router lands here with ?ticket=<id> once the
@@ -72,9 +103,20 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   const [searchParams, setSearchParams] = useSearchParams();
   const autoOpenTicketId = searchParams.get('ticket');
   const autoOpenedRef = useRef<Set<string>>(new Set());
+  // The return screen already holds the confirmed ticket (with its QR) from the
+  // refresh projection — open it instantly, don't wait for the wallet refetch.
+  const initialRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (initialOpenTicket && initialRef.current !== initialOpenTicket.id) {
+      initialRef.current = initialOpenTicket.id;
+      setSelectedTicket(initialOpenTicket);
+      setShowQR(true);
+      setDownloadDone(false);
+    }
+  }, [initialOpenTicket]);
   useEffect(() => {
     if (!autoOpenTicketId || autoOpenedRef.current.has(autoOpenTicketId)) return;
-    const target = tickets.find((t) => t.id === autoOpenTicketId);
+    const target = combinedTickets.find((t) => t.id === autoOpenTicketId);
     if (!target) return; // not issued yet — the wallet poll will bring it
     autoOpenedRef.current.add(autoOpenTicketId);
     setSelectedTicket(target);
@@ -85,9 +127,9 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
       next.delete('ticket');
       return next;
     }, { replace: true });
-  }, [autoOpenTicketId, tickets, setSelectedTicket, setSearchParams]);
+  }, [autoOpenTicketId, combinedTickets, setSelectedTicket, setSearchParams]);
 
-  const { upcoming, past } = useTicketGroups(tickets);
+  const { upcoming, past } = useTicketGroups(combinedTickets);
 
   const visibleTickets = tab === 'upcoming' ? upcoming : past;
   const showLoading = useShowSkeleton(loading);
@@ -130,12 +172,38 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
         </h1>
         <p className="text-[13px] mt-1"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}>
-          {showLoading ? '…' : `${upcoming.length} upcoming · ${past.length} past`}
+          {showLoading ? '…' : `${upcoming.length} upcoming · ${past.length} past${deviceCount > 0 ? ` · ${deviceCount} on this device` : ''}`}
           {refreshing && !showLoading && (
             <span className="ml-2 text-[11px]">Refreshing…</span>
           )}
         </p>
       </motion.div>
+
+      {/* Signed-out + device tickets: a subtle notice + manage row. The tickets
+          themselves render in the normal list below. */}
+      {!isAuthenticated && deviceCount > 0 && (
+        <div className="px-4 sm:px-6 lg:px-8 pt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)' }}>
+            Stored on this device
+          </p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={guestDevice.clearAll}
+              className="text-[11px] cursor-pointer"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={onRequestAuth ?? (() => {})}
+              className="text-[11px] underline underline-offset-2 cursor-pointer"
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}
+            >
+              Create an account to keep them
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Segmented control */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6">
@@ -236,8 +304,9 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
                 onClose={() => setSelectedTicket(null)}
                 onTransfer={() => { setTransferringTicket(selectedTicket); setSelectedTicket(null); }}
                 onShare={() => { setSharingTicket(selectedTicket); setSelectedTicket(null); }}
-                onResell={() => { if (onListForResale) { onListForResale(selectedTicket); setSelectedTicket(null); } }}
+                onResell={selectedTicket.status === 'active' && onListForResale ? () => { onListForResale(selectedTicket); setSelectedTicket(null); } : undefined}
                 onEditAnswers={selectedTicket.customQuestions?.length && selectedTicket.answersEditableUntil && Date.parse(selectedTicket.answersEditableUntil) > Date.now() ? () => { setAnswerSaveError(''); setEditingAnswersTicket(selectedTicket); setSelectedTicket(null); } : undefined}
+                onAddExtras={selectedTicket.eventSlug ? () => { setAddingExtrasTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onDownload={handleDownload}
                 downloading={downloading}
                 downloadDone={downloadDone} />
@@ -252,10 +321,27 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
           <AddExtrasDialog
             ticket={addingExtrasTicket}
             products={extrasProducts}
-            isSaving={addExtrasMutation.isPending}
-            done={extrasDone}
+            isLoading={extrasLoading}
             onClose={() => setAddingExtrasTicket(null)}
-            onConfirm={(items) => addExtrasMutation.mutate({ ticketId: addingExtrasTicket.id, items })}
+            onConfirm={(items) => {
+              const ticket = addingExtrasTicket;
+              if (!ticket.eventId || !items.length) return;
+              // Open the real extras-only checkout with the picked items.
+              setExtrasCheckout({ ticket, products: extrasProducts });
+              setAddingExtrasTicket(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {extrasCheckout && (
+          <ExtrasOnlyCheckout
+            event={{ name: extrasCheckout.ticket.eventName, date: extrasCheckout.ticket.eventDate, time: extrasCheckout.ticket.eventTime, venue: extrasCheckout.ticket.venue }}
+            eventId={extrasCheckout.ticket.eventId!}
+            products={extrasCheckout.products}
+            onClose={() => setExtrasCheckout(null)}
+            onComplete={() => { setExtrasCheckout(null); queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets }); }}
           />
         )}
       </AnimatePresence>
@@ -285,28 +371,16 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
           <TransferTicket
             ticket={transferringTicket}
             onClose={() => setTransferringTicket(null)}
-            onTransfer={async ({ recipientName, contactMethod, contactValue, note }) => {
-              const result = transferService.sendTransfer({
-                fromName: user?.name || 'A friend',
-                recipientName,
-                contactMethod,
-                contactValue,
+            onTransfer={async ({ contactValue, note }) => {
+              const result = await transferService.initiate({
+                ticketId: transferringTicket.id,
+                phone: contactValue,
                 note,
-                ticket: {
-                  id: transferringTicket.id,
-                  eventId: transferringTicket.eventId,
-                  eventName: transferringTicket.eventName,
-                  eventDate: transferringTicket.eventDate,
-                  eventTime: transferringTicket.eventTime,
-                  venue: transferringTicket.venue,
-                  ticketType: transferringTicket.ticketType,
-                  ticketLevel: transferringTicket.ticketLevel,
-                  image: transferringTicket.image,
-                  seat: transferringTicket.seat,
-                },
               });
-              queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
-              return { shareLink: result.link, recipientHasAccount: result.recipientHasAccount };
+              return {
+                shareLink: buildClaimLink(result.transferId, result.token),
+                recipientHasAccount: false,
+              };
             }}
           />
         )}

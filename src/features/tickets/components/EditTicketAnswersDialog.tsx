@@ -5,6 +5,7 @@ import { useTheme } from "@/app/components/ThemeContext";
 import { QuestionField } from "@/features/checkout/components/QuestionField";
 import type { CheckoutAnswers, UserTicket } from "@/types";
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from "@/components/primitives/GlassReflection";
 
 function formatDeadline(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -54,7 +55,9 @@ export function EditTicketAnswersDialog({
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-5" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: isDark ? "rgba(0,0,0,0.78)" : "rgba(20,20,28,0.32)", backdropFilter: "blur(22px)" }} />
-      <motion.section initial={{ y: 28, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 28, opacity: 0, scale: 0.98 }} transition={{ type: "spring", damping: 28, stiffness: 300 }} onClick={(event) => event.stopPropagation()} className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-t-[28px] sm:rounded-[28px]" style={{ background: panel, border: `1px solid ${isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)"}` }}>
+      <motion.section initial={{ y: 28, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 28, opacity: 0, scale: 0.98 }} transition={{ type: "spring", damping: 28, stiffness: 300 }} onClick={(event) => event.stopPropagation()} className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-t-[28px] sm:rounded-[28px]" style={{ background: panel }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-5 px-5 sm:px-6 pt-5 pb-4" style={{ background: panel, borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}` }}>
           <div>
             <div className="flex items-center gap-2 text-[10px] tracking-[1.6px] uppercase" style={{ color: isDark ? "#d6f905" : "#566600", fontFamily: "'Inter', sans-serif", fontWeight: 700 }}><FilePenLine className="w-3.5 h-3.5" /> Attendee details</div>
@@ -74,6 +77,7 @@ export function EditTicketAnswersDialog({
         </div>
         <div className="sticky bottom-0 px-5 sm:px-6 py-4" style={{ background: panel, borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}` }}>
           <AppButton whileTap={{ scale: isExpired || isSaving ? 1 : 0.98 }} disabled={isExpired || isSaving} onClick={submit} className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[13px] disabled:cursor-not-allowed" style={{ background: isExpired ? (isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)") : "linear-gradient(135deg, #d9ff00, #d6f905)", color: isExpired ? muted : "#0a0a0a", fontFamily: "'Inter', sans-serif", fontWeight: 700 }}><Check className="w-4 h-4" />{isSaving ? "Saving…" : "Save answers"}</AppButton>
+        </div>
         </div>
       </motion.section>
     </motion.div>

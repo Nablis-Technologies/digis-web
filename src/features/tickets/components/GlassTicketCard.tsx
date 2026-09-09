@@ -133,12 +133,12 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
             style={{ borderTop: `1px dashed ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+              <div className="relative w-5 h-5 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0"
                 style={{
                   background: isDark ? 'rgba(214,249,5,0.12)' : '#d6f905',
-                  border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(0,0,0,0.08)'}`,
                 }}>
-                <TicketIcon className="w-2.5 h-2.5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2} />
+                <GlassReflection isDark={isDark} />
+                <TicketIcon className="relative z-10 w-2.5 h-2.5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2} />
               </div>
               <span className="text-[10px] tracking-[1px] truncate max-w-[92px]"
                 style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>

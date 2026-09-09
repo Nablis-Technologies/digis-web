@@ -173,9 +173,10 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         <div className="relative px-5 sm:px-7 pt-5 sm:pt-7">
           <div className="flex items-start gap-4">
             {ticket.image && (
-              <div className="shrink-0 w-[54px] h-[54px] sm:w-[64px] sm:h-[64px] rounded-2xl overflow-hidden"
-                style={{ border: `1px solid ${t.panelBorder}`, boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.45)' : '0 10px 30px rgba(20,18,40,0.14)' }}>
-                <img src={ticket.image} alt="" className="w-full h-full object-cover" />
+              <div className="relative shrink-0 w-[54px] h-[54px] sm:w-[64px] sm:h-[64px] rounded-2xl overflow-hidden"
+                style={{ boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.45)' : '0 10px 30px rgba(20,18,40,0.14)' }}>
+                <GlassReflection isDark={isDark} />
+                <img src={ticket.image} alt="" className="relative z-10 w-full h-full object-cover" />
               </div>
             )}
             <div className="min-w-0 flex-1">
@@ -197,13 +198,13 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               </h2>
             </div>
             <AppButton whileTap={{ scale: 0.92 }} onClick={onClose}
-              className="shrink-0 -mt-1 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+              className="relative shrink-0 -mt-1 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
               style={{
                 background: isDark ? 'rgba(12,10,24,0.5)' : 'rgba(255,255,255,0.75)',
                 backdropFilter: 'blur(20px)',
-                border: `1px solid ${t.panelBorder}`,
               }}>
-              <X className="w-4 h-4" strokeWidth={1.8} style={{ color: t.textSoft }} />
+              <GlassReflection isDark={isDark} />
+              <X className="relative z-10 w-4 h-4" strokeWidth={1.8} style={{ color: t.textSoft }} />
             </AppButton>
           </div>
 
@@ -328,8 +329,10 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               </>
             ) : (
               <AppButton whileTap={{ scale: 0.99 }} onClick={onAddExtras}
-                className="w-full rounded-2xl px-4 py-3.5 flex items-center gap-3.5 text-left cursor-pointer"
-                style={{ background: t.panel, border: `1px solid ${t.panelBorder}`, backdropFilter: 'blur(24px)' }}>
+                className="relative w-full rounded-2xl overflow-hidden px-4 py-3.5 flex items-center gap-3.5 text-left cursor-pointer"
+                style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+                <GlassReflection isDark={isDark} />
+                <div className="relative z-10 flex items-center gap-3.5 w-full">
                 <span className="shrink-0 w-10 h-10 rounded-xl grid place-items-center"
                   style={{
                     background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(214,249,5,0.22)',
@@ -345,6 +348,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                   style={{ background: isDark ? 'rgba(214,249,5,0.14)' : 'rgba(214,249,5,0.28)', color: t.accent }}>
                   <Plus className="w-3.5 h-3.5" strokeWidth={2.4} />
                 </span>
+                </div>
               </AppButton>
             )}
           </section>
@@ -353,7 +357,9 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         {/* Responses — collapsed by default */}
         {ticket.customQuestions?.length ? (
           <section className="relative mx-5 sm:mx-7 mt-4 rounded-2xl overflow-hidden"
-            style={{ background: t.panel, border: `1px solid ${t.panelBorder}`, backdropFilter: 'blur(24px)' }}>
+            style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <AppButton
                 type="button"
@@ -391,6 +397,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 </motion.dl>
               )}
             </AnimatePresence>
+            </div>
           </section>
         ) : null}
 
@@ -448,12 +455,15 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 key={label}
                 whileTap={{ scale: 0.96 }}
                 onClick={action}
-                className="rounded-2xl py-3.5 flex items-center justify-center gap-2 cursor-pointer"
-                style={{ background: t.panel, border: `1px solid ${t.panelBorder}`, backdropFilter: 'blur(24px)' }}>
+                className="relative rounded-2xl overflow-hidden py-3.5 flex items-center justify-center gap-2 cursor-pointer"
+                style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+                <GlassReflection isDark={isDark} />
+                <span className="relative z-10 flex items-center justify-center gap-2">
                 <Icon className="w-[18px] h-[18px]" style={{ color: t.textSoft }} strokeWidth={1.8} />
                 <span className="text-[11.5px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: t.text }}>
                   {label}
+                </span>
                 </span>
               </AppButton>
             ))}
