@@ -6,7 +6,7 @@ import type { InviteUnlockState } from '@/types';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { AppInput } from '@/components/primitives/AppInput';
 import { Money } from '@/lib/money';
 import { audienceModule } from '@/lib/audience';
 
@@ -37,16 +37,12 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
   const accessCodes: string[] = event.accessCodes || [];
   const isPaid: boolean = !!event.inviteOnlyPaid;
   const isWaitlistOnly: boolean = !!event.inviteWaitlistOnly;
-  const waitlistAhead: number = event.waitlistAhead ?? 47;
+  const waitlistAhead: number | undefined = event.waitlistAhead;
 
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState(false);
   const [codeErrorMessage, setCodeErrorMessage] = useState('Invalid code. Check the invite you received.');
   const [checkingCode, setCheckingCode] = useState(false);
-  const [requestSent, setRequestSent] = useState(false);
-  const [showRequest, setShowRequest] = useState(accessMode === 'request');
-  const [requestMsg, setRequestMsg] = useState('');
-  const [waitlistJoined, setWaitlistJoined] = useState(false);
 
   const failCode = (message?: string) => {
     if (message) setCodeErrorMessage(message);
@@ -158,7 +154,9 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
               <p className="text-[12px] leading-relaxed mb-5"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
                 {isWaitlistOnly
-                  ? `Join the waitlist — ${waitlistAhead} ahead of you. We'll release seats as guests decline.`
+                  ? (waitlistAhead != null
+                      ? `Join the waitlist — ${waitlistAhead} ahead of you. We'll release seats as guests decline.`
+                      : "Join the waitlist — we'll release seats as guests decline.")
                   : accessMode === 'guestlist'
                     ? "Entry is by curated guest list only."
                     : accessMode === 'code'
@@ -192,30 +190,23 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px]"
                         style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)', fontWeight: 500 }}>
-                        {waitlistAhead} people ahead
-                      </p>
-                      <p className="text-[10.5px]"
-                        style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
-                        Avg release: 1–2 days before
+                        {waitlistAhead != null ? `${waitlistAhead} people ahead` : 'Waitlist open'}
                       </p>
                     </div>
                   </div>
-                  <AppButton whileTap={{ scale: 0.98 }}
-                    onClick={() => { setWaitlistJoined(true); onUnlockChange({ unlocked: true, method: 'waitlist' }); }}
-                    disabled={waitlistJoined}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl cursor-pointer"
+                  {/* No public waitlist-join endpoint exists (the waitlist is an
+                      authenticated, registration-based flow) — display-only, no
+                      fake "joined" state. */}
+                  <div className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl"
                     style={{
-                      background: waitlistJoined
-                        ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.1)')
-                        : (isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a'),
-                      color: waitlistJoined ? accent : (isDark ? '#0a0a0a' : '#fff'),
-                      border: waitlistJoined ? `1px solid rgba(${accentRgb},0.3)` : 'none',
+                      background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                      color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)',
                     }}>
-                    {waitlistJoined ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} /> : <Hourglass className="w-3.5 h-3.5" strokeWidth={2} />}
+                    <Hourglass className="w-3.5 h-3.5" strokeWidth={2} />
                     <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                      {waitlistJoined ? 'On the waitlist' : 'Join Waitlist'}
+                      Waitlist joins open once registration is available
                     </span>
-                  </AppButton>
+                  </div>
                 </motion.div>
               )}
 
@@ -341,69 +332,15 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                 </div>
               )}
 
-              {/* Request access */}
+              {/* Request access — there is no backend endpoint for requesting an invite,
+                  so this is honest guidance rather than a fake "sent" state. */}
               {!isWaitlistOnly && (
                 <div className="mt-5 pt-5"
                   style={{ borderTop: `1px dashed ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}` }}>
-                  {!showRequest && !requestSent && accessMode !== 'request' && (
-                    <AppButton onClick={() => setShowRequest(true)}
-                      className="text-[12px] tracking-[0.3px] cursor-pointer"
-                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
-                      No invite? <span style={{ color: accentText, fontWeight: 600 }}>Request access</span>
-                    </AppButton>
-                  )}
-                  <AnimatePresence>
-                    {(showRequest || (accessMode === 'request' && !requestSent)) && !requestSent && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                        className="text-left">
-                        <AppTextArea
-                          value={requestMsg}
-                          onChange={(e) => setRequestMsg(e.target.value)}
-                          placeholder="Tell the host why you'd like to attend..."
-                          rows={3}
-                          className="w-full rounded-2xl p-3 outline-none text-[13px] resize-none"
-                          style={{
-                            fontFamily: "'Inter', sans-serif",
-                            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-                            color: isDark ? '#fff' : '#1a1a1a',
-                          }} />
-                        <div className="flex items-center gap-2 mt-2">
-                          {accessMode !== 'request' && (
-                            <AppButton onClick={() => setShowRequest(false)}
-                              className="flex-1 py-2.5 rounded-xl cursor-pointer text-[12px]"
-                              style={{
-                                fontFamily: "'Inter', sans-serif",
-                                background: 'transparent',
-                                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
-                                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-                              }}>
-                              Cancel
-                            </AppButton>
-                          )}
-                          <AppButton whileTap={{ scale: 0.97 }}
-                            onClick={() => { setRequestSent(true); setShowRequest(false); }}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl cursor-pointer"
-                            style={{ background: accent, color: isDark ? '#000' : '#fff' }}>
-                            <Send className="w-3.5 h-3.5" strokeWidth={2.25} />
-                            <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                              Send Request
-                            </span>
-                          </AppButton>
-                        </div>
-                      </motion.div>
-                    )}
-                    {requestSent && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                        className="flex items-center gap-2 justify-center text-[12px]"
-                        style={{ fontFamily: "'Inter', sans-serif", color: accentText, fontWeight: 600 }}>
-                        <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                        Request sent · We'll notify you when reviewed
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <p className="text-[12px] leading-relaxed"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
+                    No invite? Requesting access in-app isn’t available yet — contact the organizer for an invitation.
+                  </p>
                 </div>
               )}
             </div>
@@ -429,7 +366,7 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
             </p>
             <p className="text-[12px] mb-3"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
-              Position #{waitlistAhead + 1} · We'll notify you the moment a seat opens
+              {waitlistAhead != null ? `Position #${waitlistAhead + 1} · We'll notify you the moment a seat opens` : "We'll notify you the moment a seat opens"}
             </p>
             <AppButton onClick={() => onUnlockChange({ unlocked: false, method: null })}
               className="text-[10px] tracking-[1.2px] uppercase cursor-pointer"

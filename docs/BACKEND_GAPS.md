@@ -258,6 +258,19 @@ are dropped, and the map falls back to a city-level default. Fix: add
 `participants`/`artists` and venue `media`/`latitude`/`longitude` to the public
 serializers (or a public participants endpoint).
 
+### #37. No public waitlist-join or access-request endpoint (INFORMATIONAL — verified 2026-09-10)
+
+The waitlist is an **authenticated, registration-based** flow
+(`POST /registrations/:id/enqueue_waitlist` + `.../accept_waitlist_offer`,
+`Ticketing::WaitlistOffersController` — not public). There is **no endpoint to
+request an invite** ("Request access"). The frontend `InviteOnlySection`'s
+"Join Waitlist"/"Request access" were local-only fakes; now they're display-only
+(no fake "joined"/"sent" state) and the fabricated `waitlistAhead` default is
+gone. Note `InviteOnlySection` only renders when `event_type === "inviteOnly"`,
+which the backend never emits (live events are `ticketed`/`rsvp`) — so this path
+is currently dead for live data. Fix (if wanted): a public guest waitlist-join
+endpoint and/or an invite-request endpoint.
+
 ---
 
 ## Deferred by design
