@@ -22,6 +22,7 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { useGuestDeviceTickets } from '@/features/tickets/hooks/useGuestDeviceTickets';
+import { ClaimGuestSheet } from '@/features/tickets/components/ClaimGuestSheet';
 
 interface TicketViewProps {
   tickets: UserTicket[];
@@ -48,6 +49,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   const [sharingTicket, setSharingTicket] = useState<UserTicket | null>(null);
   const [editingAnswersTicket, setEditingAnswersTicket] = useState<UserTicket | null>(null);
   const [answerSaveError, setAnswerSaveError] = useState('');
+  const [claimingTicket, setClaimingTicket] = useState<UserTicket | null>(null);
   const [addingExtrasTicket, setAddingExtrasTicket] = useState<UserTicket | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
@@ -307,6 +309,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
                 onResell={selectedTicket.status === 'active' && onListForResale ? () => { onListForResale(selectedTicket); setSelectedTicket(null); } : undefined}
                 onEditAnswers={selectedTicket.customQuestions?.length && selectedTicket.answersEditableUntil && Date.parse(selectedTicket.answersEditableUntil) > Date.now() ? () => { setAnswerSaveError(''); setEditingAnswersTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onAddExtras={selectedTicket.eventSlug ? () => { setAddingExtrasTicket(selectedTicket); setSelectedTicket(null); } : undefined}
+                onClaim={!isAuthenticated && selectedTicket.registrationId && selectedTicket.ticketViewToken ? () => { setClaimingTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onDownload={handleDownload}
                 downloading={downloading}
                 downloadDone={downloadDone} />
@@ -354,6 +357,21 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
             saveError={answerSaveError}
             onClose={() => { if (!updateAnswersMutation.isPending) setEditingAnswersTicket(null); }}
             onSave={(answers) => updateAnswersMutation.mutate({ ticketId: editingAnswersTicket.id, answers })}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Guest ticket → account claim (#31) */}
+      <AnimatePresence>
+        {claimingTicket && (
+          <ClaimGuestSheet
+            ticket={claimingTicket}
+            onClose={() => setClaimingTicket(null)}
+            onClaimed={() => {
+              setClaimingTicket(null);
+              // The account wallet now owns this ticket — refetch it.
+              queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+            }}
           />
         )}
       </AnimatePresence>

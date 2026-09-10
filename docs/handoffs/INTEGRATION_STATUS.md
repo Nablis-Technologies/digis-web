@@ -88,10 +88,13 @@ Re-read every gap in `docs/BACKEND_GAPS.md` and checked it against `HEAD` of
   `registration_id`/`ticket_view_token`/`ticket_view_url`/`short_url` on guest
   payment-refresh tickets — the JSON-signed-view fix this gap requested.
   Frontend: mapped through `TicketWalletWire`→`UserTicket` + copyable "Ticket
-  link" row on guest tickets (wired in the guest-payment-fields commit). The
-  "claim your account" OTP flow (`public/ticket_views/:token/request_otp`) now
-  has a token to feed but is not yet surfaced in the UI — tracked follow-up,
-  not a backend gap.
+  link" row on guest tickets. **Claim-to-account flow now BUILT**: on a guest
+  device ticket, "Save to my account" → phone → OTP
+  (`public/ticket_views/:token/request_otp`) → password →
+  `registrations/:id/claim_guest` → signs in, ticket lands in My Tickets
+  (`ClaimGuestSheet`, `registrationModule.claimOtpRequest`/`claimGuest`, 2 new
+  tests → **104/104**). Live OTP drill still needs a paid/sandbox guest
+  checkout + an OTP code.
 - **Still open (no backend change in the pulled range):** #17 (`cbe` — backend
   `PAYMENT_METHODS = [telebirr, card, bank]`), #26 (payout tokenization),
   #8/#9 (user `name` / `PATCH /auth/me`), #30 (parking seed zones), #33 (guest

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Share2, Download, ChevronRight, Sparkles, Send, Tag, Check, X, ArrowUpRight, FilePenLine, Plus, Car, Coffee, Gift, Heart, Package, Smartphone, ShoppingBag, Armchair } from 'lucide-react';
+import { Calendar, MapPin, Clock, Share2, Download, ChevronRight, Sparkles, Send, Tag, Check, X, ArrowUpRight, FilePenLine, Plus, Car, Coffee, Gift, Heart, Package, Smartphone, ShoppingBag, Armchair, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useImageColor } from '@/lib/hooks/useImageColor';
@@ -92,9 +92,11 @@ function formatAnswer(value: unknown) {
 /* ═══════════════════════════════════════════════════════
    DETAILED TICKET (modal view)
    ═══════════════════════════════════════════════════════ */
-export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell, onEditAnswers, onAddExtras, onDownload, downloading = false, downloadDone = false, receivedFrom, receivedNote, footer }: {
+export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell, onEditAnswers, onAddExtras, onDownload, downloading = false, downloadDone = false, receivedFrom, receivedNote, footer, onClaim }: {
   ticket: UserTicket; onClose: () => void; onTransfer?: () => void; onShare?: () => void; onResell?: () => void; onEditAnswers?: () => void; onAddExtras?: () => void;
   onDownload?: () => void; downloading?: boolean; downloadDone?: boolean;
+  /** Guest tickets only — "Save to my account" (#31 claim flow). */
+  onClaim?: () => void;
   /** When this ticket arrived via a transfer, the sender's name (shown instead of "Purchased"). */
   receivedFrom?: string;
   /** Optional personal note that came with the transfer. */
@@ -497,6 +499,23 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               <span className="relative z-10 flex items-center gap-1 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: linkCopied ? t.accent : t.textSoft, fontWeight: 600 }}>
                 {linkCopied && <Check className="w-3 h-3" strokeWidth={2.5} />}
                 {linkCopied ? 'Copied' : 'Copy'}
+              </span>
+            </AppButton>
+          </div>
+        )}
+
+        {/* Save-to-account — guest tickets only (#31 claim). */}
+        {onClaim && (
+          <div className="relative px-5 sm:px-7 pt-3">
+            <AppButton
+              whileTap={{ scale: 0.97 }}
+              onClick={onClaim}
+              className="relative w-full rounded-2xl overflow-hidden py-3.5 flex items-center justify-center gap-2 cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, #d9ff00, #d6f905)', color: '#0a0a0a' }}>
+              <GlassReflection isDark={isDark} />
+              <UserCheck className="relative z-10 w-[16px] h-[16px]" strokeWidth={2} />
+              <span className="relative z-10 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>
+                Save to my account
               </span>
             </AppButton>
           </div>

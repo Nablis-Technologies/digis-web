@@ -310,6 +310,62 @@ export const registrationModule = {
   },
 
   /**
+   * Guest ticket → account claim (#31 resolved 2026-09-10). Starts OTP proof
+   * against the guest's phone for a SIGNED ticket-view token
+   * (`UserTicket.ticketViewToken`, served by GuestPaymentTicketSerializer).
+   * POST /public/ticket_views/:token/request_otp — body `{ phone }`
+   * (Idempotency-Key injected). Only valid while the ticket's owner is still a
+   * shadow guest (unverified, no password). Returns the challenge to feed
+   * `verifyPhoneOtp`.
+   */
+  async claimOtpRequest(
+    viewToken: string,
+    phone: string,
+  ): Promise<{ challengeId: string; status: string; expiresAt: string }> {
+    const { data } = await apiFetch<{
+      challenge_id: string;
+      status: string;
+      expires_at: string;
+    }>(`public/ticket_views/${viewToken}/request_otp`, {
+      method: "POST",
+      body: { phone },
+    });
+    return { challengeId: data.challenge_id, status: data.status, expiresAt: data.expires_at };
+  },
+
+  /**
+   * POST /registrations/:id/claim_guest — upgrades a shadow guest to a real
+   * account after OTP proof. Body `{ phone, verification_token, password,
+   * password_confirmation }` (password ≥ 8 chars). Sets the password + marks
+   * the identity verified, then returns fresh auth tokens — the caller signs
+   * the user in and the ticket lands in the account wallet (`GET /tickets`).
+   * `claim_already_completed` when the owner is no longer a guest.
+   */
+  async claimGuest(
+    registrationId: string,
+    input: {
+      phone: string;
+      verificationToken: string;
+      password: string;
+      passwordConfirmation: string;
+    },
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const { data } = await apiFetch<{ access_token: string; refresh_token: string }>(
+      `registrations/${registrationId}/claim_guest`,
+      {
+        method: "POST",
+        body: {
+          phone: input.phone,
+          verification_token: input.verificationToken,
+          password: input.password,
+          password_confirmation: input.passwordConfirmation,
+        },
+      },
+    );
+    return { accessToken: data.access_token, refreshToken: data.refresh_token };
+  },
+
+  /**
    * POST /public/events/:event_slug/rsvp — body `{ rsvp: { ticket_type_id,
    * phone?, verification_token?, package_quantity, answers?, consents? } }`.
    * Guests must carry the phone + `verification_token` from the OTP flow;

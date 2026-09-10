@@ -136,3 +136,42 @@ describe('registrationModule public RSVP (#27 resolved)', () => {
     expect(call?.[1]?.body).toEqual({ rsvp: { ticket_type_id: 'tt-1', package_quantity: 1 } });
   });
 });
+
+describe('registrationModule guest ticket claim (#31 resolved)', () => {
+  it('claimOtpRequest posts the phone against the signed view token', async () => {
+    mockedApiFetch.mockResolvedValue({
+      data: { challenge_id: 'ch-1', status: 'pending', expires_at: '2026-09-10T12:00:00Z' },
+    } as never);
+    const result = await registrationModule.claimOtpRequest('vt-9', '+251900000000');
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      'public/ticket_views/vt-9/request_otp',
+      expect.objectContaining({ method: 'POST', body: { phone: '+251900000000' } }),
+    );
+    expect(result).toEqual({ challengeId: 'ch-1', status: 'pending', expiresAt: '2026-09-10T12:00:00Z' });
+  });
+
+  it('claimGuest posts the OTP proof + password and returns auth tokens', async () => {
+    mockedApiFetch.mockResolvedValue({
+      data: { access_token: 'at-1', refresh_token: 'rt-1' },
+    } as never);
+    const result = await registrationModule.claimGuest('reg-9', {
+      phone: '+251900000000',
+      verificationToken: 'vt-9',
+      password: 'password123',
+      passwordConfirmation: 'password123',
+    });
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      'registrations/reg-9/claim_guest',
+      expect.objectContaining({
+        method: 'POST',
+        body: {
+          phone: '+251900000000',
+          verification_token: 'vt-9',
+          password: 'password123',
+          password_confirmation: 'password123',
+        },
+      }),
+    );
+    expect(result).toEqual({ accessToken: 'at-1', refreshToken: 'rt-1' });
+  });
+});

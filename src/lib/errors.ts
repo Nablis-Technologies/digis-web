@@ -73,6 +73,10 @@ const CODE_MESSAGES: Record<string, string> = {
   // Public RSVP (Ticketing) — verified against the backend locale.
   rsvp_product_not_found: 'This RSVP is no longer available.',
   rsvp_paid_product_requires_checkout: 'This event is booked through paid checkout, not RSVP.',
+  // Guest ticket → account claim (guest_claim purpose).
+  claim_already_completed: 'This ticket is already linked to an account.',
+  verification_invalid: 'That verification code is no longer valid — please try again.',
+  password_invalid: 'Password must be at least 8 characters.',
   // Audience gating (invite-only / access-code events).
   no_valid_code_or_invitation: 'This access code or invitation is not valid for this event.',
   // Seller payout destinations (Marketplace) — verified against the backend.
