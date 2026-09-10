@@ -9,26 +9,23 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function resolveLineup(lineup: any): any[] {
-  const defaults = [
-    { name: 'Rophnan', handle: '@rophnan', role: 'Headliner', time: '11:00 PM', genre: 'Electronic', verified: true, followers: 184000, eventsPlayed: 72, rating: 4.9, bio: 'Pioneer of Ethio-electronic. Blending Habesha roots with global club sound.', image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 60%, #ec4899 100%)' },
-    { name: 'Mikaya Behailu', handle: '@mikayabehailu', role: 'Support', time: '9:30 PM', genre: 'Soul', verified: true, followers: 62000, eventsPlayed: 38, rating: 4.7, bio: 'Soulful vocals meet contemporary Ethiopian songwriting.', image: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)' },
-    { name: 'DJ Henok', handle: '@djhenok', role: 'Opening Set', time: '8:00 PM', genre: 'House', verified: false, followers: 24000, eventsPlayed: 110, rating: 4.6, bio: 'Resident DJ behind Addis\'s loudest dancefloors.', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #06b6d4 0%, #d6f905 100%)' },
-    { name: 'Liyou', handle: '@liyou', role: 'Special Guest', time: '12:30 AM', genre: 'Afro Pop', verified: true, followers: 91000, eventsPlayed: 45, rating: 4.8, bio: 'Afro-pop rising star with chart-topping releases.', image: 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)' },
-  ];
-  const source = Array.isArray(lineup) && lineup.length > 0 ? lineup : defaults;
-  return source.map((a: any, i: number) => ({
+  // Backend-sourced only — never fabricate a lineup or fill missing artist
+  // fields with invented values (no public endpoint exposes event participants
+  // yet; BACKEND_GAPS #36). Absent lineup → empty → the section hides.
+  const source = Array.isArray(lineup) ? lineup : [];
+  return source.map((a: any) => ({
     name: a.name,
-    handle: a.handle ?? defaults[i % defaults.length].handle,
-    role: a.role ?? 'Performer',
-    time: a.time ?? '—',
-    genre: a.genre ?? '',
-    verified: a.verified ?? false,
-    followers: a.followers ?? 12000,
-    eventsPlayed: a.eventsPlayed ?? 20,
-    rating: a.rating ?? 4.5,
-    bio: a.bio ?? 'Artist bio coming soon.',
+    handle: a.handle,
+    role: a.role,
+    time: a.time,
+    genre: a.genre,
+    verified: a.verified === true,
+    followers: a.followers,
+    eventsPlayed: a.eventsPlayed,
+    rating: a.rating,
+    bio: a.bio,
     image: a.image,
-    gradient: a.gradient ?? defaults[i % defaults.length].gradient,
+    gradient: a.gradient,
   }));
 }
 
@@ -39,6 +36,8 @@ export function resolveLineup(lineup: any): any[] {
  */
 export function LineupSection({ lineup, isDark, compact = false }: { lineup: any; isDark: boolean; compact?: boolean }) {
   const artists = resolveLineup(lineup);
+  // No backend lineup → render nothing (never a fabricated one).
+  if (artists.length === 0) return null;
   const accent = isDark ? '#d6f905' : '#d6f905';
   const accentRgb = isDark ? '214,249,5' : '214,249,5';
   const initialsOf = (name: string) => name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
@@ -150,7 +149,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
                     <Clock className="w-2.5 h-2.5" style={{ color: 'rgba(255,255,255,0.85)' }} strokeWidth={2} />
                     <span className="text-[10px] tracking-[0.6px]"
                       style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
-                      {a.time}
+                      {a.time ?? a.role ?? 'Performer'}
                     </span>
                   </div>
                 </div>
@@ -266,10 +265,12 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                 )}
               </div>
               <div className="flex items-center gap-2 mt-1.5 min-w-0">
-                <span className="text-[12px] truncate"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.48)' }}>
-                  {artist.handle}
-                </span>
+                {artist.handle && (
+                  <span className="text-[12px] truncate"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.48)' }}>
+                    {artist.handle}
+                  </span>
+                )}
                 {artist.genre && (
                   <>
                     <span className="w-0.5 h-0.5 rounded-full flex-shrink-0" style={{ background: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.25)' }} />
@@ -280,20 +281,24 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-2">
-                <Clock className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
-                <span className="text-[10.5px] tracking-[0.25px] truncate"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.67)' : 'rgba(0,0,0,0.62)', fontWeight: 500 }}>
-                  {artist.role} · {artist.time}
-                </span>
-              </div>
+              {[artist.role, artist.time].filter(Boolean).length > 0 && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Clock className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
+                  <span className="text-[10.5px] tracking-[0.25px] truncate"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.67)' : 'rgba(0,0,0,0.62)', fontWeight: 500 }}>
+                    {[artist.role, artist.time].filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          <p className="text-[13px] leading-relaxed font-light mb-4"
-            style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
-            {artist.bio}
-          </p>
+          {artist.bio && (
+            <p className="text-[13px] leading-relaxed font-light mb-4"
+              style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
+              {artist.bio}
+            </p>
+          )}
 
           {/* Stats */}
           <div className="relative flex items-stretch overflow-hidden py-3.5 mb-5 rounded-2xl"
@@ -302,9 +307,9 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
             }}>
             <GlassReflection isDark={isDark} />
             {[
-              { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(artist.followers) },
-              { icon: <Music2 className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Shows', value: `${artist.eventsPlayed}` },
-            ].map((s, i) => (
+              artist.followers != null && { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(artist.followers) },
+              artist.eventsPlayed != null && { icon: <Music2 className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Shows', value: `${artist.eventsPlayed}` },
+            ].filter(Boolean).map((s: any, i: number) => (
               <div key={s.label} className="relative z-10 flex-1 flex items-stretch">
                 {i > 0 && (
                   <div className="w-px self-stretch my-1"

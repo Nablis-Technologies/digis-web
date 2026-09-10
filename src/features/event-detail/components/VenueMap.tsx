@@ -458,70 +458,8 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
               </div>
             </div>
 
-            {/* Photos */}
-            {(() => {
-              const photos = [
-                'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80',
-                'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=600&q=80',
-                'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
-                'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=600&q=80',
-                'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=600&q=80',
-              ];
-              return (
-                <div className="mb-5 -mx-6">
-                  <div className="flex items-center justify-between px-6 mb-2.5">
-                    <span className="text-[10px] tracking-[1.8px] uppercase"
-                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-                      Photos
-                    </span>
-                    <span className="text-[10px] tracking-[0.3px]"
-                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
-                      {photos.length}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto px-6 pb-1 scrollbar-hide"
-                    style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
-                    {photos.map((src, i) => {
-                      const isFeatured = i === 0;
-                      return (
-                        <AppButton
-                          key={src}
-                          whileTap={{ scale: 0.98 }}
-                          className="relative flex-shrink-0 overflow-hidden rounded-2xl cursor-pointer group"
-                          style={{
-                            width: isFeatured ? 200 : 120,
-                            height: 150,
-                            scrollSnapAlign: 'start',
-                          }}>
-                          <GlassReflection isDark={isDark} />
-                          <ImageWithFallback
-                            src={src}
-                            alt={`${venueName} photo ${i + 1}`}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                          />
-                          <div className="absolute inset-0"
-                            style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.45) 100%)' }} />
-                          {isFeatured && (
-                            <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full"
-                              style={{
-                                background: 'rgba(0,0,0,0.5)',
-                                backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(255,255,255,0.18)',
-                              }}>
-                              <Sparkles className="w-2.5 h-2.5" style={{ color: accent }} strokeWidth={2.25} />
-                              <span className="text-[9px] tracking-[1.4px] uppercase leading-none"
-                                style={{ fontFamily: "'Inter', sans-serif", color: '#fff', fontWeight: 600 }}>
-                                Featured
-                              </span>
-                            </div>
-                          )}
-                        </AppButton>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Photos — the public venue payload carries no images (venue_summary is
+                id/name/city only), so this renders nothing rather than mock photos. */}
 
             {/* Shared segmented control */}
             <div className="mb-2">

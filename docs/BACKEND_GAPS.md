@@ -243,6 +243,21 @@ simply unbuyable via checkout. Frontend: friendly copy mapped
 free-RSVP fixture now sets `max_packages_per_user: 10` (preview.rb) so guest
 checkout on it can be drilled.
 
+### #36. Public event payload lacks lineup/participants + venue media/coords (INFORMATIONAL — verified 2026-09-10)
+
+`Events::Public::EventDetailSerializer` / `EventListSerializer` expose only
+categories, event_dates, event_media, event_organizations, event_setting,
+organization — **no event participants/artists** (the `events_artists` /
+`event_participants` data exists server-side but has no public route), and the
+nested `venue_summary` is `{id,name,city}` only (**no photos or lat/lng**).
+Consequence: the frontend cannot source a lineup, venue photos, or a real map
+pin. Previously it fabricated them (a hardcoded fake lineup with unsplash
+avatars, a 5-photo unsplash venue strip, a name→coord lookup with an Addis
+default). Now it renders **absent** — the Lineup section hides, venue photos
+are dropped, and the map falls back to a city-level default. Fix: add
+`participants`/`artists` and venue `media`/`latitude`/`longitude` to the public
+serializers (or a public participants endpoint).
+
 ---
 
 ## Deferred by design

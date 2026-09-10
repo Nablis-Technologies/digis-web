@@ -85,8 +85,16 @@ export function UIPreviewPage() {
   </main>;
 }
 
+// Preview-only sample lineup — mock data lives here (a design preview page),
+// never in the shared resolver.
+const PREVIEW_LINEUP = [
+  { name: 'Rophnan', handle: '@rophnan', role: 'Headliner', time: '11:00 PM', genre: 'Electronic', verified: true, followers: 184000, eventsPlayed: 72, rating: 4.9, bio: 'Pioneer of Ethio-electronic.', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 60%, #ec4899 100%)' },
+  { name: 'Mikaya Behailu', handle: '@mikayabehailu', role: 'Support', time: '9:30 PM', genre: 'Soul', verified: true, followers: 62000, eventsPlayed: 38, rating: 4.7, bio: 'Soulful vocals.', gradient: 'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)' },
+  { name: 'DJ Henok', handle: '@djhenok', role: 'Opening Set', time: '8:00 PM', genre: 'House', verified: false, followers: 24000, eventsPlayed: 110, rating: 4.6, bio: 'Resident DJ.', gradient: 'linear-gradient(135deg, #06b6d4 0%, #d6f905 100%)' },
+];
+
 function LineupDesignOptions({ isDark, reflection }: { isDark: boolean; reflection: GlassSurfaceSettings }) {
-  const artists = resolveLineup(null).slice(0, 3);
+  const artists = resolveLineup(PREVIEW_LINEUP).slice(0, 3);
   const ink = isDark ? "#fff" : "#111";
   const muted = isDark ? "rgba(255,255,255,.52)" : "rgba(0,0,0,.5)";
   const surface = isDark ? "rgba(255,255,255,.045)" : "rgba(255,255,255,.68)";
