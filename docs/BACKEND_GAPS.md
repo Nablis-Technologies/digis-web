@@ -11,10 +11,11 @@
 >
 > Re-verified 2026-09-10 against the pulled branch (fast-forward `d67e132` then
 > merge of 11 commits to `78e4a6f` — RSVP public endpoints, registration repeat,
-> guest ticket view material) by code read + live HTTP. Sweep result: **#31 newly
-> RESOLVED** (guest payment-refresh serves signed view token/url). Still open:
-> #17, #26, #8, #9, #30, #33, #34 (no backend change in the pulled range);
-> informational: #11, #16, #8-deferred. Items whose fix is confirmed are in
+> guest ticket view material) by code read + live HTTP. Sweep result: **#31 and
+> #30 newly RESOLVED** (#31 guest view token/url served + claim flow built; #30
+> seed-side parking accesses applied by the dev seed re-run). Still open: #17,
+> #26, #8, #9, #33, #34 (no backend change in the pulled range); informational:
+> #11, #16, #8-deferred. Items whose fix is confirmed are in
 > the Resolved archive at the bottom.
 
 ---
@@ -95,16 +96,20 @@ products). Frontend wired: `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/
 attendees submit directly). Live probe: FREEFORM's paid product →
 `rsvp_paid_product_requires_checkout` (mapped). See Resolved archive.
 
-### #30. Parking fulfillment blocked by missing seed zones (DEGRADING — clean error, not a crash)
+### #30. Parking fulfillment blocked by missing seed zones — RESOLVED 2026-09-10
 
-The `Parking::FulfillOrderItem` keyword-arg crash (`ArgumentError`) is RESOLVED
-on `feat/launch-hardening-telemetry` (all `error()` call sites pass `status:`
-correctly). However every parking product in the dev seed still has zero parking
-access zones, so any order containing a parking extra returns a clean
-`Core::BusinessError` ("The parking product has no parking access") instead of
-fulfilling. **Why it degrades the frontend:** the Chapa return screen stays
-`pending` until the ticket is issued. Ticket-only orders unaffected. **Fix:**
-seed parking access zones (our `db/seeds_events.rb` or backend seed).
+The `Parking::FulfillOrderItem` keyword-arg crash (`ArgumentError`) was already
+fixed (all `error()` call sites pass `status:`). The remaining half — parking
+products with **zero parking accesses** — is now resolved on the seed side:
+`db/seeds_events.rb` gives every fabricated parking add-on a `product_access`
+of type `parking` (linked to the event date) + a `PARKING` access zone. The
+2026-09-10 dev seed re-run applied it: **26/26 parking products now carry a
+parking access + PARKING zone** (verified via SQL). `Parking::FulfillOrderItem`
+only gates on `parking_accesses` being non-empty, and the fulfill path is
+covered by backend tests (`test/services/parking/issue_package_test.rb`,
+`test/integration/parking/parking_admission_test.rb`). A live end-to-end
+fulfill drill still needs a Chapa-paid order (the outbox runs after payment
+accept) — same paid-sandbox limitation as #29/#31. See Resolved archive.
 
 ### #31. No JSON endpoint returns a signed guest ticket `view_token` — RESOLVED 2026-09-10
 
@@ -280,6 +285,7 @@ history). Every item below was re-verified against the pulled
 | 23 | Repeat submissions after confirmation — `confirmed` dropped from `idx_ticketing_registrations_active_identity` + `Registration.blocking_duplicate` (`ad7bd57`); dev DB index recreated by SQL to match | live HTTP 2026-09-10: **repeat purchase proven** (2nd RSVP same identity+ticket_type → new confirmed registration + new ticket) |
 | 27 | Public RSVP — `POST public/events/:event_slug/rsvp/request_otp` (guest OTP, free products) + `POST public/events/:event_slug/rsvp` (submit → confirmed/issuing/awaiting_approval, free tickets issued synchronously); frontend `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` guest-OTP / signed-in submit wired | live HTTP 2026-09-10: **happy path confirmed** (Chapa Test Free RSVP, `+251911000001`, `full_name` answer + form_version_id → registration `confirmed`, ticket issued with active QR); paid-guard 422 on FREEFORM |
 | 31 | Guest payment-refresh returns signed guest ticket material — `GuestPaymentTicketSerializer` (`registration_id`, `ticket_view_token`, `ticket_view_url`, `short_url`) wired into `guest_payment_refresh_controller.rb` (`43174dd`); frontend maps fields → `UserTicket` + copyable "Ticket link" on guest tickets | code 2026-09-10 (`43174dd`); live paid drill still needs a Chapa sandbox-paid attempt (same limitation as #29) |
+| 30 | Parking fulfillment data — every fabricated parking product now gets a `parking` `product_access` + `PARKING` access zone (`db/seeds_events.rb`); 26/26 dev parking products carry them after the 2026-09-10 seed re-run; fulfill path covered by backend tests | SQL 2026-09-10 (26/26 parking products with parking access + zone); live fulfill drill needs a Chapa-paid order |
 
 ---
 

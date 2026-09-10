@@ -93,8 +93,6 @@ sweep is the rule that prevents that.
   is currently disabled in the UI)
 - **#26** Payout create fail-closed: registry fixed, but Chapa tokenization
   unimplemented → creates still 422 (honest)
-- **#30** Parking fulfillment blocked by missing seed zones (crash fixed, but
-  zero parking access zones in seed → parking orders still can't fulfill)
 - **#33** Guest payment-refresh re-validates the quote token even for accepted
   payments (a guest can be told "payment failed" after paying; frontend now
   correlates creds per payment + stops on terminal errors — see BACKEND_GAPS.md)
@@ -117,11 +115,12 @@ policy), #27 (public RSVP — OTP + submit, live-proven), #28 (dev DB re-synced 
 the edited `create_payments` migration), #18
 (payment refresh wired on the Chapa return screen), #20 (audience gating wired —
 gated-tier events gate the ticket selector behind server-validated access codes),
-#30-crash (parking `FulfillOrderItem` keyword-arg crash fixed; seed zones still
-missing — see open #30), #29 (wallet `add_ons` now projected from the ticket's
+#30-crash (parking `FulfillOrderItem` keyword-arg crash fixed — now fully
+resolved with seed-side parking accesses), #29 (wallet `add_ons` now projected from the ticket's
 order — `DetailedTicket` "Your extras" renders on live wallet tickets), #31
 (guest payment-refresh serves signed `ticket_view_token`/`url` — mapped +
-copyable "Ticket link" on guest tickets), #32
+copyable "Ticket link" on guest tickets), #30 (parking products seeded with
+`parking` product_access + PARKING zone — 26/26 in dev), #32
 (`price_from_minor` filtered to ticket products — discovery grid/filter/sort show
 the true ticket "from" price).
 

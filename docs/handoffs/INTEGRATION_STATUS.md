@@ -97,11 +97,17 @@ Re-read every gap in `docs/BACKEND_GAPS.md` and checked it against `HEAD` of
   checkout + an OTP code.
 - **Still open (no backend change in the pulled range):** #17 (`cbe` — backend
   `PAYMENT_METHODS = [telebirr, card, bank]`), #26 (payout tokenization),
-  #8/#9 (user `name` / `PATCH /auth/me`), #30 (parking seed zones), #33 (guest
+  #8/#9 (user `name` / `PATCH /auth/me`), #33 (guest
   refresh still re-decodes `GuestQuoteToken`), #34 (no sales-window enforcement).
+- **#30 → RESOLVED (seed side).** `Parking::FulfillOrderItem` only gates on
+  `parking_accesses` non-empty; `db/seeds_events.rb` already fabricates a
+  `parking` product_access + `PARKING` zone per parking add-on, and the
+  2026-09-10 dev seed re-run applied it — **26/26 dev parking products now carry
+  a parking access + PARKING zone** (SQL-verified). Fulfill path covered by
+  backend tests; a live fulfill drill still needs a Chapa-paid order.
 - **Informational, no frontend impact:** #11 (slug history), #16 (Chapa v1),
   #8-deferred (Google/password-reset auth).
-- **Already resolved + wired earlier this session:** #23, #27 (+ live proofs).
+- **Already resolved + wired earlier this session:** #23, #27, #31 (+ live proofs).
 
 Docs: BACKEND_GAPS.md (sweep stamp, #31 → resolved + archive row), AGENTS.md
 open/resolved lists, this snapshot.
