@@ -10,10 +10,12 @@
  * - There is no default flag and no removal endpoint; both were cut from
  *   the UI rather than faked.
  * - UI kinds map to backend type/provider on submit: Telebirr rides the
- *   mobile-money/telebirr pair; CBE/BoA ride the bank rail (the bank itself
- *   travels inside the encrypted account details).
- * - Until the backend registers a marketplace provider adapter, create
- *   answers 422 `payout_account_provider_unavailable` — surfaced honestly
+ *   mobile_money rail, CBE/BoA ride the bank rail (the bank itself travels
+ *   inside the encrypted account details); `provider` is ALWAYS "chapa" (the
+ *   only adapter the registry registers — anything else 422s as
+ *   `payout_account_provider_unavailable`).
+ * - Until Chapa tokenization lands (#26), create answers 422
+ *   (`payout_provider_operation_not_implemented`) — surfaced honestly
  *   (proceeds wait in the seller balance; listing still works).
  */
 
@@ -27,8 +29,12 @@ import type {
 } from '@/types/payout';
 
 function kindToBackend(kind: PayoutMethodKind): { type: string; provider: string } {
-  if (kind === 'telebirr') return { type: 'mobile_money', provider: 'telebirr' };
-  return { type: 'bank', provider: 'bank' };
+  // The registry (`PayoutProviders::Registry`) only ever registers "chapa",
+  // and `SellerPayoutAccountsController#create` raises KeyError (→ 422
+  // payout_account_provider_unavailable) for any other value. The provider is
+  // the tokenizer adapter; the rail (mobile_money vs bank) travels in `type`.
+  if (kind === 'telebirr') return { type: 'mobile_money', provider: 'chapa' };
+  return { type: 'bank', provider: 'chapa' };
 }
 
 /** Known status → display label. Unknown statuses have no label (absent, not invented). */
@@ -49,7 +55,11 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 function displayNameFor(provider: string, type: string): string {
-  return PROVIDER_LABELS[provider] ?? (type === 'bank' ? 'Bank account' : provider);
+  // Provider is the tokenizer adapter (always "chapa"); the rail is the
+  // user-facing label. mobile_money = Telebirr in this market.
+  if (type === 'mobile_money') return 'Telebirr';
+  if (type === 'bank') return 'Bank account';
+  return PROVIDER_LABELS[provider] ?? provider;
 }
 
 /** Map a backend status; unknown values are dropped, never defaulted. */

@@ -5,6 +5,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket, Wallet } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
 import { payoutService, payoutKeys } from '@/lib/payout';
+import { Money } from '@/lib/money';
 import { PayoutMethodsSheet } from './PayoutMethodsSheet';
 import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -30,8 +31,9 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
     return Date.now() >= new Date(starts).getTime() - policy.cutoffSecondsBeforeStart * 1000;
   })();
   // Fixed cap is the only cap expressible without a face value on the wallet wire.
+  // Compare in major units (the price input is major); never divide minor in a component.
   const fixedCapMajor = policy?.capType === 'fixed' && policy.fixedCapMinor != null
-    ? policy.fixedCapMinor / 100
+    ? Money.fromMinor(policy.fixedCapMinor, 'ETB').toMajor()
     : null;
   const overCap = fixedCapMajor != null && price > fixedCapMajor;
   const blockedReason = policyBlocked
@@ -99,11 +101,11 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                     </p>
                     <p className="text-[32px] font-light"
                       style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                      ETB {price.toLocaleString()}
+                      {Money.fromMajor(price, 'ETB').format()}
                     </p>
                     {overCap && fixedCapMajor != null && (
                       <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
-                        Max {fixedCapMajor.toLocaleString()} (resale cap)
+                        Max {Money.fromMinor(policy!.fixedCapMinor!, 'ETB').format()} (resale cap)
                       </p>
                     )}
                   </div>

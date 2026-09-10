@@ -82,7 +82,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const createListingMutation = useMutation({
     mutationKey: ['resale', 'createListing'],
     mutationFn: ({ ticket, price }: { ticket: UserTicket; price: number }) =>
-      resaleModule.createListing(ticket, Math.round(price * 100)),
+      resaleModule.createListing(ticket, Money.fromMajor(price, 'ETB').amountMinor),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
       queryClient.invalidateQueries({ queryKey: resaleModule.keys.all });

@@ -8,7 +8,7 @@ import { disabledSurface, disabledInk } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
-import { registrationModule, type SchemaQuestion } from '@/lib/registration';
+import { registrationModule, type SchemaQuestion, type ConsentDocument } from '@/lib/registration';
 import { mapApiError } from '@/lib/errors';
 
 interface RsvpSectionProps {
@@ -71,17 +71,26 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
   const accent = isDark ? '#d6f905' : '#d6f905';
   const accentRgb = isDark ? '214,249,5' : '214,249,5';
 
-  const capacity: number = event.rsvpCapacity ?? 500;
-  const baseGoing: number = event.rsvpGoing ?? 287;
+  // Backend values render as-is — absent data is never fabricated (a missing
+  // rsvp_capacity/rsvp_going is not 500/287).
+  const capacity: number | undefined = event.rsvpCapacity;
+  const baseGoing: number | undefined = event.rsvpGoing;
+  const hasCapacity = typeof capacity === 'number';
   const allowsPlusOne: boolean = event.allowsPlusOne ?? true;
   const maxGuests: number = event.maxGuests ?? 3;
 
   const myCount = status === 'going' ? 1 + guests : 0;
-  const totalGoing = baseGoing + myCount;
-  const filledPct = Math.min(100, (totalGoing / capacity) * 100);
-  const spotsLeft = Math.max(0, capacity - totalGoing);
+  const totalGoing = baseGoing != null
+    ? baseGoing + myCount
+    : (myCount > 0 ? myCount : undefined);
+  const filledPct = hasCapacity && totalGoing != null
+    ? Math.min(100, (totalGoing / capacity) * 100)
+    : undefined;
+  const spotsLeft = hasCapacity && totalGoing != null
+    ? Math.max(0, capacity - totalGoing)
+    : undefined;
   const isFull = spotsLeft === 0;
-  const isAlmostFull = spotsLeft > 0 && spotsLeft <= capacity * 0.1;
+  const isAlmostFull = spotsLeft != null && spotsLeft > 0 && spotsLeft <= capacity * 0.1;
 
   const attendees = useMemo(() => {
     return ATTENDEE_NAMES.slice(0, 6).map((n, i) => ({
@@ -122,65 +131,74 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
           style={{ background: `radial-gradient(circle at 100% 0%, rgba(${accentRgb},0.08), transparent 50%)` }} />
 
         <div className="relative z-10 p-5">
-          {/* Top row */}
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="flex items-baseline gap-1.5 mb-1">
-                <span className="text-[28px] leading-none"
-                  style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
-                  {totalGoing.toLocaleString()}
-                </span>
-                <span className="text-[13px]"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
-                  / {capacity.toLocaleString()} going
-                </span>
+          {hasCapacity ? (
+            <>
+              {/* Top row */}
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <div className="flex items-baseline gap-1.5 mb-1">
+                    <span className="text-[28px] leading-none"
+                      style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
+                      {(totalGoing ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-[13px]"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+                      / {capacity.toLocaleString()} going
+                    </span>
+                  </div>
+                  <span className="text-[10px] tracking-[1.5px] uppercase"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
+                    {isFull ? 'At capacity · Waitlist open' : isAlmostFull ? `Only ${spotsLeft} spots left` : `${spotsLeft} spots remaining`}
+                  </span>
+                </div>
+
+                {/* Pulse status chip */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                  style={{
+                    background: isFull
+                      ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)')
+                      : isAlmostFull
+                        ? (isDark ? 'rgba(251,146,60,0.12)' : 'rgba(251,146,60,0.08)')
+                        : `rgba(${accentRgb},0.1)`,
+                    border: `1px solid ${isFull
+                      ? 'rgba(239,68,68,0.25)'
+                      : isAlmostFull ? 'rgba(251,146,60,0.25)' : `rgba(${accentRgb},0.22)`}`,
+                  }}>
+                  <motion.span className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: isFull ? '#ef4444' : isAlmostFull ? '#fb923c' : accent }}
+                    animate={{ opacity: [1, 0.4, 1] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }} />
+                  <span className="text-[9px] tracking-[1.5px] uppercase"
+                    style={{ fontFamily: "'Inter', sans-serif",
+                      color: isFull ? '#ef4444' : isAlmostFull ? '#fb923c' : accent }}>
+                    {isFull ? 'Full' : isAlmostFull ? 'Filling fast' : 'Open'}
+                  </span>
+                </div>
               </div>
-              <span className="text-[10px] tracking-[1.5px] uppercase"
-                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-                {isFull ? 'At capacity · Waitlist open' : isAlmostFull ? `Only ${spotsLeft} spots left` : `${spotsLeft} spots remaining`}
-              </span>
-            </div>
 
-            {/* Pulse status chip */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-              style={{
-                background: isFull
-                  ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)')
-                  : isAlmostFull
-                    ? (isDark ? 'rgba(251,146,60,0.12)' : 'rgba(251,146,60,0.08)')
-                    : `rgba(${accentRgb},0.1)`,
-                border: `1px solid ${isFull
-                  ? 'rgba(239,68,68,0.25)'
-                  : isAlmostFull ? 'rgba(251,146,60,0.25)' : `rgba(${accentRgb},0.22)`}`,
-              }}>
-              <motion.span className="w-1.5 h-1.5 rounded-full"
-                style={{ background: isFull ? '#ef4444' : isAlmostFull ? '#fb923c' : accent }}
-                animate={{ opacity: [1, 0.4, 1] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }} />
-              <span className="text-[9px] tracking-[1.5px] uppercase"
-                style={{ fontFamily: "'Inter', sans-serif",
-                  color: isFull ? '#ef4444' : isAlmostFull ? '#fb923c' : accent }}>
-                {isFull ? 'Full' : isAlmostFull ? 'Filling fast' : 'Open'}
-              </span>
-            </div>
-          </div>
-
-          {/* Capacity bar */}
-          <div className="relative h-2 rounded-full overflow-hidden mb-4"
-            style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
-            <motion.div
-              className="absolute inset-y-0 left-0 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${filledPct}%` }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              style={{
-                background: isFull
-                  ? 'linear-gradient(90deg, #ef4444, #f87171)'
-                  : isAlmostFull
-                    ? 'linear-gradient(90deg, #fb923c, #fbbf24)'
-                    : `linear-gradient(90deg, rgba(${accentRgb},0.6), ${accent})`,
-              }} />
-          </div>
+              {/* Capacity bar */}
+              <div className="relative h-2 rounded-full overflow-hidden mb-4"
+                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${filledPct}%` }}
+                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                  style={{
+                    background: isFull
+                      ? 'linear-gradient(90deg, #ef4444, #f87171)'
+                      : isAlmostFull
+                        ? 'linear-gradient(90deg, #fb923c, #fbbf24)'
+                        : `linear-gradient(90deg, rgba(${accentRgb},0.6), ${accent})`,
+                  }} />
+              </div>
+            </>
+          ) : (
+            <p className="text-[13px] mb-4"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)' }}>
+              Reserve your spot — free entry.
+            </p>
+          )}
 
           {/* Attendee preview */}
           <div className="flex items-center gap-3">
@@ -570,6 +588,10 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   // copy — fetch the form version + questions like paid checkout does.
   const [schemaQuestions, setSchemaQuestions] = useState<SchemaQuestion[]>([]);
   const [formVersionId, setFormVersionId] = useState<string>();
+  // Required consent documents (public schema) — must be accepted before submit.
+  const [consents, setConsents] = useState<ConsentDocument[]>([]);
+  const [acceptedConsentIds, setAcceptedConsentIds] = useState<string[]>([]);
+  const [consentError, setConsentError] = useState('');
 
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
@@ -591,8 +613,18 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
         setSchemaQuestions(schema.forms[0]?.questions ?? []);
       })
       .catch(() => { /* schema is advisory — answers submit keyed by id when unavailable */ });
+    registrationModule.fetchConsentRequirements(slug, ticketTypeId)
+      .then((docs) => { if (alive) setConsents(docs); })
+      .catch(() => { /* consents advisory — absent means nothing to accept */ });
     return () => { alive = false; };
   }, [slug, ticketTypeId]);
+
+  const requiredConsents = consents.filter((c) => c.required);
+  const toggleConsent = (versionId: string) => {
+    setAcceptedConsentIds((prev) =>
+      prev.includes(versionId) ? prev.filter((id) => id !== versionId) : [...prev, versionId]);
+    setConsentError('');
+  };
 
   const schemaAsCustom: CustomQuestion[] = schemaQuestions.map((q) => ({
     id: q.key ?? q.id,
@@ -616,6 +648,13 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
       const empty = Array.isArray(value) ? value.length === 0 : !value?.trim();
       if (question.required && empty) next[question.id] = 'This response is required.';
     });
+    const missingConsents = requiredConsents.filter((c) => !acceptedConsentIds.includes(c.versionId));
+    if (missingConsents.length > 0) {
+      next.consents = 'Please accept the event’s terms to continue.';
+      setConsentError('Please accept the event’s terms to continue.');
+    } else {
+      setConsentError('');
+    }
     return next;
   };
 
@@ -626,6 +665,11 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
       ...(formVersionId ? { formVersionId } : {}),
     }));
 
+  const acceptedConsents = () =>
+    consents
+      .filter((c) => acceptedConsentIds.includes(c.versionId))
+      .map((c) => ({ consentDocumentVersionId: c.versionId, contentSha256: c.contentSha256 }));
+
   const submitRsvp = async (verificationToken?: string) => {
     setSubmitError('');
     setOtpStage('submitting');
@@ -634,6 +678,7 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
         ...(isAuthenticated ? {} : { phone, verificationToken }),
         packageQuantity: 1 + guests,
         answers: collectedAnswers(),
+        consents: acceptedConsents(),
       });
       onComplete();
     } catch (err) {
@@ -734,6 +779,36 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
             {requirePhone && <RsvpField icon={<Phone className="w-4 h-4" />} label="Phone" value={phone} onChange={(value) => { setPhone(value); setErrors((current) => ({ ...current, phone: '' })); }} placeholder="09xx xxx xxx" error={errors.phone} type="tel" isDark={isDark} />}
             {questions.map((question) => <RsvpQuestion key={question.id} question={question} value={answers[question.id]} onChange={(value) => setAnswer(question, value)} error={errors[question.id]} isDark={isDark} />)}
           </div>
+
+          {requiredConsents.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <label className="text-[10px] tracking-[1.4px] uppercase mb-1 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Terms</label>
+              {requiredConsents.map((doc) => {
+                const accepted = acceptedConsentIds.includes(doc.versionId);
+                return (
+                  <AppButton
+                    key={doc.versionId}
+                    type="button"
+                    onClick={() => toggleConsent(doc.versionId)}
+                    className="w-full flex items-start gap-3 px-3.5 py-3 rounded-2xl text-left"
+                    style={{
+                      background: accepted ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.12)') : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'),
+                      border: `1px solid ${consentError && !accepted ? 'rgba(248,113,113,0.75)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`,
+                    }}
+                  >
+                    <span className="mt-0.5 w-4 h-4 rounded-[4px] border grid place-items-center flex-shrink-0"
+                      style={{ borderColor: accepted ? '#d6f905' : muted, background: accepted ? '#d6f905' : 'transparent' }}>
+                      {accepted && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}
+                    </span>
+                    <span className="flex-1 min-w-0 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
+                      {doc.title}
+                    </span>
+                  </AppButton>
+                );
+              })}
+              {consentError && <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>{consentError}</p>}
+            </div>
+          )}
 
           {!isAuthenticated && <div className="mt-4 flex items-center justify-between gap-3"><p className="text-[11px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>No account required. We’ll use these details only for this event and its updates.</p>{onRequestAuth && <AppButton type="button" onClick={() => { onClose(); onRequestAuth(); }} className="shrink-0 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a', fontWeight: 700 }}>Sign in instead</AppButton>}</div>}
           {guests > 0 && <p className="mt-3 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>Your reservation includes {guests} guest{guests > 1 ? 's' : ''}.</p>}

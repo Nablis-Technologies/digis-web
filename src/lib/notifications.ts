@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { apiFetch } from '@/lib/api';
 import { formatRelativeTime } from '@/lib/mappers';
+import { Money } from '@/lib/money';
 import type { AppNotification, NotificationType } from '@/types/notification';
 
 /**
@@ -159,7 +160,7 @@ function bodyFor(type: string, data: Record<string, unknown>): string {
     return [event, label].filter(Boolean).join(' · ');
   }
   if (type === 'payment_succeeded' && amount != null) {
-    return `${event ?? 'Payment'} · ${(amount / 100).toLocaleString()} ETB`;
+    return `${event ?? 'Payment'} · ${Money.fromMinor(amount, 'ETB').format()}`;
   }
   if (type === 'payment_failed') return event ?? 'Your payment could not be processed.';
   if (type === 'transfer_received') return event ?? 'A ticket was transferred to you.';

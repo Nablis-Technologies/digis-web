@@ -13,7 +13,7 @@ function accountWire(overrides = {}) {
     id: 'pa-1',
     user_id: 'user-uuid',
     type: 'mobile_money',
-    provider: 'telebirr',
+    provider: 'chapa',
     status: 'verified',
     verified_at: '2026-09-06T10:00:00.000Z',
     last_used_at: null,
@@ -30,7 +30,7 @@ beforeEach(() => {
 describe('payoutService reads (live API, mocked HTTP)', () => {
   it('fetchMethods calls the seller endpoint and maps thin rows', async () => {
     mockedApiFetch.mockResolvedValue({
-      data: [accountWire(), accountWire({ id: 'pa-2', type: 'bank', provider: 'bank', status: 'pending_verification', verified_at: null })],
+      data: [accountWire(), accountWire({ id: 'pa-2', type: 'bank', provider: 'chapa', status: 'pending_verification', verified_at: null })],
     } as never);
     const methods = await payoutService.fetchMethods();
     expect(mockedApiFetch).toHaveBeenCalledWith('marketplace/seller/payout_accounts');
@@ -58,7 +58,7 @@ describe('payoutService reads (live API, mocked HTTP)', () => {
 });
 
 describe('payoutService.addMethod (live API, mocked HTTP)', () => {
-  it('posts telebirr as mobile_money/telebirr with the phone in details', async () => {
+  it('posts telebirr on the mobile_money rail under the chapa provider', async () => {
     mockedApiFetch.mockResolvedValue({ data: accountWire() } as never);
     const method = await payoutService.addMethod({ kind: 'telebirr', holderName: 'Abebe M', accountNumber: '09 11 22 33 44' });
     expect(mockedApiFetch).toHaveBeenCalledWith(
@@ -68,7 +68,7 @@ describe('payoutService.addMethod (live API, mocked HTTP)', () => {
         body: {
           payout_account: {
             type: 'mobile_money',
-            provider: 'telebirr',
+            provider: 'chapa',
             holder_name: 'Abebe M',
             account_details: { phone: '0911223344' },
           },
@@ -78,8 +78,8 @@ describe('payoutService.addMethod (live API, mocked HTTP)', () => {
     expect(method.displayName).toBe('Telebirr');
   });
 
-  it('posts banks on the bank rail with the bank in details', async () => {
-    mockedApiFetch.mockResolvedValue({ data: accountWire({ type: 'bank', provider: 'bank' }) } as never);
+  it('posts banks on the bank rail under the chapa provider', async () => {
+    mockedApiFetch.mockResolvedValue({ data: accountWire({ type: 'bank', provider: 'chapa' }) } as never);
     await payoutService.addMethod({ kind: 'cbe', holderName: 'Abebe M', accountNumber: '1000 0000' });
     expect(mockedApiFetch).toHaveBeenCalledWith(
       'marketplace/seller/payout_accounts',
@@ -87,7 +87,7 @@ describe('payoutService.addMethod (live API, mocked HTTP)', () => {
         body: {
           payout_account: expect.objectContaining({
             type: 'bank',
-            provider: 'bank',
+            provider: 'chapa',
             account_details: { account_number: '10000000', bank: 'cbe' },
           }),
         },
