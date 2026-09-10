@@ -30,6 +30,7 @@ import type { CheckoutOrder } from "@/lib/order";
 import type { ResaleListing, PublicResaleListingWire, SellerResaleListingWire } from "@/types/resale";
 import type { UserTicket } from "@/types/ticket";
 import { getEventImage } from "@/lib/utils/eventImages";
+import { Money } from "@/lib/money";
 
 /** Map the buyer-visible wire shape to display fields. No invention. */
 export function mapPublicListing(wire: PublicResaleListingWire, image: string): ResaleListing {
@@ -214,7 +215,7 @@ export const resaleModule = {
     const wallet = await ticketsService.fetchUserTickets();
     const ticket = wallet.find((t) => t.id === ticketId);
     if (!ticket) throw new Error('Ticket not found in your wallet.');
-    const listing = await resaleModule.createListing(ticket, Math.round(priceMajor * 100));
+    const listing = await resaleModule.createListing(ticket, Money.fromMajor(priceMajor, 'ETB').amountMinor);
     return { ok: true, listingId: listing.id };
   },
 };

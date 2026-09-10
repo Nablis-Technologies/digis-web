@@ -42,12 +42,8 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
     try {
       // Authorize against EVERY gated tier — a code valid for any of them opens
       // the gate (tiers may share one code or carry distinct ones).
-      const results = await Promise.all(
-        gatedTicketTypeIds.map((id) =>
-          audienceModule.authorize({ ticketTypeId: id, accessCode: trimmed }).then((r) => r.authorized).catch(() => false),
-        ),
-      );
-      if (results.some((ok) => ok)) {
+      const ok = await audienceModule.authorizeAny(gatedTicketTypeIds, { accessCode: trimmed });
+      if (ok) {
         onUnlocked();
       } else {
         setError('This access code is not valid for this event.');

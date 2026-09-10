@@ -41,3 +41,26 @@ describe('audienceModule.authorize (#20)', () => {
     expect((opts?.body as Record<string, unknown>).invitation_token).toBe('tok-1');
   });
 });
+
+describe('audienceModule.authorizeAny — gate across tiers', () => {
+  it('is true when any tier authorizes', async () => {
+    mockedApiFetch
+      .mockResolvedValueOnce({ data: { authorized: false, reason: 'public' } } as never)
+      .mockResolvedValueOnce({ data: { authorized: true, reason: 'access_code' } } as never);
+    const ok = await audienceModule.authorizeAny(['tt-1', 'tt-2'], { accessCode: 'CODE' });
+    expect(ok).toBe(true);
+  });
+
+  it('is false when every tier rejects or errors', async () => {
+    mockedApiFetch
+      .mockResolvedValueOnce({ data: { authorized: false, reason: 'public' } } as never)
+      .mockRejectedValueOnce(new Error('boom'));
+    const ok = await audienceModule.authorizeAny(['tt-1', 'tt-2'], { accessCode: 'CODE' });
+    expect(ok).toBe(false);
+  });
+
+  it('is false for an empty tier list', async () => {
+    expect(await audienceModule.authorizeAny([], { accessCode: 'CODE' })).toBe(false);
+    expect(mockedApiFetch).not.toHaveBeenCalled();
+  });
+});

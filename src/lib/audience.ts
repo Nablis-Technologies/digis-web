@@ -53,4 +53,23 @@ export const audienceModule = {
     );
     return data;
   },
+
+  /**
+   * Authorize one code/invitation against EVERY gated tier — valid for any of
+   * them opens the gate (tiers may share one code or carry distinct ones).
+   * Shared by GatedTierGate + InviteOnlySection. Any authorize error counts as
+   * "not authorized" for that tier.
+   */
+  async authorizeAny(ticketTypeIds: string[], input: { accessCode?: string; invitationToken?: string }): Promise<boolean> {
+    if (ticketTypeIds.length === 0) return false;
+    const results = await Promise.all(
+      ticketTypeIds.map((id) =>
+        audienceModule
+          .authorize({ ticketTypeId: id, ...input })
+          .then((r) => r.authorized)
+          .catch(() => false),
+      ),
+    );
+    return results.some(Boolean);
+  },
 };
