@@ -228,6 +228,21 @@ Backend implements v1 only. Keys prefixed `CHASECK_TEST-`/`CHASECK-` work
 `CHAPA_TEST-` keys (v2) fail the boot-time validator. No frontend impact —
 backend presents the same `PaymentSerializer` either way.
 
+### #35. Checkout requires a purchase limit on the ticket type (INFORMATIONAL — verified live 2026-09-10)
+
+`Ticketing::PurchaseLimits::Reserve` skips creating allocations when
+`effective_limit` is nil (`max_packages_per_user` unset and no
+`PurchaseLimitOverride`); the later `PurchaseLimits::Commit` then fails the
+order with `purchase_limit_allocations_missing`. Verified live on the dev
+"Chapa Test Free RSVP" product (no limit → guest order 422; after setting
+`max_packages_per_user: 10` → order created and auto-fulfilled, active ticket
+issued). In practice every sellable ticket type is expected to set a limit, so
+this is organizer-config rather than a bug — but a product with no limit is
+simply unbuyable via checkout. Frontend: friendly copy mapped
+(`purchase_limit_allocations_missing` / `purchase_limit_exceeded`). The dev
+free-RSVP fixture now sets `max_packages_per_user: 10` (preview.rb) so guest
+checkout on it can be drilled.
+
 ---
 
 ## Deferred by design

@@ -79,6 +79,25 @@ the same identity + ticket type issued a NEW confirmed registration + a new
 ticket. Frontend needs no change (`active_registration_conflict` choice-sheet is
 only a surface for genuinely-active rows). **102/102 tests**, tsc clean.
 
+## Session 2026-09-10 (night) — free guest checkout unlocked (#35), dev-DB test hazard
+
+- **Root-caused + fixed guest checkout on the free product.** Checkout's
+  `PurchaseLimits::Commit` fails the order with `purchase_limit_allocations_missing`
+  when the ticket type has no `max_packages_per_user` (or override) — `Reserve`
+  skips allocation. Filed as **#35** (informational; organizer config, not a
+  bug). Set `max_packages_per_user: 10` on the free-RSVP fixture (preview.rb,
+  committed `1a786f1`) and in the dev DB. **Live drill: guest registration →
+  quote → order → auto-fulfilled (total 0, #6) → active ticket issued** on
+  Chapa Test Free RSVP. Frontend: friendly copy for `purchase_limit_allocations_missing`
+  / `purchase_limit_exceeded`.
+- **⚠ dev-DB test hazard (IMPORTANT):** the web container's `DATABASE_URL`
+  hardcodes the database name, so `RAILS_ENV=test bin/rails test` /
+  `db:test:prepare` connect to **`digis_backend_development`** and the fixture
+  harness **purges it**. Running backend tests in this container wiped the seed
+  data (34 events → 2); restored via `bin/rails db:seed`. Do NOT run backend
+  tests here without a test-specific `DATABASE_URL`.
+- Committed: backend `1a786f1`; frontend (errors + #35 gap + this snapshot).
+
 ## Session 2026-09-10 (late) — full gap sweep against the merged branch (`78e4a6f`)
 
 Re-read every gap in `docs/BACKEND_GAPS.md` and checked it against `HEAD` of

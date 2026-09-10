@@ -77,6 +77,10 @@ const CODE_MESSAGES: Record<string, string> = {
   claim_already_completed: 'This ticket is already linked to an account.',
   verification_invalid: 'That verification code is no longer valid — please try again.',
   password_invalid: 'Password must be at least 8 characters.',
+  // Checkout purchase-limit reservations (Ticketing) — the order step needs a
+  // configured purchase limit on the ticket type to commit its allocations.
+  purchase_limit_allocations_missing: 'This ticket type has no purchase limit configured — the organizer needs to set one.',
+  purchase_limit_exceeded: 'You have reached the purchase limit for this ticket type.',
   // Audience gating (invite-only / access-code events).
   no_valid_code_or_invitation: 'This access code or invitation is not valid for this event.',
   // Seller payout destinations (Marketplace) — verified against the backend.
