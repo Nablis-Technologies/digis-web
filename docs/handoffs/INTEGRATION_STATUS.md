@@ -69,7 +69,17 @@ DB** (dev seeds don't include the preview-profile free product) + an OTP code.
 and `DetailedTicket` shows a copyable "Ticket link" row for guest tickets.
 `mapWalletTicket` regression test added.
 
-**Docs:** BACKEND_GAPS.md #27/#23 → RESOLVED (+ archive rows, #27 now live-proven),
+**#23 verified + dev-DB index synced:** the service fix uses
+`Registration.blocking_duplicate` (excludes `confirmed`), but the edited
+migration doesn't re-run on the already-migrated dev DB — the live
+`idx_ticketing_registrations_active_identity` still had `confirmed` (a repeat
+buy would hit `RecordNotUnique`). Recreated the index by SQL to the 4-value
+form (matching `structure.sql`). **Repeat purchase proven live:** a 2nd RSVP for
+the same identity + ticket type issued a NEW confirmed registration + a new
+ticket. Frontend needs no change (`active_registration_conflict` choice-sheet is
+only a surface for genuinely-active rows). **102/102 tests**, tsc clean.
+
+**Docs:** BACKEND_GAPS.md #27/#23 → RESOLVED (+ archive rows, #27 + #23 now live-proven),
 this snapshot.
 
 ## Session 2026-09-10 — config projection live (#1 fully wired), sold-out ordering, codebase committed

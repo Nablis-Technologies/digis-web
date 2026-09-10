@@ -35,11 +35,15 @@ button is currently disabled as a workaround. **VERIFIED STILL OPEN 2026-09-09.*
 ### #23. One active registration per identity+ticket type — RESOLVED 2026-09-10
 
 `ad7bd57` (`feat(registration)`) dropped `confirmed` from the active-identity
-unique index `idx_ticketing_registrations_active_identity` and from
-`Registration.active`, so a confirmed registration no longer blocks a fresh
-submit of the same tier — repeat bookings after confirmation now work. The
-frontend `register`/`guestRegister` already map `active_registration_conflict`
-(still valid for genuinely active rows) — no frontend change needed. See Resolved archive.
+unique index `idx_ticketing_registrations_active_identity` and introduced
+`Registration.blocking_duplicate` (pending_payment/pending_approval/waitlisted/
+offered — no `confirmed`), which `Registrations::Submit#existing_active_registration`
+now uses. A confirmed registration no longer blocks a fresh submit — repeat
+bookings after confirmation work. **Dev-DB note:** the migration edit does NOT
+re-run on an already-migrated DB — the live dev index still had `confirmed`
+until recreated by SQL (2026-09-10, matching `structure.sql`). Frontend needs no
+change: the `active_registration_conflict` choice-sheet is only a surface for
+genuinely-active rows. See Resolved archive.
 
 ### #26. Payout destination creation fail-closed (BLOCKING for seller payout-account verification) — PARTIAL
 
@@ -274,7 +278,7 @@ history). Every item below was re-verified against the pulled
 | 30 (crash half) | `Parking::FulfillOrderItem` keyword-arg crash fixed (`status:` keyword) | code 2026-09-09 |
 | 29 | Wallet `add_ons` projected from the ticket's order (non-ticket items `{id,name,type,quantity,unit_amount_minor}`) + eager load in `TicketsController#index` and `PaymentRefresh`; frontend `mapWalletTicket` already maps `add_ons` → `UserTicket.addOns`, so `DetailedTicket` "Your extras" renders on live wallet tickets | code 2026-09-09 (d67e132); live paid verification needs a Chapa sandbox-paid attempt |
 | 32 | `price_from_minor` restricted to `status == "active" && ticket?` products (`event_list_serializer.rb`) — discovery grid/filter/sort now show the true ticket "from" price | live HTTP 2026-09-09 (`on-on` → 60000, `euphoria` → 70000; was 10000) |
-| 23 | Repeat submissions after confirmation — `confirmed` dropped from `idx_ticketing_registrations_active_identity` + `Registration.active` (`ad7bd57`) | code 2026-09-10 |
+| 23 | Repeat submissions after confirmation — `confirmed` dropped from `idx_ticketing_registrations_active_identity` + `Registration.blocking_duplicate` (`ad7bd57`); dev DB index recreated by SQL to match | live HTTP 2026-09-10: **repeat purchase proven** (2nd RSVP same identity+ticket_type → new confirmed registration + new ticket) |
 | 27 | Public RSVP — `POST public/events/:event_slug/rsvp/request_otp` (guest OTP, free products) + `POST public/events/:event_slug/rsvp` (submit → confirmed/issuing/awaiting_approval, free tickets issued synchronously); frontend `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` guest-OTP / signed-in submit wired | live HTTP 2026-09-10: **happy path confirmed** (Chapa Test Free RSVP, `+251911000001`, `full_name` answer + form_version_id → registration `confirmed`, ticket issued with active QR); paid-guard 422 on FREEFORM |
 
 ---
