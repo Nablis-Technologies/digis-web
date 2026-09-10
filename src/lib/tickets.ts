@@ -383,6 +383,12 @@ export interface TicketWalletWire {
   unit_number: number;
   admissions_per_unit_snapshot: number;
   credential_mode: string;
+  /** Guest payment-refresh projection only (GuestPaymentTicketSerializer) —
+   *  authenticated wallet responses omit these. */
+  registration_id?: string;
+  ticket_view_token?: string;
+  ticket_view_url?: string;
+  short_url?: string;
   event: { id: string; slug: string; title: string; timezone: string; currency: string };
   product: { id: string; name: string; type: string };
   ticket_type: {
@@ -433,6 +439,12 @@ export function mapWalletTicket(w: TicketWalletWire): UserTicket {
   const tt = w.ticket_type;
   return {
     id: w.id,
+    // Guest payment-refresh projection (#14): registration reference + signed
+    // public view link (GuestPaymentTicketSerializer, merged 2026-09-10).
+    ...(w.registration_id ? { registrationId: w.registration_id } : {}),
+    ...(w.ticket_view_token ? { ticketViewToken: w.ticket_view_token } : {}),
+    ...(w.ticket_view_url ? { ticketViewUrl: w.ticket_view_url } : {}),
+    ...(w.short_url ? { shortUrl: w.short_url } : {}),
     eventId: w.event.id,
     eventSlug: w.event.slug,
     eventName: w.event.title,

@@ -329,7 +329,7 @@ export const registrationModule = {
       /** Admissions: the RSVP-er plus plus-ones. Defaults to 1. */
       packageQuantity?: number;
       selectedEventDateId?: string;
-      answers?: Array<{ questionKey: string; value: unknown }>;
+      answers?: Array<{ questionKey: string; value: unknown; formVersionId?: string }>;
       consents?: Array<{ consentDocumentVersionId: string; contentSha256: string }>;
     },
   ): Promise<RsvpOutcome> {
@@ -341,7 +341,13 @@ export const registrationModule = {
         package_quantity: input.packageQuantity ?? 1,
         ...(input.selectedEventDateId ? { selected_event_date_id: input.selectedEventDateId } : {}),
         ...(input.answers && input.answers.length > 0
-          ? { answers: input.answers.map((a) => ({ question_key: a.questionKey, value: a.value })) }
+          ? {
+              answers: input.answers.map((a) => ({
+                ...(a.formVersionId ? { form_version_id: a.formVersionId } : {}),
+                question_key: a.questionKey,
+                value: a.value,
+              })),
+            }
           : {}),
         ...(input.consents && input.consents.length > 0
           ? {

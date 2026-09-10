@@ -112,6 +112,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
   const t = ticketTokens(isDark);
   const [zoomQR, setZoomQR] = useState(false);
   const [responsesOpen, setResponsesOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Tier tag matches the ticket-type accents from the event/purchase page.
   const tt = tierTheme(ticket.ticketType, ticket.ticketLevel);
@@ -467,6 +468,37 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 </span>
               </AppButton>
             ))}
+          </div>
+        )}
+
+        {/* Signed public view link — guest payment-refresh tickets only (#14).
+            Lets a guest reopen/share the ticket from another device. */}
+        {ticket.ticketViewUrl && (
+          <div className="relative px-5 sm:px-7 pt-3">
+            <AppButton
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                void navigator.clipboard?.writeText(ticket.ticketViewUrl!).catch(() => {});
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 1800);
+              }}
+              className="relative w-full rounded-2xl overflow-hidden py-3 px-4 flex items-center gap-3 cursor-pointer"
+              style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+              <GlassReflection isDark={isDark} />
+              <ArrowUpRight className="relative z-10 w-[16px] h-[16px] flex-shrink-0" style={{ color: t.textSoft }} strokeWidth={1.8} />
+              <span className="relative z-10 flex-1 min-w-0">
+                <span className="block text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif", color: t.text, fontWeight: 600 }}>
+                  Ticket link
+                </span>
+                <span className="block truncate text-[10.5px]" style={{ fontFamily: "'Inter', sans-serif", color: t.textSoft }}>
+                  Reopen or share this ticket from any device
+                </span>
+              </span>
+              <span className="relative z-10 flex items-center gap-1 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: linkCopied ? t.accent : t.textSoft, fontWeight: 600 }}>
+                {linkCopied && <Check className="w-3 h-3" strokeWidth={2.5} />}
+                {linkCopied ? 'Copied' : 'Copy'}
+              </span>
+            </AppButton>
           </div>
         )}
 

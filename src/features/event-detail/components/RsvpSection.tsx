@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, HelpCircle, Users, Plus, Minus, Sparkles, CalendarCheck, UserPlus, CalendarPlus, Send, Copy, MessageCircle, Mail, Phone, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { CustomQuestion, RsvpStatus } from '@/types';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -8,7 +8,7 @@ import { disabledSurface, disabledInk } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
-import { registrationModule } from '@/lib/registration';
+import { registrationModule, type SchemaQuestion } from '@/lib/registration';
 import { mapApiError } from '@/lib/errors';
 
 interface RsvpSectionProps {
@@ -555,7 +555,6 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   const { isDark } = useTheme();
   const { user, isAuthenticated } = useAuth();
   const requirements = event.rsvpRequirements ?? {};
-  const questions: CustomQuestion[] = requirements.questions ?? [];
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
@@ -566,6 +565,11 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [submitError, setSubmitError] = useState('');
+  // Required answers come from the registration schema (backend validates
+  // against the published form), not the event's rsvp_requirements display
+  // copy — fetch the form version + questions like paid checkout does.
+  const [schemaQuestions, setSchemaQuestions] = useState<SchemaQuestion[]>([]);
+  const [formVersionId, setFormVersionId] = useState<string>();
 
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
@@ -575,8 +579,32 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   // Guests must verify a phone for the OTP even when the organizer didn't ask
   // for one — the public RSVP endpoint keys identity on the phone.
   const requirePhone = isAuthenticated ? Boolean(requirements.requirePhone) : true;
-  const organizerFields = questions.length > 0 || requireEmail || requirePhone;
   const slug = event.slug ?? '';
+
+  useEffect(() => {
+    if (!slug || !ticketTypeId) return;
+    let alive = true;
+    registrationModule.fetchRegistrationSchema(slug, ticketTypeId)
+      .then((schema) => {
+        if (!alive || !schema) return;
+        setFormVersionId(schema.forms[0]?.id);
+        setSchemaQuestions(schema.forms[0]?.questions ?? []);
+      })
+      .catch(() => { /* schema is advisory — answers submit keyed by id when unavailable */ });
+    return () => { alive = false; };
+  }, [slug, ticketTypeId]);
+
+  const schemaAsCustom: CustomQuestion[] = schemaQuestions.map((q) => ({
+    id: q.key ?? q.id,
+    type: q.type === 'long_text' ? 'textarea' : q.type === 'short_text' ? 'text' : q.type as CustomQuestion['type'],
+    label: q.label,
+    required: q.required,
+    options: Array.isArray(q.options) ? q.options as string[] : undefined,
+  }));
+  const questions: CustomQuestion[] = schemaQuestions.length > 0
+    ? schemaAsCustom
+    : (requirements.questions ?? []);
+  const organizerFields = questions.length > 0 || requireEmail || requirePhone;
 
   const validate = (): Record<string, string> => {
     const next: Record<string, string> = {};
@@ -592,7 +620,11 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   };
 
   const collectedAnswers = () =>
-    questions.map((question) => ({ questionKey: question.id, value: answers[question.id] ?? '' }));
+    questions.map((question) => ({
+      questionKey: question.id,
+      value: answers[question.id] ?? '',
+      ...(formVersionId ? { formVersionId } : {}),
+    }));
 
   const submitRsvp = async (verificationToken?: string) => {
     setSubmitError('');

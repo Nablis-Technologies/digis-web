@@ -50,7 +50,27 @@ the route, body shape (`{ rsvp: { phone, ticket_type_id } }`), and Idempotency
 path. Happy-path guest OTP drill still needs: a **free RSVP product in the dev
 DB** (dev seeds don't include the preview-profile free product) + an OTP code.
 
-**Docs:** BACKEND_GAPS.md #27/#23 → RESOLVED (+ archive rows), this snapshot.
+**Follow-up (same run) — RSVP happy path PROVEN live:**
+- Re-ran the dev seed (`DIGIS_SEED_PROFILE=dev`, idempotent — preview.rb now
+  carries the free-RSVP product from `922d2c1`): dev DB gained **"Chapa Test
+  Free RSVP"** (price 0, available, capacity 500) on the Chapa Test Event.
+- RSVP answers come from the **registration schema** (`full_name`, required),
+  not `rsvp_requirements` — fixed `RsvpRegistrationSheet` to fetch the schema
+  (like checkout) and submit `form_version_id` + `question_key` answers.
+- **Live drill (authenticated):** `POST /public/events/chapa-test-event/rsvp`
+  with `{ answers: [{ form_version_id, question_key: "full_name", value }] }`
+  → registration `confirmed`, `next_action: confirmed`, ticket issued with an
+  active signed QR. **102/102 tests**, tsc clean, build ok.
+
+**Also wired (commit-message sweep of the merged range):** `GuestPaymentTicketSerializer`
+(43174dd) adds `registration_id`, `ticket_view_token`, `ticket_view_url`,
+`short_url` to guest payment-refresh tickets → mapped through `TicketWalletWire`
+→ `UserTicket` (`registrationId`/`ticketViewUrl`/`shortUrl`/`ticketViewToken`),
+and `DetailedTicket` shows a copyable "Ticket link" row for guest tickets.
+`mapWalletTicket` regression test added.
+
+**Docs:** BACKEND_GAPS.md #27/#23 → RESOLVED (+ archive rows, #27 now live-proven),
+this snapshot.
 
 ## Session 2026-09-10 — config projection live (#1 fully wired), sold-out ordering, codebase committed
 

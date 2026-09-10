@@ -26,6 +26,11 @@ export interface UserTicket {
   ticketLevel?: string;
   /** Backend ticket status (active, transferred, ...). Absent on legacy mocks. */
   status?: string;
+  /** Guest payment-refresh projection only — registration + signed view link. */
+  registrationId?: string;
+  ticketViewToken?: string;
+  ticketViewUrl?: string;
+  shortUrl?: string;
   qrCode: string;
   gradient?: string;
   purchased: string;

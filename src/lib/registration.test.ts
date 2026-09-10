@@ -107,7 +107,7 @@ describe('registrationModule public RSVP (#27 resolved)', () => {
       phone: '+251900000000',
       verificationToken: 'vt-1',
       packageQuantity: 2,
-      answers: [{ questionKey: 'q1', value: 'Selam' }],
+      answers: [{ questionKey: 'full_name', value: 'Selam', formVersionId: 'fver-1' }],
     });
     expect(mockedApiFetch).toHaveBeenCalledWith(
       'public/events/freeform/rsvp',
@@ -119,7 +119,7 @@ describe('registrationModule public RSVP (#27 resolved)', () => {
             phone: '+251900000000',
             verification_token: 'vt-1',
             package_quantity: 2,
-            answers: [{ question_key: 'q1', value: 'Selam' }],
+            answers: [{ form_version_id: 'fver-1', question_key: 'full_name', value: 'Selam' }],
           },
         },
       }),

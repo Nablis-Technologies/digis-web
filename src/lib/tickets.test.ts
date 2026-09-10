@@ -24,6 +24,25 @@ function wire(tt: TicketWalletWire['ticket_type']): TicketWalletWire {
   };
 }
 
+describe('mapWalletTicket — guest payment-refresh projection (GuestPaymentTicketSerializer, merged 2026-09-10)', () => {
+  it('maps registration_id + signed view link when present, omits them otherwise', () => {
+    const guest = wire({ id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr' });
+    guest.registration_id = 'reg-9';
+    guest.ticket_view_token = 'vt-9';
+    guest.ticket_view_url = 'http://localhost:3000/t/abc';
+    guest.short_url = 'https://dig.is/abc';
+    const t = mapWalletTicket(guest);
+    expect(t.registrationId).toBe('reg-9');
+    expect(t.ticketViewToken).toBe('vt-9');
+    expect(t.ticketViewUrl).toBe('http://localhost:3000/t/abc');
+    expect(t.shortUrl).toBe('https://dig.is/abc');
+
+    const plain = mapWalletTicket(wire({ id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr' }));
+    expect(plain.registrationId).toBeUndefined();
+    expect(plain.ticketViewUrl).toBeUndefined();
+  });
+});
+
 describe('mapWalletTicket — purchased extras projection (#29)', () => {
   it('maps add_ons onto the ticket as SelectedEventProduct[]', () => {
     const w = wire({ id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr' });
