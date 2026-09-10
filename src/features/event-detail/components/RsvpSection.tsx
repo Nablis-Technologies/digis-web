@@ -8,6 +8,8 @@ import { disabledSurface, disabledInk } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { registrationModule } from '@/lib/registration';
+import { mapApiError } from '@/lib/errors';
 
 interface RsvpSectionProps {
   event: any;
@@ -541,9 +543,11 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
   );
 }
 
-export function RsvpRegistrationSheet({ event, guests, onClose, onComplete, onRequestAuth }: {
+export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, onComplete, onRequestAuth }: {
   event: any;
   guests: number;
+  /** The event's free RSVP ticket type id (from products — `ticket_type.id`). */
+  ticketTypeId: string;
   onClose: () => void;
   onComplete: () => void;
   onRequestAuth?: () => void;
@@ -557,16 +561,24 @@ export function RsvpRegistrationSheet({ event, guests, onClose, onComplete, onRe
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Public RSVP (#27) — guests prove phone ownership via OTP, then submit.
+  const [otpStage, setOtpStage] = useState<'idle' | 'sending' | 'sent' | 'submitting'>('idle');
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
   const surface = isDark ? '#101115' : '#fff';
   const requireName = requirements.requireName !== false;
   const requireEmail = Boolean(requirements.requireEmail);
-  const requirePhone = Boolean(requirements.requirePhone);
+  // Guests must verify a phone for the OTP even when the organizer didn't ask
+  // for one — the public RSVP endpoint keys identity on the phone.
+  const requirePhone = isAuthenticated ? Boolean(requirements.requirePhone) : true;
   const organizerFields = questions.length > 0 || requireEmail || requirePhone;
+  const slug = event.slug ?? '';
 
-  const submit = () => {
+  const validate = (): Record<string, string> => {
     const next: Record<string, string> = {};
     if (requireName && name.trim().length < 2) next.name = 'Add the name for the guest list.';
     if (requireEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = 'Add a valid email address.';
@@ -576,8 +588,67 @@ export function RsvpRegistrationSheet({ event, guests, onClose, onComplete, onRe
       const empty = Array.isArray(value) ? value.length === 0 : !value?.trim();
       if (question.required && empty) next[question.id] = 'This response is required.';
     });
+    return next;
+  };
+
+  const collectedAnswers = () =>
+    questions.map((question) => ({ questionKey: question.id, value: answers[question.id] ?? '' }));
+
+  const submitRsvp = async (verificationToken?: string) => {
+    setSubmitError('');
+    setOtpStage('submitting');
+    try {
+      await registrationModule.rsvpSubmit(slug, ticketTypeId, {
+        ...(isAuthenticated ? {} : { phone, verificationToken }),
+        packageQuantity: 1 + guests,
+        answers: collectedAnswers(),
+      });
+      onComplete();
+    } catch (err) {
+      setSubmitError(mapApiError(err));
+      setOtpStage(verificationToken ? 'sent' : 'idle');
+    }
+  };
+
+  const sendCode = async () => {
+    const next = validate();
     setErrors(next);
-    if (Object.keys(next).length === 0) onComplete();
+    if (Object.keys(next).length > 0) return;
+    setSubmitError('');
+    setOtpStage('sending');
+    try {
+      const { challengeId: id } = await registrationModule.rsvpRequestOtp(slug, ticketTypeId, phone);
+      setChallengeId(id);
+      setOtpStage('sent');
+    } catch (err) {
+      setSubmitError(mapApiError(err));
+      setOtpStage('idle');
+    }
+  };
+
+  const confirm = async () => {
+    const next = validate();
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    if (isAuthenticated) {
+      await submitRsvp();
+      return;
+    }
+    if (!challengeId) {
+      setSubmitError('Something went wrong — please try again.');
+      return;
+    }
+    if (otpCode.replace(/\D/g, '').length < 4) {
+      setErrors((current) => ({ ...current, otp: 'Enter the 6-digit code we sent.' }));
+      return;
+    }
+    try {
+      const { verificationToken } = await registrationModule.verifyPhoneOtp(challengeId, otpCode);
+      await submitRsvp(verificationToken);
+    } catch (err) {
+      setSubmitError(mapApiError(err));
+      setOtpStage('sent');
+    }
   };
 
   const setAnswer = (question: CustomQuestion, value: string | string[]) => {
@@ -634,8 +705,46 @@ export function RsvpRegistrationSheet({ event, guests, onClose, onComplete, onRe
 
           {!isAuthenticated && <div className="mt-4 flex items-center justify-between gap-3"><p className="text-[11px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>No account required. We’ll use these details only for this event and its updates.</p>{onRequestAuth && <AppButton type="button" onClick={() => { onClose(); onRequestAuth(); }} className="shrink-0 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a', fontWeight: 700 }}>Sign in instead</AppButton>}</div>}
           {guests > 0 && <p className="mt-3 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>Your reservation includes {guests} guest{guests > 1 ? 's' : ''}.</p>}
-          <AppButton onClick={submit} className="mt-5 w-full h-12 rounded-2xl flex items-center justify-center gap-2" style={{ background: '#d6f905', color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13 }}>
-            {isAuthenticated && !organizerFields ? 'Confirm RSVP' : 'Reserve my spot'} <ArrowRight className="w-4 h-4" strokeWidth={2.2} />
+          {!isAuthenticated && otpStage === 'sent' && (
+            <div>
+              <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>
+                Verification code
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
+                <AppInput
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(event) => { setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setErrors((current) => ({ ...current, otp: '' })); }}
+                  placeholder="6-digit code"
+                  className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px] tracking-[0.3em]"
+                  style={{ background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)', border: `1px solid ${errors.otp ? 'rgba(248,113,113,0.75)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                />
+              </div>
+              {errors.otp && <p className="mt-1.5 text-[10px]" style={{ color: '#f87171', fontFamily: "'Inter', sans-serif" }}>{errors.otp}</p>}
+              <p className="mt-2 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
+                We sent a code to <span style={{ color: text }}>{phone}</span>.{' '}
+                <AppButton type="button" onClick={sendCode} className="inline text-[11px] underline" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
+                  Resend
+                </AppButton>
+              </p>
+            </div>
+          )}
+          {submitError && <p className="mt-3 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>{submitError}</p>}
+          <AppButton
+            onClick={confirm}
+            disabled={otpStage === 'sending' || otpStage === 'submitting'}
+            className="mt-5 w-full h-12 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: '#d6f905', color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13 }}
+          >
+            {isAuthenticated
+              ? (isAuthenticated && !organizerFields ? 'Confirm RSVP' : 'Reserve my spot')
+              : otpStage === 'sent'
+                ? 'Confirm RSVP'
+                : 'Send code'} <ArrowRight className="w-4 h-4" strokeWidth={2.2} />
           </AppButton>
         </div>
       </motion.section>

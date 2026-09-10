@@ -32,19 +32,14 @@ capabilities list `payment_methods: %w[telebirr card bank]`
 capabilities, and any organizer-facing `payment_method` enums; the frontend's CBE
 button is currently disabled as a workaround. **VERIFIED STILL OPEN 2026-09-09.**
 
-### #23. One active registration per identity+ticket type (BLOCKING for buying the same ticket twice)
+### #23. One active registration per identity+ticket type — RESOLVED 2026-09-10
 
-Even with #21/#22 landed, `Submit` allows exactly one *active* registration per
-(identity, ticket type, date) — and `confirmed` is still in `Registration.active`
-(`app/models/ticketing/registration.rb:66`), so a confirmed registration still
-blocks a fresh submit of the same tier. `TicketType.max_packages_per_user` exists
-(`app/models/ticketing/ticket_type.rb:76`) but nothing allows multiple active
-registrations. #22's release frees a `pending_payment`/`cancelled` row; #21
-confirms paid rows. The frontend funnels multi-ticket buyers into the quantity
-stepper and surfaces a choice sheet (continue / view Tickets) on conflict — never
-a dead-end error. If true repeat purchase is wanted, the backend must allow
-multiple active registrations up to `TicketType.max_packages_per_user`.
-**VERIFIED STILL OPEN 2026-09-09.**
+`ad7bd57` (`feat(registration)`) dropped `confirmed` from the active-identity
+unique index `idx_ticketing_registrations_active_identity` and from
+`Registration.active`, so a confirmed registration no longer blocks a fresh
+submit of the same tier — repeat bookings after confirmation now work. The
+frontend `register`/`guestRegister` already map `active_registration_conflict`
+(still valid for genuinely active rows) — no frontend change needed. See Resolved archive.
 
 ### #26. Payout destination creation fail-closed (BLOCKING for seller payout-account verification) — PARTIAL
 
@@ -82,17 +77,16 @@ Settings profile-edit UI is display-only. Add an auth-bounded update endpoint
 guarded by `Core::Authorizable`; needs `name` column (#8) for the same payload.
 **VERIFIED STILL OPEN 2026-09-09.**
 
-### #27. No consumer RSVP submit endpoint (RSVP events display but can't confirm)
+### #27. No consumer RSVP submit endpoint — RESOLVED 2026-09-10
 
-`event_type: "rsvp"` events are fully servable — the config projection exposes
-`rsvp_going`/`rsvp_capacity`/`rsvp_requirements` and the frontend adapter maps
-them, so the RSVP section renders — but there is **no RSVP route anywhere**
-(`config/routes.rb`, grep 2026-09-09: no `rsvp`). The frontend's RSVP confirm
-is local-state only. Fix: a public non-ticketed RSVP endpoint (e.g.
-`POST public/events/:slug/rsvp`) recording a lightweight attendance record per
-(identity, event, date) and reflecting back into `rsvp_going`. Until it lands,
-the frontend keeps RSVP display-only (degrading — no live RSVP event is seeded).
-**VERIFIED STILL OPEN 2026-09-09.**
+`983c6a3`/`e42f981`/`193fbb2`/`0a3b728` (`feat(rsvps)`) added public RSVP:
+`POST public/events/:event_slug/rsvp/request_otp` (guest OTP challenge, free
+products only) + `POST public/events/:event_slug/rsvp` (submit → `confirmed` /
+`issuing` / `awaiting_approval`, with synchronous ticket issuance for free
+products). Frontend wired: `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/
+`rsvpSubmit` + `RsvpRegistrationSheet` (guest phone → OTP → submit; signed-in
+attendees submit directly). Live probe: FREEFORM's paid product →
+`rsvp_paid_product_requires_checkout` (mapped). See Resolved archive.
 
 ### #30. Parking fulfillment blocked by missing seed zones (DEGRADING — clean error, not a crash)
 
@@ -280,6 +274,8 @@ history). Every item below was re-verified against the pulled
 | 30 (crash half) | `Parking::FulfillOrderItem` keyword-arg crash fixed (`status:` keyword) | code 2026-09-09 |
 | 29 | Wallet `add_ons` projected from the ticket's order (non-ticket items `{id,name,type,quantity,unit_amount_minor}`) + eager load in `TicketsController#index` and `PaymentRefresh`; frontend `mapWalletTicket` already maps `add_ons` → `UserTicket.addOns`, so `DetailedTicket` "Your extras" renders on live wallet tickets | code 2026-09-09 (d67e132); live paid verification needs a Chapa sandbox-paid attempt |
 | 32 | `price_from_minor` restricted to `status == "active" && ticket?` products (`event_list_serializer.rb`) — discovery grid/filter/sort now show the true ticket "from" price | live HTTP 2026-09-09 (`on-on` → 60000, `euphoria` → 70000; was 10000) |
+| 23 | Repeat submissions after confirmation — `confirmed` dropped from `idx_ticketing_registrations_active_identity` + `Registration.active` (`ad7bd57`) | code 2026-09-10 |
+| 27 | Public RSVP — `POST public/events/:event_slug/rsvp/request_otp` (guest OTP, free products) + `POST public/events/:event_slug/rsvp` (submit → confirmed/issuing/awaiting_approval, free tickets issued synchronously); frontend `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` guest-OTP / signed-in submit wired | live HTTP 2026-09-10 (paid-guard 422 `rsvp_paid_product_requires_checkout` on FREEFORM); happy-path live drill needs a free RSVP product in dev + an OTP code |
 
 ---
 

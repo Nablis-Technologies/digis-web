@@ -70,6 +70,9 @@ const CODE_MESSAGES: Record<string, string> = {
   consent_requirement_not_pending: 'This event’s terms changed — please review and accept them again.',
   required_buyer_consent_missing: 'Please accept all required event terms to continue.',
   invalid_submission: 'Some registration details were rejected — please check and try again.',
+  // Public RSVP (Ticketing) — verified against the backend locale.
+  rsvp_product_not_found: 'This RSVP is no longer available.',
+  rsvp_paid_product_requires_checkout: 'This event is booked through paid checkout, not RSVP.',
   // Audience gating (invite-only / access-code events).
   no_valid_code_or_invitation: 'This access code or invitation is not valid for this event.',
   // Seller payout destinations (Marketplace) — verified against the backend.

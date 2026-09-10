@@ -7,6 +7,51 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-10 (pm) — backend pull succeeded (11 commits); RSVP wired (#27), #23 resolved
+
+**Pull:** first `git fetch` failed (no github.com:443); retry succeeded —
+`d67e132..78e4a6f` on `feat/launch-hardening-telemetry`. Merged into the local
+branch that already carried this session's `feat(events)` commit (config
+projection, pazimo-mirror seeds, SolidQueue-in-Puma). One conflict:
+`db/structure.sql` `idx_ticketing_registrations_active_identity` — took the
+remote side (drops `confirmed` from the partial index = the #23 fix).
+`db/seeds/preview.rb` auto-merged. Merge commit `16293f9`. **Restarted the web
+container** — Puma had a stale route table (merged `routes.rb` wasn't live), so
+the new RSVP routes 404'd until restart.
+
+**New backend surface (merged):**
+- **#27 RSVP** — `POST public/events/:event_slug/rsvp/request_otp` (guest OTP
+  challenge, free products only) + `POST public/events/:event_slug/rsvp`
+  (submit → `confirmed`/`issuing`/`awaiting_approval`, free tickets issued
+  synchronously). `next_action` types confirmed from `Rsvps::Submit`.
+- **#23** repeat registration after confirmation (`confirmed` removed from the
+  active-identity unique index) — `ad7bd57`.
+- GuestPaymentTicketSerializer, ticket response carries `registration_id` +
+  view-token details; RSVP phone included in guest-throttle id.
+- Seeds: preview profile gains a free RSVP product for public OTP testing
+  (`922d2c1`) — NOT in the dev DB (dev profile uses `seeds_events.rb`).
+
+**Frontend wiring (#27):**
+- `registrationModule.rsvpRequestOtp(slug, ticketTypeId, phone)` →
+  `public/events/:slug/rsvp/request_otp`; `verifyPhoneOtp(challengeId, code)` →
+  `phone_verifications/:id/verify`; `rsvpSubmit(slug, ticketTypeId, {...})` →
+  `public/events/:slug/rsvp` (guest: phone+verification_token; signed-in: actor
+  only; `package_quantity = 1 + guests`; organizer answers mapped).
+- `RsvpRegistrationSheet` now actually books: guests collect phone → "Send
+  code" (OTP) → 6-digit field → "Confirm RSVP" (verify + submit); signed-in
+  attendees confirm directly. Errors via `mapApiError` (+ new RSVP codes
+  `rsvp_product_not_found`, `rsvp_paid_product_requires_checkout`).
+- `EventDetailPage` passes the RSVP ticket type id from `displayTicketTypes[0]`.
+- 4 new lib tests (registration.test.ts) → **101/101**, tsc clean.
+
+**Live probe:** `POST /public/events/freeform/rsvp/request_otp` on FREEFORM's
+paid GA product → 422 `rsvp_paid_product_requires_checkout` (mapped) — proves
+the route, body shape (`{ rsvp: { phone, ticket_type_id } }`), and Idempotency
+path. Happy-path guest OTP drill still needs: a **free RSVP product in the dev
+DB** (dev seeds don't include the preview-profile free product) + an OTP code.
+
+**Docs:** BACKEND_GAPS.md #27/#23 → RESOLVED (+ archive rows), this snapshot.
+
 ## Session 2026-09-10 — config projection live (#1 fully wired), sold-out ordering, codebase committed
 
 **Backend fixes applied (committed locally as `feat(events)` — `git fetch` from

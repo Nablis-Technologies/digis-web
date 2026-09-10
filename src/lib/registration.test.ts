@@ -74,3 +74,65 @@ describe('registrationModule.release (#22 resolved)', () => {
     expect(schema?.forms[0]?.version).toBe(3);
   });
 });
+
+describe('registrationModule public RSVP (#27 resolved)', () => {
+  it('rsvpRequestOtp posts the phone + ticket_type_id and returns the challenge', async () => {
+    mockedApiFetch.mockResolvedValue({
+      data: { challenge_id: 'ch-1', status: 'pending', expires_at: '2026-09-10T12:00:00Z' },
+    } as never);
+    const result = await registrationModule.rsvpRequestOtp('freeform', 'tt-1', '+251900000000');
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      'public/events/freeform/rsvp/request_otp',
+      expect.objectContaining({ method: 'POST', body: { rsvp: { phone: '+251900000000', ticket_type_id: 'tt-1' } } }),
+    );
+    expect(result).toEqual({ challengeId: 'ch-1', status: 'pending', expiresAt: '2026-09-10T12:00:00Z' });
+  });
+
+  it('verifyPhoneOtp trades the code for a verification_token', async () => {
+    mockedApiFetch.mockResolvedValue({ data: { verification_token: 'vt-1' } } as never);
+    const result = await registrationModule.verifyPhoneOtp('ch-1', '123456');
+    expect(mockedApiFetch).toHaveBeenCalledWith('phone_verifications/ch-1/verify', expect.objectContaining({ method: 'POST' }));
+    expect(result).toEqual({ verificationToken: 'vt-1' });
+  });
+
+  it('rsvpSubmit posts the guest proof + answers and maps the outcome', async () => {
+    mockedApiFetch.mockResolvedValue({
+      data: {
+        registration: { id: 'reg-1', status: 'confirmed' },
+        next_action: { type: 'confirmed' },
+        tickets: [{ id: 't1' }, { id: 't2' }],
+      },
+    } as never);
+    const outcome = await registrationModule.rsvpSubmit('freeform', 'tt-1', {
+      phone: '+251900000000',
+      verificationToken: 'vt-1',
+      packageQuantity: 2,
+      answers: [{ questionKey: 'q1', value: 'Selam' }],
+    });
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      'public/events/freeform/rsvp',
+      expect.objectContaining({
+        method: 'POST',
+        body: {
+          rsvp: {
+            ticket_type_id: 'tt-1',
+            phone: '+251900000000',
+            verification_token: 'vt-1',
+            package_quantity: 2,
+            answers: [{ question_key: 'q1', value: 'Selam' }],
+          },
+        },
+      }),
+    );
+    expect(outcome).toEqual({ registrationId: 'reg-1', status: 'confirmed', nextAction: 'confirmed', ticketCount: 2 });
+  });
+
+  it('rsvpSubmit omits phone/proof for signed-in attendees and answers/consents when empty', async () => {
+    mockedApiFetch.mockResolvedValue({
+      data: { registration: { id: 'reg-1', status: 'confirmed' }, next_action: { type: 'confirmed' }, tickets: [] },
+    } as never);
+    await registrationModule.rsvpSubmit('freeform', 'tt-1', { packageQuantity: 1, consents: [] });
+    const call = mockedApiFetch.mock.calls.find(([path]) => path === 'public/events/freeform/rsvp');
+    expect(call?.[1]?.body).toEqual({ rsvp: { ticket_type_id: 'tt-1', package_quantity: 1 } });
+  });
+});

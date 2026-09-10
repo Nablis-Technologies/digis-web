@@ -318,6 +318,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
           <RsvpRegistrationSheet
             event={event}
             guests={rsvpGuests}
+            ticketTypeId={displayTicketTypes[0]?.ticketTypeId ?? ''}
             onClose={() => setShowRsvpRegistration(false)}
             onRequestAuth={onRequestAuth}
             onComplete={() => {
