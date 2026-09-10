@@ -7,19 +7,21 @@
  * the same EventSettingSerializer; detail adds only `created_at`):
  *   EventListSerializer:   id, slug, title, description, visibility, timezone,
  *                          currency, published_at, categories, event_dates,
- *                          event_media, event_organizations, event_setting, organization.
- *                          NOTE: no `price_from_minor` (BACKEND_GAPS #13, open) —
- *                          `priceFromMinor` below defaults to 0 until it lands.
- *   event_setting.config:  17-key public projection (BACKEND_GAPS #1, resolved):
- *                          featured, rating, sold_out, tickets_left,
- *                          price_foreign_from_minor, foreign_currency, event_type,
- *                          seat_map, answer_edit_window_hours, rsvp_going,
- *                          rsvp_capacity, allows_plus_one, max_guests,
- *                          rsvp_requirements, access_mode, invite_only_paid,
- *                          on_guest_list. `access_codes`/`guest_name`/`invite_tickets`
+ *                          event_media, event_organizations, event_setting, organization,
+ *                          price_from_minor (computed over active ticket products
+ *                          only — BACKEND_GAPS #13/#32 resolved).
+ *   event_setting.config:  PUBLIC_CONFIG_KEYS projection (BACKEND_GAPS #1,
+ *                          resolved + live since the 2026-09-10 serializer commit):
+ *                          allow_waitlist, public_guest_limit, featured, rating,
+ *                          sold_out, tickets_left, price_foreign_from_minor,
+ *                          foreign_currency, event_type, seat_map,
+ *                          answer_edit_window_hours, rsvp_going, rsvp_capacity,
+ *                          allows_plus_one, max_guests, rsvp_requirements,
+ *                          access_mode, invite_only_paid, on_guest_list.
+ *                          `access_codes`/`guest_name`/`invite_tickets`
  *                          stay private by design.
- *   Currently mapped:      featured, tickets_left. The other served keys arrive
- *                          on the wire but are dropped here (frontend follow-up).
+ *   All 17 config keys are mapped below; `foreign_currency` is intentionally
+ *   dropped (currency is ETB-only).
  *
  * Mock policy: the backend is the only source of truth. No mock event record
  * is merged in — absent backend data renders as absent.
@@ -70,8 +72,9 @@ export interface BackendEvent {
  *
  * Config parsing is strict by design: a wrong-typed or unknown value maps to
  * absent, never through. A missing value must NOT read as a real one (a
- * missing `tickets_left` is not sold out; a missing price is not free — though
- * `priceFromMinor` still defaults to 0 until BACKEND_GAPS #13 lands).
+ * missing `tickets_left` is not sold out; a missing price is not free).
+ * `priceFromMinor` defaults to 0 only as a last resort when the wire omits
+ * `price_from_minor` entirely.
  */
 const asNumber = (v: unknown): number | undefined =>
   typeof v === "number" ? v : undefined;

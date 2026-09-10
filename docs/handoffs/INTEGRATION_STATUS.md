@@ -7,6 +7,47 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-10 — config projection live (#1 fully wired), sold-out ordering, codebase committed
+
+**Backend fixes applied (committed locally as `feat(events)` — `git fetch` from
+origin BLOCKED, no network to github.com:443; the local staged fixes are the
+changes):**
+- `event_setting_serializer.rb`: `PUBLIC_CONFIG_KEYS` expanded **2 → 19 keys**
+  (`allow_waitlist`, `public_guest_limit`, `featured`, `rating`, `sold_out`,
+  `tickets_left`, `price_foreign_from_minor`, `foreign_currency`, `event_type`,
+  `seat_map`, `answer_edit_window_hours`, `rsvp_going`, `rsvp_capacity`,
+  `allows_plus_one`, `max_guests`, `rsvp_requirements`, `access_mode`,
+  `invite_only_paid`, `on_guest_list`). Previously only `allow_waitlist` +
+  `public_guest_limit` were served — the frontend adapter's 17-key mapping was
+  dead code against live data; it is now live.
+- Dev seeds mirror the pazimo catalog (28 events) via `db/seeds_events.rb`
+  (idempotent, standalone-runnable; `dev_extensions.rb` requires it). Dev DB
+  already carries the events (34 total incl. drill/test).
+- `development.rb`: per-request reloading OFF (Docker bind-mount latency) +
+  SolidQueue-in-Puma; Dockerfile `development` stage (pg18 client); `compose.yaml`;
+  `queue.yml` fixed threads; `.gitattributes` LF for bin/script; preview campaign
+  suppression idempotency fix.
+
+**Live verification (`GET /public/events`):** 34 events, 30 with non-empty
+`config`. Mirror events serve all 17 keys — `featured`×8, `sold_out`×11,
+`seat_map`×3, `event_type` ∈ {`rsvp`, `ticketed`}, real `tickets_left`/`rating`.
+`price_from_minor` live ticket-only (`on-on` 60000, `euphoria` 70000, #32).
+
+**Frontend wiring:** `src/lib/events-adapter.ts` header corrected — it claimed
+#13 (`price_from_minor`) still open and "currently mapped: featured, tickets_left",
+but the code maps all 17 keys; both now true. No mapping code changed — the
+serializer fix makes the existing mapping live. Sold-out ordering (sold-out
+events sort behind available, never lead the carousel) now has real effect on
+live events.
+
+**Committed all uncommitted frontend work on `feat/frontend-backend-integration`
+in 12 logical chunks** (verified: tsc clean, 97/97 vitest, build ok): event-detail
+ended gating (#34) + gated tiers (#20); discovery sold-out ordering; guest device
+wallet + parking duplicate-card filter; live transfer/claim + OTP; checkout
+extras-only + payment-return; registration/audience libs; payout; resale wiring +
+spec; app shell; e2e; docs. `.agents/` + `.ua/` added to `.gitignore` (tool
+caches / node_modules — not committed).
+
 ## Session 2026-09-09 — backend fast-forward (`d67e132`); #29/#32 resolved, transfer OTP surface recorded
 
 Fast-forwarded `digis_backend` `91063d8 → d67e132` (wallet `add_ons`, ticket-only

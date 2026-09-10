@@ -262,7 +262,7 @@ history). Every item below was re-verified against the pulled
 | 5 | `GET /tickets` owner wallet (`TicketWalletSerializer`) | live HTTP + frontend wired |
 | 6 | Free orders fulfill → issue tickets (`accept_zero_total!`) | code |
 | 15 | Mock-mirror dev events seeded with `platform_default` fee schedule | live 2026-09-04 |
-| 1 | `PUBLIC_CONFIG_KEYS` 17-key projection (`featured`, `rating`, `sold_out`, `tickets_left`, `price_foreign_from_minor`, `foreign_currency`, `event_type`, `seat_map`, `answer_edit_window_hours`, `rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`, `rsvp_requirements`, `access_mode`, `invite_only_paid`, `on_guest_list`) | serializer code + live HTTP 2026-09-07 |
+| 1 | `PUBLIC_CONFIG_KEYS` 19-key projection (`allow_waitlist`, `public_guest_limit`, `featured`, `rating`, `sold_out`, `tickets_left`, `price_foreign_from_minor`, `foreign_currency`, `event_type`, `seat_map`, `answer_edit_window_hours`, `rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`, `rsvp_requirements`, `access_mode`, `invite_only_paid`, `on_guest_list`) — `event_setting_serializer.rb` (committed `feat(events)` 2026-09-10); frontend `events-adapter.ts` maps all 17 keys | live HTTP 2026-09-10 (mirror events serve `featured`×8, `sold_out`×11, `seat_map`×3, `event_type`, `tickets_left`) |
 | 13 | `price_from_minor` computed on the public list serializer | live HTTP 2026-09-08 (`on-on` → 10000) |
 | 3-nuance | `requires_ticket` projected from product `metadata` | code 2026-09-08 |
 | 19 | Public `GET public/events/:slug/ticket_types/:id/registration_schema` | live HTTP 2026-09-08 |
