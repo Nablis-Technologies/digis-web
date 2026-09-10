@@ -41,6 +41,7 @@
 | 16 | informational | Chapa v1 only (key-prefix gated) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 37 | informational | no public waitlist-join / invite-request endpoint |
+| 38 | informational | `requires_ticket` not enforced at quote/order time |
 | 8-deferred | deferred | no Google / check-account / password-reset auth |
 
 ---
@@ -229,6 +230,21 @@ data.
 
 **Fix (if wanted):** a public guest waitlist-join endpoint and/or an
 invite-request endpoint.
+
+### #38. `requires_ticket` is not enforced at quote/order time
+
+Product `metadata.requires_ticket` is projected on the public products payload
+(`requires_ticket`) and mapped by the frontend (`EventProduct.requiresTicket`),
+but **no gate enforces it** — `Orders::BuildQuote` accepts a non-ticket line
+regardless, and there is no order-level "buyer holds a ticket for this event"
+check. Extras-only orders are otherwise fully supported (verified live 2026-09-10:
+a guest extras-only quote → order for on-on "Reserved parking",
+`requires_ticket: true`, succeeded without any ticket). The UI only offers
+extras from a ticket's "Add extras" entry, so it's soft-gated there — but the
+API would accept a ticket-required extra standalone.
+
+**Fix (if wanted):** reject a quote/order line whose product `requires_ticket`
+when the buyer has no ticket (or no ticket in the order) for the event.
 
 ---
 
