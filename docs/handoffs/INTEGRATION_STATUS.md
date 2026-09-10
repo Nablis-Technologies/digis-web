@@ -79,6 +79,27 @@ the same identity + ticket type issued a NEW confirmed registration + a new
 ticket. Frontend needs no change (`active_registration_conflict` choice-sheet is
 only a surface for genuinely-active rows). **102/102 tests**, tsc clean.
 
+## Session 2026-09-10 (late night) — mock leaks removed; dev OTP path; guest OTP drill proven
+
+- **Detail-page mock leaks removed.** `resolveLineup` fabricated a hardcoded
+  lineup (unsplash avatars) whenever an event had no lineup, and the venue
+  profile sheet showed 5 hardcoded unsplash photos. Now: no fabricated lineup
+  (section hides), no venue photo strip, `UIPreviewPage` owns its sample mock.
+  **mock-audit e2e: detail images 8 mock-host → 0** (2/2 backend). Filed
+  **#36** (public payload lacks participants/venue media/coords).
+- **InviteOnly fakes removed.** "Join Waitlist"/"Request access" were local-only
+  fakes + a fabricated `waitlistAhead` default. Now display-only; filed **#37**
+  (no public waitlist-join / invite-request endpoint; note InviteOnlySection is
+  dead for live data — backend never emits `inviteOnly` event_type).
+- **Dev OTP path (backend `8304637`).** The OTP was silently swallowed in dev
+  (no sender registered; challenge stores only a keyed digest). Added a
+  dev-only logging sender in `development.rb` → codes now appear as
+  `[DEV OTP] challenge=… code=…`. **Full guest RSVP OTP drill proven live:**
+  `request_otp` → verify (Idempotency-Key required) → `rsvpSubmit` →
+  registration `confirmed`, 1 ticket issued. Unblocks the guest claim/transfer
+  drills too.
+- Committed: backend `8304637`; frontend (`88a2111`, `7055211`).
+
 ## Session 2026-09-10 (night) — free guest checkout unlocked (#35), dev-DB test hazard
 
 - **Root-caused + fixed guest checkout on the free product.** Checkout's
