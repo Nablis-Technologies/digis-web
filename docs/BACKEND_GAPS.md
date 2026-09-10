@@ -2,54 +2,65 @@
 
 > Every confirmed gap between what the frontend needs and what the backend provides,
 > **verified against the actual backend code** (serializers, policies, controllers,
-> routes). The frontend does NOT work around these (ADR-0002) — it mocks/defer/disables
+> routes). The frontend does NOT work around these (ADR-0002) — it disables/hides
 > until the backend resolves them.
 >
-> Status key: `blocking` (frontend feature can't ship), `degrading` (works but
-> suboptimal), `informational` (note for backend correctness), `RESOLVED` (fixed on
-> `feat/launch-hardening-telemetry`).
->
-> Re-verified 2026-09-10 against the pulled branch (fast-forward `d67e132` then
-> merge of 11 commits to `78e4a6f` — RSVP public endpoints, registration repeat,
-> guest ticket view material) by code read + live HTTP. Sweep result: **#31 and
-> #30 newly RESOLVED** (#31 guest view token/url served + claim flow built; #30
-> seed-side parking accesses applied by the dev seed re-run). Still open: #17,
-> #26, #8, #9, #33, #34 (no backend change in the pulled range); informational:
-> #11, #16, #8-deferred. Items whose fix is confirmed are in
-> the Resolved archive at the bottom.
+> Re-verified 2026-09-10 against `feat/launch-hardening-telemetry` at `78e4a6f`
+> (fast-forward `d67e132` + merged 11 commits: RSVP public endpoints, registration
+> repeat, guest ticket view material) by code read + live HTTP. Sweep result:
+> **#31, #30, #23, #27, #1, #29, #32 resolved and frontend-wired.** Still open:
+> #17, #26, #8, #9, #33, #34. Informational: #11, #16, #35, #36, #37.
+
+## Status key
+
+| Status | Meaning |
+|---|---|
+| **open — blocking** | frontend feature cannot ship until fixed |
+| **open — degrading** | works but suboptimal; frontend has a mitigation |
+| **informational** | note for backend correctness; no frontend impact |
+| **deferred** | product decision, not a bug |
+| **resolved** | fixed; detail in the Resolved archive |
+
+## At a glance
+
+| # | Status | Summary |
+|---|---|---|
+| 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
+| 26 | open — blocking (partial) | payout destination create fail-closed on Chapa tokenization |
+| 8 | open — degrading | no user `name` column / serializer field |
+| 9 | open — degrading | no self-service `PATCH /auth/me` |
+| 33 | open — degrading | guest payment-refresh re-validates the quote token on accepted payments |
+| 34 | open — degrading | past events remain purchasable (no date/sales-window check) |
+| 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
+| 16 | informational | Chapa v1 only (key-prefix gated) |
+| 35 | informational | checkout requires a purchase limit on the ticket type |
+| 36 | informational | public payload lacks lineup/participants + venue media/coords |
+| 37 | informational | no public waitlist-join / invite-request endpoint |
+| 8-deferred | deferred | no Google / check-account / password-reset auth |
 
 ---
 
 ## Open — blocking
 
-These are the items the frontend cannot ship a feature around. Each entry: what's
-missing (file + fields), why it matters, and a concrete fix.
+These items block a frontend feature. Each entry: what's missing (file + fields),
+why it matters, and a concrete fix.
 
-### #17. `cbe` is not a valid backend payment method (BLOCKING for the CBE Birr option)
+### #17. `cbe` is not a valid backend payment method
 
 Frontend `PaymentMethod = 'telebirr' | 'cbe' | 'card'`; backend
 `Commercial::FeeComponent::PAYMENT_METHODS = %w[telebirr card bank]`
 (`app/models/commercial/fee_component.rb:23`), and the Chapa payment adapter
 capabilities list `payment_methods: %w[telebirr card bank]`
 (`app/services/payments/providers/registration.rb`). Selecting CBE Birr →
-`422 invalid_payment_method`. Add `"cbe"` to the model, the `chapa_adapter`
-capabilities, and any organizer-facing `payment_method` enums; the frontend's CBE
-button is currently disabled as a workaround. **VERIFIED STILL OPEN 2026-09-09.**
+`422 invalid_payment_method`.
 
-### #23. One active registration per identity+ticket type — RESOLVED 2026-09-10
+**Fix:** add `"cbe"` to the model, the `chapa_adapter` capabilities, and any
+organizer-facing `payment_method` enums. The frontend's CBE button is currently
+disabled as a workaround.
 
-`ad7bd57` (`feat(registration)`) dropped `confirmed` from the active-identity
-unique index `idx_ticketing_registrations_active_identity` and introduced
-`Registration.blocking_duplicate` (pending_payment/pending_approval/waitlisted/
-offered — no `confirmed`), which `Registrations::Submit#existing_active_registration`
-now uses. A confirmed registration no longer blocks a fresh submit — repeat
-bookings after confirmation work. **Dev-DB note:** the migration edit does NOT
-re-run on an already-migrated DB — the live dev index still had `confirmed`
-until recreated by SQL (2026-09-10, matching `structure.sql`). Frontend needs no
-change: the `active_registration_conflict` choice-sheet is only a surface for
-genuinely-active rows. See Resolved archive.
+**Status: open — verified 2026-09-09.**
 
-### #26. Payout destination creation fail-closed (BLOCKING for seller payout-account verification) — PARTIAL
+### #26. Payout destination creation fail-closed (PARTIAL)
 
 `Marketplace::PayoutProviders::Registration` registers the Chapa adapter at boot
 (when `CHAPA_ENABLED` + `CHAPA_PAYOUT_ENABLED`), so `Registry.fetch` no longer
@@ -61,136 +72,91 @@ However `ChapaTransferClient#capabilities` reports
 `payout_provider_operation_not_implemented` unless the client responds to it
 (`chapa_adapter.rb:15-19`). Creates still 422, intentionally — raw credentials
 must never be stored until the provider can tokenize destinations. Reads (`GET`)
-work. **VERIFIED PARTIAL 2026-09-09:** registry fixed; destination verification
-remains blocked on Chapa tokenization capability.
+work.
+
+**Fix:** implement Chapa destination tokenization so `VerifyPayoutAccount` can
+complete. (Frontend already submits `provider: "chapa"` — the only registered
+adapter.)
+
+**Status: open (partial — registry fixed) — verified 2026-09-09.**
 
 ---
 
 ## Open — degrading
 
-Work but suboptimal. Frontend falls back to mock or local enrichment.
+Work but suboptimal; the frontend mitigates. Fixing these improves correctness.
 
 ### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column
 
 `Core::UserAuthSerializer` returns `id, email, phone, verified_at, created_at,
 updated_at, permissions` only (`app/serializers/core/user_auth_serializer.rb:3`)
-— no `name`. Frontend derives display name from email local-part. Fix: add
-`name` column and serializer field if the product wants a real display name.
-**VERIFIED STILL OPEN 2026-09-09.**
+— no `name`. Frontend derives display name from email local-part.
+
+**Fix:** add a `name` column and serializer field if the product wants a real
+display name.
+
+**Status: open — verified 2026-09-09.**
 
 ### #9. No self-service `PATCH /auth/me` or `PATCH /users/me`
 
 Routes expose only `GET auth/me` (`config/routes.rb:10`) — no update endpoint.
-Settings profile-edit UI is display-only. Add an auth-bounded update endpoint
-guarded by `Core::Authorizable`; needs `name` column (#8) for the same payload.
-**VERIFIED STILL OPEN 2026-09-09.**
+Settings profile-edit UI is display-only.
 
-### #27. No consumer RSVP submit endpoint — RESOLVED 2026-09-10
+**Fix:** add an auth-bounded update endpoint guarded by `Core::Authorizable`;
+needs the `name` column (#8) for the same payload.
 
-`983c6a3`/`e42f981`/`193fbb2`/`0a3b728` (`feat(rsvps)`) added public RSVP:
-`POST public/events/:event_slug/rsvp/request_otp` (guest OTP challenge, free
-products only) + `POST public/events/:event_slug/rsvp` (submit → `confirmed` /
-`issuing` / `awaiting_approval`, with synchronous ticket issuance for free
-products). Frontend wired: `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/
-`rsvpSubmit` + `RsvpRegistrationSheet` (guest phone → OTP → submit; signed-in
-attendees submit directly). Live probe: FREEFORM's paid product →
-`rsvp_paid_product_requires_checkout` (mapped). See Resolved archive.
+**Status: open — verified 2026-09-09.**
 
-### #30. Parking fulfillment blocked by missing seed zones — RESOLVED 2026-09-10
-
-The `Parking::FulfillOrderItem` keyword-arg crash (`ArgumentError`) was already
-fixed (all `error()` call sites pass `status:`). The remaining half — parking
-products with **zero parking accesses** — is now resolved on the seed side:
-`db/seeds_events.rb` gives every fabricated parking add-on a `product_access`
-of type `parking` (linked to the event date) + a `PARKING` access zone. The
-2026-09-10 dev seed re-run applied it: **26/26 parking products now carry a
-parking access + PARKING zone** (verified via SQL). `Parking::FulfillOrderItem`
-only gates on `parking_accesses` being non-empty, and the fulfill path is
-covered by backend tests (`test/services/parking/issue_package_test.rb`,
-`test/integration/parking/parking_admission_test.rb`). A live end-to-end
-fulfill drill still needs a Chapa-paid order (the outbox runs after payment
-accept) — same paid-sandbox limitation as #29/#31. See Resolved archive.
-
-### #31. No JSON endpoint returns a signed guest ticket `view_token` — RESOLVED 2026-09-10
-
-`43174dd` (`feat(ticketing)`) added `Ticketing::GuestPaymentTicketSerializer`
-(extends `TicketWalletSerializer` with `registration_id`, `ticket_view_token`,
-`ticket_view_url`, `short_url`) and wired it into the guest payment-refresh
-response (`guest_payment_refresh_controller.rb` now serializes `tickets:` with
-it). A guest completing checkout now receives a **signed `ticket_view_token` +
-`ticket_view_url` in a JSON body** — exactly the fix this gap requested. The
-public ticket view (`GET /public/tickets/:ticket_id?view_token=`) is reachable
-from inside the app via the guest's ticket link.
-
-**Frontend wiring (2026-09-10):** `TicketWalletWire` + `mapWalletTicket` map
-`registration_id`/`ticket_view_token`/`ticket_view_url`/`short_url` →
-`UserTicket` (`registrationId`/`ticketViewToken`/`ticketViewUrl`/`shortUrl`);
-`DetailedTicket` renders a copyable **"Ticket link"** row for guest/device
-tickets, giving cross-device access (the durable path the device wallet alone
-couldn't provide). The device-wallet mitigation (2026-09-09) remains as the
-same-device layer.
-
-**Follow-up (frontend feature, no longer a backend gap):** the in-app "claim
-your account" OTP flow (`POST /public/ticket_views/:token/request_otp` now has
-a token to feed) is not yet surfaced in the UI. Tracked in `.scratch/`-style
-follow-up; the copyable ticket link covers access meanwhile. See Resolved archive.
-
-### #33. Guest payment-refresh re-validates the quote token even for accepted payments (DEGRADING — can strand a paid guest)
+### #33. Guest payment-refresh re-validates the quote token even for accepted payments
 
 `Orders::GuestPaymentRefreshController#create` re-decodes `GuestQuoteToken`
 (`guest_payment_refresh_controller.rb:19-21`) before reconciling. The token
 binds `event_id` + a `phone_digest` (`guest_quote_token.rb:36,70-75`); any
 failure — including pairing a payment with creds from a DIFFERENT order —
-returns `422 invalid_guest_quote`. Note there is **no time check at decode**
-(the "invalid or has expired" copy is generic): the 10-minute quote hold
-(`Orders::BuildQuote::HOLD_DURATION`) is enforced only at create/restart/
-payment-attempt, not at refresh. Separately, `Core::GuestRequestThrottling`
-(`guest_request_throttling.rb:23`) counts every ≥400 response (LIMIT=10/min per
-IP+phone), and the app's 3-second return poll tripped it (`429 rate_limited`)
-by retrying the failing refresh.
+returns `422 invalid_guest_quote`. There is **no time check at decode**; the
+10-minute quote hold is enforced only at create/restart/payment-attempt, not at
+refresh. Separately, `Core::GuestRequestThrottling` counts every ≥400 response
+(LIMIT=10/min per IP+phone), and the app's 3-second return poll tripped it
+(`429 rate_limited`) by retrying the failing refresh.
 
 **Why it degrades the frontend:** a guest whose checkout creds are stale or
-crossed (abandoned earlier checkout, multi-order purchase, leftover
-`localStorage`) gets a refresh that 422s even though the payment was accepted
-and tickets were issued server-side. The return screen then tells them
-"payment failed", and the retry loop locks the phone out of the guest
-endpoints for a minute.
+crossed gets a refresh that 422s even though the payment was accepted and
+tickets issued server-side. The return screen then says "payment failed", and
+the retry loop locks the phone out of the guest endpoints for a minute.
 
-**Frontend mitigation (live 2026-09-09):** guest creds are now correlated to
-the payment being reconciled (`findGuestReturnCreds(paymentId)` in
-`src/lib/order.ts` resolves the order via `digis:payment-id:<orderId>`), the
-reconcile loop treats `invalid_guest_quote`/not-owned/not-found as terminal
-(stops polling, honest copy), and 429 backs off for the throttle window. The
-device wallet + SMS link remain the recovery path when verification genuinely
-can't run.
+**Frontend mitigation (live 2026-09-09):** guest creds are correlated to the
+payment being reconciled (`findGuestReturnCreds(paymentId)` in `src/lib/order.ts`
+resolves the order via `digis:payment-id:<orderId>`), the reconcile loop treats
+`invalid_guest_quote`/not-owned/not-found as terminal (stops polling, honest
+copy), and 429 backs off for the throttle window. Device wallet + SMS link
+remain the recovery path.
 
 **Fix (backend):** for an already-accepted payment, bind refresh by payment id
 + the order's buyer phone and skip the quote-token decode (the payment is the
-durable proof, not the quote); and don't count `invalid_guest_quote` on
-accepted payments toward the guest throttle. **VERIFIED 2026-09-09.**
+durable proof); don't count `invalid_guest_quote` on accepted payments toward
+the guest throttle.
 
-### #34. Past events remain purchasable — no date / sales-window enforcement (DEGRADING for purchase correctness)
+**Status: open — verified 2026-09-09.**
+
+### #34. Past events remain purchasable — no date / sales-window enforcement
 
 The quote → order → payment path never checks the event date or the product
 sales window. `Orders::BuildQuote#normalize_item_request`
 (`app/services/orders/build_quote.rb:108-154`) only rejects an event when
 `status == "cancelled"` and a product when `status != "active"`. It ignores:
-- `Events::EventDate#starts_at` / `#ends_at` and its `status`
-  (`STATUSES = %w[scheduled postponed cancelled completed]`,
-  `app/models/events/event_date.rb:8`) — nothing marks dates `completed` when
-  `ends_at` passes, and nothing refuses a quote for a finished date.
+- `Events::EventDate#starts_at` / `#ends_at` and `status`
+  (`STATUSES = %w[scheduled postponed cancelled completed]`) — nothing marks
+  dates `completed` when `ends_at` passes, nothing refuses a quote for a
+  finished date.
 - the product sales window `sales_start_at` / `sales_end_at`
   (`app/models/catalog/event_product.rb`). `Catalog::Public::ProductAvailability`
-  respects it but is DISPLAY-only (sold-out/tickets-left), and
-  `Catalog::Inventory::Reserve` (box-office reserve) enforces it — the online
-  guest/auth checkout path (`BuildQuote` → `CreateCheckout` →
-  `StartPaymentAttempt`) does not.
-- `Events::Event.publicly_visible` is `status: "published" AND
-  visibility: "public"` with no date filter (`app/models/events/event.rb:86`),
-  so past published events stay listed and quotable.
+  respects it but is DISPLAY-only; `Catalog::Inventory::Reserve` (box-office)
+  enforces it — the online guest/auth checkout path does not.
+- `Events::Event.publicly_visible` is `status: "published" AND visibility:
+  "public"` with no date filter, so past published events stay listed/quotable.
 
 **Verified live 2026-09-09:** a published event whose only date has passed still
-returns a quote, creates an order, and opens a payment — end-to-end purchasable.
+quotes, orders, and opens payment — end-to-end purchasable.
 
 **Frontend mitigation (live 2026-09-09):** display-side "disable" per ADR-0002.
 `eventEnded()` (`src/lib/eventDates.ts`) treats an event as ended when no date
@@ -202,20 +168,22 @@ badge.
 
 **Fix (backend):** reject a quote when the event has no future purchasable date
 (or the requested event_date has passed / is `completed`/`cancelled`), and
-enforce the product `sales_end_at` window in `BuildQuote` (or in
-`StartPaymentAttempt` as the last gate). Optionally auto-mark event dates
-`completed` when `ends_at` passes (the status already exists) and/or filter
-`publicly_visible` to events with a future date.
+enforce the product `sales_end_at` window in `BuildQuote` (or
+`StartPaymentAttempt` as the last gate). Optionally auto-mark dates `completed`
+when `ends_at` passes and/or filter `publicly_visible` to events with a future
+date.
+
+**Status: open — verified 2026-09-09.**
 
 ---
 
 ## Informational
 
-Cheap insurance / product-clarity notes, not blocking.
+Notes for backend correctness; no frontend impact (or frontend already honest).
 
-### #11. Slug namespace safety + redirects — PARTIALLY ADDRESSED
+### #11. Slug namespace safety + redirects (PARTIALLY ADDRESSED)
 
-A `RESERVED_SLUGS` denylist now exists on the short-link model
+A `RESERVED_SLUGS` denylist exists on the short-link model
 (`app/models/links/short_link.rb:12`, validated at `short_link.rb:58`) guarding
 the branded-link space. What remains: an event-slug `slug_history` 301 table so
 renamed event slugs keep their old URLs. Frontend needs zero changes.
@@ -225,57 +193,55 @@ renamed event slugs keep their old URLs. Frontend needs zero changes.
 Backend implements v1 only. Keys prefixed `CHASECK_TEST-`/`CHASECK-` work
 (`app/services/payments/providers/chapa_client.rb:191`,
 `app/services/finance/payout_providers/chapa_transfer_client.rb:152`);
-`CHAPA_TEST-` keys (v2) fail the boot-time validator. No frontend impact —
-backend presents the same `PaymentSerializer` either way.
+`CHAPA_TEST-` keys (v2) fail the boot-time validator. Backend presents the same
+`PaymentSerializer` either way.
 
-### #35. Checkout requires a purchase limit on the ticket type (INFORMATIONAL — verified live 2026-09-10)
+### #35. Checkout requires a purchase limit on the ticket type (verified live 2026-09-10)
 
 `Ticketing::PurchaseLimits::Reserve` skips creating allocations when
 `effective_limit` is nil (`max_packages_per_user` unset and no
-`PurchaseLimitOverride`); the later `PurchaseLimits::Commit` then fails the
-order with `purchase_limit_allocations_missing`. Verified live on the dev
-"Chapa Test Free RSVP" product (no limit → guest order 422; after setting
-`max_packages_per_user: 10` → order created and auto-fulfilled, active ticket
-issued). In practice every sellable ticket type is expected to set a limit, so
-this is organizer-config rather than a bug — but a product with no limit is
-simply unbuyable via checkout. Frontend: friendly copy mapped
-(`purchase_limit_allocations_missing` / `purchase_limit_exceeded`). The dev
-free-RSVP fixture now sets `max_packages_per_user: 10` (preview.rb) so guest
-checkout on it can be drilled.
+`PurchaseLimitOverride`); `PurchaseLimits::Commit` then fails the order with
+`purchase_limit_allocations_missing`. Verified live: dev "Chapa Test Free RSVP"
+(no limit → guest order 422; after `max_packages_per_user: 10` → order created
+and auto-fulfilled, active ticket issued). In practice every sellable ticket
+type is expected to set a limit, so this is organizer-config rather than a bug —
+but a product with no limit is simply unbuyable via checkout. Frontend maps
+friendly copy (`purchase_limit_allocations_missing` / `purchase_limit_exceeded`);
+the dev free-RSVP fixture sets `max_packages_per_user: 10` (preview.rb).
 
-### #36. Public event payload lacks lineup/participants + venue media/coords (INFORMATIONAL — verified 2026-09-10)
+### #36. Public event payload lacks lineup/participants + venue media/coords
 
-`Events::Public::EventDetailSerializer` / `EventListSerializer` expose only
-categories, event_dates, event_media, event_organizations, event_setting,
-organization — **no event participants/artists** (the `events_artists` /
-`event_participants` data exists server-side but has no public route), and the
-nested `venue_summary` is `{id,name,city}` only (**no photos or lat/lng**).
-Consequence: the frontend cannot source a lineup, venue photos, or a real map
-pin. Previously it fabricated them (a hardcoded fake lineup with unsplash
+`EventDetailSerializer` / `EventListSerializer` expose only categories,
+event_dates, event_media, event_organizations, event_setting, organization —
+**no event participants/artists** (the data exists server-side but has no public
+route), and `venue_summary` is `{id,name,city}` only (**no photos or lat/lng**).
+The frontend previously fabricated these (a hardcoded fake lineup with unsplash
 avatars, a 5-photo unsplash venue strip, a name→coord lookup with an Addis
-default). Now it renders **absent** — the Lineup section hides, venue photos
-are dropped, and the map falls back to a city-level default. Fix: add
-`participants`/`artists` and venue `media`/`latitude`/`longitude` to the public
-serializers (or a public participants endpoint).
+default). Now it renders **absent** — the Lineup section hides, venue photos are
+dropped, the map falls back to a city-level default.
 
-### #37. No public waitlist-join or access-request endpoint (INFORMATIONAL — verified 2026-09-10)
+**Fix:** add `participants`/`artists` and venue `media`/`latitude`/`longitude`
+to the public serializers (or a public participants endpoint).
+
+### #37. No public waitlist-join or access-request endpoint
 
 The waitlist is an **authenticated, registration-based** flow
-(`POST /registrations/:id/enqueue_waitlist` + `.../accept_waitlist_offer`,
-`Ticketing::WaitlistOffersController` — not public). There is **no endpoint to
-request an invite** ("Request access"). The frontend `InviteOnlySection`'s
-"Join Waitlist"/"Request access" were local-only fakes; now they're display-only
-(no fake "joined"/"sent" state) and the fabricated `waitlistAhead` default is
-gone. Note `InviteOnlySection` only renders when `event_type === "inviteOnly"`,
-which the backend never emits (live events are `ticketed`/`rsvp`) — so this path
-is currently dead for live data. Fix (if wanted): a public guest waitlist-join
-endpoint and/or an invite-request endpoint.
+(`POST /registrations/:id/enqueue_waitlist` + `.../accept_waitlist_offer` — not
+public). There is **no endpoint to request an invite** ("Request access"). The
+frontend `InviteOnlySection`'s "Join Waitlist"/"Request access" were local-only
+fakes; now display-only (no fake "joined"/"sent" state), fabricated
+`waitlistAhead` default removed. Note `InviteOnlySection` only renders when
+`event_type === "inviteOnly"`, which the backend never emits — dead for live
+data.
+
+**Fix (if wanted):** a public guest waitlist-join endpoint and/or an
+invite-request endpoint.
 
 ---
 
 ## Deferred by design
 
-These are product decisions, not bugs. Re-open only if requirements change.
+Product decisions, not bugs. Re-open only if requirements change.
 
 ### #8-deferred. Auth: no Google / check-account / password-reset
 
@@ -307,7 +273,7 @@ history). Every item below was re-verified against the pulled
 | 5 | `GET /tickets` owner wallet (`TicketWalletSerializer`) | live HTTP + frontend wired |
 | 6 | Free orders fulfill → issue tickets (`accept_zero_total!`) | code |
 | 15 | Mock-mirror dev events seeded with `platform_default` fee schedule | live 2026-09-04 |
-| 1 | `PUBLIC_CONFIG_KEYS` 19-key projection (`allow_waitlist`, `public_guest_limit`, `featured`, `rating`, `sold_out`, `tickets_left`, `price_foreign_from_minor`, `foreign_currency`, `event_type`, `seat_map`, `answer_edit_window_hours`, `rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`, `rsvp_requirements`, `access_mode`, `invite_only_paid`, `on_guest_list`) — `event_setting_serializer.rb` (committed `feat(events)` 2026-09-10); frontend `events-adapter.ts` maps all 17 keys | live HTTP 2026-09-10 (mirror events serve `featured`×8, `sold_out`×11, `seat_map`×3, `event_type`, `tickets_left`) |
+| 1 | `PUBLIC_CONFIG_KEYS` 19-key projection — `event_setting_serializer.rb`; frontend `events-adapter.ts` maps all 17 keys (`featured`, `rating`, `sold_out`, `tickets_left`, `event_type`, `seat_map`, `rsvp_*`, `access_mode`, `invite_only_paid`, `price_foreign_from_minor`, …) | live HTTP 2026-09-10 (mirror events serve `featured`×8, `sold_out`×11, `seat_map`×3) |
 | 13 | `price_from_minor` computed on the public list serializer | live HTTP 2026-09-08 (`on-on` → 10000) |
 | 3-nuance | `requires_ticket` projected from product `metadata` | code 2026-09-08 |
 | 19 | Public `GET public/events/:slug/ticket_types/:id/registration_schema` | live HTTP 2026-09-08 |
@@ -323,12 +289,12 @@ history). Every item below was re-verified against the pulled
 | 28 | Dev DB re-synced to the edited `create_payments` migration (`structure.sql` regenerated) | live 2026-09-08 |
 | 14 | Guest shadow checkout: OTP flow, guest registration, guest quote/order/payment, claim-guest upgrade, public ticket views (backend complete; frontend slices 1–3 wired) | code + live HTTP 2026-09-09 |
 | 30 (crash half) | `Parking::FulfillOrderItem` keyword-arg crash fixed (`status:` keyword) | code 2026-09-09 |
-| 29 | Wallet `add_ons` projected from the ticket's order (non-ticket items `{id,name,type,quantity,unit_amount_minor}`) + eager load in `TicketsController#index` and `PaymentRefresh`; frontend `mapWalletTicket` already maps `add_ons` → `UserTicket.addOns`, so `DetailedTicket` "Your extras" renders on live wallet tickets | code 2026-09-09 (d67e132); live paid verification needs a Chapa sandbox-paid attempt |
-| 32 | `price_from_minor` restricted to `status == "active" && ticket?` products (`event_list_serializer.rb`) — discovery grid/filter/sort now show the true ticket "from" price | live HTTP 2026-09-09 (`on-on` → 60000, `euphoria` → 70000; was 10000) |
-| 23 | Repeat submissions after confirmation — `confirmed` dropped from `idx_ticketing_registrations_active_identity` + `Registration.blocking_duplicate` (`ad7bd57`); dev DB index recreated by SQL to match | live HTTP 2026-09-10: **repeat purchase proven** (2nd RSVP same identity+ticket_type → new confirmed registration + new ticket) |
-| 27 | Public RSVP — `POST public/events/:event_slug/rsvp/request_otp` (guest OTP, free products) + `POST public/events/:event_slug/rsvp` (submit → confirmed/issuing/awaiting_approval, free tickets issued synchronously); frontend `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` guest-OTP / signed-in submit wired | live HTTP 2026-09-10: **happy path confirmed** (Chapa Test Free RSVP, `+251911000001`, `full_name` answer + form_version_id → registration `confirmed`, ticket issued with active QR); paid-guard 422 on FREEFORM |
-| 31 | Guest payment-refresh returns signed guest ticket material — `GuestPaymentTicketSerializer` (`registration_id`, `ticket_view_token`, `ticket_view_url`, `short_url`) wired into `guest_payment_refresh_controller.rb` (`43174dd`); frontend maps fields → `UserTicket` + copyable "Ticket link" on guest tickets | code 2026-09-10 (`43174dd`); live paid drill still needs a Chapa sandbox-paid attempt (same limitation as #29) |
-| 30 | Parking fulfillment data — every fabricated parking product now gets a `parking` `product_access` + `PARKING` access zone (`db/seeds_events.rb`); 26/26 dev parking products carry them after the 2026-09-10 seed re-run; fulfill path covered by backend tests | SQL 2026-09-10 (26/26 parking products with parking access + zone); live fulfill drill needs a Chapa-paid order |
+| 29 | Wallet `add_ons` projected from the ticket's order + eager-loaded; frontend `mapWalletTicket` maps → `UserTicket.addOns` ("Your extras" on live wallet tickets) | code 2026-09-09 (d67e132); live paid verification needs a Chapa sandbox-paid attempt |
+| 32 | `price_from_minor` restricted to `active && ticket?` products — discovery shows the true "from" price | live HTTP 2026-09-09 (`on-on` → 60000, `euphoria` → 70000) |
+| 23 | Repeat submissions after confirmation — `confirmed` dropped from the active-identity index + `Registration.blocking_duplicate`; dev DB index recreated by SQL | live HTTP 2026-09-10: **repeat purchase proven** (2nd RSVP same identity+ticket_type → new confirmed registration + new ticket) |
+| 27 | Public RSVP — `request_otp` (guest OTP) + `rsvp` submit (confirmed/issuing/awaiting_approval, free tickets issued synchronously); `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` wired | live HTTP 2026-09-10: **happy path confirmed** (Chapa Test Free RSVP → registration `confirmed`, ticket with active QR); paid-guard 422 on FREEFORM |
+| 31 | Guest payment-refresh returns signed guest ticket material — `GuestPaymentTicketSerializer` (`registration_id`, `ticket_view_token`, `ticket_view_url`, `short_url`); frontend maps → `UserTicket` + copyable "Ticket link"; **claim-to-account flow built** (`ClaimGuestSheet`: OTP → password → claim → sign in; follow-up note in `.scratch/guest-claim-account/`) | code 2026-09-10 (`43174dd`); live paid drill needs a Chapa sandbox-paid attempt |
+| 30 | Parking fulfillment data — every fabricated parking product gets a `parking` `product_access` + `PARKING` zone; 26/26 dev parking products carry them; fulfill path covered by backend tests | SQL 2026-09-10 (26/26); live fulfill drill needs a Chapa-paid order |
 
 ---
 
@@ -336,66 +302,50 @@ history). Every item below was re-verified against the pulled
 
 Every open gap is backend serializer/code-level — not a seed problem. The
 frontend-owned `db/seeds_events.rb` mock-mirror seed writes everything the
-backend can possibly consume (full `event_setting.config` JSONB, `price_from_minor`
-data via `Catalog::ProductPrice`, `requires_ticket` via product metadata).
-Per the hard constraint we do not touch backend code; the seed is ready
-for backend fixes to land without further seed work.
+backend can possibly consume (full `event_setting.config` JSONB,
+`price_from_minor` via `Catalog::ProductPrice`, `requires_ticket` via product
+metadata). The seed is ready for backend fixes to land without further seed
+work.
 
-**One seed-side TODO (frontend-owned, for Phase 3 wiring):** ~~add a promotion
-+ promo code fixture to `db/seeds_events.rb` so `order_quotes.promotion_code`
-can be integration-tested once the frontend passes the code at quote time.~~
-**DONE 2026-09-05** — active 10% promotion + `LAUNCH10` code seeded on the
-`on-on` event; verified live (quote applies `discount_minor`, unknown codes →
+**Seed-side TODO (frontend-owned, Phase 3):** ~~add a promotion + promo code
+fixture so `order_quotes.promotion_code` can be integration-tested.~~
+**DONE 2026-09-05** — active 10% promotion + `LAUNCH10` code on `on-on`;
+verified live (quote applies `discount_minor`, unknown codes →
 `invalid_promotion_code`).
 
 ---
 
-## Discovered endpoints (no consumer yet — recorded for knowledge)
+## Discovered endpoints
 
-### Guest shadow checkout (verified against `config/routes.rb`, 2026-09-09)
+Recorded for knowledge; most are now consumed (see the relevant gap/archive row).
 
-- `POST /public/ticket_views/:token/request_otp` — request OTP for a guest ticket
-  (requires a valid `view_token`; see #31)
-- `POST /phone_verifications/:id/verify` — verify OTP code, get signed proof token
+### Guest checkout + claim (verified against `config/routes.rb` 2026-09-09; wired)
+
+- `POST /public/ticket_views/:token/request_otp` — request OTP for a guest ticket (needs a valid `view_token`; #31)
+- `POST /phone_verifications/:id/verify` — verify OTP code → signed proof token (Idempotency-Key required)
 - `POST /guest/ticket_types/:ticket_type_id/registrations` — passwordless shadow registration
 - `POST /guest/events/:event_id/order_quotes` — phone-confirmed quote preview
 - `POST /guest/events/:event_id/orders` (and `/guest/orders`) — create order from guest quote token
-- `POST /guest/orders/:order_id/payment_attempts` — start Chapa payment for guest order
-- `POST /guest/payments/:payment_id/refresh` — guest payment reconciliation (returns wallet incl. QR credentials)
-- `POST /registrations/:id/claim_guest` — upgrade shadow user with OTP proof + password → auth tokens
+- `POST /guest/orders/:order_id/payment_attempts` — start Chapa payment for a guest order
+- `POST /guest/payments/:payment_id/refresh` — guest payment reconciliation (returns wallet incl. QR credentials; now serves the signed guest ticket material, #31)
+- `POST /registrations/:id/claim_guest` — upgrade shadow user with OTP proof + password → auth tokens (wired: `ClaimGuestSheet`)
 - `GET /public/tickets/:ticket_id?view_token=` — signed public ticket view (QR material)
 - `POST /auth/phone_verifications` — OTP request for the authenticated-account path
 
 ### Ticket transfer recipient flow (verified against `config/routes.rb` + live E2E 2026-09-09)
 
-**WIRED 2026-09-09** — `src/lib/transfer.ts` now consumes these live (see
-`.scratch/transfer-recipient-otp/`): sender `POST /tickets/:ticket_id/transfers`
-(nested under `resources :tickets`), recipient landing/OTP/accept as below.
-`TicketTransfer` stores an encrypted `token_ciphertext` and verify proof tokens
-carry a `purpose` (e.g. `ticket_transfer`):
+**WIRED 2026-09-09** — `src/lib/transfer.ts` consumes these live (see
+`.scratch/transfer-recipient-otp/`). `TicketTransfer` stores an encrypted
+`token_ciphertext`; verify proof tokens carry a `purpose` (e.g. `ticket_transfer`):
 
-- `POST /tickets/:ticket_id/transfers` — authenticated initiate → `{ transfer,
-  token }` (the secret the sender shares; only recipient acceptance changes
-  ownership)
-- `GET /public/ticket_transfers/:id?token=` — recipient-safe landing
-  (`PublicTicketTransferSerializer`: masked recipient phone, event, ticket
-  product, `expires_at`; 404 `invalid_transfer` for wrong/expired token)
-- `POST /public/ticket_transfers/:id/request_otp` — `{ phone, token }` (+ Idempotency-Key)
-  → `{ challenge_id, status, expires_at }`; `purpose: "ticket_transfer"`
-- `POST /phone_verifications/:challenge_id/verify` — `{ code }` (+ Idempotency-Key)
-  → `{ verification_token, expires_at }` (15-min proof)
-- `POST /public/ticket_transfers/:id/accept_guest` — `{ token, phone,
-  verification_token, password?, password_confirmation? }` (+ Idempotency-Key)
-  → `{ transfer, ticket (PublicTicketViewSerializer), ticket_view_url, user,
-  access_token, refresh_token }` — claims the ticket into the recipient's wallet
-  (or shadow identity when no password), rotates the credential generation, and
-  returns a signed view link
-- `POST /ticket_transfers/:id/accept|decline|cancel` — authenticated recipient
-  paths (not yet consumed by the frontend)
+- `POST /tickets/:ticket_id/transfers` — authenticated initiate → `{ transfer, token }` (the secret the sender shares)
+- `GET /public/ticket_transfers/:id?token=` — recipient-safe landing (404 `invalid_transfer` for wrong/expired token)
+- `POST /public/ticket_transfers/:id/request_otp` — `{ phone, token }` (+ Idempotency-Key) → `{ challenge_id, status, expires_at }`; `purpose: "ticket_transfer"`
+- `POST /phone_verifications/:challenge_id/verify` — `{ code }` (+ Idempotency-Key) → `{ verification_token, expires_at }`
+- `POST /public/ticket_transfers/:id/accept_guest` — `{ token, phone, verification_token, password?, password_confirmation? }` → claims the ticket, rotates credentials, returns a signed view link + auth tokens
+- `POST /ticket_transfers/:id/accept|decline|cancel` — authenticated recipient paths (not yet consumed by the frontend)
 
-### Previously recorded
+### Previously recorded (not consumed)
 
-- `GET /feed` (`core/feed#index`) — follows-based social feed. Discovery is
-  the browse surface; not consumed yet.
-- `GET /categories`, `/venues`, `/artists` (+ `:id`) — public read endpoints
-  backing the follow system. Not consumed.
+- `GET /feed` (`core/feed#index`) — follows-based social feed. Discovery is the browse surface.
+- `GET /categories`, `/venues`, `/artists` (+ `:id`) — public read endpoints backing the follow system.
