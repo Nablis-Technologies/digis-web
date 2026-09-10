@@ -9,9 +9,12 @@
 > suboptimal), `informational` (note for backend correctness), `RESOLVED` (fixed on
 > `feat/launch-hardening-telemetry`).
 >
-> Re-verified 2026-09-09 against the pulled branch (`91063d8` then fast-forward
-> `d67e132` — wallet `add_ons` + ticket-only min price + public ticket-transfer
-> OTP endpoints) by code read + live HTTP. Items whose fix is confirmed are in
+> Re-verified 2026-09-10 against the pulled branch (fast-forward `d67e132` then
+> merge of 11 commits to `78e4a6f` — RSVP public endpoints, registration repeat,
+> guest ticket view material) by code read + live HTTP. Sweep result: **#31 newly
+> RESOLVED** (guest payment-refresh serves signed view token/url). Still open:
+> #17, #26, #8, #9, #30, #33, #34 (no backend change in the pulled range);
+> informational: #11, #16, #8-deferred. Items whose fix is confirmed are in
 > the Resolved archive at the bottom.
 
 ---
@@ -103,33 +106,29 @@ fulfilling. **Why it degrades the frontend:** the Chapa return screen stays
 `pending` until the ticket is issued. Ticket-only orders unaffected. **Fix:**
 seed parking access zones (our `db/seeds_events.rb` or backend seed).
 
-### #31. No JSON endpoint returns a signed guest ticket `view_token` (DEGRADING for guest ticket access + OTP claim)
+### #31. No JSON endpoint returns a signed guest ticket `view_token` — RESOLVED 2026-09-10
 
-`Ticketing::GuestTicketViewToken.issue(ticket:)` is minted ONLY inside
-`Links::BrandedUrl#direct_ticket_url` (SMS fallback when short links disabled)
-and `Links::TargetResolver#public_ticket_location` (short-link redirect) —
-**no controller returns a view_token in a JSON body** (verified 2026-09-09). The
-public ticket view (`GET /public/tickets/:ticket_id?view_token=`) and the guest
-OTP request (`POST /public/ticket_views/:token/request_otp`, which requires a
-valid `view_token`) are therefore unreachable from inside the app without first
-holding a signed link.
+`43174dd` (`feat(ticketing)`) added `Ticketing::GuestPaymentTicketSerializer`
+(extends `TicketWalletSerializer` with `registration_id`, `ticket_view_token`,
+`ticket_view_url`, `short_url`) and wired it into the guest payment-refresh
+response (`guest_payment_refresh_controller.rb` now serializes `tickets:` with
+it). A guest completing checkout now receives a **signed `ticket_view_token` +
+`ticket_view_url` in a JSON body** — exactly the fix this gap requested. The
+public ticket view (`GET /public/tickets/:ticket_id?view_token=`) is reachable
+from inside the app via the guest's ticket link.
 
-**Why it degrades the frontend:** a guest's device-held ticket has no server-
-signed fallback link, and the in-app "claim your account" OTP flow cannot start
-(no token to feed `request_otp`).
+**Frontend wiring (2026-09-10):** `TicketWalletWire` + `mapWalletTicket` map
+`registration_id`/`ticket_view_token`/`ticket_view_url`/`short_url` →
+`UserTicket` (`registrationId`/`ticketViewToken`/`ticketViewUrl`/`shortUrl`);
+`DetailedTicket` renders a copyable **"Ticket link"** row for guest/device
+tickets, giving cross-device access (the durable path the device wallet alone
+couldn't provide). The device-wallet mitigation (2026-09-09) remains as the
+same-device layer.
 
-**Frontend mitigation (live 2026-09-09):** the guest return screen persists the
-issued tickets (full wire, incl. per-credential QR) into an **encrypted device
-wallet** (`src/lib/guest-wallet.ts` — AES-GCM over IndexedDB) BEFORE the checkout
-resume keys are cleared. Signed-out `/tickets` shows a "Tickets on this device"
-section. This covers same-device re-entry; the durable cross-device path still
-needs the backend fix below.
-
-**Fix (backend):** expose a `view_url`/`view_token` on the guest payment-refresh
-response (or a public endpoint that mints one for the owner of a ticket), and/or
-allow `request_otp` to accept phone+payment proof instead of a view_token.
-This is the backend follow-up that makes claim → authenticated wallet fully
-workable.
+**Follow-up (frontend feature, no longer a backend gap):** the in-app "claim
+your account" OTP flow (`POST /public/ticket_views/:token/request_otp` now has
+a token to feed) is not yet surfaced in the UI. Tracked in `.scratch/`-style
+follow-up; the copyable ticket link covers access meanwhile. See Resolved archive.
 
 ### #33. Guest payment-refresh re-validates the quote token even for accepted payments (DEGRADING — can strand a paid guest)
 
@@ -280,6 +279,7 @@ history). Every item below was re-verified against the pulled
 | 32 | `price_from_minor` restricted to `status == "active" && ticket?` products (`event_list_serializer.rb`) — discovery grid/filter/sort now show the true ticket "from" price | live HTTP 2026-09-09 (`on-on` → 60000, `euphoria` → 70000; was 10000) |
 | 23 | Repeat submissions after confirmation — `confirmed` dropped from `idx_ticketing_registrations_active_identity` + `Registration.blocking_duplicate` (`ad7bd57`); dev DB index recreated by SQL to match | live HTTP 2026-09-10: **repeat purchase proven** (2nd RSVP same identity+ticket_type → new confirmed registration + new ticket) |
 | 27 | Public RSVP — `POST public/events/:event_slug/rsvp/request_otp` (guest OTP, free products) + `POST public/events/:event_slug/rsvp` (submit → confirmed/issuing/awaiting_approval, free tickets issued synchronously); frontend `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` guest-OTP / signed-in submit wired | live HTTP 2026-09-10: **happy path confirmed** (Chapa Test Free RSVP, `+251911000001`, `full_name` answer + form_version_id → registration `confirmed`, ticket issued with active QR); paid-guard 422 on FREEFORM |
+| 31 | Guest payment-refresh returns signed guest ticket material — `GuestPaymentTicketSerializer` (`registration_id`, `ticket_view_token`, `ticket_view_url`, `short_url`) wired into `guest_payment_refresh_controller.rb` (`43174dd`); frontend maps fields → `UserTicket` + copyable "Ticket link" on guest tickets | code 2026-09-10 (`43174dd`); live paid drill still needs a Chapa sandbox-paid attempt (same limitation as #29) |
 
 ---
 

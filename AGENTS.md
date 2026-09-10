@@ -91,15 +91,10 @@ sweep is the rule that prevents that.
 
 - **#17** `cbe` payment method not in backend `PAYMENT_METHODS` (CBE option
   is currently disabled in the UI)
-- **#23** One active registration per identity+ticket type (`confirmed` still
-  blocks a fresh submit; quantity stepper + choice sheet stand)
 - **#26** Payout create fail-closed: registry fixed, but Chapa tokenization
   unimplemented → creates still 422 (honest)
-- **#27** No consumer RSVP submit endpoint (RSVP events display-only)
 - **#30** Parking fulfillment blocked by missing seed zones (crash fixed, but
   zero parking access zones in seed → parking orders still can't fulfill)
-- **#31** No JSON endpoint returns a signed guest ticket `view_token` — the
-  in-app OTP claim flow can't start without a signed link
 - **#33** Guest payment-refresh re-validates the quote token even for accepted
   payments (a guest can be told "payment failed" after paying; frontend now
   correlates creds per payment + stops on terminal errors — see BACKEND_GAPS.md)
@@ -116,13 +111,17 @@ wallet), #6 (free orders fulfill), #7 (notifications — inbox live), #10 (signu
 validation), #12 (auth throttle), #13 (`price_from_minor`), #14 (guest shadow
 checkout — OTP, guest reg, quote/order/payment, claim-guest, public ticket
 views), #15 (commercial terms seeded), #19 (registration schema), #21 (paid regs
-confirmed), #22 (buyer release), #24 (`resale_listings/mine`), #25 (wallet resale
-policy), #28 (dev DB re-synced to the edited `create_payments` migration), #18
+confirmed), #22 (buyer release), #23 (repeat purchases after confirmation —
+dev DB index synced), #24 (`resale_listings/mine`), #25 (wallet resale
+policy), #27 (public RSVP — OTP + submit, live-proven), #28 (dev DB re-synced to
+the edited `create_payments` migration), #18
 (payment refresh wired on the Chapa return screen), #20 (audience gating wired —
 gated-tier events gate the ticket selector behind server-validated access codes),
 #30-crash (parking `FulfillOrderItem` keyword-arg crash fixed; seed zones still
 missing — see open #30), #29 (wallet `add_ons` now projected from the ticket's
-order — `DetailedTicket` "Your extras" renders on live wallet tickets), #32
+order — `DetailedTicket` "Your extras" renders on live wallet tickets), #31
+(guest payment-refresh serves signed `ticket_view_token`/`url` — mapped +
+copyable "Ticket link" on guest tickets), #32
 (`price_from_minor` filtered to ticket products — discovery grid/filter/sort show
 the true ticket "from" price).
 

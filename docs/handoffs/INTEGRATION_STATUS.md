@@ -79,6 +79,30 @@ the same identity + ticket type issued a NEW confirmed registration + a new
 ticket. Frontend needs no change (`active_registration_conflict` choice-sheet is
 only a surface for genuinely-active rows). **102/102 tests**, tsc clean.
 
+## Session 2026-09-10 (late) — full gap sweep against the merged branch (`78e4a6f`)
+
+Re-read every gap in `docs/BACKEND_GAPS.md` and checked it against `HEAD` of
+`feat/launch-hardening-telemetry` (the merged 11-commit range). Result:
+
+- **#31 → RESOLVED.** `GuestPaymentTicketSerializer` (43174dd) now returns
+  `registration_id`/`ticket_view_token`/`ticket_view_url`/`short_url` on guest
+  payment-refresh tickets — the JSON-signed-view fix this gap requested.
+  Frontend: mapped through `TicketWalletWire`→`UserTicket` + copyable "Ticket
+  link" row on guest tickets (wired in the guest-payment-fields commit). The
+  "claim your account" OTP flow (`public/ticket_views/:token/request_otp`) now
+  has a token to feed but is not yet surfaced in the UI — tracked follow-up,
+  not a backend gap.
+- **Still open (no backend change in the pulled range):** #17 (`cbe` — backend
+  `PAYMENT_METHODS = [telebirr, card, bank]`), #26 (payout tokenization),
+  #8/#9 (user `name` / `PATCH /auth/me`), #30 (parking seed zones), #33 (guest
+  refresh still re-decodes `GuestQuoteToken`), #34 (no sales-window enforcement).
+- **Informational, no frontend impact:** #11 (slug history), #16 (Chapa v1),
+  #8-deferred (Google/password-reset auth).
+- **Already resolved + wired earlier this session:** #23, #27 (+ live proofs).
+
+Docs: BACKEND_GAPS.md (sweep stamp, #31 → resolved + archive row), AGENTS.md
+open/resolved lists, this snapshot.
+
 **Docs:** BACKEND_GAPS.md #27/#23 → RESOLVED (+ archive rows, #27 + #23 now live-proven),
 this snapshot.
 
