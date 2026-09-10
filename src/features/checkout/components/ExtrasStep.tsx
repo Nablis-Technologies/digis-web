@@ -73,6 +73,11 @@ export function ExtrasStep({ products, selected, onChange, includedProductIds = 
               <div className="relative min-w-0 flex-1">
                 <p className="text-[8px] tracking-[1.5px] uppercase mb-0.5" style={{ fontFamily: "'Inter', sans-serif", color: accent, fontWeight: 600 }}>{s.label}</p>
                 <p className="text-[13px] leading-tight truncate" style={{ fontFamily: "'Inter', sans-serif", color: nameColor, fontWeight: 600 }}>{product.name}</p>
+                {product.requiresTicket && (
+                  <p className="text-[9px] tracking-[0.5px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+                    Requires a ticket
+                  </p>
+                )}
               </div>
 
               <div className="relative shrink-0 flex flex-col items-end gap-1.5">
