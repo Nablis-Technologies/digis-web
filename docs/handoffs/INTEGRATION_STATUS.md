@@ -79,6 +79,24 @@ the same identity + ticket type issued a NEW confirmed registration + a new
 ticket. Frontend needs no change (`active_registration_conflict` choice-sheet is
 only a surface for genuinely-active rows). **102/102 tests**, tsc clean.
 
+## Session 2026-09-10 (night) — dev image-load latency root-caused + fixed (~14×)
+
+- **Root cause found.** Every request cost ~350-400ms in this Docker-on-Windows
+  dev container (even `/up`, from inside the container, regardless of endpoint).
+  Isolation: a middleware short-circuit returned in 1ms while the full stack took
+  ~366ms. The culprit was **`ActiveRecord::Migration::CheckPending`** — it stats
+  every migration file in `db/migrate` (100+) on the slow Windows↔WSL2 bind
+  mount **per request**. With 75 discovery images each paying ~850ms, the grid
+  took ages. It was NOT a seed problem (images exist and serve fine).
+- **Fix (backend `896bf3d`, development.rb):** `config.active_record.migration_error = false`
+  (removes CheckPending) + `config.server_timing = false` +
+  `config.public_file_server.enabled = false` (both also touch the mount).
+  Migrations still run via `db:prepare`/`db:migrate`.
+- **Measured result:** `/up` 416ms → **5ms**; images **~850ms → ~60ms** (14×);
+  warm `GET /public/events` 143ms. First request after boot is ~5s (cold
+  autoload with `eager_load = false`) — one-time per boot.
+- Committed: backend `896bf3d`. No frontend change needed.
+
 ## Session 2026-09-10 (late night) — mock leaks removed; dev OTP path; guest OTP drill proven
 
 - **Detail-page mock leaks removed.** `resolveLineup` fabricated a hardcoded
