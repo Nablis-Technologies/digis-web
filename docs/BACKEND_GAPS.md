@@ -5,11 +5,17 @@
 > routes). The frontend does NOT work around these (ADR-0002) — it disables/hides
 > until the backend resolves them.
 >
+> **Seed data is NOT a backend gap.** The dev seeds (`db/seeds_events.rb`,
+> `db/seeds/preview.rb`) mirror the frontend mocks so the UI has data — a seed
+> omission is fixed in the seed, never tracked here. Past seed-side issues (#30
+> parking accesses, #35 purchase limit) were fixed in the seed and are recorded in
+> the Resolved archive.
+>
 > Re-verified 2026-09-10 against `feat/launch-hardening-telemetry` at `78e4a6f`
 > (fast-forward `d67e132` + merged 11 commits: RSVP public endpoints, registration
 > repeat, guest ticket view material) by code read + live HTTP. Sweep result:
 > **#31, #30, #23, #27, #1, #29, #32 resolved and frontend-wired.** Still open:
-> #17, #26, #8, #9, #33, #34. Informational: #11, #16, #35, #36, #37.
+> #17, #26, #8, #9, #33, #34. Informational: #11, #16, #36, #37.
 
 ## Status key
 
@@ -33,7 +39,6 @@
 | 34 | open — degrading | past events remain purchasable (no date/sales-window check) |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 16 | informational | Chapa v1 only (key-prefix gated) |
-| 35 | informational | checkout requires a purchase limit on the ticket type |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 37 | informational | no public waitlist-join / invite-request endpoint |
 | 8-deferred | deferred | no Google / check-account / password-reset auth |
@@ -196,32 +201,20 @@ Backend implements v1 only. Keys prefixed `CHASECK_TEST-`/`CHASECK-` work
 `CHAPA_TEST-` keys (v2) fail the boot-time validator. Backend presents the same
 `PaymentSerializer` either way.
 
-### #35. Checkout requires a purchase limit on the ticket type (verified live 2026-09-10)
-
-`Ticketing::PurchaseLimits::Reserve` skips creating allocations when
-`effective_limit` is nil (`max_packages_per_user` unset and no
-`PurchaseLimitOverride`); `PurchaseLimits::Commit` then fails the order with
-`purchase_limit_allocations_missing`. Verified live: dev "Chapa Test Free RSVP"
-(no limit → guest order 422; after `max_packages_per_user: 10` → order created
-and auto-fulfilled, active ticket issued). In practice every sellable ticket
-type is expected to set a limit, so this is organizer-config rather than a bug —
-but a product with no limit is simply unbuyable via checkout. Frontend maps
-friendly copy (`purchase_limit_allocations_missing` / `purchase_limit_exceeded`);
-the dev free-RSVP fixture sets `max_packages_per_user: 10` (preview.rb).
-
 ### #36. Public event payload lacks lineup/participants + venue media/coords
 
 `EventDetailSerializer` / `EventListSerializer` expose only categories,
 event_dates, event_media, event_organizations, event_setting, organization —
-**no event participants/artists** (the data exists server-side but has no public
-route), and `venue_summary` is `{id,name,city}` only (**no photos or lat/lng**).
-The frontend previously fabricated these (a hardcoded fake lineup with unsplash
-avatars, a 5-photo unsplash venue strip, a name→coord lookup with an Addis
-default). Now it renders **absent** — the Lineup section hides, venue photos are
-dropped, the map falls back to a city-level default.
+**no event participants/artists**, and `venue_summary` is `{id,name,city}` only
+(**no photos or lat/lng**). This is a backend SERIALIZER gap: the frontend
+cannot source a lineup, venue photos, or a real map pin even with seed data
+present, so it renders **absent** (Lineup section hides, venue photos dropped,
+map falls back to a city-level default). **Seed side (frontend-owned):** the
+dev seeds do not yet populate `events_event_participants` / venue media — that
+is a seed task for when the backend exposes them, not a gap tracked here.
 
-**Fix:** add `participants`/`artists` and venue `media`/`latitude`/`longitude`
-to the public serializers (or a public participants endpoint).
+**Fix (backend):** add `participants`/`artists` and venue `media`/`latitude`/
+`longitude` to the public serializers (or a public participants endpoint).
 
 ### #37. No public waitlist-join or access-request endpoint
 
@@ -294,18 +287,25 @@ history). Every item below was re-verified against the pulled
 | 23 | Repeat submissions after confirmation — `confirmed` dropped from the active-identity index + `Registration.blocking_duplicate`; dev DB index recreated by SQL | live HTTP 2026-09-10: **repeat purchase proven** (2nd RSVP same identity+ticket_type → new confirmed registration + new ticket) |
 | 27 | Public RSVP — `request_otp` (guest OTP) + `rsvp` submit (confirmed/issuing/awaiting_approval, free tickets issued synchronously); `registrationModule.rsvpRequestOtp`/`verifyPhoneOtp`/`rsvpSubmit` + `RsvpRegistrationSheet` wired | live HTTP 2026-09-10: **happy path confirmed** (Chapa Test Free RSVP → registration `confirmed`, ticket with active QR); paid-guard 422 on FREEFORM |
 | 31 | Guest payment-refresh returns signed guest ticket material — `GuestPaymentTicketSerializer` (`registration_id`, `ticket_view_token`, `ticket_view_url`, `short_url`); frontend maps → `UserTicket` + copyable "Ticket link"; **claim-to-account flow built** (`ClaimGuestSheet`: OTP → password → claim → sign in; follow-up note in `.scratch/guest-claim-account/`) | code 2026-09-10 (`43174dd`); live paid drill needs a Chapa sandbox-paid attempt |
-| 30 | Parking fulfillment data — every fabricated parking product gets a `parking` `product_access` + `PARKING` zone; 26/26 dev parking products carry them; fulfill path covered by backend tests | SQL 2026-09-10 (26/26); live fulfill drill needs a Chapa-paid order |
+| 30 | Parking fulfillment data — **seed-side fix**: every fabricated parking product gets a `parking` `product_access` + `PARKING` zone; 26/26 dev parking products carry them; fulfill path covered by backend tests | SQL 2026-09-10 (26/26); live fulfill drill needs a Chapa-paid order |
+| 35 | Checkout purchase limit — **seed-side fix**: `PurchaseLimits::Reserve`/`Commit` require a ticket-type limit (`purchase_limit_allocations_missing` otherwise); the dev free-RSVP fixture now sets `max_packages_per_user: 10` (preview.rb), so guest checkout on it creates + auto-fulfills. Frontend maps friendly copy for the limit errors | live HTTP 2026-09-10 (free guest order 422 → after seed fix: order created, active ticket issued) |
 
 ---
 
 ## Seed-side review (2026-09-04)
 
-Every open gap is backend serializer/code-level — not a seed problem. The
-frontend-owned `db/seeds_events.rb` mock-mirror seed writes everything the
-backend can possibly consume (full `event_setting.config` JSONB,
-`price_from_minor` via `Catalog::ProductPrice`, `requires_ticket` via product
-metadata). The seed is ready for backend fixes to land without further seed
-work.
+The dev seeds (`db/seeds_events.rb` — the frontend-owned mock-mirror;
+`db/seeds/preview.rb`) exist so the UI has data. **Seed-side issues are fixed in
+the seed, not tracked as backend gaps.** Past seed fixes: **#30** (parking
+`product_access` + `PARKING` zone per parking add-on) and **#35**
+(`max_packages_per_user: 10` on the free-RSVP fixture) — see the Resolved
+archive.
+
+Every open gap above is backend serializer/code-level, not a seed problem. The
+mock-mirror seed writes everything the backend can possibly consume (full
+`event_setting.config` JSONB, `price_from_minor` via `Catalog::ProductPrice`,
+`requires_ticket` via product metadata); remaining seed-side TODO is populating
+`event_participants` + venue media once the backend exposes them (#36).
 
 **Seed-side TODO (frontend-owned, Phase 3):** ~~add a promotion + promo code
 fixture so `order_quotes.promotion_code` can be integration-tested.~~
