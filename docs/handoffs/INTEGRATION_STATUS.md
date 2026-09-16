@@ -11,13 +11,13 @@
 
 **Tunnels:** cloudflared (Docker image) exposes **backend `localhost:3000`** and
 **frontend `localhost:5173`** over public HTTPS. `.env.chapa` `CHAPA_CALLBACK_URL`
-→ backend tunnel, `CHAPA_RETURN_URL` → frontend tunnel. Frontend side (ours): Vite
+→ backend tunnel, `CHAPA_RETURN_URL` → frontend tunnel. Frontend side: Vite
 `server.host: true` + `allowedHosts: ['.trycloudflare.com']`. **Backend side is
-FILED, not changed by us** — Rails needs `config.hosts << ".trycloudflare.com"`
+local dev setup, NOT a gap** — Rails needs `config.hosts << ".trycloudflare.com"`
 (else it 403s the tunnel) and a `development:` block in `config/recurring.yml`;
-see `docs/BACKEND_GAPS.md` #40/#16. Dev helper scripts
-(`digis_backend/script/dev_tunnels.ps1`, `tail_log.ps1`, `tail_otp.ps1`) are dev
-tooling.
+see `docs/BACKEND_GAPS.md` #16 *Local dev setup* / #40 *dev setup*. Dev helper
+scripts (`digis_backend/script/dev_tunnels.ps1`, `tail_log.ps1`, `tail_otp.ps1`)
+are dev tooling.
 
 **Key findings (Chapa V2):**
 - `POST /v2/payments/hosted` **rejects non-https callback/return URLs** (`400
@@ -31,9 +31,9 @@ tooling.
 
 **#40 FILED for the backend (not changed by us):** `ExpireCheckout` raises when a
 current payment's settlement grace has already elapsed, aborting the whole sweep —
-one stale attempt blocks every later checkout. The exact product-code fix +
-required dev config (`config/recurring.yml` `development:` block) are in
-`docs/BACKEND_GAPS.md` #40. Verified the *failure* live:
+one stale attempt blocks every later checkout. The product-code fix is in
+`docs/BACKEND_GAPS.md` #40 (the `config/recurring.yml` dev block is local setup,
+not part of the gap). Verified the *failure* live:
 `ExpireCheckout.call(now: 1.day.from_now)` → `success=false`, 0 released.
 
 **End-to-end proven with a real Chapa test payment:**

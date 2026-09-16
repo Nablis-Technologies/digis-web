@@ -5,6 +5,16 @@
 > routes). The frontend does NOT work around these (ADR-0002) — it disables/hides
 > until the backend resolves them.
 >
+> **What counts as a backend gap:** a deficiency in the backend's
+> **code / API / contract** that the backend dev must fix — a missing field or
+> endpoint, a wrong status or business rule, a serializer/policy gap.
+>
+> **What does NOT count:** anything that has to be **set up**. Seeds; dev
+> environment config (`config.hosts` tunnel allowlist, `config/recurring.yml` dev
+> jobs); provider/dashboard setup (webhook registration, API keys, webhook secret
+> hash); env vars; tunnels; deploys. Those are setup chores for whoever runs the
+> environment — record them where the setup lives, never as a gap here.
+>
 > **Seed data is NOT a backend gap.** The dev seeds (`db/seeds_events.rb`,
 > `db/seeds/preview.rb`) mirror the frontend mocks so the UI has data — a seed
 > omission is fixed in the seed, never tracked here. Past seed-side issues (#30
@@ -82,14 +92,13 @@ disabled as a workaround.
 
 ### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts
 
-`Orders::ExpireCheckout` is driven only by `Orders::EnterSettlementGraceJob`, and
-development has **no `development:` section in `config/recurring.yml`**, so it
-never runs there: abandoned `pending_payment` orders pile up and every later
-checkout for that buyer+event 409s `active_checkout_exists`.
+`Orders::ExpireCheckout` is what releases an abandoned `pending_payment` order,
+which is what unblocks `active_checkout_exists`. When the sweep aborts, those
+orders pile up and every later checkout for that buyer+event 409s.
 
-Even when it does run, `ExpireCheckout#expire_order`
-(`app/services/orders/expire_checkout.rb:49-57`) **raises `ExpiryFailure` when a
-`current` payment (`status in created/processing`) has an already-elapsed
+**The gap** is in `ExpireCheckout#expire_order`
+(`app/services/orders/expire_checkout.rb:49-57`): it **raises `ExpiryFailure`
+when a `current` payment (`status in created/processing`) has an already-elapsed
 `settlement_grace_expires_at`**. `ExpiryFailure` aborts the whole sweep
 (`call` rescues → failure), so a single such order leaves **every** stale checkout
 unexpired. Verified live 2026-09-15: 10 active checkouts, 2 with elapsed grace →
@@ -99,7 +108,7 @@ unexpired. Verified live 2026-09-15: 10 active checkouts, 2 with elapsed grace �
 event; from a fresh session the conflict sheet cannot even offer a restart,
 because the `active_checkout_exists` 409 carries no order id.
 
-**Fix (1 — product code, `app/services/orders/expire_checkout.rb`):** move to
+**Fix (product code — `app/services/orders/expire_checkout.rb`):** move to
 settlement grace only while it is still open; otherwise release the order instead
 of raising:
 
@@ -117,12 +126,14 @@ next true
 (A late provider success is still handled by `AcceptPayment`'s rejection/reversal
 path.)
 
-**Fix (2 — dev config, `config/recurring.yml`):** add a `development:` block so the
-sweep actually runs locally — `Catalog::ExpireInventoryReservationsJob` and
-`Orders::EnterSettlementGraceJob` (every minute) + `Core::ProcessOutboxJob`
-(outbox drain). `Orders::ExpireCheckout` is otherwise never triggered in dev.
+**Dev setup (NOT part of the gap):** to *exercise* this locally the sweep must
+run, which needs a `development:` block in `config/recurring.yml`
+(`Catalog::ExpireInventoryReservationsJob`, `Orders::EnterSettlementGraceJob`
+every minute, `Core::ProcessOutboxJob` for the outbox drain) — otherwise
+`Orders::ExpireCheckout` is never triggered in dev. That is local environment
+config; the gap itself is the code path above.
 
-**Fix (3 — optional):** include the conflicting order id in the
+**Fix (optional):** include the conflicting order id in the
 `active_checkout_exists` 409 so the client can offer a restart, not just
 "start fresh".
 
@@ -289,14 +300,21 @@ key, `POST /v2/payments/hosted` returns `400 invalid_format — "Callback URL mu
 start with https:// and be a valid URL"` when `CHAPA_CALLBACK_URL`/`CHAPA_RETURN_URL`
 are `http://localhost`. Both must be **https**.
 
-**Local dev setup (2026-09-16) — requires two BACKEND dev-config changes** (filed
-here; the frontend does not change backend code). Chapa needs a public HTTPS host,
-so both ends are exposed through **cloudflared quick tunnels** (backend + frontend):
+**Local dev setup (2026-09-16) — environment config, NOT a backend gap.** Chapa
+needs a public HTTPS host, so both ends are exposed through **cloudflared quick
+tunnels** (backend + frontend). Two pieces of **local dev config** (dev-only,
+uncommitted) make that work — they are setup chores, not gaps:
 - `config/environments/development.rb` → allow the tunnel hosts:
   `config.hosts << ".trycloudflare.com"` (+ `.ngrok-free.app`). Without it Rails
   **403s** every tunnel request, so Chapa's callback/webhook never lands.
 - `config/recurring.yml` → a `development:` block running the checkout-lifecycle
-  jobs (see #40, "Fix 2"). Without it `Orders::ExpireCheckout` never runs locally.
+  jobs (see #40 *dev setup*). Without it `Orders::ExpireCheckout` never runs locally.
+
+Provider/dashboard setup lives with the setup too: the webhook endpoint
+(`POST <host>/payments/chapa/webhook`) and the **webhook secret hash** are
+registered in the Chapa dashboard, and `.env.chapa` holds the keys
+(`CHAPA_WEBHOOK_SECRET` is any random string you invent — the same value must be
+saved in the dashboard).
 
 Frontend side (ours): Vite `server.host: true` + `allowedHosts` (`vite.config.ts`).
 Dev-only helper scripts live in the backend repo (`script/dev_tunnels.ps1`,

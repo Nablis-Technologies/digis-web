@@ -69,6 +69,13 @@ Single source of truth: **`docs/BACKEND_GAPS.md`** (reorganized
 2026-09-04: blocking → degrading → informational → deferred → resolved
 archive). Open items that matter for new work:
 
+**A backend gap is a deficiency in the backend's code/API/contract** that the
+backend dev must fix (missing field/endpoint, wrong status or rule,
+serializer/policy gap). **Setup is NOT a gap** — seeds, dev env config
+(`config.hosts`, `config/recurring.yml` dev jobs), provider/dashboard webhook
+registration, API keys, webhook secret hashes, env vars, tunnels, deploys. Never
+file a setup chore as a gap.
+
 **When you discover a backend gap** (during verification, a live API probe, a
 code read, or a route grep) — **file it yourself in `docs/BACKEND_GAPS.md`
 immediately, without asking or re-explaining it in chat.** Give it the next
