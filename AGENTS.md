@@ -11,9 +11,12 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
+npx vitest run    # unit tests (107)
+npx playwright test  # e2e vs the live backend on :3000 (17)
 ```
 
-There is no lint or test script — `pnpm build` + `npx tsc --noEmit` are the checks.
+Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
+`npx playwright test` for the full stack). There is no lint script.
 
 ## Integration status (IMPORTANT)
 
@@ -90,9 +93,16 @@ missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
 - **#17** `cbe` payment method not in backend `PAYMENT_METHODS` (CBE option
-  is currently disabled in the UI)
-- **#26** Payout create fail-closed: registry fixed, but Chapa tokenization
-  unimplemented → creates still 422 (honest)
+  is currently disabled in the UI; `cbebirr` is now a Chapa V2 adapter
+  capability but the domain enum is still `telebirr card bank`)
+- **#40** Abandoned checkouts never expire (`ExpireCheckout` aborts the whole
+  sweep on an elapsed-grace `processing` payment) → `active_checkout_exists`
+  blocks all later checkouts; the 409 carries no order id
+- **#39** No public endpoint listing payout `bank_slug`s — the frontend
+  hardcodes `telebirr`/`cbe`/`boa` (`src/lib/payout.ts`)
+- **#41** A released order permanently burns its registration
+  (`idx_one_order_item_per_registration` ignores order status) → retries need a
+  brand-new registration
 - **#33** Guest payment-refresh re-validates the quote token even for accepted
   payments (a guest can be told "payment failed" after paying; frontend now
   correlates creds per payment + stops on terminal errors — see BACKEND_GAPS.md)
@@ -122,7 +132,10 @@ order — `DetailedTicket` "Your extras" renders on live wallet tickets), #31
 copyable "Ticket link" on guest tickets), #30 (parking products seeded with
 `parking` product_access + PARKING zone — 26/26 in dev), #32
 (`price_from_minor` filtered to ticket products — discovery grid/filter/sort show
-the true ticket "from" price).
+the true ticket "from" price), #16 (Chapa API V2 — `api.chapa.global`,
+`CHAPA_TEST_`/`CHAPA_LIVE_` keys), #26 (seller payout destination create now
+succeeds — Chapa V2 direct transfer; frontend rewired to the flat
+`bank_slug`/`account_number`/`holder_name` payload).
 
 ## Agent skills
 

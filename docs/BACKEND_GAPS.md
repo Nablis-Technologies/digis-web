@@ -16,6 +16,17 @@
 > repeat, guest ticket view material) by code read + live HTTP. Sweep result:
 > **#31, #30, #23, #27, #1, #29, #32 resolved and frontend-wired.** Still open:
 > #17, #26, #8, #9, #33, #34. Informational: #11, #16, #36, #37.
+>
+> **Re-verified 2026-09-15 against `feat/launch-hardening-telemetry` at `a470c76`**
+> (merged 46 commits: **Chapa API V2 migration** — `api.chapa.global`, `CHAPA_TEST_`/
+> `CHAPA_LIVE_` keys, hosted + direct charge, refunds, webhooks; **marketplace
+> seller payout direct transfer**; resale purchase replay/idempotency). Sweep
+> result: **#26 and #16 resolved and frontend-wired** (payout create now succeeds
+> with the new flat Chapa V2 payload; see #39 for the remaining bank-list
+> limitation). **#38 upgraded to a real backend surface** (`requires_ticket` is
+> exposed — G-07 — but still not enforced). Still open: #17, #8, #9, #33, #34,
+> #39. Informational: #11, #36, #37, #38. The dev `.env.chapa` had to migrate from
+> a V1 `CHASECK_TEST-` key to a V2 `CHAPA_TEST_` key to boot at all.
 
 ## Status key
 
@@ -32,17 +43,20 @@
 | # | Status | Summary |
 |---|---|---|
 | 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
-| 26 | open — blocking (partial) | payout destination create fail-closed on Chapa tokenization |
+| 40 | resolved | `ExpireCheckout` no longer aborts the sweep on an elapsed-grace payment (2026-09-16) |
+| 39 | open — degrading | no public endpoint listing payout `bank_slug`s; frontend hardcodes the 3 known slugs |
+| 41 | open — degrading | a released order permanently burns its registration (`idx_one_order_item_per_registration` ignores order status) |
 | 8 | open — degrading | no user `name` column / serializer field |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 33 | open — degrading | guest payment-refresh re-validates the quote token on accepted payments |
 | 34 | open — degrading | past events remain purchasable (no date/sales-window check) |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
-| 16 | informational | Chapa v1 only (key-prefix gated) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 37 | informational | no public waitlist-join / invite-request endpoint |
-| 38 | informational | `requires_ticket` not enforced at quote/order time |
+| 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
 | 8-deferred | deferred | no Google / check-account / password-reset auth |
+| 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) |
+| 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
 
 ---
 
@@ -66,31 +80,85 @@ disabled as a workaround.
 
 **Status: open — verified 2026-09-09.**
 
-### #26. Payout destination creation fail-closed (PARTIAL)
+### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts (RESOLVED 2026-09-16)
 
-`Marketplace::PayoutProviders::Registration` registers the Chapa adapter at boot
-(when `CHAPA_ENABLED` + `CHAPA_PAYOUT_ENABLED`), so `Registry.fetch` no longer
-raises `KeyError` — the `payout_account_provider_unavailable` 422 is gone.
-However `ChapaTransferClient#capabilities` reports
-`destination_registration: { supported: false }`
-(`app/services/finance/payout_providers/chapa_transfer_client.rb:64-70`), and
-`Marketplace::PayoutProviders::ChapaAdapter#tokenize_payout_account` raises
-`payout_provider_operation_not_implemented` unless the client responds to it
-(`chapa_adapter.rb:15-19`). Creates still 422, intentionally — raw credentials
-must never be stored until the provider can tokenize destinations. Reads (`GET`)
-work.
+**Fixed:** `ExpireCheckout#expire_order` now moves an order to settlement grace
+only while the grace window is still open; with no live attempt, **or** an attempt
+whose `settlement_grace_expires_at` has already elapsed, it releases the order
+instead of raising. Verified live with `ExpireCheckout.call(now: 1.day.from_now)`
+→ `success=true`, active checkouts released (previously `success=false`, 0
+released). A late provider success is still handled by `AcceptPayment`'s
+rejection/reversal path.
 
-**Fix:** implement Chapa destination tokenization so `VerifyPayoutAccount` can
-complete. (Frontend already submits `provider: "chapa"` — the only registered
-adapter.)
+**Original finding (below, kept for context).**
 
-**Status: open (partial — registry fixed) — verified 2026-09-09.**
+`Orders::ExpireCheckout` is driven only by `Orders::EnterSettlementGraceJob`, and
+development had **no `development:` section in `config/recurring.yml`**, so it
+never ran: abandoned `pending_payment` orders piled up and every later checkout
+for that buyer+event 409s `active_checkout_exists`.
+
+Even once it runs, `ExpireCheckout#expire_order` **raises `ExpiryFailure` when a
+`current` payment (`status in created/processing`) has an already-elapsed
+`settlement_grace_expires_at`** (`app/services/orders/expire_checkout.rb:49-63`).
+`ExpiryFailure` aborts the whole sweep (`call` rescues → failure), so one such
+order leaves **every** stale checkout unexpired. Verified live 2026-09-15: 10
+active checkouts, 2 with elapsed grace → `ExpireCheckout.call` `success=false`,
+`remaining=10`, 0 released.
+
+**Why it blocks the frontend:** the buyer can never start a new checkout for the
+event; from a fresh session the conflict sheet cannot even offer a restart,
+because the `active_checkout_exists` 409 carries no order id.
+
+**Fix (backend):** release the order when a current payment's grace has elapsed
+(or the payment is terminal) instead of raising; include the conflicting order id
+in the 409 so the client can offer restart. **Dev mitigation added:** a minimal
+`development:` block in `config/recurring.yml` (expiry + outbox) plus a one-off
+`Orders::ReleaseCheckout` sweep to clear the backlog.
+
+**Status: open — verified 2026-09-15 (dev DB + `expire_checkout.rb` + live `ExpireCheckout.call`).**
 
 ---
 
 ## Open — degrading
 
 Work but suboptimal; the frontend mitigates. Fixing these improves correctness.
+
+### #41. A released order permanently burns its registration
+
+`idx_one_order_item_per_registration` is `UNIQUE (registration_id) WHERE
+registration_id IS NOT NULL` (`db/structure.sql`) — it does **not** exclude
+released/expired orders. Once a registration is attached to any order item it can
+never be attached to another, so releasing an abandoned order leaves that
+registration unusable for a retry: a new order with it 409s
+`idempotency_conflict`.
+
+**Why it degrades:** the buyer must start a brand-new registration to retry
+(frontend "Discard & start fresh" → `registrationModule.release` + a fresh
+submit). If a registration is meant to be one-checkout-only that's fine, but a
+*released* order should not keep the slot burned.
+
+**Status: open — verified 2026-09-15 (index definition + live 409).**
+
+### #39. No public endpoint exposing payout `bank_slug`s
+
+Chapa V2 payout-registration requires a top-level `bank_slug`
+(`Marketplace::VerifyPayoutAccount` requires `bank_slug`, validates it against
+the provider's ET bank list via `adapter.available_banks(country: "ET")`, and
+persists the encrypted destination — `verify_payout_account.rb:28,88-93`). The
+provider list is reachable server-side (`ChapaPayoutClient#available_banks` →
+`GET /v2/payouts/banks`), but **no API route exposes it** (`config/routes.rb`
+has no banks endpoint). The frontend therefore hardcodes the three known slugs
+(`telebirr`, `cbe`, `boa` — `src/lib/payout.ts`).
+
+**Why it degrades:** with a configured provider the user cannot be offered the
+authoritative, complete bank list; an unknown slug 422s
+`payout_account_bank_unsupported`. With an unconfigured/failing provider,
+`available_banks` returns `nil` and validation is skipped (any slug passes).
+
+**Fix:** expose `GET` available payout banks (slug + name + type) behind the
+seller scope so the frontend can render real options.
+
+**Status: open — verified 2026-09-15 (route grep + adapter code read).**
 
 ### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column
 
@@ -194,13 +262,48 @@ A `RESERVED_SLUGS` denylist exists on the short-link model
 the branded-link space. What remains: an event-slug `slug_history` 301 table so
 renamed event slugs keep their old URLs. Frontend needs zero changes.
 
-### #16. Chapa v1 vs v2 (key-prefix gated)
+### #16. Chapa v1 vs v2 (RESOLVED — V2 migrated 2026-09-15)
 
-Backend implements v1 only. Keys prefixed `CHASECK_TEST-`/`CHASECK-` work
-(`app/services/payments/providers/chapa_client.rb:191`,
-`app/services/finance/payout_providers/chapa_transfer_client.rb:152`);
-`CHAPA_TEST-` keys (v2) fail the boot-time validator. Backend presents the same
-`PaymentSerializer` either way.
+Backend now implements **Chapa API V2 only** (`api.chapa.global`, `POST
+/v2/payments/hosted` + `/v2/payments/direct`). V1 `CHASECK_*` validation is
+removed; `ChapaClient`/`ChapaPayoutClient` require `CHAPA_TEST_`/`CHAPA_LIVE_`
+key prefixes matching `CHAPA_MODE` (`chapa_client.rb:388-394`,
+`chapa_payout_client.rb:174-175`). The `PaymentSerializer` shape is unchanged,
+so no consumer wiring was needed beyond the dev `.env.chapa` key-format fix.
+Direct charge and `cbebirr`/`mpesa`/`awashbirr` are adapter capabilities, but
+the domain `PAYMENT_METHODS` enum is still `%w[telebirr card bank]` (see #17).
+
+**Local-testing constraint (verified live 2026-09-15):** with a valid V2 test
+key, `POST /v2/payments/hosted` returns `400 invalid_format — "Callback URL must
+start with https:// and be a valid URL"` when `CHAPA_CALLBACK_URL`/`CHAPA_RETURN_URL`
+are `http://localhost`. Both must be **https**.
+
+**Resolved locally via HTTPS tunnels (2026-09-16):** backend + frontend are
+exposed through cloudflared quick tunnels; `digis_backend/script/dev_tunnels.ps1`
+restarts them, rewrites `.env.chapa`, reloads the backend, and prints the
+webhook URL. Dev tunnel hosts are allowlisted in `config/environments/development.rb`
+(`.trycloudflare.com`) and Vite `server.allowedHosts`/`host: true`.
+
+**Verified end-to-end with a real Chapa test payment (2026-09-16):** Chapa
+delivered a signed `POST /payments/chapa/webhook` **from its own IP** →
+`payment.success` → `processed` → payment `succeeded` (`provider_reference` =
+Chapa's reference) → order `fulfilled` → **ticket issued**. Our side was also
+proven independently by re-sending a correctly HMAC-signed webhook.
+
+**Two caveats:**
+1. Quick-tunnel hostnames are **ephemeral**. When they expire (DNS stops
+   resolving) no callback/webhook arrives — symptom: the payment succeeds on
+   Chapa but nothing fulfills. Re-run `script/dev_tunnels.ps1` and update the
+   dashboard webhook URL it prints.
+2. Chapa V2 does **not** return the buyer to the app — the API `return_url` is
+   ignored (verified: the browser stays on Chapa's receipt; there is no dashboard
+   redirect setting either). **Handled in the frontend:** the hosted checkout now
+   opens in a **new tab** (`window.open`), and the app tab stays open and confirms
+   the payment (`POST /payments/:id/refresh` + wallet poll) — once the webhook
+   fulfills, the app shows "You're going!", **closes the Chapa tab**
+   (`src/lib/checkout-popup.ts`, so the buyer is returned to Digis) and routes to
+   the ticket. Falls back to same-tab navigation if the popup is blocked.
+   (`e2e/checkout.spec.ts` accepts either a popup or a redirect.)
 
 ### #36. Public event payload lacks lineup/participants + venue media/coords
 
@@ -305,6 +408,8 @@ history). Every item below was re-verified against the pulled
 | 31 | Guest payment-refresh returns signed guest ticket material — `GuestPaymentTicketSerializer` (`registration_id`, `ticket_view_token`, `ticket_view_url`, `short_url`); frontend maps → `UserTicket` + copyable "Ticket link"; **claim-to-account flow built** (`ClaimGuestSheet`: OTP → password → claim → sign in; follow-up note in `.scratch/guest-claim-account/`) | code 2026-09-10 (`43174dd`); live paid drill needs a Chapa sandbox-paid attempt |
 | 30 | Parking fulfillment data — **seed-side fix**: every fabricated parking product gets a `parking` `product_access` + `PARKING` zone; 26/26 dev parking products carry them; fulfill path covered by backend tests | SQL 2026-09-10 (26/26); live fulfill drill needs a Chapa-paid order |
 | 35 | Checkout purchase limit — **seed-side fix**: `PurchaseLimits::Reserve`/`Commit` require a ticket-type limit (`purchase_limit_allocations_missing` otherwise); the dev free-RSVP fixture now sets `max_packages_per_user: 10` (preview.rb), so guest checkout on it creates + auto-fulfills. Frontend maps friendly copy for the limit errors | live HTTP 2026-09-10 (free guest order 422 → after seed fix: order created, active ticket issued) |
+| 16 | Chapa API V2 migration — `api.chapa.global`, `CHAPA_TEST_`/`CHAPA_LIVE_` key prefixes matching `CHAPA_MODE`, V1 `CHASECK_*` validation removed; `PaymentSerializer` shape unchanged | code read 2026-09-15 (`a470c76`) |
+| 26 | Seller payout destination create now works — Chapa V2 direct transfer: `VerifyPayoutAccount` persists an encrypted destination from a **flat** `payout_account { type, provider, bank_slug, account_number, holder_name }`, verifies via provider or leaves `pending_verification`; frontend `payoutService.addMethod` rewired to the flat payload + new wire fields | code read + local wiring 2026-09-15 (`a470c76`) |
 
 ---
 

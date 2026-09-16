@@ -7,6 +7,132 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-16 — Chapa V2 payments WORK end-to-end locally (HTTPS tunnels); #40 fixed
+
+**Tunnels:** cloudflared (Docker image) exposes **backend `localhost:3000`** and
+**frontend `localhost:5173`** over public HTTPS. `.env.chapa` `CHAPA_CALLBACK_URL`
+→ backend tunnel, `CHAPA_RETURN_URL` → frontend tunnel. Dev allowlists:
+`config.hosts << ".trycloudflare.com"` (development.rb) and Vite
+`server.host: true` + `allowedHosts: ['.trycloudflare.com']`.
+`digis_backend/script/dev_tunnels.ps1` restarts both tunnels, rewrites
+`.env.chapa`, reloads the backend, and prints the webhook URL.
+
+**Key findings (Chapa V2):**
+- `POST /v2/payments/hosted` **rejects non-https callback/return URLs** (`400
+  invalid_format` on `http://localhost`).
+- V2 appears to **ignore the API's `return_url`** — after paying, the browser
+  stayed on Chapa's receipt (no redirect back). The **dashboard webhook is the
+  actual completion mechanism.**
+- **Ephemeral hostnames:** when a trycloudflare hostname expires (DNS stops
+  resolving) Chapa can't deliver — symptom: the payment succeeds on Chapa but
+  nothing fulfills. Re-run the tunnel script + update the dashboard URL.
+
+**#40 fixed (backend):** `ExpireCheckout` now releases an order when a current
+payment's settlement grace has already elapsed, instead of raising and aborting
+the whole sweep (previously a single stale attempt blocked every later checkout).
+Verified: `ExpireCheckout.call(now: 1.day.from_now)` → `success=true`, active
+checkouts released.
+
+**End-to-end proven with a real Chapa test payment:**
+`checkout_url` → pay (test phone `251900000000`) → Chapa POSTs a **signed
+webhook from its own IP** → `Orders::PaymentEvent` (`payment.success`) →
+`processed` → `Orders::AcceptPayment` (payment `succeeded`, `provider_reference`
+= Chapa's reference) → `Orders::FulfillOrder` (order `fulfilled`) →
+`Ticketing::Packages::Issue` → **ticket in the wallet**. Our side was also proven
+in isolation by re-sending a correctly HMAC-signed webhook.
+
+**Still open / next:** the "return to app" UX (V2 return_url ignored — needs a
+dashboard redirect setting, or a `return_to` on the receipt); rotate
+`CHAPA_WEBHOOK_SECRET` off `tolo-dev`; consider a stable tunnel (ngrok static
+domain) to end the URL churn.
+
+## Session 2026-09-15 — backend pull (46 commits: Chapa V2 + seller payouts); payout wired, #26/#16 resolved
+
+**Pull:** `git fetch` advanced `feat/launch-hardening-telemetry`
+`78e4a6f..a470c76` — 46 commits, dominated by the **Chapa API V2 migration**
+(`api.chapa.global`; hosted + direct charge, refunds, signature-resilient
+webhooks; `CHAPA_TEST_`/`CHAPA_LIVE_` keys), **marketplace seller payout direct
+transfer** (encrypted destinations, `bank_code`→`bank_slug`, `available_banks`,
+admin verify, `set_default`), and resale purchase replay/idempotency. Local had
+6 commits not upstream (dev tooling + pazimo-mirror seeds + FREEFORM RSVP).
+Merged → `dc1d9df`. One conflict: `db/structure.sql` (took upstream — new
+`bank_slug`/`provider_merchant_reference` constraints). `development.rb`
+auto-merged and **kept the dev tooling** (reloading off, `migration_error` off,
+dev OTP sender, SolidQueue-in-Puma).
+
+**Chapa V2 boot blocker:** `ChapaClient` now requires `CHAPA_SECRET_KEY` to start
+with `CHAPA_TEST_`/`CHAPA_LIVE_` matching `CHAPA_MODE`; the dev `.env.chapa` had
+a V1 `CHASECK_TEST-` key → boot aborted. Migrated `.env.chapa` to
+`CHAPA_MODE=test` + a `CHAPA_TEST_…` value (currently a **placeholder** — the
+user must paste the real V2 test key).
+
+**Dev DB rebuilt from scratch:** upstream edits existing migrations in place
+(project rule), so the existing dev DB had stale payout/payment tables. Final
+state = `db:drop db:create` → **`db:migrate` (all migrations replayed from
+scratch — proves the edited-in-place migrations are self-consistent)** → load
+`db/queue_schema.rb` → strip the stray `schema_migrations` version it injects
+(dev shares one DB, so it showed as a bogus `NO FILE` row) → `db:seed` (`dev`
+profile). Result: **153 versions (== migration files), no `NO FILE`, 11
+SolidQueue tables, 34 events**; verified live: payout create returns
+`bank_slug`/`is_default`, 3 SolidQueue processes running. Documented in
+`digis_backend/config/environments/development.rb`.
+
+**Backend's own frontend-gap tracker** (`docs/operations/frontend-backend-gap-tracker-2026-09-08.md`)
+maps to ours: G-06 `price_from_minor` ticket-only, G-07 `requires_ticket`
+exposed, G-15 repeat purchases, G-20 wallet `add_ons`, G-21 RSVP, G-22 guest
+claim context, G-03 seller payout destination — all implemented.
+
+**Frontend wiring (this diff):**
+- Seller payout create contract changed to a **flat** payload —
+  `payout_account { type, provider, bank_slug, account_number, holder_name }`
+  (was nested `account_details`). Updated `src/lib/payout.ts` (+ test);
+  `cbe`/`telebirr` slugs confirmed, `boa` assumed (see #39).
+- `SellerPayoutAccountWire` / `PayoutMethod` gain `bank_slug`, `is_default`,
+  `verification_source`, `account_label`; `mapPayoutAccount` maps `bankSlug` +
+  `isDefault`.
+- `src/lib/errors.ts`: dropped the removed `payout_account_verification_pending`
+  / `_token_invalid`; added `_bank_unsupported` / `_verification_required` /
+  `_not_verifiable` / `_not_found` (+ test).
+
+**Gaps:** **#26 resolved** (create works end-to-end), **#16 resolved** (V2).
+New **#39** (no public endpoint listing payout `bank_slug`s → frontend
+hardcodes). **#17 still open** — `cbebirr` is an adapter capability but
+`Commercial::FeeComponent::PAYMENT_METHODS` is unchanged (`telebirr card bank`).
+
+**No consumer impact:** `JsonNumber` is unused by serializers (money still
+integer cents); `PaymentSerializer`/envelope unchanged; resale
+answers/consents/accepted both nested and top-level; form-submission answers
+normalization is strictly more lenient; claim/transfer changes are internal
+class renames. **Verify: tsc clean, 107/107 vitest.**
+
+**Follow-up (same day) — Chapa V2 live checkout + two checkout-flow bugs:**
+
+- **Chapa key:** the first replacement still 401'd (`unauthorized`); a second one
+  authenticated but Chapa answered `400 invalid_format — "Callback URL must
+  start with https:// and be a valid URL"`. Chapa V2 requires **https** for both
+  callback and return URLs. `.env.chapa` now uses `https://example.com/...`
+  placeholders → a real hosted checkout opens (Playwright redirect to
+  `https://checkout.chapa.global/test/payment/hosted/TEST…`). Real callback /
+  return delivery needs an https tunnel to this machine.
+- **False "Payment Confirmed"** (`useCheckoutFlow.onSuccess`): the backend
+  returns **201** with `status:"failed", checkout_url:null` for a rejected
+  attempt, and the hook treated "no checkout URL" as a finished purchase. Now:
+  `payment == null`/`succeeded` → success, `processing + checkout_url` →
+  redirect, **anything else → "Payment could not be started."** (Also fixed a
+  null-deref on free orders and a missing redirect in the per-call handler.)
+  Proven with a temporary spec that drove the live UI.
+- **Checkout conflict sheet** (`ConflictSheet`, `useCheckoutFlow`): the sheet no
+  longer claims "you already have this ticket" (there is none) — now "You have
+  an unfinished checkout". "Discard & start fresh" is offered whenever we hold
+  our own registration (releases it and retries), and an `idempotency_conflict`
+  at order creation now opens the sheet instead of stranding an inline error.
+- **Dev env:** added a minimal `development:` recurring set to `config/recurring.yml`
+  (checkout expiry + outbox) and released the stale backlog (10 orders). Filed
+  **#40** (`ExpireCheckout` aborts the sweep on an elapsed-grace `processing`
+  payment; the 409 carries no order id) and **#41** (a released order permanently
+  burns its registration).
+- **Verify: tsc clean, 107/107 vitest, e2e 17/17.**
+
 ## Session 2026-09-10 (pm) — backend pull succeeded (11 commits); RSVP wired (#27), #23 resolved
 
 **Pull:** first `git fetch` failed (no github.com:443); retry succeeded —
