@@ -7,15 +7,17 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
-## Session 2026-09-16 — Chapa V2 payments WORK end-to-end locally (HTTPS tunnels); #40 fixed
+## Session 2026-09-16 — Chapa V2 payments WORK end-to-end locally (HTTPS tunnels); #40 filed
 
 **Tunnels:** cloudflared (Docker image) exposes **backend `localhost:3000`** and
 **frontend `localhost:5173`** over public HTTPS. `.env.chapa` `CHAPA_CALLBACK_URL`
-→ backend tunnel, `CHAPA_RETURN_URL` → frontend tunnel. Dev allowlists:
-`config.hosts << ".trycloudflare.com"` (development.rb) and Vite
-`server.host: true` + `allowedHosts: ['.trycloudflare.com']`.
-`digis_backend/script/dev_tunnels.ps1` restarts both tunnels, rewrites
-`.env.chapa`, reloads the backend, and prints the webhook URL.
+→ backend tunnel, `CHAPA_RETURN_URL` → frontend tunnel. Frontend side (ours): Vite
+`server.host: true` + `allowedHosts: ['.trycloudflare.com']`. **Backend side is
+FILED, not changed by us** — Rails needs `config.hosts << ".trycloudflare.com"`
+(else it 403s the tunnel) and a `development:` block in `config/recurring.yml`;
+see `docs/BACKEND_GAPS.md` #40/#16. Dev helper scripts
+(`digis_backend/script/dev_tunnels.ps1`, `tail_log.ps1`, `tail_otp.ps1`) are dev
+tooling.
 
 **Key findings (Chapa V2):**
 - `POST /v2/payments/hosted` **rejects non-https callback/return URLs** (`400
@@ -27,11 +29,12 @@
   resolving) Chapa can't deliver — symptom: the payment succeeds on Chapa but
   nothing fulfills. Re-run the tunnel script + update the dashboard URL.
 
-**#40 fixed (backend):** `ExpireCheckout` now releases an order when a current
-payment's settlement grace has already elapsed, instead of raising and aborting
-the whole sweep (previously a single stale attempt blocked every later checkout).
-Verified: `ExpireCheckout.call(now: 1.day.from_now)` → `success=true`, active
-checkouts released.
+**#40 FILED for the backend (not changed by us):** `ExpireCheckout` raises when a
+current payment's settlement grace has already elapsed, aborting the whole sweep —
+one stale attempt blocks every later checkout. The exact product-code fix +
+required dev config (`config/recurring.yml` `development:` block) are in
+`docs/BACKEND_GAPS.md` #40. Verified the *failure* live:
+`ExpireCheckout.call(now: 1.day.from_now)` → `success=false`, 0 released.
 
 **End-to-end proven with a real Chapa test payment:**
 `checkout_url` → pay (test phone `251900000000`) → Chapa POSTs a **signed

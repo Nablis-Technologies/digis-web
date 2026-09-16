@@ -43,7 +43,7 @@
 | # | Status | Summary |
 |---|---|---|
 | 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
-| 40 | resolved | `ExpireCheckout` no longer aborts the sweep on an elapsed-grace payment (2026-09-16) |
+| 40 | open — blocking | `ExpireCheckout` aborts the sweep on an elapsed-grace payment → abandoned checkouts never expire |
 | 39 | open — degrading | no public endpoint listing payout `bank_slug`s; frontend hardcodes the 3 known slugs |
 | 41 | open — degrading | a released order permanently burns its registration (`idx_one_order_item_per_registration` ignores order status) |
 | 8 | open — degrading | no user `name` column / serializer field |
@@ -80,42 +80,53 @@ disabled as a workaround.
 
 **Status: open — verified 2026-09-09.**
 
-### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts (RESOLVED 2026-09-16)
-
-**Fixed:** `ExpireCheckout#expire_order` now moves an order to settlement grace
-only while the grace window is still open; with no live attempt, **or** an attempt
-whose `settlement_grace_expires_at` has already elapsed, it releases the order
-instead of raising. Verified live with `ExpireCheckout.call(now: 1.day.from_now)`
-→ `success=true`, active checkouts released (previously `success=false`, 0
-released). A late provider success is still handled by `AcceptPayment`'s
-rejection/reversal path.
-
-**Original finding (below, kept for context).**
+### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts
 
 `Orders::ExpireCheckout` is driven only by `Orders::EnterSettlementGraceJob`, and
-development had **no `development:` section in `config/recurring.yml`**, so it
-never ran: abandoned `pending_payment` orders piled up and every later checkout
-for that buyer+event 409s `active_checkout_exists`.
+development has **no `development:` section in `config/recurring.yml`**, so it
+never runs there: abandoned `pending_payment` orders pile up and every later
+checkout for that buyer+event 409s `active_checkout_exists`.
 
-Even once it runs, `ExpireCheckout#expire_order` **raises `ExpiryFailure` when a
+Even when it does run, `ExpireCheckout#expire_order`
+(`app/services/orders/expire_checkout.rb:49-57`) **raises `ExpiryFailure` when a
 `current` payment (`status in created/processing`) has an already-elapsed
-`settlement_grace_expires_at`** (`app/services/orders/expire_checkout.rb:49-63`).
-`ExpiryFailure` aborts the whole sweep (`call` rescues → failure), so one such
-order leaves **every** stale checkout unexpired. Verified live 2026-09-15: 10
-active checkouts, 2 with elapsed grace → `ExpireCheckout.call` `success=false`,
-`remaining=10`, 0 released.
+`settlement_grace_expires_at`**. `ExpiryFailure` aborts the whole sweep
+(`call` rescues → failure), so a single such order leaves **every** stale checkout
+unexpired. Verified live 2026-09-15: 10 active checkouts, 2 with elapsed grace →
+`ExpireCheckout.call` `success=false`, `remaining=10`, 0 released.
 
 **Why it blocks the frontend:** the buyer can never start a new checkout for the
 event; from a fresh session the conflict sheet cannot even offer a restart,
 because the `active_checkout_exists` 409 carries no order id.
 
-**Fix (backend):** release the order when a current payment's grace has elapsed
-(or the payment is terminal) instead of raising; include the conflicting order id
-in the 409 so the client can offer restart. **Dev mitigation added:** a minimal
-`development:` block in `config/recurring.yml` (expiry + outbox) plus a one-off
-`Orders::ReleaseCheckout` sweep to clear the backlog.
+**Fix (1 — product code, `app/services/orders/expire_checkout.rb`):** move to
+settlement grace only while it is still open; otherwise release the order instead
+of raising:
 
-**Status: open — verified 2026-09-15 (dev DB + `expire_checkout.rb` + live `ExpireCheckout.call`).**
+```ruby
+payment = order.payments.current.lock.order(:id).first
+if payment && payment.settlement_grace_expires_at > now
+  move_to_grace!(order, payment)
+  next payment.id
+end
+
+release = Orders::ReleaseCheckout.call(order:, at: now)
+raise ExpiryFailure, release.error if release.failure?
+next true
+```
+(A late provider success is still handled by `AcceptPayment`'s rejection/reversal
+path.)
+
+**Fix (2 — dev config, `config/recurring.yml`):** add a `development:` block so the
+sweep actually runs locally — `Catalog::ExpireInventoryReservationsJob` and
+`Orders::EnterSettlementGraceJob` (every minute) + `Core::ProcessOutboxJob`
+(outbox drain). `Orders::ExpireCheckout` is otherwise never triggered in dev.
+
+**Fix (3 — optional):** include the conflicting order id in the
+`active_checkout_exists` 409 so the client can offer a restart, not just
+"start fresh".
+
+**Status: open — filed 2026-09-16 (frontend does not change backend code).**
 
 ---
 
@@ -278,11 +289,18 @@ key, `POST /v2/payments/hosted` returns `400 invalid_format — "Callback URL mu
 start with https:// and be a valid URL"` when `CHAPA_CALLBACK_URL`/`CHAPA_RETURN_URL`
 are `http://localhost`. Both must be **https**.
 
-**Resolved locally via HTTPS tunnels (2026-09-16):** backend + frontend are
-exposed through cloudflared quick tunnels; `digis_backend/script/dev_tunnels.ps1`
-restarts them, rewrites `.env.chapa`, reloads the backend, and prints the
-webhook URL. Dev tunnel hosts are allowlisted in `config/environments/development.rb`
-(`.trycloudflare.com`) and Vite `server.allowedHosts`/`host: true`.
+**Local dev setup (2026-09-16) — requires two BACKEND dev-config changes** (filed
+here; the frontend does not change backend code). Chapa needs a public HTTPS host,
+so both ends are exposed through **cloudflared quick tunnels** (backend + frontend):
+- `config/environments/development.rb` → allow the tunnel hosts:
+  `config.hosts << ".trycloudflare.com"` (+ `.ngrok-free.app`). Without it Rails
+  **403s** every tunnel request, so Chapa's callback/webhook never lands.
+- `config/recurring.yml` → a `development:` block running the checkout-lifecycle
+  jobs (see #40, "Fix 2"). Without it `Orders::ExpireCheckout` never runs locally.
+
+Frontend side (ours): Vite `server.host: true` + `allowedHosts` (`vite.config.ts`).
+Dev-only helper scripts live in the backend repo (`script/dev_tunnels.ps1`,
+`script/tail_log.ps1`, `script/tail_otp.ps1`).
 
 **Verified end-to-end with a real Chapa test payment (2026-09-16):** Chapa
 delivered a signed `POST /payments/chapa/webhook` **from its own IP** →
