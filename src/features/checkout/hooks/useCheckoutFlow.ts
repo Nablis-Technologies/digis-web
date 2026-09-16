@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { orderModule, type CheckoutOrder, type OrderQuote } from '@/lib/order';
 import { ticketsService } from '@/lib/tickets';
 import { clearCheckoutResumeKeys } from '@/lib/payment-return';
+import { setCheckoutPopup } from '@/lib/checkout-popup';
 import { registrationModule, type ConsentDocument } from '@/lib/registration';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { ApiError, messageForCode } from '@/lib/errors';
@@ -203,6 +204,33 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     }
   };
 
+  /**
+   * Chapa V2 does NOT redirect the buyer back to the app (verified: the receipt
+   * page stays put, and the API `return_url` is ignored). So open the hosted
+   * checkout in a NEW tab and keep THIS tab alive to confirm — the webhook
+   * fulfills server-side and the refresh + wallet poll then resolve it. Falls
+   * back to a same-tab navigation when the popup is blocked. The
+   * `digis:awaiting-confirm` flag tells the router to start the confirmation
+   * poll on this (still-open) tab.
+   */
+  const openedCheckoutsRef = useRef<Set<string>>(new Set());
+  const openHostedCheckout = (orderId: string, checkoutUrl: string) => {
+    // Both the hook-level and per-call onSuccess handlers can fire for one
+    // attempt; open exactly once per order.
+    if (openedCheckoutsRef.current.has(orderId)) return;
+    openedCheckoutsRef.current.add(orderId);
+    try {
+      sessionStorage.setItem('digis:awaiting-confirm', orderId);
+      window.dispatchEvent(new Event('digis:awaiting-confirm'));
+    } catch { /* storage unavailable */ }
+    // No `noopener` feature here: with it, window.open returns null even on
+    // success, which made this tab ALSO navigate (the double action we saw) and
+    // would leave us no handle to close the tab with once the payment resolves.
+    const opened = window.open(checkoutUrl, '_blank');
+    setCheckoutPopup(opened);
+    if (!opened) window.location.href = checkoutUrl;
+  };
+
   const completeCheckoutMutation = useMutation({
     mutationKey: ['checkout', 'complete'],
     // Returns the order + payment attempt (`payment` is null for free orders,
@@ -250,23 +278,9 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
       const { payment } = await orderModule.startPayment({ orderId: order.id, provider: 'chapa', paymentMethod: method, eventId: evId, guest });
       return { order, payment };
     },
-    onSuccess: ({ order, payment }) => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', 'user'] });
-      // Chapa hosted checkout: hand the buyer to Chapa's page. The backend
-      // verifies the outcome server-side (webhook + return-URL verify); when
-      // Chapa redirects back the session/refresh flow re-enters the app.
-      // Persist the URL so a later retry resumes instead of conflicting.
-      if (payment && payment.status === 'processing' && payment.checkout_url) {
-        try {
-          const payload = JSON.stringify({ url: payment.checkout_url, at: Date.now() });
-          sessionStorage.setItem(paymentUrlKey(order.id), payload);
-          window.localStorage.setItem(paymentUrlKey(order.id), payload);
-        } catch { /* storage unavailable — resume link just won't exist */ }
-        window.location.href = payment.checkout_url;
-        return;
-      }
-      finalizeSuccess(order);
-    },
+    // Success/error are handled PER-CALL in payNow (the only caller). TanStack
+    // Query v5 fires BOTH the hook-level and the mutate-level callbacks, so a
+    // handler here would double-run the open/finalize logic for every attempt.
   });
 
   const finalizeSuccess = (order: CheckoutOrder) => {
@@ -323,7 +337,12 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     const stuck = stuckOrderIdRef.current;
     const resumeUrl = stuck ? readResumeUrl(stuck) : null;
     const restartable = !!stuck && !!registrationIdRef.current;
-    setConflict({ kind, canContinue: !!resumeUrl || restartable, canReplace: restartable });
+    // "Start fresh" is also possible when the conflict is our own registration
+    // (no stored order id): replaceConflictCheckout releases it so the next
+    // submit is genuinely new. Without this, a fresh session whose checkout was
+    // started elsewhere had no way forward at all.
+    const ownRegistration = !!registrationIdRef.current;
+    setConflict({ kind, canContinue: !!resumeUrl || restartable, canReplace: restartable || ownRegistration });
     setStep('payment');
   };
   const closeConflictSheet = () => setConflict(null);
@@ -757,12 +776,17 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
                 openConflictSheet('finished');
                 return;
               }
-              if (e instanceof ApiError && e.code === 'active_checkout_exists') {
+              if (
+                e instanceof ApiError &&
+                (e.code === 'active_checkout_exists' || e.code === 'idempotency_conflict')
+              ) {
                 // A previous checkout for this buyer+event is still active
                 // (draft/pending_payment) and this session doesn't know its id
-                // (fresh tab). Offer the conflict sheet — View Tickets, or a
-                // restartable path when we hold a resume link — never a bare
-                // inline error that leaves the buyer stranded.
+                // (fresh tab) — or a dead order still holds this registration
+                // (idx_one_order_item_per_registration is unique per
+                // registration regardless of the order's status). Offer the
+                // conflict sheet, never a bare inline error: "Discard & start
+                // fresh" releases the registration and retries as a new one.
                 openConflictSheet('finished');
                 return;
               }
@@ -773,15 +797,23 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
             // screen then renders on return. A synchronous success (free/
             // stubbed provider) lands here.
             onSuccess: ({ order, payment }) => {
+              if (!payment || payment.status === 'succeeded') {
+                finalizeSuccess(order);
+                return;
+              }
               if (payment.status === 'processing' && payment.checkout_url) {
                 try {
                   const payload = JSON.stringify({ url: payment.checkout_url, at: Date.now() });
                   sessionStorage.setItem(paymentUrlKey(order.id), payload);
                   window.localStorage.setItem(paymentUrlKey(order.id), payload);
                 } catch { /* storage full/blocked — resume link just won't exist */ }
+                openHostedCheckout(order.id, payment.checkout_url);
                 return;
               }
-              finalizeSuccess(order);
+              // Failed / URL-less attempt (returned as a 200 payload) is not a
+              // completed purchase — surface it instead of a false "confirmed".
+              setStep('payment');
+              setPaymentError('Payment could not be started. Please try again.');
             },
           },
         );

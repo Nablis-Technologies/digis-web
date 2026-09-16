@@ -36,7 +36,7 @@ import type { UserTicket } from '@/types';
  */
 export function clearCheckoutResumeKeys(): void {
   try {
-    const prefixes = ['digis:checkout-key:', 'digis:stuck-order:', 'digis:payment-url:', 'digis:payment-key:', 'digis:payment-event:', 'digis:payment-id:', 'digis:guest:'];
+    const prefixes = ['digis:checkout-key:', 'digis:stuck-order:', 'digis:payment-url:', 'digis:payment-key:', 'digis:payment-event:', 'digis:payment-id:', 'digis:awaiting-confirm', 'digis:guest:'];
     const clearStore = (store: Storage) => {
       const doomed: string[] = [];
       for (let i = 0; i < store.length; i++) {

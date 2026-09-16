@@ -23,6 +23,7 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { AuthModal } from '@/features/auth/components/AuthModal';
 import { TopBar } from '@/components/TopBar';
 import { usePaymentReturnConfirmation, useGuestPaymentReturnConfirmation } from '@/lib/payment-return';
+import { closeCheckoutPopup } from '@/lib/checkout-popup';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 
 export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings';
@@ -283,6 +284,32 @@ function AppContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPaymentReturn, isAuthenticated]);
+
+  // Chapa V2 doesn't redirect back, so the checkout opens in a NEW tab and
+  // signals THIS still-open tab (digis:awaiting-confirm) to start confirming.
+  // Keep the latest start fn in a ref so the listener never needs re-binding.
+  const confirmStartRef = useRef<() => void>(() => {});
+  confirmStartRef.current = () =>
+    isAuthenticated ? startReturnConfirm() : startGuestReturnConfirm();
+  useEffect(() => {
+    const handler = () => confirmStartRef.current();
+    window.addEventListener('digis:awaiting-confirm', handler);
+    return () => window.removeEventListener('digis:awaiting-confirm', handler);
+  }, []);
+
+  // When the payment resolves, CLOSE the Chapa tab so the buyer is returned to
+  // Digis (Chapa V2 never redirects back). Drop the awaiting flag either way so
+  // a later load doesn't re-start the poll.
+  useEffect(() => {
+    const confirmed = returnState.kind === 'confirmed' || guestReturnState.kind === 'confirmed';
+    const done =
+      returnState.kind === 'timeout' || returnState.kind === 'terminal' ||
+      guestReturnState.kind === 'timeout' || guestReturnState.kind === 'terminal';
+    if (confirmed) closeCheckoutPopup();
+    if (confirmed || done) {
+      try { sessionStorage.removeItem('digis:awaiting-confirm'); } catch { /* ignore */ }
+    }
+  }, [returnState.kind, guestReturnState.kind]);
 
   // Re-kick verification while confirming: a first verify can land while
   // Chapa still reports the attempt pending (or the kick raced the receipt),

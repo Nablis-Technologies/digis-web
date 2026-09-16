@@ -88,24 +88,29 @@ test('full purchase chain reaches payment (Chapa hosted checkout or typed error)
   await expect(payNow).toBeEnabled({ timeout: 10_000 });
   await payNow.click();
 
-  // Either Chapa is configured (redirect to the hosted checkout) or not
-  // (typed error on the payment step). Both prove the chain ran. The
-  // redirect is cross-origin, so wait for the URL change (Playwright's
-  // default 30s navigation timeout covers it).
+  // Chapa V2 doesn't redirect back, so the hosted checkout opens in a NEW tab
+  // ("popup") and the app tab stays open to confirm. Either a popup OR a
+  // same-tab redirect proves the chain reached payment.
+  const popup = await page.waitForEvent('popup', { timeout: 30_000 }).catch(() => null);
+  if (popup) {
+    await popup.waitForURL(/chapa\.(co|global)/i, { timeout: 30_000 }).catch(() => {});
+    expect(popup.url()).toMatch(/chapa\.(co|global)/i);
+    return;
+  }
   const redirected = await page
-    .waitForURL(/chapa\.(co|global)/, { timeout: 30_000 })
+    .waitForURL(/chapa\.(co|global)/i, { timeout: 5_000 })
     .then(() => true)
     .catch(() => false);
 
   if (redirected) {
-    expect(page.url()).toMatch(/chapa\.(co|global)/);
+    expect(page.url()).toMatch(/chapa\.(co|global)/i);
     return;
   }
   // No redirect → either a typed error, or the conflict choice sheet (the
   // seeded buyer holds fulfilled-but-still-active GA registrations — backend
   // gaps #21/#22 — so a fresh context re-buy lands on the sheet, which must
   // offer View Tickets, never a dead end).
-  const sheet = page.getByText(/you already have this ticket in another checkout/i).first();
+  const sheet = page.getByText(/you have an unfinished checkout/i).first();
   if (await sheet.isVisible().catch(() => false)) {
     await page.getByRole('button', { name: /view tickets/i }).click();
     await expect(page).toHaveURL(/tickets/, { timeout: 10_000 });

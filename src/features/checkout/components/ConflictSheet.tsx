@@ -64,13 +64,14 @@ export function ConflictSheet({
               className="text-[19px] font-light mb-2"
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}
             >
-              You already have this ticket in another checkout
+              You have an unfinished checkout
             </h3>
             <p
               className="text-[12.5px] leading-relaxed mb-6"
               style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}
             >
-              Pick up where you left off, replace it with the selections above, or check your tickets.
+              A checkout for this event was started but not finished — you don&apos;t have a ticket for
+              it yet. Continue where you left off, or discard it and start fresh.
             </p>
 
             <div className="flex flex-col gap-2.5">

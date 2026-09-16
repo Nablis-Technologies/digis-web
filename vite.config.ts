@@ -31,6 +31,11 @@ export default defineConfig({
     },
   },
   server: {
+    // Allow the HTTPS dev tunnel used as Chapa's return_url (Chapa requires a
+    // public https host; localhost is rejected). host:true binds 0.0.0.0 so the
+    // tunnel container can reach Vite on the host.
+    host: true,
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app'],
     watch: {
       // Playwright writes test-results/playwright-report during e2e runs —
       // without this, those writes trigger HMR reloads that abort in-flight
