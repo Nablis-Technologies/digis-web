@@ -30,11 +30,13 @@ describe('resale + payout error copy', () => {
       'idempotency_conflict',
       'payout_account_provider_unavailable',
       'payout_account_input_invalid',
+      'payout_account_bank_unsupported',
       'payout_account_verification_failed',
-      'payout_account_verification_pending',
+      'payout_account_verification_required',
+      'payout_account_not_verifiable',
+      'payout_account_not_found',
       'payout_account_conflict',
       'payout_account_invalid',
-      'payout_account_token_invalid',
     ];
     for (const code of codes) {
       const copy = messageForCode(code, 'FALLBACK');

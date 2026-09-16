@@ -14,7 +14,11 @@ function accountWire(overrides = {}) {
     user_id: 'user-uuid',
     type: 'mobile_money',
     provider: 'chapa',
+    bank_slug: 'telebirr',
+    account_label: null,
     status: 'verified',
+    verification_source: 'provider',
+    is_default: false,
     verified_at: '2026-09-06T10:00:00.000Z',
     last_used_at: null,
     created_at: '2026-09-06T09:00:00.000Z',
@@ -35,7 +39,7 @@ describe('payoutService reads (live API, mocked HTTP)', () => {
     const methods = await payoutService.fetchMethods();
     expect(mockedApiFetch).toHaveBeenCalledWith('marketplace/seller/payout_accounts');
     expect(methods).toHaveLength(2);
-    expect(methods[0]).toMatchObject({ id: 'pa-1', displayName: 'Telebirr', status: 'verified' });
+    expect(methods[0]).toMatchObject({ id: 'pa-1', displayName: 'Telebirr', status: 'verified', bankSlug: 'telebirr', isDefault: false });
     expect(methods[1]).toMatchObject({ id: 'pa-2', displayName: 'Bank account', status: 'pending_verification' });
     // Identifiers are never serialized — nothing to leak into the rows.
     expect(methods[0]).not.toHaveProperty('accountNumber');
@@ -69,8 +73,9 @@ describe('payoutService.addMethod (live API, mocked HTTP)', () => {
           payout_account: {
             type: 'mobile_money',
             provider: 'chapa',
+            bank_slug: 'telebirr',
+            account_number: '0911223344',
             holder_name: 'Abebe M',
-            account_details: { phone: '0911223344' },
           },
         },
       }),
@@ -88,7 +93,9 @@ describe('payoutService.addMethod (live API, mocked HTTP)', () => {
           payout_account: expect.objectContaining({
             type: 'bank',
             provider: 'chapa',
-            account_details: { account_number: '10000000', bank: 'cbe' },
+            bank_slug: 'cbe',
+            account_number: '10000000',
+            holder_name: 'Abebe M',
           }),
         },
       }),

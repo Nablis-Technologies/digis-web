@@ -9,14 +9,16 @@
  *   list shows provider + type + verification status only.
  * - There is no default flag and no removal endpoint; both were cut from
  *   the UI rather than faked.
- * - UI kinds map to backend type/provider on submit: Telebirr rides the
- *   mobile_money rail, CBE/BoA ride the bank rail (the bank itself travels
- *   inside the encrypted account details); `provider` is ALWAYS "chapa" (the
- *   only adapter the registry registers — anything else 422s as
- *   `payout_account_provider_unavailable`).
- * - Until Chapa tokenization lands (#26), create answers 422
- *   (`payout_provider_operation_not_implemented`) — surfaced honestly
- *   (proceeds wait in the seller balance; listing still works).
+ * - Chapa V2 create contract is FLAT (no `account_details` envelope):
+ *   `payout_account: { type, provider, bank_slug, account_number, holder_name }`.
+ *   Telebirr rides the mobile_money rail, CBE/BoA ride the bank rail; the
+ *   bank now travels as a top-level `bank_slug` (was nested `bank`). `provider`
+ *   is ALWAYS "chapa" (the only registered adapter).
+ * - `bank_slug` is validated server-side against the provider's ET bank list
+ *   (`/v2/payouts/banks`). There is no public endpoint exposing that list, so
+ *   the slugs below are the known provider values — see BACKEND_GAPS.md.
+ * - Create now works end to end (Chapa V2 tokenization landed): a verified
+ *   account returns verified; an unverifiable one returns pending_verification.
  */
 
 import { apiFetch } from '@/lib/api';
@@ -28,14 +30,16 @@ import type {
   SellerPayoutAccountWire,
 } from '@/types/payout';
 
-function kindToBackend(kind: PayoutMethodKind): { type: string; provider: string } {
-  // The registry (`PayoutProviders::Registry`) only ever registers "chapa",
-  // and `SellerPayoutAccountsController#create` raises KeyError (→ 422
-  // payout_account_provider_unavailable) for any other value. The provider is
-  // the tokenizer adapter; the rail (mobile_money vs bank) travels in `type`.
-  if (kind === 'telebirr') return { type: 'mobile_money', provider: 'chapa' };
-  return { type: 'bank', provider: 'chapa' };
-}
+/** UI kind → backend create fields (type/provider/bank_slug). */
+const KIND_ACCOUNTS: Record<PayoutMethodKind, { type: string; provider: string; bank_slug: string }> = {
+  // The registry (`PayoutProviders::Registry`) only ever registers "chapa".
+  // Telebirr is the mobile_money rail (slug `telebirr`); CBE/BoA are bank rails.
+  // `cbe` and `telebirr` are confirmed provider slugs; `boa` is the assumed
+  // slug pending a public banks endpoint (see BACKEND_GAPS.md).
+  telebirr: { type: 'mobile_money', provider: 'chapa', bank_slug: 'telebirr' },
+  cbe: { type: 'bank', provider: 'chapa', bank_slug: 'cbe' },
+  boa: { type: 'bank', provider: 'chapa', bank_slug: 'boa' },
+};
 
 /** Known status → display label. Unknown statuses have no label (absent, not invented). */
 export const STATUS_LABELS: Record<SellerPayoutAccountStatus, string> = {
@@ -74,6 +78,8 @@ export function mapPayoutAccount(wire: SellerPayoutAccountWire): PayoutMethod {
     id: wire.id,
     type: wire.type === 'bank' ? 'bank' : 'mobile_money',
     provider: wire.provider,
+    bankSlug: wire.bank_slug,
+    isDefault: wire.is_default === true,
     status: toStatus(wire.status),
     verifiedAt: wire.verified_at,
     displayName: displayNameFor(wire.provider, wire.type),
@@ -92,18 +98,16 @@ export const payoutService = {
     const accountNumber = input.accountNumber.replace(/\s+/g, '');
     if (holderName.length <= 1) throw new Error('Enter the account holder name.');
     if (accountNumber.length < 4) throw new Error('Enter a valid account number.');
-    const { type, provider } = kindToBackend(input.kind);
+    const { type, provider, bank_slug } = KIND_ACCOUNTS[input.kind];
     const { data } = await apiFetch<SellerPayoutAccountWire>('marketplace/seller/payout_accounts', {
       method: 'POST',
       body: {
         payout_account: {
           type,
           provider,
+          bank_slug,
+          account_number: accountNumber,
           holder_name: holderName,
-          account_details:
-            input.kind === 'telebirr'
-              ? { phone: accountNumber }
-              : { account_number: accountNumber, bank: input.kind },
         },
       },
     });

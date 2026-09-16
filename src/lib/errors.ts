@@ -83,14 +83,18 @@ const CODE_MESSAGES: Record<string, string> = {
   purchase_limit_exceeded: 'You have reached the purchase limit for this ticket type.',
   // Audience gating (invite-only / access-code events).
   no_valid_code_or_invitation: 'This access code or invitation is not valid for this event.',
-  // Seller payout destinations (Marketplace) — verified against the backend.
-  payout_account_provider_unavailable: 'Payout verification is not available yet. You can still list and sell — proceeds wait in your seller balance until verification opens.',
+  // Seller payout destinations (Marketplace) — verified against the backend
+  // locale (Chapa V2). bank_code gave way to bank_slug; the token/verification
+  // -pending codes were dropped and the verify/manual-review codes added.
+  payout_account_provider_unavailable: 'Payout verification is unavailable right now — try again later.',
   payout_account_input_invalid: 'Those payout details were rejected — check the holder name and account number and try again.',
+  payout_account_bank_unsupported: 'The selected bank is not supported by the payout provider.',
   payout_account_verification_failed: 'The provider could not verify this account — check the details and try again.',
-  payout_account_verification_pending: 'Verification is still pending with the provider — check back shortly.',
+  payout_account_verification_required: 'Verification needs a reason and an evidence reference.',
+  payout_account_not_verifiable: 'This payout account is not eligible for verification.',
+  payout_account_not_found: 'That payout account could not be found.',
   payout_account_conflict: 'This destination is already registered.',
   payout_account_invalid: 'This destination could not be saved — check the details and try again.',
-  payout_account_token_invalid: 'The provider did not return a valid token — try again.',
   // Resale listings (Marketplace) — verified against the backend locale.
   resale_disabled: 'Resale is not enabled for this ticket type.',
   asking_amount_exceeds_cap: 'That price is above this event’s resale cap — lower your asking price and try again.',
