@@ -27,6 +27,10 @@ test('LIVE: full real payment → ticket lands in wallet (no mocks)', async ({ p
   await page.getByRole('button', { name: /Buy Now|Get Tickets/ }).first().click();
   await page.waitForTimeout(1500);
 
+  // Chapa V2 ignores return_url, so the hosted checkout opens in a NEW tab
+  // ("popup") and this tab stays on the app for the confirmation poll.
+  const popupPromise = page.waitForEvent('popup', { timeout: 120_000 }).catch(() => null);
+
   let step = 0;
   while (step < 10) {
     const cb = page.locator('input[type=checkbox]');
@@ -51,15 +55,22 @@ test('LIVE: full real payment → ticket lands in wallet (no mocks)', async ({ p
     step++;
   }
 
-  await page.waitForURL(/checkout\.chapa\.co/, { timeout: 30_000 });
-  console.log('at Chapa hosted checkout:', page.url());
+  const chapa = (await popupPromise) ?? page;
+  await chapa.waitForURL(/chapa\.(co|global)/, { timeout: 30_000 });
+  console.log('at Chapa hosted checkout:', chapa.url());
 
-  await page.waitForTimeout(2500);
-  await page.fill('#test-number', '0900123456');
-  await page.getByRole('button', { name: 'Pay using Test Mode' }).click();
-
-  await page.waitForURL(/localhost:5173\/\?status=return/, { timeout: 30_000 });
-  console.log('returned to app — payment successful');
+  await chapa.waitForTimeout(2500);
+  const testBank = chapa.getByText(/Test Bank Payment/i).first();
+  if ((await testBank.count()) > 0) await testBank.click();
+  const phoneField = chapa.getByPlaceholder(/Testing phone number/i).first();
+  if (await phoneField.count() > 0) {
+    await phoneField.fill('251900000000');
+  } else {
+    await chapa.locator('#test-number').fill('0900123456');
+  }
+  await chapa.getByRole('button', { name: 'Pay using Test Mode' }).click();
+  await chapa.waitForTimeout(3000);
+  console.log('paid on Chapa (no return_url) — app tab confirms:', chapa.url());
 
   const t0 = Date.now();
 

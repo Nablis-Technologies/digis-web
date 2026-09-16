@@ -44,10 +44,19 @@ webhook from its own IP** → `Orders::PaymentEvent` (`payment.success`) →
 `Ticketing::Packages::Issue` → **ticket in the wallet**. Our side was also proven
 in isolation by re-sending a correctly HMAC-signed webhook.
 
-**Still open / next:** the "return to app" UX (V2 return_url ignored — needs a
-dashboard redirect setting, or a `return_to` on the receipt); rotate
-`CHAPA_WEBHOOK_SECRET` off `tolo-dev`; consider a stable tunnel (ngrok static
-domain) to end the URL churn.
+**Webhook secret rotated (2026-09-16):** `CHAPA_WEBHOOK_SECRET` moved off the
+weak `tolo-dev` to a random 64-hex value in `.env.chapa` (gitignored), and the
+**same value was saved in the Chapa dashboard** (`Profile settings → Webhooks →
+Webhook secret hash`). `web` was recreated, then a second real test payment
+proved it: `payment.success` → `processed`, order `fulfilled`, ticket issued, and
+**no new `[CHAPA-WEBHOOK-DIAGNOSTIC]`** (a mismatch logs one + returns 401). The
+live drills `e2e/zz-*.spec.ts` were updated for the new-tab checkout flow.
+
+**Still open / next:** buyer return is a frontend workaround (checkout opens in a
+new tab; the app tab polls and closes it on `confirmed`) because V2 ignores
+`return_url` — a dashboard redirect setting or `return_to` on the receipt would
+let us drop it. Consider a stable tunnel (ngrok static domain) to end the URL
+churn.
 
 ## Session 2026-09-15 — backend pull (46 commits: Chapa V2 + seller payouts); payout wired, #26/#16 resolved
 

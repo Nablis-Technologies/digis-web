@@ -45,13 +45,14 @@ test('fresh buyer reaches chapa hosted checkout', async ({ page }) => {
   await expect(payNow).toBeEnabled({ timeout: 10_000 });
   await payNow.click();
 
-  const redirected = await page
-    .waitForURL(/chapa\.(co|global)/, { timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false);
+  // Chapa V2 ignores return_url and never redirects back, so the app opens the
+  // hosted checkout in a NEW tab ("popup") and keeps its own tab to confirm.
+  const chapa = await page.waitForEvent('popup', { timeout: 30_000 }).catch(() => null);
+  if (chapa) await chapa.waitForLoadState('domcontentloaded').catch(() => {});
 
   console.log('CALLS:\n' + calls.join('\n'));
-  console.log('REDIRECTED TO CHAPA:', redirected, 'URL:', page.url());
+  console.log('CHAPA POPUP OPENED:', !!chapa, 'URL:', chapa?.url() ?? page.url());
   await page.screenshot({ path: 'test-results/chapa-redirect-outcome.png' });
-  expect(redirected).toBe(true);
+  expect(chapa).not.toBeNull();
+  await expect(chapa!.getByText(/Test Bank Payment/i).first()).toBeVisible({ timeout: 60_000 });
 });
