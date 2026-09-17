@@ -9,15 +9,17 @@
 
 ## Session 2026-09-16 — Chapa V2 payments WORK end-to-end locally (HTTPS tunnels); #40 filed
 
-**Tunnels:** cloudflared (Docker image) exposes **backend `localhost:3000`** and
-**frontend `localhost:5173`** over public HTTPS. `.env.chapa` `CHAPA_CALLBACK_URL`
-→ backend tunnel, `CHAPA_RETURN_URL` → frontend tunnel. Frontend side: Vite
-`server.host: true` + `allowedHosts: ['.trycloudflare.com']`. **Backend side is
+**Tunnels:** the **backend** is exposed over public HTTPS by a **stable ngrok dev
+domain** (`debug-snowiness-unreached.ngrok-free.dev`), run as a Docker container
+(`digis-tunnel-ngrok`: `ngrok/ngrok` → `http host.docker.internal:3000 --url=https://<dev-domain>`).
+`.env.chapa` `CHAPA_CALLBACK_URL` **and** `CHAPA_RETURN_URL` both point at it; the
+cloudflared quick tunnels (backend + frontend) were **retired** — Chapa V2 ignores
+`return_url`, so the frontend no longer needs a tunnel at all. **Backend side is
 local dev setup, NOT a gap** — Rails needs `config.hosts << ".trycloudflare.com"`
-(else it 403s the tunnel) and a `development:` block in `config/recurring.yml`;
-see `docs/BACKEND_GAPS.md` #16 *Local dev setup* / #40 *dev setup*. Dev helper
-scripts (`digis_backend/script/dev_tunnels.ps1`, `tail_log.ps1`, `tail_otp.ps1`)
-are dev tooling.
+and `<< ".ngrok-free.dev"` (else it 403s the tunnel) plus a `development:` block in
+`config/recurring.yml`; see `docs/BACKEND_GAPS.md` #16 *Local dev setup* / #40
+*dev setup*. Dev helper scripts (`digis_backend/script/tail_log.ps1`,
+`tail_otp.ps1`) are dev tooling.
 
 **Key findings (Chapa V2):**
 - `POST /v2/payments/hosted` **rejects non-https callback/return URLs** (`400
@@ -25,9 +27,11 @@ are dev tooling.
 - V2 appears to **ignore the API's `return_url`** — after paying, the browser
   stayed on Chapa's receipt (no redirect back). The **dashboard webhook is the
   actual completion mechanism.**
-- **Ephemeral hostnames:** when a trycloudflare hostname expires (DNS stops
-  resolving) Chapa can't deliver — symptom: the payment succeeds on Chapa but
-  nothing fulfills. Re-run the tunnel script + update the dashboard URL.
+- **Stable tunnel (2026-09-16):** the ngrok dev domain is **stable across
+  restarts**, so the Chapa dashboard webhook URL is set once and never re-pasted.
+  Earlier the cloudflared quick tunnels were ephemeral — when a hostname expired
+  Chapa couldn't deliver, so the payment succeeded on Chapa but nothing
+  fulfilled, and the tunnel script + dashboard URL had to be re-run/re-pasted.
 
 **#40 FILED for the backend (not changed by us):** `ExpireCheckout` raises when a
 current payment's settlement grace has already elapsed, aborting the whole sweep —

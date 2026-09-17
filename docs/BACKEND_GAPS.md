@@ -301,24 +301,28 @@ start with https:// and be a valid URL"` when `CHAPA_CALLBACK_URL`/`CHAPA_RETURN
 are `http://localhost`. Both must be **https**.
 
 **Local dev setup (2026-09-16) — environment config, NOT a backend gap.** Chapa
-needs a public HTTPS host, so both ends are exposed through **cloudflared quick
-tunnels** (backend + frontend). Two pieces of **local dev config** (dev-only,
-uncommitted) make that work — they are setup chores, not gaps:
+needs a public HTTPS host, so the **backend** is exposed through a **stable ngrok
+dev domain** (Docker container `digis-tunnel-ngrok`: `ngrok/ngrok` →
+`http host.docker.internal:3000 --url=https://<dev-domain>`). Two pieces of
+**local dev config** (dev-only, uncommitted) make that work — they are setup
+chores, not gaps:
 - `config/environments/development.rb` → allow the tunnel hosts:
-  `config.hosts << ".trycloudflare.com"` (+ `.ngrok-free.app`). Without it Rails
-  **403s** every tunnel request, so Chapa's callback/webhook never lands.
+  `config.hosts << ".ngrok-free.dev"` / `".ngrok-free.app"` /
+  `".trycloudflare.com"`. Without it Rails **403s** every tunnel request (the
+  response is Rails' Host Authorization HTML page), so Chapa's callback/webhook
+  never lands.
 - `config/recurring.yml` → a `development:` block running the checkout-lifecycle
   jobs (see #40 *dev setup*). Without it `Orders::ExpireCheckout` never runs locally.
 
 Provider/dashboard setup lives with the setup too: the webhook endpoint
-(`POST <host>/payments/chapa/webhook`) and the **webhook secret hash** are
-registered in the Chapa dashboard, and `.env.chapa` holds the keys
+(`POST https://<dev-domain>/payments/chapa/webhook`) and the **webhook secret
+hash** are registered in the Chapa dashboard, and `.env.chapa` holds the keys
 (`CHAPA_WEBHOOK_SECRET` is any random string you invent — the same value must be
-saved in the dashboard).
+saved in the dashboard). Both `CHAPA_CALLBACK_URL` and `CHAPA_RETURN_URL` point at
+the tunnel host (V2 requires https on both).
 
-Frontend side (ours): Vite `server.host: true` + `allowedHosts` (`vite.config.ts`).
-Dev-only helper scripts live in the backend repo (`script/dev_tunnels.ps1`,
-`script/tail_log.ps1`, `script/tail_otp.ps1`).
+Frontend side: no tunnel needed any more (V2 ignores `return_url`); Vite still
+carries `server.host: true` + `allowedHosts` in `vite.config.ts`.
 
 **Verified end-to-end with a real Chapa test payment (2026-09-16):** Chapa
 delivered a signed `POST /payments/chapa/webhook` **from its own IP** →
@@ -327,10 +331,11 @@ Chapa's reference) → order `fulfilled` → **ticket issued**. Our side was als
 proven independently by re-sending a correctly HMAC-signed webhook.
 
 **Two caveats:**
-1. Quick-tunnel hostnames are **ephemeral**. When they expire (DNS stops
-   resolving) no callback/webhook arrives — symptom: the payment succeeds on
-   Chapa but nothing fulfills. Re-run `script/dev_tunnels.ps1` and update the
-   dashboard webhook URL it prints.
+1. ~~Quick-tunnel hostnames are **ephemeral**~~ — **resolved 2026-09-16** by
+   moving to a **stable ngrok dev domain**, which survives restarts, so the
+   dashboard webhook URL is set once. (With the earlier cloudflared quick tunnels,
+   an expired hostname meant no webhook arrived — symptom: the payment succeeded
+   on Chapa but nothing fulfilled.)
 2. Chapa V2 does **not** return the buyer to the app — the API `return_url` is
    ignored (verified: the browser stays on Chapa's receipt; there is no dashboard
    redirect setting either). **Handled in the frontend:** the hosted checkout now
