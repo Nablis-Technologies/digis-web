@@ -9,14 +9,29 @@
  * still no removal endpoint — a destination stands until suspended/closed.
  */
 
-/** Input selector in the add form (UI kinds; mapped to backend type/provider on submit). */
+/** Payment-method logo selector (checkout rails — not seller payouts). */
 export type PayoutMethodKind = 'telebirr' | 'cbe' | 'boa';
+
+/**
+ * One destination the provider actually supports, from the backend's bank list
+ * (`GET /marketplace/seller/payout_accounts/banks`). `type` is the provider's
+ * own rail type (`bank`, `mobile_money`, `store_value`, …) and is sent back
+ * verbatim on create — the UI never invents slugs or rails.
+ */
+export interface PayoutBank {
+  bankSlug: string;
+  bankName: string;
+  type: string;
+  minAmount?: number;
+  maxAmount?: number;
+}
 
 export type SellerPayoutAccountStatus = 'pending_verification' | 'verified' | 'suspended' | 'closed';
 
 export interface PayoutMethod {
   id: string;
-  type: 'mobile_money' | 'bank';
+  /** Provider rail type, e.g. 'bank' | 'mobile_money' | 'store_value'. */
+  type: string;
   provider: string;
   /** Provider bank/mobile-money slug the destination is registered against. */
   bankSlug: string;
@@ -25,13 +40,14 @@ export interface PayoutMethod {
   /** Absent when the backend omits or sends an unknown status — never defaulted. */
   status?: SellerPayoutAccountStatus;
   verifiedAt: string | null;
-  /** Provider display name ('Telebirr' | 'Bank account' | ...). */
+  /** Provider display name ('Bank account' | 'Mobile money' | 'Wallet'). */
   displayName: string;
   createdAt: string;
 }
 
 export interface AddPayoutMethodInput {
-  kind: PayoutMethodKind;
+  bankSlug: string;
+  type: string;
   holderName: string;
   accountNumber: string;
 }

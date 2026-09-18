@@ -7,4 +7,5 @@ export type { UserTicket, TicketActionResult, ListForResaleResult } from './tick
 export type { PromoCode, PromoCreateInput, PromoDiscountType, AppliedPromo } from './promo';
 export type { CheckoutOrder, CheckoutStep, PaymentMethod, ContactDetails, CheckoutAnswers } from './checkout';
 export type { ResaleListing } from './resale';
-export type { PayoutMethod, PayoutMethodKind, AddPayoutMethodInput } from './payout';
+export type { PayoutMethod, PayoutMethodKind, PayoutBank, AddPayoutMethodInput } from './payout';
+export type { SellerBalance, SellerLedgerEntry } from './seller-reports';

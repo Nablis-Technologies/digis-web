@@ -3,34 +3,13 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
-import { X, Plus, Check, ArrowLeft, Wallet } from 'lucide-react';
+import { X, Plus, Check, ArrowLeft, Wallet, Landmark } from 'lucide-react';
 import { payoutService, payoutKeys, statusLabel } from '@/lib/payout';
-import type { PayoutMethod, PayoutMethodKind, AddPayoutMethodInput } from '@/types';
-import { ProviderLogo as SharedProviderLogo } from '@/components/ProviderLogo';
+import type { PayoutMethod, AddPayoutMethodInput } from '@/types';
 import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
-import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-
-/* Provider metadata shared by payout forms and selection states. */
-export const PAYOUT_PROVIDERS: Record<PayoutMethodKind, {
-  label: string;
-  full: string;
-  accountLabel: string;
-  placeholder: string;
-  mark: string;      // short text drawn inside the logo badge
-  color: string;     // brand color
-}> = {
-  telebirr: { label: 'Telebirr', full: 'Telebirr', accountLabel: 'Phone number', placeholder: '09xx xxx xxx', mark: 't', color: '#1aa64b' },
-  cbe: { label: 'CBE', full: 'Commercial Bank of Ethiopia', accountLabel: 'Account number', placeholder: '1000 0000 000000', mark: 'CBE', color: '#7b2d8e' },
-  boa: { label: 'BoA', full: 'Bank of Abyssinia', accountLabel: 'Account number', placeholder: '01 000 000 0000', mark: 'BoA', color: '#b3122e' },
-};
-
-const KIND_ORDER: PayoutMethodKind[] = ['telebirr', 'cbe', 'boa'];
-
-export function ProviderLogo({ kind, size = 40 }: { kind: PayoutMethodKind; size?: number }) {
-  return <SharedProviderLogo kind={kind} size={size} />;
-}
 
 export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }: { onClose: () => void; onMethodAdded?: (method: PayoutMethod) => void; onMethodSelected?: (method: PayoutMethod) => void }) {
   const { isDark } = useTheme();
@@ -184,14 +163,12 @@ function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect }
       <AppButton onClick={onSelect}
         className="min-w-0 flex-1 flex items-center gap-3 p-2.5 rounded-xl text-left cursor-pointer"
         style={{ background: 'transparent' }}>
-        {method.type === 'mobile_money' ? (
-          <ProviderLogo kind="telebirr" />
-        ) : (
-          <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-            <Wallet className="w-5 h-5" style={{ color: muted }} strokeWidth={1.5} />
-          </span>
-        )}
+        <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+          {method.type === 'bank'
+            ? <Landmark className="w-5 h-5" style={{ color: muted }} strokeWidth={1.5} />
+            : <Wallet className="w-5 h-5" style={{ color: muted }} strokeWidth={1.5} />}
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="text-[14px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
@@ -236,13 +213,20 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, isDark
   onSubmit: (input: AddPayoutMethodInput) => void; submitting: boolean; continueAfterSave?: boolean;
   isDark: boolean; text: string; muted: string; cardBg: string; cardBorder: string;
 }) {
-  const [kind, setKind] = useState<PayoutMethodKind>('telebirr');
+  // Destinations come from the provider (via the backend), never hardcoded:
+  // whichever rails it supports for this market are the ones we offer.
+  const { data: banks = [], isPending, isError, refetch } = useQuery({
+    queryKey: payoutKeys.banks,
+    queryFn: payoutService.fetchBanks,
+  });
+  const showBanksLoading = useShowSkeleton(isPending);
+  const [bankSlug, setBankSlug] = useState('');
   const [holderName, setHolderName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
 
-  const provider = PAYOUT_PROVIDERS[kind];
-  const isPhone = kind === 'telebirr';
-  const valid = holderName.trim().length > 1 && accountNumber.trim().length >= 4;
+  const selected = banks.find((bank) => bank.bankSlug === bankSlug) ?? null;
+  const isPhone = selected?.type === 'mobile_money';
+  const valid = Boolean(selected) && holderName.trim().length > 1 && accountNumber.trim().length >= 4;
 
   const inputStyle = {
     fontFamily: "'Inter', sans-serif", color: text,
@@ -252,27 +236,61 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, isDark
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <p className="text-[10px] tracking-[1.5px] uppercase mb-2" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
-        Provider
+        Destination
       </p>
-      <div className="grid grid-cols-3 gap-2 mb-5">
-        {KIND_ORDER.map(k => {
-          const p = PAYOUT_PROVIDERS[k];
-          const active = kind === k;
-          return (
-            <AppButton key={k} whileTap={{ scale: 0.97 }} onClick={() => setKind(k)}
-              className="rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer"
-              style={{
-                background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
-                border: `1px solid ${active ? p.color : cardBorder}`,
-              }}>
-              <ProviderLogo kind={k} size={38} />
-              <span className="text-[11px] text-center leading-tight" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
-                {p.label}
-              </span>
-            </AppButton>
-          );
-        })}
-      </div>
+
+      {showBanksLoading ? (
+        <div className="flex flex-col gap-2 mb-5">
+          <Pulse className="h-[52px] rounded-xl" />
+          <Pulse className="h-[52px] rounded-xl" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-2xl p-4 mb-5 text-center" style={{ background: cardBg }}>
+          <p className="text-[13px] mb-3" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
+            Couldn't load payout destinations.
+          </p>
+          <AppButton onClick={() => void refetch()} className="cursor-pointer"
+            style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+            Retry
+          </AppButton>
+        </div>
+      ) : banks.length === 0 ? (
+        <div className="rounded-2xl p-4 mb-5 text-center" style={{ background: cardBg }}>
+          <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
+            No payout destinations are available right now.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 mb-5">
+          {banks.map((bank) => {
+            const active = bankSlug === bank.bankSlug;
+            return (
+              <AppButton key={bank.bankSlug} whileTap={{ scale: 0.98 }} onClick={() => setBankSlug(bank.bankSlug)}
+                className="rounded-xl p-3 flex items-center gap-3 cursor-pointer text-left"
+                style={{
+                  background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
+                  border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.5)' : 'rgba(109,40,217,0.4)') : cardBorder}`,
+                }}>
+                <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+                  {bank.type === 'bank'
+                    ? <Landmark className="w-4 h-4" style={{ color: muted }} strokeWidth={1.5} />
+                    : <Wallet className="w-4 h-4" style={{ color: muted }} strokeWidth={1.5} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
+                    {bank.bankName}
+                  </p>
+                  <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
+                    {bank.type === 'mobile_money' ? 'Mobile money' : bank.type === 'bank' ? 'Bank transfer' : 'Wallet'}
+                  </p>
+                </div>
+                {active && <Check className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={2.4} />}
+              </AppButton>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mb-4">
         <label className="text-[10px] tracking-[1.5px] uppercase mb-2 block" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
@@ -284,16 +302,16 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, isDark
 
       <div className="mb-6">
         <label className="text-[10px] tracking-[1.5px] uppercase mb-2 block" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
-          {provider.accountLabel}
+          {isPhone ? 'Phone number' : 'Account number'}
         </label>
         <AppInput value={accountNumber} onChange={e => setAccountNumber(e.target.value)}
           inputMode={isPhone ? 'tel' : 'numeric'}
-          placeholder={provider.placeholder}
+          placeholder={isPhone ? '09xx xxx xxx' : 'Account number'}
           className="w-full h-[52px] rounded-2xl px-4 text-[14px] outline-none" style={inputStyle} />
       </div>
 
       <AppButton whileHover={valid ? { scale: 1.02 } : undefined} whileTap={valid ? { scale: 0.97 } : undefined}
-        onClick={() => { if (valid && !submitting) onSubmit({ kind, holderName, accountNumber }); }}
+        onClick={() => { if (valid && selected && !submitting) onSubmit({ bankSlug: selected.bankSlug, type: selected.type, holderName, accountNumber }); }}
         disabled={!valid || submitting}
         className="w-full h-[56px] rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
         style={{
