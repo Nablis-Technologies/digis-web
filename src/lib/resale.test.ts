@@ -176,6 +176,35 @@ describe('resaleModule reads (live API, mocked HTTP)', () => {
     expect(mockedApiFetch).toHaveBeenCalledWith('resale_listings/rl-1');
     expect(l.originalPriceMinor).toBe(350000);
   });
+
+  it('fetchListingDetail handles the flat seller wire (own listing) without throwing', async () => {
+    mockedApiFetch.mockImplementation((async (path: string) => {
+      if (path === 'resale_listings/rl-flat') return { data: sellerWire({ id: 'rl-flat' }) };
+      if (path === 'resale_listings') return { data: [browseWire({ id: 'rl-flat' })] };
+      if (path === 'public/events/on-on') return { data: { id: 'e-1', slug: 'on-on', event_media: [{ type: 'cover', file: { medium: 'https://cdn/on-on-cover.jpg' } }] } };
+      return { data: null };
+    }) as typeof apiFetch);
+    const l = await resaleModule.fetchListingDetail('rl-flat');
+    expect(l.id).toBe('rl-flat');
+    // Seller economics come from the flat wire…
+    expect(l.askingPriceMinor).toBe(250000);
+    expect(l.originalPriceMinor).toBe(200000);
+    // …display context is borrowed from the browse row.
+    expect(l.eventName).toBe('On & On');
+    expect(l.image).toBe('https://cdn/on-on-cover.jpg');
+  });
+
+  it('fetchListingDetail stays absent (no invention) when a flat listing is not browsable', async () => {
+    mockedApiFetch.mockImplementation((async (path: string) => {
+      if (path === 'resale_listings/rl-flat') return { data: sellerWire({ id: 'rl-flat' }) };
+      if (path === 'resale_listings') return { data: [] };
+      return { data: null };
+    }) as typeof apiFetch);
+    const l = await resaleModule.fetchListingDetail('rl-flat');
+    expect(l.id).toBe('rl-flat');
+    expect(l.eventName).toBe('');
+    expect(l.image).toBe('');
+  });
 });
 
 describe('resaleModule.createListing (live API, mocked HTTP)', () => {
@@ -232,6 +261,19 @@ describe('resaleModule.createListing (live API, mocked HTTP)', () => {
 
   it('createTicketListingReference throws for unknown wallet ids', async () => {
     await expect(resaleModule.createTicketListingReference('tk-nope', 2500)).rejects.toThrow('Ticket not found');
+  });
+
+  it('createListing still succeeds when the enrichment read fails (listing exists either way)', async () => {
+    mockedApiFetch.mockImplementation((async (path: string, opts?: { method?: string }) => {
+      if (path === 'tickets/tk-1/resale' && opts?.method === 'POST') return { data: sellerWire({ id: 'rl-new' }) };
+      if (path === 'resale_listings/rl-new') throw new Error('boom');
+      if (path === 'resale_listings') throw new Error('boom');
+      return { data: null };
+    }) as typeof apiFetch);
+    const listing = await resaleModule.createListing(ticket, 250000);
+    expect(listing.id).toBe('rl-new');
+    expect(listing.askingPriceMinor).toBe(250000);
+    expect(listing.ticket).toBe(ticket);
   });
 });
 

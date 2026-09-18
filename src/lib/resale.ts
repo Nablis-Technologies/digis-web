@@ -104,6 +104,35 @@ async function resolveImages(wires: PublicResaleListingWire[]): Promise<Map<stri
   return new Map(entries);
 }
 
+/**
+ * The detail endpoint is shape-polymorphic: a NON-seller gets the nested public
+ * wire (event/product/ticket_type/event_dates), while the SELLER gets the flat
+ * seller wire (ids + economics, no nested context). Discriminate on the nested
+ * `event` rather than assuming either.
+ */
+function isPublicListingWire(
+  wire: PublicResaleListingWire | SellerResaleListingWire,
+): wire is PublicResaleListingWire {
+  return Boolean((wire as PublicResaleListingWire).event?.id);
+}
+
+/** Overlay flat seller economics with the display context from a browse row. */
+function withDisplayContext(base: ResaleListing, row: ResaleListing | undefined): ResaleListing {
+  if (!row) return base;
+  return {
+    ...base,
+    eventSlug: row.eventSlug || base.eventSlug,
+    eventName: row.eventName || base.eventName,
+    eventDate: row.eventDate || base.eventDate,
+    eventTime: row.eventTime || base.eventTime,
+    venue: row.venue || base.venue,
+    city: row.city || base.city,
+    ticketType: row.ticketType || base.ticketType,
+    image: row.image || base.image,
+    listedAgo: row.listedAgo || base.listedAgo,
+  };
+}
+
 export const resaleModule = {
   keys: {
     all: ['resale', 'listings'] as const,
@@ -143,9 +172,19 @@ export const resaleModule = {
    * value (mapped to originalPriceMinor); buyer view does not.
    */
   async fetchListingDetail(id: string): Promise<ResaleListing> {
-    const { data } = await apiFetch<PublicResaleListingWire>(`resale_listings/${id}`);
-    const image = (await resolveImages([data])).get(data.event.slug) ?? getEventImage(data.event.title);
-    return mapPublicListing(data, image);
+    const { data } = await apiFetch<PublicResaleListingWire | SellerResaleListingWire>(`resale_listings/${id}`);
+    if (isPublicListingWire(data)) {
+      const image = (await resolveImages([data])).get(data.event.slug) ?? getEventImage(data.event.title);
+      return mapPublicListing(data, image);
+    }
+    // Seller view is flat — enrich display from the browse row when the listing
+    // is browsable. Missing context stays absent, never invented.
+    const base = sellerWireToListing(data);
+    const row = await resaleModule
+      .fetchListings()
+      .then((all) => all.find((l) => l.id === id))
+      .catch(() => undefined);
+    return withDisplayContext(base, row);
   },
 
   /**
@@ -170,10 +209,15 @@ export const resaleModule = {
       method: 'POST',
       body: { resale_listing: { asking_amount_minor: askingAmountMinor } },
     });
-    // Enrich the flat create response via the detail endpoint (buyer/seller
-    // shape with nested event context + acquisition value).
-    const listing = await resaleModule.fetchListingDetail(data.id);
-    return { ...listing, ticket };
+    // Enrichment is cosmetic — the listing exists either way. A failed detail
+    // or browse read must NOT fail the create (the seller would be left on a
+    // stuck sheet for a listing that was actually created).
+    try {
+      const listing = await resaleModule.fetchListingDetail(data.id);
+      return { ...listing, ticket };
+    } catch {
+      return { ...sellerWireToListing(data), ticket };
+    }
   },
 
   /**
