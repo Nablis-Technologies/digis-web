@@ -14,6 +14,8 @@ export function PurchaseBar({
   minPrice,
   onGift,
   onPurchase,
+  label,
+  hideGift = false,
 }: {
   isDark: boolean;
   selectedTicket: TicketTier | null;
@@ -23,6 +25,10 @@ export function PurchaseBar({
   minPrice: number;
   onGift: () => void;
   onPurchase: () => void;
+  /** CTA copy override (e.g. resale). Defaults to Buy Now / Get Tickets. */
+  label?: string;
+  /** Gifting is a primary-sale action; resale listings hide it. */
+  hideGift?: boolean;
 }) {
   const priceAmount = Money.fromMinor(selectedTicketType ? totalPrice : minPrice, "ETB").formatNumber();
   const priceCurrency = "ETB";
@@ -73,6 +79,7 @@ export function PurchaseBar({
       </div>
       <div className="relative z-10 w-px self-stretch my-1"
         style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
+      {!hideGift && (
       <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}
         onClick={onGift}
         aria-label="Gift this ticket"
@@ -92,6 +99,7 @@ export function PurchaseBar({
           Gift
         </span>
       </AppButton>
+      )}
       <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onPurchase}
         className="relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer"
         style={{
@@ -100,7 +108,7 @@ export function PurchaseBar({
         }}>
         <span className="text-[12px] sm:text-[14px] tracking-[0.2px] sm:tracking-[0.3px]"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-          {selectedTicketType ? 'Buy Now' : 'Get Tickets'}
+          {label ?? (selectedTicketType ? 'Buy Now' : 'Get Tickets')}
         </span>
         <ArrowRight className="w-4 h-4" strokeWidth={2.25} />
       </AppButton>

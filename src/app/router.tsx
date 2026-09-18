@@ -7,7 +7,7 @@ import { ticketsService, ticketKeys } from '@/lib/tickets';
 import { eventsModule } from '@/lib/events';
 import { productsModule } from '@/lib/products';
 import { orderModule } from '@/lib/order';
-import type { Event, UserTicket } from '@/types';
+import type { Event, UserTicket, ResaleListing } from '@/types';
 import { EventDiscovery } from '@/features/discovery/pages/DiscoveryPage';
 import { EventDetailSkeleton } from '@/components/loading';
 import { TicketView } from '@/features/tickets/pages/TicketsPage';
@@ -127,6 +127,10 @@ function AppContent() {
   }, [detailMissing, navigate]);
   const navigateToView = useCallback((view: AppView) => navigate(VIEW_PATHS[view]), [navigate]);
   const [resaleTicket, setResaleTicket] = useState<UserTicket | null>(null);
+  // A resale listing opened from the resale page: the SAME event detail page,
+  // buying that listing instead of a primary tier.
+  const [resaleListing, setResaleListing] = useState<ResaleListing | null>(null);
+  const [resaleIsOwn, setResaleIsOwn] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState(false);
   const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
@@ -414,7 +418,15 @@ function AppContent() {
             >
               <EventDetail
                 event={selectedEvent}
+                resaleListing={resaleListing}
+                resaleIsOwn={resaleIsOwn}
                 onBack={() => {
+                  // A resale listing is a detour from the resale page — return there.
+                  if (resaleListing) {
+                    setResaleListing(null);
+                    navigate('/resale');
+                    return;
+                  }
                   pendingRestore.current = true;
                   navigate('/');
                 }}
@@ -482,7 +494,15 @@ function AppContent() {
               ) : currentView === 'create' ? (
                 null
               ) : currentView === 'resale' ? (
-                <ResaleMarketplace userTickets={userTickets} initialListTicket={resaleTicket} />
+                <ResaleMarketplace
+                  userTickets={userTickets}
+                  initialListTicket={resaleTicket}
+                  onOpenListing={(listing, isOwn) => {
+                    setResaleListing(listing);
+                    setResaleIsOwn(isOwn);
+                    navigate(`/events/${listing.eventSlug}`);
+                  }}
+                />
               ) : currentView === 'settings' ? (
                 <SettingsView
                   onBack={() => navigateToView('profile')}

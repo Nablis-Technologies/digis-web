@@ -12,7 +12,7 @@ import { ResaleEventCard } from '@/features/resale/components/ResaleEventCard';
 import type { ResaleListing, UserTicket } from '@/types';
 import { resaleModule } from '@/lib/resale';
 import { FilterPanel } from '@/features/resale/components/FilterPanel';
-import { ListingDetailSheet } from '@/features/resale/components/ListingDetailSheet';
+
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
 import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSheet';
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
@@ -32,17 +32,18 @@ import { EventCardSkeleton, ListingRowSkeleton, LoadErrorCard, useShowSkeleton }
 interface ResaleMarketplaceProps {
   userTickets: UserTicket[];
   initialListTicket?: UserTicket | null;
+  /** Open a listing on the shared event detail page (resale mode). */
+  onOpenListing: (listing: ResaleListing, isOwn: boolean) => void;
 }
 
 /* ═══════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════ */
-export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMarketplaceProps) {
+export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListing }: ResaleMarketplaceProps) {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'browse' | 'myListings'>('browse');
-  const [selectedListing, setSelectedListing] = useState<ResaleListing | null>(null);
   const [showListSheet, setShowListSheet] = useState(false);
   const [listingTicket, setListingTicket] = useState<UserTicket | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,13 +121,13 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
 
   // Lock body scroll when a bottom sheet is open
   useEffect(() => {
-    if (selectedListing || showListSheet) {
+    if (showListSheet || showPayoutSheet) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
-  }, [selectedListing, showListSheet]);
+  }, [showListSheet, showPayoutSheet]);
 
   // Group browse listings by event (mirrors the browse view's "Events with Resale").
   const eventGroups = (() => {
@@ -555,7 +556,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                             transition={{ delay: index * 0.04 }}
                             whileHover={{ x: 2 }}
                             whileTap={{ scale: 0.99 }}
-                            onClick={() => setSelectedListing(listing)}
+                            onClick={() => onOpenListing(listing, myListings.some((l) => l.id === listing.id))}
                             className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl cursor-pointer text-left"
                             style={{
                               background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
@@ -884,18 +885,6 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
               </div>
             )}
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Listing Detail Sheet */}
-      <AnimatePresence>
-        {selectedListing && (
-          <ListingDetailSheet
-            listing={selectedListing}
-            isOwn={myListings.some((l) => l.id === selectedListing.id)}
-            onClose={() => setSelectedListing(null)}
-            onViewTickets={() => navigate('/tickets')}
-          />
         )}
       </AnimatePresence>
 
