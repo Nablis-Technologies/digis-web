@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
-import { X, Plus, Check, ArrowLeft, Wallet, Landmark } from 'lucide-react';
+import { X, Plus, Check, ArrowLeft, Wallet, Landmark, AlertTriangle } from 'lucide-react';
 import { payoutService, payoutKeys, statusLabel } from '@/lib/payout';
+import { mapApiError } from '@/lib/errors';
+import { toastSuccess } from '@/lib/feedback';
 import type { PayoutMethod, AddPayoutMethodInput } from '@/types';
 import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -24,6 +26,8 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
     onSuccess: (method) => {
       void qc.invalidateQueries({ queryKey: payoutKeys.all });
       setAdding(false);
+      // The form closes on success, so confirm it transiently.
+      toastSuccess('Payout method saved.');
       onMethodAdded?.(method);
     },
   });
@@ -89,6 +93,7 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
             {adding ? (
               <AddPayoutForm key="form" onSubmit={i => addMutation.mutate(i)} submitting={addMutation.isPending}
                 continueAfterSave={Boolean(onMethodAdded)}
+                error={addMutation.error ? mapApiError(addMutation.error, 'Could not save this payout method. Please try again.') : null}
                 isDark={isDark} text={text} muted={muted} cardBg={cardBg} cardBorder={cardBorder} />
             ) : (
               <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -131,7 +136,7 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
                   </div>
                 )}
 
-                <AppButton whileTap={{ scale: 0.98 }} onClick={() => setAdding(true)}
+                <AppButton whileTap={{ scale: 0.98 }} onClick={() => { addMutation.reset(); setAdding(true); }}
                   className="w-full h-[52px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer"
                   style={{ background: cardBg, border: `1px dashed ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}` }}>
                   <span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
@@ -209,8 +214,9 @@ function PayoutRowSkeleton({ isDark, cardBg, cardBorder }: { isDark: boolean; ca
   );
 }
 
-function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, isDark, text, muted, cardBg, cardBorder }: {
+function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error = null, isDark, text, muted, cardBg, cardBorder }: {
   onSubmit: (input: AddPayoutMethodInput) => void; submitting: boolean; continueAfterSave?: boolean;
+  error?: string | null;
   isDark: boolean; text: string; muted: string; cardBg: string; cardBorder: string;
 }) {
   // Destinations come from the provider (via the backend), never hardcoded:
@@ -309,6 +315,16 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, isDark
           placeholder={isPhone ? '09xx xxx xxx' : 'Account number'}
           className="w-full h-[52px] rounded-2xl px-4 text-[14px] outline-none" style={inputStyle} />
       </div>
+
+      {error && (
+        <div className="flex items-start gap-2 mb-4 rounded-xl px-3.5 py-3"
+          style={{ background: 'rgba(229,72,77,0.08)', border: '1px solid rgba(229,72,77,0.25)' }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#e5484d' }} strokeWidth={2} />
+          <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+            {error}
+          </p>
+        </div>
+      )}
 
       <AppButton whileHover={valid ? { scale: 1.02 } : undefined} whileTap={valid ? { scale: 0.97 } : undefined}
         onClick={() => { if (valid && selected && !submitting) onSubmit({ bankSlug: selected.bankSlug, type: selected.type, holderName, accountNumber }); }}

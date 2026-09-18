@@ -11,7 +11,7 @@ import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
-export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false }: { ticket: UserTicket; onClose: () => void; onConfirm: (price: number) => void; submitting?: boolean }) {
+export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false, error = null }: { ticket: UserTicket; onClose: () => void; onConfirm: (price: number) => void; submitting?: boolean; error?: string | null }) {
   const { isDark } = useTheme();
   const [step, setStep] = useState<'price' | 'confirm'>('price');
   const [price, setPrice] = useState(2000);
@@ -291,6 +291,16 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                     Your ticket will be transferred to the buyer upon purchase. This action cannot be undone.
                   </p>
                 </div>
+
+                {error && (
+                  <div className="flex items-start gap-2 mb-4 rounded-xl px-3.5 py-3"
+                    style={{ background: 'rgba(229,72,77,0.08)', border: '1px solid rgba(229,72,77,0.25)' }}>
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#e5484d' }} strokeWidth={2} />
+                    <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+                      {error}
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-3">
                   <AppButton whileTap={{ scale: 0.97 }}

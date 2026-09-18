@@ -20,6 +20,8 @@ import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
 import { PayoutMethodsSheet } from '@/features/resale/components/PayoutMethodsSheet';
 import { ticketKeys } from '@/lib/tickets';
 import { sellerReportsService, sellerReportsKeys } from '@/lib/seller-reports';
+import { toastError } from '@/lib/feedback';
+import { mapApiError } from '@/lib/errors';
 import { isoToDisplayDate } from '@/lib/mappers';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
@@ -67,7 +69,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     refetch: refetchMine,
   } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings() });
   // Seller earnings — read straight from the seller reports endpoints.
-  const { data: sellerBalance = [] } = useQuery({ queryKey: sellerReportsKeys.balance, queryFn: () => sellerReportsService.fetchBalance() });
+  const { data: sellerBalance = [], isError: balanceError, refetch: refetchBalance } = useQuery({ queryKey: sellerReportsKeys.balance, queryFn: () => sellerReportsService.fetchBalance() });
   const { data: sellerHistory = [] } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
   const [showAllHistory, setShowAllHistory] = useState(false);
   // Skeletons only appear if loading persists.
@@ -102,6 +104,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
       queryClient.invalidateQueries({ queryKey: resaleModule.keys.all });
       queryClient.invalidateQueries({ queryKey: resaleModule.keys.myListings });
     },
+    // The confirm sheet closes on submit, so a failure has no surface left on
+    // screen — toast it (reusing the existing sonner host + error copy).
+    onError: (error) => toastError(error, 'Could not delist this ticket. Please try again.'),
   });
 
   // Auto-open sell sheet when navigated from TicketView with a ticket to list
@@ -199,9 +204,17 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     : [];
 
   const handleListTicket = (ticket: UserTicket) => {
+    // Clear any error from a previous attempt so the sheet opens clean.
+    createListingMutation.reset();
     setListingTicket(ticket);
     setShowListSheet(true);
   };
+
+  // A failed listing keeps the sheet open, so the message renders inline
+  // (mirrors the purchase error) instead of vanishing into a toast.
+  const listingError = createListingMutation.error
+    ? mapApiError(createListingMutation.error, 'Could not list this ticket. Please try again.')
+    : null;
 
   const handleConfirmListing = async (price: number) => {
     if (!listingTicket) return;
@@ -766,7 +779,22 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
               </div>
 
               {/* Seller earnings — balance + ledger from the seller reports API. */}
-              {sellerBalance.length > 0 && (
+              {balanceError && (
+                <div className="mt-3 p-4 rounded-2xl text-center"
+                  style={{
+                    background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                  }}>
+                  <p className="text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                    Couldn't load your earnings.
+                  </p>
+                  <AppButton onClick={() => void refetchBalance()} className="cursor-pointer"
+                    style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                    Retry
+                  </AppButton>
+                </div>
+              )}
+              {!balanceError && sellerBalance.length > 0 && (
                 <div className="mt-3 p-4 rounded-2xl"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
@@ -919,6 +947,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
             onClose={() => { setShowListSheet(false); setListingTicket(null); }}
             onConfirm={handleConfirmListing}
             submitting={createListingMutation.isPending}
+            error={listingError}
           />
         )}
       </AnimatePresence>
