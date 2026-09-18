@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { Check, Copy, Shield, Sparkles } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
+import { Money } from '@/lib/money';
 import { copyText } from '@/lib/utils/clipboard';
 import { AppButton } from '@/components/primitives/AppButton';
 
@@ -112,7 +113,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           className="text-[13px] leading-relaxed mb-7 max-w-[280px]"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.6)' }}
         >
-          {ticket.eventName} · ETB {price.toLocaleString()} is now visible to buyers. We'll notify you the moment it sells.
+          {ticket.eventName} · {Money.fromMinor(price, 'ETB').format()} is now visible to buyers. We'll notify you the moment it sells.
         </motion.p>
 
         {/* Trust badges */}
