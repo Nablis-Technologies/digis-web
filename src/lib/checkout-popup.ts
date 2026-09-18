@@ -26,3 +26,23 @@ export function closeCheckoutPopup(): void {
   }
   try { window.focus(); } catch { /* ignore — focus may be blocked */ }
 }
+
+/**
+ * Open the hosted checkout in a new tab and signal this tab to start
+ * confirming. Shared by every flow that starts a hosted payment (checkout and
+ * resale purchase) so the return UX is identical: the app tab polls, and on
+ * confirmation closes the Chapa tab, returning the buyer to Digis.
+ *
+ * Falls back to a same-tab navigation when the popup is blocked.
+ */
+export function openHostedCheckout(orderId: string, checkoutUrl: string): void {
+  try {
+    sessionStorage.setItem('digis:awaiting-confirm', orderId);
+    window.dispatchEvent(new Event('digis:awaiting-confirm'));
+  } catch { /* storage unavailable — the poll simply won't start */ }
+  // No `noopener` feature: with it `window.open` returns null even on success,
+  // which made this tab ALSO navigate, and left us no handle to close the tab.
+  const opened = window.open(checkoutUrl, '_blank');
+  setCheckoutPopup(opened);
+  if (!opened) window.location.href = checkoutUrl;
+}

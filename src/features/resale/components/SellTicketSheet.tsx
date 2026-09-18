@@ -108,6 +108,14 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                         Max {Money.fromMinor(policy!.fixedCapMinor!, 'ETB').format()} (resale cap)
                       </p>
                     )}
+                    {/* The wallet carries the policy but not the value a
+                        percentage cap is computed from, so we can only state
+                        the rule — the backend enforces the ceiling. */}
+                    {!overCap && policy?.capType === 'percentage' && policy.percentageCapBps != null && (
+                      <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }}>
+                        Capped at {Math.round(policy.percentageCapBps / 100)}% of your purchase price
+                      </p>
+                    )}
                   </div>
                   <AppButton whileTap={{ scale: 0.9 }}
                     onClick={() => setPrice(p => (fixedCapMajor != null ? Math.min(fixedCapMajor, p + 100) : p + 100))}

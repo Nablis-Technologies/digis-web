@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { orderModule, type CheckoutOrder, type OrderQuote } from '@/lib/order';
 import { ticketsService } from '@/lib/tickets';
 import { clearCheckoutResumeKeys } from '@/lib/payment-return';
-import { setCheckoutPopup } from '@/lib/checkout-popup';
+import { openHostedCheckout as openHostedCheckoutTab } from '@/lib/checkout-popup';
 import { registrationModule, type ConsentDocument } from '@/lib/registration';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { ApiError, messageForCode } from '@/lib/errors';
@@ -219,16 +219,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     // attempt; open exactly once per order.
     if (openedCheckoutsRef.current.has(orderId)) return;
     openedCheckoutsRef.current.add(orderId);
-    try {
-      sessionStorage.setItem('digis:awaiting-confirm', orderId);
-      window.dispatchEvent(new Event('digis:awaiting-confirm'));
-    } catch { /* storage unavailable */ }
-    // No `noopener` feature here: with it, window.open returns null even on
-    // success, which made this tab ALSO navigate (the double action we saw) and
-    // would leave us no handle to close the tab with once the payment resolves.
-    const opened = window.open(checkoutUrl, '_blank');
-    setCheckoutPopup(opened);
-    if (!opened) window.location.href = checkoutUrl;
+    openHostedCheckoutTab(orderId, checkoutUrl);
   };
 
   const completeCheckoutMutation = useMutation({

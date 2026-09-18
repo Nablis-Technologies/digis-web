@@ -8,6 +8,7 @@ import { resaleModule } from '@/lib/resale';
 import { orderModule } from '@/lib/order';
 import type { CheckoutOrder } from '@/lib/order';
 import { mapApiError } from '@/lib/errors';
+import { openHostedCheckout } from '@/lib/checkout-popup';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
@@ -59,7 +60,10 @@ export function ListingDetailSheet({ listing, isOwn, onClose, onViewTickets }: {
             JSON.stringify({ url: payment.checkout_url, at: Date.now() }),
           );
         } catch { /* storage unavailable — resume link just won't exist */ }
-        window.location.href = payment.checkout_url;
+        // Same hosted-checkout UX as checkout: open in a NEW tab and let this
+        // tab confirm (Chapa V2 never redirects the buyer back), so the buyer
+        // lands on their ticket instead of a dead receipt page.
+        openHostedCheckout(order.id, payment.checkout_url);
         return;
       }
       // No hosted redirect: the payment was already accepted server-side.
