@@ -19,6 +19,8 @@ import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState'
 import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
 import { PayoutMethodsSheet } from '@/features/resale/components/PayoutMethodsSheet';
 import { ticketKeys } from '@/lib/tickets';
+import { sellerReportsService, sellerReportsKeys } from '@/lib/seller-reports';
+import { isoToDisplayDate } from '@/lib/mappers';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -64,6 +66,10 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
     isError: myError,
     refetch: refetchMine,
   } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings() });
+  // Seller earnings — read straight from the seller reports endpoints.
+  const { data: sellerBalance = [] } = useQuery({ queryKey: sellerReportsKeys.balance, queryFn: () => sellerReportsService.fetchBalance() });
+  const { data: sellerHistory = [] } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
+  const [showAllHistory, setShowAllHistory] = useState(false);
   // Skeletons only appear if loading persists.
   const showBrowseLoading = useShowSkeleton(browsePending);
   const showMyLoading = useShowSkeleton(myPending);
@@ -758,6 +764,64 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                   </AppButton>
                 ))}
               </div>
+
+              {/* Seller earnings — balance + ledger from the seller reports API. */}
+              {sellerBalance.length > 0 && (
+                <div className="mt-3 p-4 rounded-2xl"
+                  style={{
+                    background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                  }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
+                      <TrendingUp className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                        Available to pay out
+                      </p>
+                      <p className="text-[18px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#fff' : '#1a1a1a' }}>
+                        {sellerBalance.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')}
+                      </p>
+                      {sellerBalance.some((b) => b.reservedMinor > 0) && (
+                        <p className="text-[11px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                          {sellerBalance
+                            .filter((b) => b.reservedMinor > 0)
+                            .map((b) => `${Money.fromMinor(b.reservedMinor, b.currency).format()} on hold`)
+                            .join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {sellerHistory.length > 0 && (
+                    <div className="mt-3 pt-3 space-y-2.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                      {(showAllHistory ? sellerHistory : sellerHistory.slice(0, 3)).map((entry) => (
+                        <div key={entry.id} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[12.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                              {entry.description || entry.eventName || entry.type}
+                            </p>
+                            <p className="text-[10.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                              {entry.eventName ? `${entry.eventName} · ` : ''}Available {isoToDisplayDate(entry.availableAt)}
+                            </p>
+                          </div>
+                          <p className="text-[12.5px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: entry.amountMinor < 0 ? (isDark ? '#ff6b70' : '#c0392b') : (isDark ? '#34d399' : '#059669') }}>
+                            {entry.amountMinor < 0 ? '' : '+'}{Money.fromMinor(entry.amountMinor, entry.currency).format()}
+                          </p>
+                        </div>
+                      ))}
+                      {sellerHistory.length > 3 && (
+                        <AppButton onClick={() => setShowAllHistory((v) => !v)} className="cursor-pointer"
+                          style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                          {showAllHistory ? 'Show less' : `Show all ${sellerHistory.length}`}
+                        </AppButton>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Payout methods entry */}
               <AppButton whileTap={{ scale: 0.98 }}
