@@ -145,4 +145,36 @@ describe('transferService', () => {
     expect(result.ticket.qrCode).toBe('QR-1');
     expect(result.ticketViewUrl).toBe('https://digis.app/public/tickets/tk-1?view_token=v');
   });
+
+  it('accept posts an optional password + confirmation to create an account', async () => {
+    mockedApiFetch.mockResolvedValue({
+      data: {
+        ticket: walletWire,
+        ticket_view_url: 'https://digis.app/public/tickets/tk-1?view_token=v',
+        user: { id: 'u-1' },
+        access_token: 'at',
+        refresh_token: 'rt',
+      },
+    });
+    const result = await transferService.accept({
+      id: 'tr-1',
+      token: 's3cr3t',
+      phone: '+251911223344',
+      verificationToken: 'proof-1',
+      password: 'hunter2hunter2',
+      passwordConfirmation: 'hunter2hunter2',
+    });
+    expect(mockedApiFetch).toHaveBeenCalledWith('public/ticket_transfers/tr-1/accept_guest', {
+      method: 'POST',
+      body: {
+        token: 's3cr3t',
+        phone: '+251911223344',
+        verification_token: 'proof-1',
+        password: 'hunter2hunter2',
+        password_confirmation: 'hunter2hunter2',
+      },
+    });
+    expect(result.user).toEqual({ id: 'u-1' });
+    expect(result.accessToken).toBe('at');
+  });
 });

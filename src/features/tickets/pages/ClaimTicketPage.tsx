@@ -26,7 +26,7 @@ interface ClaimTicketPageProps {
   onNavigateTickets: () => void;
 }
 
-type Step = 'phone' | 'otp' | 'done';
+type Step = 'phone' | 'claim' | 'done';
 
 export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNavigateTickets }: ClaimTicketPageProps) {
   const { isDark } = useTheme();
@@ -44,6 +44,8 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [challengeId, setChallengeId] = useState('');
   const [sending, setSending] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -61,7 +63,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
     try {
       const result = await transferService.requestOtp(id, token, phone.trim());
       setChallengeId(result.challengeId);
-      setStep('otp');
+      setStep('claim');
     } catch (err) {
       setError(mapApiError(err));
     } finally {
@@ -80,6 +82,8 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
         token,
         phone: phone.trim(),
         verificationToken,
+        password: password || undefined,
+        passwordConfirmation: passwordConfirm || undefined,
       });
       setAccepted(result);
       setStep('done');
@@ -94,7 +98,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
     } finally {
       setClaiming(false);
     }
-  }, [transfer, challengeId, code, id, token, phone, queryClient]);
+  }, [transfer, challengeId, code, password, passwordConfirm, id, token, phone, queryClient]);
 
   const handleDownload = useCallback(async () => {
     if (!downloadRef.current) return;
@@ -216,10 +220,10 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
       <div className="space-y-2.5">
         <AppButton onClick={onRequestAuth} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}>
           <LogIn className="w-4 h-4" strokeWidth={2} />
-          Create an account to keep it
+          Sign in with your phone
         </AppButton>
         <p className="text-[11px] text-center" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>
-          Your ticket is saved on this device — no account needed.
+          Your account is created — sign in to keep this ticket on all your devices.
         </p>
       </div>
     );
@@ -298,21 +302,39 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
               ) : (
                 <>
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                    Enter the 6-digit code we texted you.
+                    Enter the code we texted you and create your account.
                   </p>
                   <AppInput
                     type="text"
                     inputMode="numeric"
                     maxLength={6}
-                    placeholder="••••••"
+                    placeholder="Code ••••••"
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                     className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-center text-[20px] tracking-[8px]"
                     style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
                   />
+                  <AppInput
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Password (at least 8 characters)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
+                    style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                  />
+                  <AppInput
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Confirm password"
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
+                    style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                  />
                   <AppButton
                     onClick={handleClaim}
-                    disabled={code.trim().length !== 6 || claiming}
+                    disabled={code.trim().length !== 6 || password.length < 8 || password !== passwordConfirm || claiming}
                     className="mt-4 w-full py-3.5 rounded-full flex items-center justify-center gap-2 cursor-pointer"
                     style={{ background: ACCENT_HEX, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}
                   >
@@ -320,7 +342,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                       <motion.div className="w-4 h-4 rounded-full" style={{ border: '2px solid rgba(0,0,0,0.25)', borderTopColor: '#0a0a0a' }} animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} />
                     ) : (
                       <>
-                        Claim ticket
+                        Claim & create account
                         <Check className="w-4 h-4" strokeWidth={2.4} />
                       </>
                     )}
@@ -332,6 +354,11 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   >
                     Use a different number
                   </button>
+                  {password && passwordConfirm && password !== passwordConfirm && (
+                    <p className="mt-2 text-[11px] text-center" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
+                      Passwords do not match
+                    </p>
+                  )}
                 </>
               )}
 
