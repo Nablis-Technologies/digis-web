@@ -105,8 +105,6 @@ sweep is the rule that prevents that.
 - **#40** Abandoned checkouts never expire (`ExpireCheckout` aborts the whole
   sweep on an elapsed-grace `processing` payment) → `active_checkout_exists`
   blocks all later checkouts; the 409 carries no order id
-- **#39** No public endpoint listing payout `bank_slug`s — the frontend
-  hardcodes `telebirr`/`cbe`/`boa` (`src/lib/payout.ts`)
 - **#41** A released order permanently burns its registration
   (`idx_one_order_item_per_registration` ignores order status) → retries need a
   brand-new registration
@@ -142,7 +140,9 @@ copyable "Ticket link" on guest tickets), #30 (parking products seeded with
 the true ticket "from" price), #16 (Chapa API V2 — `api.chapa.global`,
 `CHAPA_TEST_`/`CHAPA_LIVE_` keys), #26 (seller payout destination create now
 succeeds — Chapa V2 direct transfer; frontend rewired to the flat
-`bank_slug`/`account_number`/`holder_name` payload).
+`bank_slug`/`account_number`/`holder_name` payload), #39 (seller-scoped
+`GET /marketplace/seller/payout_accounts/banks` + provider rail types; the
+frontend fetches destinations instead of hardcoding `telebirr`/`cbe`/`boa`).
 
 ## Agent skills
 

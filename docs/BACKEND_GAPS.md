@@ -54,8 +54,9 @@
 |---|---|---|
 | 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
 | 40 | open — blocking | `ExpireCheckout` aborts the sweep on an elapsed-grace payment → abandoned checkouts never expire |
-| 39 | open — degrading | no public endpoint listing payout `bank_slug`s; frontend hardcodes the 3 known slugs |
+| 39 | resolved | `GET /marketplace/seller/payout_accounts/banks` + provider rail types; frontend fetches destinations |
 | 41 | open — degrading | a released order permanently burns its registration (`idx_one_order_item_per_registration` ignores order status) |
+| 42 | open — degrading | wallet resale policy omits the percentage-cap basis → the seller can't know the max asking price |
 | 8 | open — degrading | no user `name` column / serializer field |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 33 | open — degrading | guest payment-refresh re-validates the quote token on accepted payments |
@@ -161,6 +162,32 @@ submit). If a registration is meant to be one-checkout-only that's fine, but a
 
 **Status: open — verified 2026-09-15 (index definition + live 409).**
 
+### #42. Wallet resale policy omits the value a percentage cap is computed from
+
+`Ticketing::TicketWalletSerializer` projects the resale policy
+(`resale_enabled`, `resale_price_cap_type`, `resale_fixed_cap_minor`,
+`resale_percentage_cap_bps`, cutoff, `max_completed_resales`) but **no
+acquisition/face value**. For a `percentage` cap the ceiling is
+`current_acquisition_product_value_minor × bps / 10000` (=
+`Marketplace::CalculatePriceCap`), so the seller UI cannot know the allowed
+range. The fixed-cap case is expressible (the cap is the number itself); the
+percentage case is not.
+
+**Why it degrades:** `SellTicketSheet` defaults the asking price to 2000 ETB and
+only validates a *fixed* cap. Verified live on `on-on` (100% cap on a 1025 ETB
+acquisition): asking 2000 ETB → `422 asking_amount_exceeds_cap`; asking 1000 ETB
+→ `201`. The seller only learns the ceiling from the error and must guess
+(no price engine is allowed on the frontend). The FE now states the rule
+("Capped at N% of your purchase price") but cannot enforce it.
+
+**Fix:** expose the cap basis (or the resolved cap) alongside the resale policy
+on the wallet ticket — e.g. `resale_acquisition_product_value_minor` and/or a
+resolved `resale_price_cap_minor`. A resolved cap keeps the money math
+server-side (the Marketplace-owned `CalculatePriceCap`), which the module
+dependency rules require, since Ticketing must not depend on Marketplace.
+
+**Status: open — verified 2026-09-18 (live 422/201 pair + serializer read).**
+
 ### #39. No public endpoint exposing payout `bank_slug`s
 
 Chapa V2 payout-registration requires a top-level `bank_slug`
@@ -180,7 +207,30 @@ authoritative, complete bank list; an unknown slug 422s
 **Fix:** expose `GET` available payout banks (slug + name + type) behind the
 seller scope so the frontend can render real options.
 
-**Status: open — verified 2026-09-15 (route grep + adapter code read).**
+**2026-09-18 update — the hardcoded slugs are all rejected, so a payout method
+cannot be added at all (live-probed):**
+- Chapa's live `GET /v2/payouts/banks?country=ET` (test key) returns **one**
+  bank: `{ bank_slug: "link", bank_name: "Link", type: "store_value" }`.
+- `Marketplace::SellerPayoutAccount::TYPES == ["bank"]`, so Telebirr's
+  `type: "mobile_money"` → `422 payout_account_input_invalid`.
+- `bank_slug` `cbe`/`boa` → `422 payout_account_bank_unsupported`.
+- `type: "store_value"` (Link's own rail) → `422 payout_account_input_invalid`.
+- **Only `type: "bank"` + `bank_slug: "link"` creates** (verified → `201`,
+  `pending_verification`).
+
+So the frontend's `KIND_ACCOUNTS` (`telebirr`/`cbe`/`boa`) can never succeed
+against this backend/provider, and the sole working destination is Chapa's
+`link` rail. Two backend-side issues combine: the `TYPES` allow-list is narrower
+than the provider's own `type` values, and there is no discovery endpoint.
+
+**Status: resolved 2026-09-18.** `GET /marketplace/seller/payout_accounts/banks`
+(seller-scoped) now returns the provider's supported destinations, and the rail
+`type` allow-list was widened to the provider's own types
+(`TYPES = %w[bank mobile_money store_value]`). The frontend fetches the list and
+renders it — no hardcoded slugs. Verified live: the endpoint returns
+`{ bank_slug: "link", bank_name: "Link", type: "store_value", … }` and a create
+with that pair returns 201 `pending_verification`; the same flow was driven
+through the real UI (resale → Payout methods → Add → Save) and persisted.
 
 ### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column
 
