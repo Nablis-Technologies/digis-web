@@ -15,6 +15,7 @@ import { EventDetail } from '@/features/event-detail/pages/EventDetailPage';
 import { UserProfile } from '@/features/profile/pages/ProfilePage';
 import { SettingsView } from '@/features/profile/pages/SettingsPage';
 import { ResaleMarketplace } from '@/features/resale/pages/ResalePage';
+import { resaleModule } from '@/lib/resale';
 import { ClaimTicketPage } from '@/features/tickets/pages/ClaimTicketPage';
 import { UIPreviewPage } from '@/features/ui-preview/pages/UIPreviewPage';
 import { Navigation } from '@/components/Navigation';
@@ -55,7 +56,7 @@ export function pathToView(pathname: string): AppView {
   if (pathname === '/tickets' || pathname.startsWith('/tickets/')) return 'tickets';
   if (pathname === '/profile') return 'profile';
   if (pathname === '/create') return 'create';
-  if (pathname === '/resale') return 'resale';
+  if (pathname === '/resale' || pathname.startsWith('/resale/')) return 'resale';
   if (pathname === '/settings') return 'settings';
   return 'discover';
 }
@@ -98,6 +99,11 @@ function AppContent() {
   const ticketId = useMemo(() => {
     if (!location.pathname.startsWith('/tickets/')) return null;
     return decodeURIComponent(location.pathname.split('/')[2] ?? '') || null;
+  }, [location.pathname]);
+  // `/resale/events/:slug` — the deep-linkable per-event resale page.
+  const resaleEventSlug = useMemo(() => {
+    const m = location.pathname.match(/^\/resale\/events\/([^/]+)/);
+    return m ? decodeURIComponent(m[1]) || null : null;
   }, [location.pathname]);
   // In-app navigation ships the just-fetched list event through location.state
   // (instant paint, no request). Deep links and refreshes have no state and
@@ -568,7 +574,13 @@ function AppContent() {
               ) : currentView === 'create' ? (
                 null
               ) : currentView === 'resale' ? (
-                <ResaleMarketplace userTickets={userTickets} initialListTicket={resaleTicket} />
+                <ResaleMarketplace
+                  userTickets={userTickets}
+                  initialListTicket={resaleTicket}
+                  selectedEventSlug={resaleEventSlug}
+                  onOpenEvent={(slug) => navigate(`/resale/events/${encodeURIComponent(slug)}`)}
+                  onCloseEvent={() => navigate('/resale')}
+                />
               ) : currentView === 'settings' ? (
                 <SettingsView
                   onBack={() => navigateToView('profile')}
@@ -766,6 +778,43 @@ function AuthRoute({ mode }: { mode: 'signin' | 'signup' }) {
 function AuthLoginRoute() { return <AuthRoute mode="signin" />; }
 function AuthSignupRoute() { return <AuthRoute mode="signup" />; }
 
+/**
+ * `/resale/listings/:id` — the shareable listing link. Resolves the listing
+ * (public detail) and opens its event's resale page, so a shared listing id
+ * lands on a stable, meaningful URL. A gone listing falls back to a notice.
+ */
+function ResaleListingRedirect() {
+  const { listingId = '' } = useParams();
+  const navigate = useNavigate();
+  const { isDark } = useTheme();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    resaleModule.fetchListingDetail(listingId)
+      .then((listing) => {
+        if (!alive) return;
+        if (listing.eventSlug) navigate(`/resale/events/${encodeURIComponent(listing.eventSlug)}`, { replace: true });
+        else setFailed(true);
+      })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [listingId, navigate]);
+  if (!failed) return null;
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="text-center">
+        <p className="text-[15px] mb-3" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }}>
+          This listing is no longer available.
+        </p>
+        <AppButton onClick={() => navigate('/resale')} className="px-5 py-3 rounded-full cursor-pointer"
+          style={{ background: '#d6f905', color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13 }}>
+          Browse resale
+        </AppButton>
+      </div>
+    </div>
+  );
+}
+
 function ClaimRoute() {
   const navigate = useNavigate();
   const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
@@ -809,6 +858,8 @@ export function AppRouterProvider() {
       { path: '/tickets/:ticketId', Component: AppContent },
       { path: '/profile', Component: AppContent },
       { path: '/resale', Component: AppContent },
+      { path: '/resale/events/:eventSlug', Component: AppContent },
+      { path: '/resale/listings/:listingId', Component: ResaleListingRedirect },
       { path: '/create', Component: CreateRedirect },
       { path: '/settings', Component: AppContent },
       { path: '/login', Component: AuthLoginRoute },

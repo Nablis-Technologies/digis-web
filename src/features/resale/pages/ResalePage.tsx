@@ -37,12 +37,16 @@ import { EventCardSkeleton, ListingRowSkeleton, LoadErrorCard, useShowSkeleton }
 interface ResaleMarketplaceProps {
   userTickets: UserTicket[];
   initialListTicket?: UserTicket | null;
+  /** Route-driven per-event drill-down (`/resale/events/:slug`). */
+  selectedEventSlug?: string | null;
+  onOpenEvent?: (slug: string) => void;
+  onCloseEvent?: () => void;
 }
 
 /* ═══════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════ */
-export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMarketplaceProps) {
+export function ResaleMarketplace({ userTickets, initialListTicket, selectedEventSlug = null, onOpenEvent, onCloseEvent }: ResaleMarketplaceProps) {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -136,6 +140,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const eventGroups = (() => {
     const map = new Map<string, {
       eventId: string;
+      eventSlug?: string;
       eventName: string;
       eventDate: string;
       eventTime: string;
@@ -159,6 +164,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
       } else {
         map.set(l.event_id, {
           eventId: l.event_id,
+          eventSlug: l.eventSlug,
           eventName: l.eventName,
           eventDate: l.eventDate,
           eventTime: l.eventTime,
@@ -207,6 +213,14 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
         return 0;
       })
     : [];
+
+  // Route → drill-down sync: `/resale/events/:slug` selects the matching group
+  // once browse has it; leaving the route clears the selection.
+  useEffect(() => {
+    if (!selectedEventSlug) { setSelectedEventName(null); return; }
+    const match = browseListings.find((l) => l.eventSlug === selectedEventSlug);
+    if (match) setSelectedEventName(match.eventName);
+  }, [selectedEventSlug, browseListings]);
 
   // Resale purchase — the shared command used by every resale buy surface.
   const resalePurchase = useResalePurchase();
@@ -413,7 +427,10 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                       <motion.div key={group.eventName}
                         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.08, duration: 0.35 }}>
-                        <ResaleEventCard group={group} onClick={() => setSelectedEventName(group.eventName)} />
+                        <ResaleEventCard group={group} onClick={() => {
+                          if (onOpenEvent && group.eventSlug) onOpenEvent(group.eventSlug);
+                          else setSelectedEventName(group.eventName);
+                        }} />
                       </motion.div>
                     ))}
                     {browseError ? (
@@ -447,7 +464,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                   {/* Back link */}
                   <div className="px-5 lg:px-8 pt-5">
                     <AppButton whileTap={{ scale: 0.95 }}
-                      onClick={() => setSelectedEventName(null)}
+                      onClick={() => { if (onCloseEvent) onCloseEvent(); else setSelectedEventName(null); }}
                       className="flex items-center gap-1.5 mb-4 cursor-pointer">
                       <ArrowLeft className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }} strokeWidth={1.5} />
                       <span className="text-[12px] tracking-[0.3px]"

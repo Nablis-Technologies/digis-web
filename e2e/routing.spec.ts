@@ -83,4 +83,15 @@ test.describe('routing', () => {
     await expect(page).toHaveURL(/\/tickets$/);
     await expect(page.getByRole('button', { name: 'Close ticket' })).toHaveCount(0);
   });
+
+  test('resale event + listing routes resolve (no redirect away)', async ({ page }) => {
+    // The per-event page is a real route (stays on the URL).
+    await page.goto('/resale/events/does-not-exist');
+    await expect(page).toHaveURL(/\/resale\/events\/does-not-exist$/);
+
+    // A listing link resolves; an unavailable listing shows the notice.
+    await page.goto('/resale/listings/does-not-exist');
+    await expect(page).toHaveURL(/\/resale\/listings\/does-not-exist$/);
+    await expect(page.getByText('This listing is no longer available.')).toBeVisible({ timeout: 10_000 });
+  });
 });

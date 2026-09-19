@@ -12,7 +12,10 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
   const brand = '#d6f905';
   const [copied, setCopied] = useState(false);
   const copyListingLink = async () => {
-    const link = typeof window === 'undefined' ? `#resale/listing/${listingId}` : `${window.location.origin}${window.location.pathname}#resale/listing/${listingId}`;
+    // A real, resolvable route (it opens the listing's event resale page).
+    const link = typeof window === 'undefined'
+      ? `/resale/listings/${listingId}`
+      : `${window.location.origin}/resale/listings/${listingId}`;
     if (await copyText(link)) setCopied(true);
     else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
   };
