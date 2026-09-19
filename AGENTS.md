@@ -63,6 +63,32 @@ All monetary values are integer cents, paired with a currency, wrapped in
 `Money` (src/lib/money.ts). Convert to display units ONLY via `money.format()`.
 Never do `price / 100` or `price * 0.05` in components.
 
+## Error handling & feedback rule
+
+**A failure must never look like success, emptiness, or absence.** Housekeeping
+sweep 2026-09-19 (commits `6c1f717`, `b08db36`, `fe74e32`) fixed violations of
+this; keep it that way.
+
+- **Forms / field errors:** attach the message to the field that caused it.
+  Pass `error` to `AppInput`/`AppTextArea` (it sets `aria-invalid`, an `id`,
+  and a `role="alert"` description) or render `<FieldError>` under the input,
+  plus a red border. Do **not** use one global error line for a multi-field
+  form. Map backend `ApiError.fieldErrors` to fields with `mapFieldErrors`
+  (`src/lib/errors.ts`); unrecognized messages go to a form-level banner.
+- **Feedback layer:** `toastError`/`toastSuccess`/`toastWarning`
+  (`src/lib/feedback.ts`, sonner). Use a toast when no form is left on screen
+  (e.g. a sheet that closes on submit); otherwise prefer the inline message.
+- **Queries:** render `isError` explicitly with a retry (`LoadErrorCard` or an
+  inline retry). Never let a failed fetch collapse into an empty state ("No X
+  available") or a false "all caught up".
+- **Commands:** disable the trigger while pending; on failure show an inline
+  error or a toast; only show success **after the server confirms** (never an
+  optimistic "done"/"delisted" before the response).
+- **Enrichment reads:** degrade quietly only when truly optional; if the
+  failure blocks the user, surface it with a retry.
+- **Copy:** route errors through `mapApiError` (`src/lib/errors.ts`); add new
+  backend codes to `CODE_MESSAGES` so they get friendly text.
+
 ## Backend gaps (do NOT build against these — flag to backend dev)
 
 Single source of truth: **`docs/BACKEND_GAPS.md`** (reorganized

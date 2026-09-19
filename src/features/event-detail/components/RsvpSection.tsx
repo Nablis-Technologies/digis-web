@@ -592,6 +592,12 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   const [consents, setConsents] = useState<ConsentDocument[]>([]);
   const [acceptedConsentIds, setAcceptedConsentIds] = useState<string[]>([]);
   const [consentError, setConsentError] = useState('');
+  // These fetches are advisory for layout, but a failed terms fetch MUST be
+  // visible — otherwise the user submits with no way to accept the terms and
+  // only sees a server rejection.
+  const [consentsLoadError, setConsentsLoadError] = useState(false);
+  const [schemaLoadError, setSchemaLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
@@ -606,18 +612,20 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
   useEffect(() => {
     if (!slug || !ticketTypeId) return;
     let alive = true;
+    setConsentsLoadError(false);
+    setSchemaLoadError(false);
     registrationModule.fetchRegistrationSchema(slug, ticketTypeId)
       .then((schema) => {
         if (!alive || !schema) return;
         setFormVersionId(schema.forms[0]?.id);
         setSchemaQuestions(schema.forms[0]?.questions ?? []);
       })
-      .catch(() => { /* schema is advisory — answers submit keyed by id when unavailable */ });
+      .catch(() => { if (alive) setSchemaLoadError(true); });
     registrationModule.fetchConsentRequirements(slug, ticketTypeId)
       .then((docs) => { if (alive) setConsents(docs); })
-      .catch(() => { /* consents advisory — absent means nothing to accept */ });
+      .catch(() => { if (alive) setConsentsLoadError(true); });
     return () => { alive = false; };
-  }, [slug, ticketTypeId]);
+  }, [slug, ticketTypeId, reloadKey]);
 
   const requiredConsents = consents.filter((c) => c.required);
   const toggleConsent = (versionId: string) => {
@@ -779,6 +787,22 @@ export function RsvpRegistrationSheet({ event, guests, ticketTypeId, onClose, on
             {requirePhone && <RsvpField icon={<Phone className="w-4 h-4" />} label="Phone" value={phone} onChange={(value) => { setPhone(value); setErrors((current) => ({ ...current, phone: '' })); }} placeholder="09xx xxx xxx" error={errors.phone} type="tel" isDark={isDark} />}
             {questions.map((question) => <RsvpQuestion key={question.id} question={question} value={answers[question.id]} onChange={(value) => setAnswer(question, value)} error={errors[question.id]} isDark={isDark} />)}
           </div>
+
+          {(consentsLoadError || schemaLoadError) && (
+            <div className="mt-4 rounded-2xl px-3.5 py-3"
+              style={{ background: 'rgba(229,72,77,0.08)', border: '1px solid rgba(229,72,77,0.25)' }}>
+              <p className="text-[11.5px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>
+                {consentsLoadError
+                  ? 'Couldn’t load this event’s terms. Retry before continuing.'
+                  : 'Couldn’t load this event’s questions. Retry before continuing.'}
+              </p>
+              <AppButton onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-2 text-[11.5px] underline cursor-pointer"
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a', fontWeight: 700 }}>
+                Try again
+              </AppButton>
+            </div>
+          )}
 
           {requiredConsents.length > 0 && (
             <div className="mt-4 space-y-2">
