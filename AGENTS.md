@@ -89,6 +89,26 @@ this; keep it that way.
 - **Copy:** route errors through `mapApiError` (`src/lib/errors.ts`); add new
   backend codes to `CODE_MESSAGES` so they get friendly text.
 
+## Routing rule
+
+Real routes for destinations; state only for the transient.
+
+- **Routes:** `/`, `/events/:slug`, `/tickets`, `/tickets/:id`, `/profile`,
+  `/resale`, `/resale/events/:slug`, `/resale/listings/:id`, `/settings`,
+  `/login`, `/signup`, `/claim/:id`, `/create`, `/ui-preview`.
+- **Must be a route** when it is linkable, shareable, refresh-safe, or should be
+  closed by the browser Back button: auth, ticket detail, resale event/listing,
+  discovery search (`?q=`). `pathToView` maps prefixes (`/tickets/*`,
+  `/resale/*`) so nested routes keep the shell view.
+- **Keep as state** (modal/sheet) when transactional or ephemeral: checkout
+  steps, OTP steps, transfer/gift, sell/payout sheets, confirmations, pickers.
+- **Auth is a standalone route** (`AuthRoute`): CTAs go via
+  `requestAuth(mode)` → `navigate('/login'|'/signup', { state: { returnTo } })`;
+  `returnTo` is validated (relative-only), the route redirects away when already
+  signed in, and signin↔signup swaps the same modal instance (no remount/double
+  modal). Do not re-introduce the "modal over the current page" variant — its
+  presence was not deterministic under load.
+
 ## Backend gaps (do NOT build against these — flag to backend dev)
 
 Single source of truth: **`docs/BACKEND_GAPS.md`** (reorganized
