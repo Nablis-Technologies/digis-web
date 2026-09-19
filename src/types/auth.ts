@@ -51,7 +51,18 @@ export type SignInRequest = { identifier: string; password: string };
 export type SignInResponse = AuthResult<AuthSession>;
 
 /** Signup is phone-first. Backend accepts email/phone + password. */
-export type SignUpRequest = { phone: string; password: string };
+/**
+ * POST /auth/signup body. Phone-first: phone is the identity, email is
+ * optional (`Core::User` validates `email` with `allow_blank`), and the backend
+ * validates `password_confirmation` — so we send the confirmation explicitly
+ * instead of echoing the password. There is no `name` field (BACKEND_GAPS #8).
+ */
+export type SignUpRequest = {
+  phone: string;
+  email?: string;
+  password: string;
+  passwordConfirmation: string;
+};
 export type SignUpResponse = AuthResult<{ user: AuthUser }>;
 
 export type MeResponse = AuthResult<{ user: AuthUser }>;

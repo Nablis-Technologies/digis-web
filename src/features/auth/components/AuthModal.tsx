@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
-  X, Phone, Lock, ArrowRight, Eye, EyeOff,
+  X, Phone, Lock, Mail, ArrowRight, Eye, EyeOff,
   AlertCircle, Check, ShieldCheck, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -71,7 +71,9 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
   // form state
   const [identifier, setIdentifier] = useState(''); // unified entry (phone or email)
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState(''); // signup only — optional server-side
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
 
   useEffect(() => {
@@ -110,12 +112,28 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
       setError('Enter a valid mobile number for the selected country.');
       return;
     }
+    // Email is optional (`Core::User` validates it with `allow_blank`), so only
+    // shape-check it when the user supplies one.
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Enter a valid email address, or leave it blank.');
+      return;
+    }
     if (password.length < 8) {
       setError('Password must be at least 8 characters.');
       return;
     }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setLoading(true);
-    const res = await auth.signUp({ phone: e164, password });
+    const res = await auth.signUp({
+      phone: e164,
+      ...(trimmedEmail ? { email: trimmedEmail } : {}),
+      password,
+      passwordConfirmation: confirmPassword,
+    });
     setLoading(false);
     if (res.ok) finishAuthed();
     // Backend per-field messages (e.g. "Phone has already been taken") are
@@ -125,7 +143,7 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
 
   const titles = {
     signin: { kicker: 'Welcome back', title: 'Log in', sub: 'Enter your phone number or email and password to continue.' },
-    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required to secure your tickets.' },
+    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required — email is optional.' },
   };
   const t = titles[mode];
 
@@ -255,9 +273,11 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
                       value={phone} onChange={(v) => { setPhone(v); setError(''); }}
                       isDark={isDark} onEnter={handleSignUp}
                     />
+                    <EmailField value={email} onChange={(v) => { setEmail(v); setError(''); }} isDark={isDark} onEnter={handleSignUp} />
                     <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleSignUp} />
+                    <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); setError(''); }} isDark={isDark} placeholder="Confirm your password" onEnter={handleSignUp} />
                     <ErrorLine error={error} />
-                    <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!phone.trim() || !password} />
+                    <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!phone.trim() || !password || !confirmPassword} />
                     <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                       By continuing you agree to Digis’ Terms & Privacy Policy.
                     </p>
@@ -440,7 +460,24 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
   );
 }
 
-/* ─── Generic Field ────────────────────────────────────────── */
+/* ─── Email field (signup only — optional server-side) ────── */
+function EmailField({ value, onChange, isDark, onEnter }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void }) {
+  const [focused, setFocused] = useState(false);
+  const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
+  return (
+    <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
+        border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
+      }}>
+      <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
+      <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder="Email (optional)" style={inputStyle(isDark)}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+    </div>
+  );
+}
 
 function PasswordField({ value, onChange, isDark, placeholder, onEnter }: { value: string; onChange: (v: string) => void; isDark: boolean; placeholder: string; onEnter?: () => void }) {
   const [show, setShow] = useState(false);

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, ReactNode } from "react"
 import { useSyncExternalStore } from "react";
 import { getSession, setSession, clearSession, subscribe, getSnapshot } from "@/lib/session";
 import { authService, toAuthUser } from "@/lib/auth";
-import type { AuthUser } from "@/types/auth";
+import type { AuthUser, SignUpRequest } from "@/types/auth";
 
 export type Result = { ok: boolean; error?: string; fieldErrors?: string[] };
 
@@ -10,7 +10,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   signIn: (identifier: string, password: string) => Promise<Result>;
-  signUp: (data: { phone: string; password: string }) => Promise<Result>;
+  signUp: (data: SignUpRequest) => Promise<Result>;
   signOut: () => Promise<void>;
 }
 

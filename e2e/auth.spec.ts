@@ -128,7 +128,11 @@ test.describe('auth', () => {
     // "Phone number" would hit the dying signin input instead).
     await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
     await page.getByPlaceholder('Phone number', { exact: true }).fill(phone);
+    // Registration carries the identity fields the backend accepts: an optional
+    // email plus an explicit password confirmation.
+    await expect(page.getByPlaceholder('Email (optional)', { exact: true })).toBeVisible();
     await page.getByPlaceholder('Create a password (min 8 chars)', { exact: true }).fill('Test1234!');
+    await page.getByPlaceholder('Confirm your password', { exact: true }).fill('Test1234!');
     await expect(page.getByRole('button', { name: 'Create account' })).toBeEnabled();
     await page.getByRole('button', { name: 'Create account' }).click();
 

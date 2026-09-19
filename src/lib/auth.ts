@@ -86,7 +86,7 @@ export const authService = {
     }
   },
 
-  /** POST /auth/signup — create the account (phone-first). Returns the user only.
+  /** POST /auth/signup — create the account (phone-first, email optional).
    *  Surfaces the backend's per-field errors (e.g. "Phone has already been taken")
    *  alongside the friendly message so the modal can show real validation output. */
   async signUp(input: SignUpRequest): Promise<SignUpResponse> {
@@ -96,8 +96,9 @@ export const authService = {
         body: {
           user: {
             phone: input.phone,
+            ...(input.email ? { email: input.email } : {}),
             password: input.password,
-            password_confirmation: input.password,
+            password_confirmation: input.passwordConfirmation,
           },
         },
       });
