@@ -3,13 +3,13 @@ import { useState } from 'react';
 import {
   ArrowLeft, Moon, Sun, Bell, Mail, Phone, Ticket, ArrowUpDown,
   Globe, CreditCard, Languages, Shield, Lock, Eye, FileText, HelpCircle,
-  ChevronRight, LogOut, User, BadgeCheck, Sparkles, Pencil, Check, Loader2,
-  X, AlertCircle, KeyRound, ShieldCheck,
+  ChevronRight, LogOut, User, BadgeCheck, Sparkles, Pencil, Loader2,
+  X, ShieldCheck,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { flatAvatarColor } from '@/lib/utils/avatarColor';
-import { CancelBtn, Divider, EditField, PickerList, Row, SaveBtn, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill } from '@/features/profile/components/SettingsPrimitives';
+import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill } from '@/features/profile/components/SettingsPrimitives';
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -39,32 +39,11 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const [twoFaEnabled, setTwoFaEnabled] = useState(false);
 
   // Sheet state — which bottom sheet is open
-  type Sheet = 'none' | 'changePassword' | 'language' | 'currency' | 'region' | '2fa' | 'help' | 'terms' | 'privacy';
+  type Sheet = 'none' | 'language' | 'currency' | 'region' | '2fa' | 'help' | 'terms' | 'privacy';
   const [sheet, setSheet] = useState<Sheet>('none');
 
-  // Change-password form state
-  const [pwCurrent, setPwCurrent] = useState('');
-  const [pwNew, setPwNew] = useState('');
-  const [pwConfirm, setPwConfirm] = useState('');
-  const [pwError, setPwError] = useState('');
-  const [pwSaving, setPwSaving] = useState(false);
-  const [pwSaved, setPwSaved] = useState(false);
-
   const openSheet = (s: Sheet) => setSheet(s);
-  const closeSheet = () => {
-    setSheet('none');
-    setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwError(''); setPwSaving(false); setPwSaved(false);
-  };
-
-  const handleChangePassword = async () => {
-    if (!pwCurrent.trim()) { setPwError('Enter your current password.'); return; }
-    if (pwNew.length < 8) { setPwError('New password must be at least 8 characters.'); return; }
-    if (pwNew !== pwConfirm) { setPwError('Passwords don\'t match.'); return; }
-    setPwError(''); setPwSaving(true);
-    await new Promise(r => setTimeout(r, 900)); // simulated API call
-    setPwSaving(false); setPwSaved(true);
-    setTimeout(closeSheet, 1400);
-  };
+  const closeSheet = () => setSheet('none');
 
   const avatarColor = flatAvatarColor(user?.name || user?.email || 'Digis');
   const brand = '#d6f905';
@@ -153,8 +132,10 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         <Row icon={<Eye className="w-4 h-4" />} label="Public profile" hint="Let others find you" isDark={isDark}
           right={<Toggle checked={publicProfile} onChange={() => setPublicProfile(v => !v)} isDark={isDark} />} />
         <Divider isDark={isDark} />
-        <Row icon={<Lock className="w-4 h-4" />} label="Change password" isDark={isDark}
-          right={<ChevronRight className="w-4 h-4" strokeWidth={1.75} style={{ color: subtle }} />} clickable onClick={() => openSheet('changePassword')} />
+        {/* No self-service password endpoint yet (BACKEND_GAPS #8-deferred), so
+            this is surfaced as unavailable rather than a fake success. */}
+        <Row icon={<Lock className="w-4 h-4" />} label="Change password" hint="Coming soon" isDark={isDark}
+          right={<ChevronRight className="w-4 h-4" strokeWidth={1.75} style={{ color: subtle, opacity: 0.4 }} />} />
         <Divider isDark={isDark} />
         <Row icon={<Shield className="w-4 h-4" />} label="Two-factor authentication" hint={twoFaEnabled ? 'On' : 'Off'} isDark={isDark}
           right={<ChevronRight className="w-4 h-4" strokeWidth={1.75} style={{ color: subtle }} />} clickable onClick={() => openSheet('2fa')} />
@@ -217,40 +198,6 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
               style={{ background: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(20,18,40,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
               onClick={closeSheet}
             />
-
-            {/* ── Change password ── */}
-            {sheet === 'changePassword' && (
-              <SettingsSheet key="pw" title="Change password" onClose={closeSheet} isDark={isDark} brand={brand} cardBorder={cardBorder}>
-                {pwSaved ? (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center py-4 gap-3">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center"
-                      style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>
-                      <Check className="w-6 h-6" strokeWidth={2.5} style={{ color: '#10b981' }} />
-                    </div>
-                    <p className="text-[15px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: heading, fontWeight: 300 }}>Password updated</p>
-                  </motion.div>
-                ) : (
-                  <div className="space-y-3">
-                    <EditField icon={<Lock className="w-4 h-4" />} type="password" placeholder="Current password" value={pwCurrent} onChange={setPwCurrent} isDark={isDark} />
-                    <EditField icon={<KeyRound className="w-4 h-4" />} type="password" placeholder="New password (min 8 chars)" value={pwNew} onChange={setPwNew} isDark={isDark} />
-                    <EditField icon={<ShieldCheck className="w-4 h-4" />} type="password" placeholder="Confirm new password" value={pwConfirm} onChange={setPwConfirm} isDark={isDark} />
-                    <AnimatePresence>
-                      {pwError && (
-                        <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                          className="text-[12px] flex items-center gap-1.5" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
-                          <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} /> {pwError}
-                        </motion.p>
-                      )}
-                    </AnimatePresence>
-                    <div className="flex gap-2 pt-1">
-                      <CancelBtn onClick={closeSheet} isDark={isDark} value={value} cardBorder={cardBorder} />
-                      <SaveBtn onClick={handleChangePassword} saving={pwSaving} isDark={isDark} />
-                    </div>
-                  </div>
-                )}
-              </SettingsSheet>
-            )}
 
             {/* ── Language picker ── */}
             {sheet === 'language' && (

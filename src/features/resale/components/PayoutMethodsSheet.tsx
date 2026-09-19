@@ -13,6 +13,9 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
+/** Shared styling for AppInput's built-in error output. */
+const FIELD_ERROR_CLASS = 'flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400';
+
 export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }: { onClose: () => void; onMethodAdded?: (method: PayoutMethod) => void; onMethodSelected?: (method: PayoutMethod) => void }) {
   const { isDark } = useTheme();
   const qc = useQueryClient();
@@ -229,10 +232,18 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
   const [bankSlug, setBankSlug] = useState('');
   const [holderName, setHolderName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [touched, setTouched] = useState<{ holderName?: boolean; accountNumber?: boolean }>({});
 
   const selected = banks.find((bank) => bank.bankSlug === bankSlug) ?? null;
   const isPhone = selected?.type === 'mobile_money';
   const valid = Boolean(selected) && holderName.trim().length > 1 && accountNumber.trim().length >= 4;
+  // Explain the disabled button per field once the user leaves the field.
+  const holderError = touched.holderName && holderName.trim().length <= 1
+    ? "Enter the account holder's full name."
+    : undefined;
+  const accountError = touched.accountNumber && accountNumber.trim().length < 4
+    ? (isPhone ? 'Enter a valid phone number.' : 'Enter a valid account number.')
+    : undefined;
 
   const inputStyle = {
     fontFamily: "'Inter', sans-serif", color: text,
@@ -303,6 +314,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
           Account holder name
         </label>
         <AppInput value={holderName} onChange={e => setHolderName(e.target.value)} placeholder="Full name"
+          onBlur={() => setTouched(t => ({ ...t, holderName: true }))} error={holderError} errorClassName={FIELD_ERROR_CLASS}
           className="w-full h-[52px] rounded-2xl px-4 text-[14px] outline-none" style={inputStyle} />
       </div>
 
@@ -312,6 +324,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
         </label>
         <AppInput value={accountNumber} onChange={e => setAccountNumber(e.target.value)}
           inputMode={isPhone ? 'tel' : 'numeric'}
+          onBlur={() => setTouched(t => ({ ...t, accountNumber: true }))} error={accountError} errorClassName={FIELD_ERROR_CLASS}
           placeholder={isPhone ? '09xx xxx xxx' : 'Account number'}
           className="w-full h-[52px] rounded-2xl px-4 text-[14px] outline-none" style={inputStyle} />
       </div>

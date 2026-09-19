@@ -10,6 +10,7 @@ import { mapFieldErrors } from '@/lib/errors';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
+import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import type { CSSProperties } from 'react';
 
@@ -456,16 +457,6 @@ function fieldBorder(error: string | undefined, focused: boolean, isDark: boolea
   if (error) return 'rgba(248,113,113,0.7)';
   if (focused) return isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)';
   return isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
-}
-
-/** Field-attached error message, announced to assistive tech. */
-function FieldError({ error }: { error?: string }) {
-  if (!error) return null;
-  return (
-    <p role="alert" className="flex items-center gap-1.5 mt-1.5 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>
-      <AlertCircle className="w-3 h-3 flex-shrink-0" strokeWidth={2} />{error}
-    </p>
-  );
 }
 
 /* ─── PhoneField (with dial selector) ─────────────────────── */

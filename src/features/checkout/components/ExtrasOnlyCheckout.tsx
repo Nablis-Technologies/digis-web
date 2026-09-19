@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Lock, ArrowRight } from 'lucide-react';
+import { Lock, ArrowRight } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { ExtrasStep } from '@/features/checkout/components/ExtrasStep';
 import { CheckoutSheetFrame } from '@/features/checkout/components/CheckoutSheetFrame';
 import { orderModule, guestReturnKey } from '@/lib/order';
-import { ApiError, messageForCode } from '@/lib/errors';
+import { ApiError, messageForCode, mapFieldErrors } from '@/lib/errors';
 import { randomUuid } from '@/lib/api';
 import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
+import { AppInput } from '@/components/primitives/AppInput';
+import { FieldError } from '@/components/primitives/FieldError';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { EventProduct, SelectedEventProduct } from '@/types';
+
+/** Shared styling for AppInput's built-in error output. */
+const FIELD_ERROR_CLASS = 'flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400';
 
 interface ExtrasOnlyCheckoutProps {
   event: { name: string; date: string; time: string; venue: string; image?: string };
@@ -42,7 +47,15 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
   const [guestPhone, setGuestPhone] = useState(user?.phone ?? '+251');
   const [guestName, setGuestName] = useState(user?.name ?? '');
   const [guestEmail, setGuestEmail] = useState(user?.email ?? '');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const payingRef = useRef(false);
+
+  const clearField = (field: string) => setFieldErrors((prev) => {
+    if (!prev[field]) return prev;
+    const next = { ...prev };
+    delete next[field];
+    return next;
+  });
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -65,10 +78,11 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
   };
 
   const submitPhone = async () => {
-    if (guestPhone.replace(/\s/g, '').length < 9) {
-      setError('Enter your phone number to continue.');
-      return;
-    }
+    const next: Record<string, string> = {};
+    if (guestPhone.replace(/\s/g, '').length < 9) next.phone = 'Enter your phone number to continue.';
+    if (guestEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) next.email = 'Enter a valid email address, or leave it blank.';
+    if (Object.keys(next).length) { setFieldErrors(next); return; }
+    setFieldErrors({});
     setError(undefined);
     await runPayment();
   };
@@ -100,8 +114,21 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
       }
       onComplete();
     } catch (e) {
-      setStep('error');
-      setError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Payment could not be started. Please try again.');
+      // Backend field errors send the guest back to the field that failed;
+      // anything else is a payment-level error.
+      const { fields, general } = mapFieldErrors(e instanceof ApiError ? e.fieldErrors : undefined);
+      const mapped: Record<string, string> = {};
+      if (fields.phone) mapped.phone = fields.phone;
+      if (fields.name) mapped.name = fields.name;
+      if (fields.email) mapped.email = fields.email;
+      if (Object.keys(mapped).length) {
+        setFieldErrors(mapped);
+        setStep('details');
+        setError(undefined);
+      } else {
+        setStep('error');
+        setError(general.join(' ') || (e instanceof ApiError ? messageForCode(e.code, e.message) : 'Payment could not be started. Please try again.'));
+      }
     } finally {
       payingRef.current = false;
     }
@@ -158,36 +185,39 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             <p className="text-[10px] tracking-[1.6px] uppercase mb-4" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
               Contact details
             </p>
-            <input
-              type="tel"
-              placeholder="Phone number"
-              value={guestPhone}
-              onChange={(e) => setGuestPhone(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl mb-3 text-[14px] outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
-            />
-            <input
-              type="text"
-              placeholder="Full name (optional)"
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl mb-3 text-[14px] outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
-            />
-            <input
-              type="email"
-              placeholder="Email (optional)"
-              value={guestEmail}
-              onChange={(e) => setGuestEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl mb-3 text-[14px] outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
-            />
-            {error && (
-              <div className="flex items-center gap-2 justify-center text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
-                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                <span>{error}</span>
-              </div>
-            )}
+            <div className="mb-3">
+              <AppInput
+                type="tel"
+                placeholder="Phone number"
+                value={guestPhone}
+                onChange={(e) => { setGuestPhone(e.target.value); clearField('phone'); }}
+                error={fieldErrors.phone} errorClassName={FIELD_ERROR_CLASS}
+                className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
+                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+              />
+            </div>
+            <div className="mb-3">
+              <AppInput
+                type="text"
+                placeholder="Full name (optional)"
+                value={guestName}
+                onChange={(e) => { setGuestName(e.target.value); clearField('name'); }}
+                error={fieldErrors.name} errorClassName={FIELD_ERROR_CLASS}
+                className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
+                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+              />
+            </div>
+            <div className="mb-3">
+              <AppInput
+                type="email"
+                placeholder="Email (optional)"
+                value={guestEmail}
+                onChange={(e) => { setGuestEmail(e.target.value); clearField('email'); }}
+                error={fieldErrors.email} errorClassName={FIELD_ERROR_CLASS}
+                className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
+                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+              />
+            </div>
           </div>
         ) : (
           <div className="relative px-6 py-5 overflow-y-auto scrollbar-hide" style={{ background: bgPanel }}>
@@ -200,10 +230,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
               <p className="text-[13px] py-8 text-center" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>No extras are available for this event.</p>
             )}
             {step === 'error' && error && (
-              <div className="mt-3 flex items-center gap-2 justify-center text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
-                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                <span>{error}</span>
-              </div>
+              <FieldError error={error} className="mt-3 flex items-center gap-1.5 justify-center text-[12px]" />
             )}
           </div>
         )}

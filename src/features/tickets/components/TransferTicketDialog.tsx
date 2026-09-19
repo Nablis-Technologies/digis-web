@@ -22,6 +22,7 @@ import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { copyText } from '@/lib/utils/clipboard';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { mapApiError } from '@/lib/errors';
 
@@ -74,6 +75,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
   const [acknowledged, setAcknowledged] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [touched, setTouched] = useState<{ name?: boolean; contact?: boolean }>({});
   const [shareLink, setShareLink] = useState('');
   const [recipientHasAccount, setRecipientHasAccount] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -105,6 +107,11 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
   const recipientValid =
     recipientName.trim().length > 0 && isValidContact('phone', contactValue);
   const canProceed = step === 0 ? recipientValid : step === 2 ? acknowledged : true;
+  // Explain the disabled Continue per field once the user leaves it.
+  const nameError = touched.name && !recipientName.trim() ? "Enter the recipient's name." : undefined;
+  const contactError = touched.contact && !isValidContact('phone', contactValue)
+    ? 'Enter a valid phone number, including the country code.'
+    : undefined;
 
   const handleSend = () => {
     setSending(true);
@@ -274,6 +281,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   icon={<User className="w-4 h-4" strokeWidth={1.8} />}
                   isDark={isDark}
                   active={recipientName.length > 0}
+                  error={Boolean(nameError)}
                 >
                   <AppInput
                     ref={nameRef}
@@ -281,26 +289,33 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     placeholder="Recipient's full name"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                    aria-invalid={nameError ? true : undefined}
                     className={`w-full bg-transparent outline-none text-[14px] ${placeholderClass}`}
                     style={{ fontFamily: "'Inter', sans-serif", color: text }}
                   />
                 </Field>
+                {nameError && <FieldError error={nameError} className="flex items-center gap-1.5 px-1 -mt-1 text-[11px]" />}
 
                 {/* Recipient phone — transfers are bound to a verified phone number */}
                 <Field
                   icon={<Phone className="w-4 h-4" strokeWidth={1.8} />}
                   isDark={isDark}
                   active={contactValue.length > 0}
+                  error={Boolean(contactError)}
                 >
                   <AppInput
                     type="tel"
                     placeholder="+251 9·· ·· ·· ··"
                     value={contactValue}
                     onChange={(e) => setContactValue(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, contact: true }))}
+                    aria-invalid={contactError ? true : undefined}
                     className={`w-full bg-transparent outline-none text-[14px] ${placeholderClass}`}
                     style={{ fontFamily: "'Inter', sans-serif", color: text }}
                   />
                 </Field>
+                {contactError && <FieldError error={contactError} className="flex items-center gap-1.5 px-1 -mt-1 text-[11px]" />}
                 <p className="px-1 text-[10.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>
                   They verify with a code sent to this number — the ticket is handed over only after that.
                 </p>

@@ -11,11 +11,13 @@ export function Field({
   children,
   isDark,
   active,
+  error = false,
 }: {
   icon: React.ReactNode;
   children: React.ReactNode;
   isDark: boolean;
   active: boolean;
+  error?: boolean;
 }) {
   const surfaceSoft = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
   const borderSoft = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
@@ -25,7 +27,7 @@ export function Field({
       className="relative flex items-center gap-3 px-4 py-3.5 rounded-2xl"
       style={{
         background: surfaceSoft,
-        border: `1px solid ${active ? `rgba(${ACCENT},0.3)` : borderSoft}`,
+        border: `1px solid ${error ? 'rgba(239,68,68,0.6)' : active ? `rgba(${ACCENT},0.3)` : borderSoft}`,
         transition: 'border-color 0.25s',
       }}
     >

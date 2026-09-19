@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { X, Phone, ShieldCheck, KeyRound, Lock, AlertCircle, ArrowRight, Check, UserCheck } from 'lucide-react';
+import { X, Phone, ShieldCheck, KeyRound, Lock, ArrowRight, Check, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { UserTicket } from '@/types';
@@ -8,7 +8,8 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { registrationModule } from '@/lib/registration';
-import { mapApiError } from '@/lib/errors';
+import { ApiError, mapApiError, mapFieldErrors } from '@/lib/errors';
+import { FieldError } from '@/components/primitives/FieldError';
 
 /**
  * Guest ticket → account claim (#31 resolved). A guest whose ticket carries a
@@ -29,7 +30,10 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   const [otpCode, setOtpCode] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [error, setError] = useState('');
+  // Per-field messages so a failure points at the input that caused it; `formError`
+  // carries anything that names no field (API/ownership failures).
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState('');
 
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
@@ -43,51 +47,55 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
     fontFamily: "'Inter', sans-serif",
   });
 
-  const validatePhone = (): boolean => phone.replace(/\D/g, '').length >= 9;
-  const validateClaim = (): boolean => {
-    if (otpCode.replace(/\D/g, '').length < 4) {
-      setError('Enter the 6-digit code we sent.');
-      return false;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return false;
-    }
-    if (password !== passwordConfirm) {
-      setError('Passwords do not match.');
+  const clearAll = () => { setErrors({}); setFormError(''); };
+  const clearField = (field: string) => setErrors((prev) => {
+    if (!prev[field]) return prev;
+    const next = { ...prev };
+    delete next[field];
+    return next;
+  });
+
+  const validatePhone = (): boolean => {
+    if (phone.replace(/\D/g, '').length < 9) {
+      setErrors({ phone: 'Add the phone number you checked out with.' });
       return false;
     }
     return true;
   };
+  const validateClaim = (): boolean => {
+    const next: Record<string, string> = {};
+    if (otpCode.replace(/\D/g, '').length < 4) next.otp = 'Enter the 6-digit code we sent.';
+    if (password.length < 8) next.password = 'Password must be at least 8 characters.';
+    if (password !== passwordConfirm) next.passwordConfirm = 'Passwords do not match.';
+    if (Object.keys(next).length) { setErrors(next); return false; }
+    return true;
+  };
 
   const sendCode = async () => {
-    if (!validatePhone()) {
-      setError('Add the phone number you checked out with.');
-      return;
-    }
+    clearAll();
+    if (!validatePhone()) return;
     if (!ticket.ticketViewToken) {
-      setError('This ticket can’t be claimed — no signed view token.');
+      setFormError('This ticket can’t be claimed — no signed view token.');
       return;
     }
-    setError('');
     setOtpStage('sending');
     try {
       const { challengeId: id } = await registrationModule.claimOtpRequest(ticket.ticketViewToken, phone);
       setChallengeId(id);
       setOtpStage('sent');
     } catch (err) {
-      setError(mapApiError(err));
+      setFormError(mapApiError(err));
       setOtpStage('idle');
     }
   };
 
   const claim = async () => {
+    clearAll();
     if (!validateClaim()) return;
     if (!ticket.registrationId || !challengeId) {
-      setError('Something went wrong — please try again.');
+      setFormError('Something went wrong — please try again.');
       return;
     }
-    setError('');
     setOtpStage('submitting');
     try {
       const { verificationToken } = await registrationModule.verifyPhoneOtp(challengeId, otpCode);
@@ -101,13 +109,19 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
       // ticket appears in the account wallet.
       const result = await signIn(phone, password);
       if (!result.ok) {
-        setError(result.error ?? 'We could not sign you in after claiming.');
+        setFormError(result.error ?? 'We could not sign you in after claiming.');
         setOtpStage('sent');
         return;
       }
       onClaimed();
     } catch (err) {
-      setError(mapApiError(err));
+      // Backend field errors (e.g. a rejected password) point at their input.
+      const { fields, general } = mapFieldErrors(err instanceof ApiError ? err.fieldErrors : undefined);
+      const mapped: Record<string, string> = {};
+      if (fields.password) mapped.password = fields.password;
+      if (fields.passwordConfirmation) mapped.passwordConfirm = fields.passwordConfirmation;
+      if (Object.keys(mapped).length) setErrors(mapped);
+      setFormError(general.join(' ') || (Object.keys(mapped).length ? '' : mapApiError(err)));
       setOtpStage('sent');
     }
   };
@@ -152,12 +166,13 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
                 <AppInput
                   type="tel" value={phone} disabled={otpStage === 'sent' || otpStage === 'submitting'}
-                  onChange={(e) => { setPhone(e.target.value); setError(''); }}
+                  onChange={(e) => { setPhone(e.target.value); clearField('phone'); }}
                   placeholder="The phone you checked out with"
                   className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px]"
-                  style={inputStyle()}
+                  style={inputStyle(Boolean(errors.phone))} aria-invalid={errors.phone ? true : undefined}
                 />
               </div>
+              <FieldError error={errors.phone} />
             </div>
 
             {otpStage === 'sent' && (
@@ -168,12 +183,13 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><ShieldCheck className="w-4 h-4" /></span>
                     <AppInput
                       type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otpCode}
-                      onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+                      onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); clearField('otp'); }}
                       placeholder="6-digit code"
                       className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px] tracking-[0.3em]"
-                      style={inputStyle()}
+                      style={inputStyle(Boolean(errors.otp))} aria-invalid={errors.otp ? true : undefined}
                     />
                   </div>
+                  <FieldError error={errors.otp} />
                   <p className="mt-2 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
                     We sent a code to <span style={{ color: text }}>{phone}</span>.{' '}
                     <AppButton type="button" onClick={sendCode} className="inline text-[11px] underline" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? accent : '#0a0a0a' }}>Resend</AppButton>
@@ -186,27 +202,29 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><Lock className="w-4 h-4" /></span>
                     <AppInput
                       type="password" autoComplete="new-password" value={password}
-                      onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                      onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
                       placeholder="At least 8 characters"
                       className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px]"
-                      style={inputStyle()}
+                      style={inputStyle(Boolean(errors.password))} aria-invalid={errors.password ? true : undefined}
                     />
                   </div>
-                  <div className="relative">
+                  <FieldError error={errors.password} />
+                  <div className="relative mt-2">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><KeyRound className="w-4 h-4" /></span>
                     <AppInput
                       type="password" autoComplete="new-password" value={passwordConfirm}
-                      onChange={(e) => { setPasswordConfirm(e.target.value); setError(''); }}
+                      onChange={(e) => { setPasswordConfirm(e.target.value); clearField('passwordConfirm'); }}
                       placeholder="Repeat password"
                       className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px]"
-                      style={inputStyle()}
+                      style={inputStyle(Boolean(errors.passwordConfirm))} aria-invalid={errors.passwordConfirm ? true : undefined}
                     />
                   </div>
+                  <FieldError error={errors.passwordConfirm} />
                 </div>
               </>
             )}
 
-            {error && <p className="flex items-center gap-1.5 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}><AlertCircle className="w-3 h-3" />{error}</p>}
+            {formError && <FieldError error={formError} className="flex items-start gap-1.5 text-[11px]" />}
           </div>
 
           <AppButton
