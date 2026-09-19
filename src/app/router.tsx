@@ -52,7 +52,7 @@ export function eventPath(event: Event): string {
 }
 
 export function pathToView(pathname: string): AppView {
-  if (pathname === '/tickets') return 'tickets';
+  if (pathname === '/tickets' || pathname.startsWith('/tickets/')) return 'tickets';
   if (pathname === '/profile') return 'profile';
   if (pathname === '/create') return 'create';
   if (pathname === '/resale') return 'resale';
@@ -92,6 +92,11 @@ function AppContent() {
   const currentView = pathToView(location.pathname);
   const eventSlug = useMemo(() => {
     if (!location.pathname.startsWith('/events/')) return null;
+    return decodeURIComponent(location.pathname.split('/')[2] ?? '') || null;
+  }, [location.pathname]);
+  // `/tickets/:id` — the deep-linkable open-ticket route.
+  const ticketId = useMemo(() => {
+    if (!location.pathname.startsWith('/tickets/')) return null;
     return decodeURIComponent(location.pathname.split('/')[2] ?? '') || null;
   }, [location.pathname]);
   // In-app navigation ships the just-fetched list event through location.state
@@ -537,6 +542,9 @@ function AppContent() {
                 <TicketView
                   tickets={userTickets}
                   initialOpenTicket={lastConfirmedTicketRef.current ?? confirmedTicket}
+                  selectedTicketId={ticketId}
+                  onOpenTicket={(id) => navigate(`/tickets/${encodeURIComponent(id)}`)}
+                  onCloseTicket={() => navigate('/tickets', { replace: true })}
                   loading={isAuthenticated && walletPending}
                   refreshing={isAuthenticated && walletFetching && !walletPending}
                   loadError={isAuthenticated && walletError}
@@ -669,7 +677,7 @@ function AppContent() {
                 const controller = isAuthenticated ? returnController : guestReturnController;
                 lastConfirmedTicketRef.current = activeConfirmed;
                 controller.stop();
-                navigate(`/tickets${id ? `?ticket=${id}` : ''}`);
+                navigate(id ? `/tickets/${encodeURIComponent(id)}` : '/tickets');
               },
               onGoToTickets: closeReturn,
             }}
@@ -798,6 +806,7 @@ export function AppRouterProvider() {
       { path: '/', Component: AppContent },
       { path: '/events/:eventTitle', Component: AppContent },
       { path: '/tickets', Component: AppContent },
+      { path: '/tickets/:ticketId', Component: AppContent },
       { path: '/profile', Component: AppContent },
       { path: '/resale', Component: AppContent },
       { path: '/create', Component: CreateRedirect },

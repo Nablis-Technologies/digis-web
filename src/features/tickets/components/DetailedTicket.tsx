@@ -202,7 +202,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 {ticket.eventName}
               </h2>
             </div>
-            <AppButton whileTap={{ scale: 0.92 }} onClick={onClose}
+            <AppButton whileTap={{ scale: 0.92 }} onClick={onClose} aria-label="Close ticket"
               className="relative shrink-0 -mt-1 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
               style={{
                 background: isDark ? 'rgba(12,10,24,0.5)' : 'rgba(255,255,255,0.75)',

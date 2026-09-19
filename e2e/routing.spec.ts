@@ -1,4 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const API = 'http://localhost:3000';
+// Seeded verified attendee with active paid tickets in the wallet.
+const BUYER = '+251900123456';
+const BUYER_PASSWORD = 'password123';
+
+async function loginThroughUi(page: Page, identifier: string) {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in' }).first().click();
+  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(identifier);
+  await page.getByPlaceholder('Your password', { exact: true }).fill(BUYER_PASSWORD);
+  await page.getByRole('button', { name: 'Log in' }).last().click();
+  await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Welcome to Digis')).toBeHidden({ timeout: 20_000 });
+}
 
 /**
  * Routing e2e — auth is a modal ROUTE (/login, /signup) layered over the page
@@ -42,5 +57,30 @@ test.describe('routing', () => {
     await expect(page).toHaveURL(/\?q=jazz/);
     await page.reload();
     await expect(page.getByPlaceholder('Search events, venues, artists...')).toHaveValue('jazz');
+  });
+
+  test('ticket detail is deep-linkable at /tickets/:id and Back closes it', async ({ page }) => {
+    await loginThroughUi(page, BUYER);
+
+    // Fetch a real wallet ticket id for this buyer.
+    const session = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('digis_session') ?? 'null'),
+    );
+    expect(session?.access_token).toBeTruthy();
+    const res = await page.request.get(`${API}/tickets`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    const id = (await res.json())?.data?.[0]?.id as string | undefined;
+    expect(id, 'buyer should have at least one wallet ticket').toBeTruthy();
+
+    // Deep link straight to the ticket — the detail opens for that id.
+    await page.goto(`/tickets/${id}`);
+    await expect(page).toHaveURL(new RegExp(`/tickets/${id}$`));
+    await expect(page.getByRole('button', { name: 'Close ticket' })).toBeVisible({ timeout: 10_000 });
+
+    // Closing returns to the list route.
+    await page.getByRole('button', { name: 'Close ticket' }).click();
+    await expect(page).toHaveURL(/\/tickets$/);
+    await expect(page.getByRole('button', { name: 'Close ticket' })).toHaveCount(0);
   });
 });

@@ -1,6 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
 import { TransferTicket } from '@/features/tickets/components/TransferTicketDialog';
@@ -41,10 +40,13 @@ interface TicketViewProps {
   isAuthenticated?: boolean;
   /** Opens the auth modal (claim path for durable cross-device tickets). */
   onRequestAuth?: () => void;
+  /** Route-driven open ticket (`/tickets/:id`) — the deep-linkable selection. */
+  selectedTicketId?: string | null;
+  onOpenTicket?: (id: string) => void;
+  onCloseTicket?: () => void;
 }
 
-export function TicketView({ tickets, onListForResale, onDiscover, loading = false, refreshing = false, loadError = false, onRetry, initialOpenTicket, isAuthenticated = true, onRequestAuth }: TicketViewProps) {
-  const [selectedTicket, setSelectedTicket] = useState<UserTicket | null>(null);
+export function TicketView({ tickets, onListForResale, onDiscover, loading = false, refreshing = false, loadError = false, onRetry, initialOpenTicket, isAuthenticated = true, onRequestAuth, selectedTicketId = null, onOpenTicket, onCloseTicket }: TicketViewProps) {
   const [showQR, setShowQR] = useState(false);
   const [transferringTicket, setTransferringTicket] = useState<UserTicket | null>(null);
   const [sharingTicket, setSharingTicket] = useState<UserTicket | null>(null);
@@ -67,6 +69,26 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
     ? tickets
     : [...tickets, ...guestDevice.tickets];
   const deviceCount = guestDevice.tickets.length;
+  // The open ticket is route-driven (`/tickets/:id`) so it is deep-linkable and
+  // Back closes it. `pendingOpenTicket` covers the post-purchase instant-open
+  // (the confirmed ticket before the wallet refetch settles) when no route id
+  // is present. `setSelectedTicket` keeps the existing call sites working:
+  // opening navigates, closing returns to /tickets.
+  const [pendingOpenTicket, setPendingOpenTicket] = useState<UserTicket | null>(null);
+  const routeOpenTicket = selectedTicketId
+    ? combinedTickets.find((t) => t.id === selectedTicketId) ?? null
+    : null;
+  const selectedTicket = selectedTicketId ? routeOpenTicket : pendingOpenTicket;
+  const setSelectedTicket = (ticket: UserTicket | null) => {
+    if (ticket) {
+      setPendingOpenTicket(null);
+      if (onOpenTicket) onOpenTicket(ticket.id);
+      else setPendingOpenTicket(ticket);
+    } else {
+      setPendingOpenTicket(null);
+      if (onCloseTicket) onCloseTicket();
+    }
+  };
   const updateAnswersMutation = useMutation({
     mutationKey: ['tickets', 'answers'],
     mutationFn: ({ ticketId, answers }: { ticketId: string; answers: Record<string, unknown> }) => ticketsService.updateTicketAnswers(ticketId, answers),
@@ -102,39 +124,19 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   }, [addingExtrasTicket, extrasReload]);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
-  // Just-returned-from-Chapa: the router lands here with ?ticket=<id> once the
-  // webhook-issued ticket appears. The success message already lives in the
-  // checkout sheet, so instead of a redundant banner we auto-open the new
-  // ticket's QR. The ticket may still be settling in the wallet (the return
-  // poll keeps updating it), so re-check whenever `tickets` changes.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const autoOpenTicketId = searchParams.get('ticket');
-  const autoOpenedRef = useRef<Set<string>>(new Set());
-  // The return screen already holds the confirmed ticket (with its QR) from the
-  // refresh projection — open it instantly, don't wait for the wallet refetch.
+  // Just-returned-from-Chapa: the router opens `/tickets/:id` and also passes the
+  // confirmed ticket (with its QR) from the refresh projection, so open it
+  // instantly rather than waiting for the wallet refetch. Only used when no
+  // route id is present (the route is the source of truth once it is).
   const initialRef = useRef<string | null>(null);
   useEffect(() => {
     if (initialOpenTicket && initialRef.current !== initialOpenTicket.id) {
       initialRef.current = initialOpenTicket.id;
-      setSelectedTicket(initialOpenTicket);
+      setPendingOpenTicket(initialOpenTicket);
       setShowQR(true);
       setDownloadDone(false);
     }
   }, [initialOpenTicket]);
-  useEffect(() => {
-    if (!autoOpenTicketId || autoOpenedRef.current.has(autoOpenTicketId)) return;
-    const target = combinedTickets.find((t) => t.id === autoOpenTicketId);
-    if (!target) return; // not issued yet — the wallet poll will bring it
-    autoOpenedRef.current.add(autoOpenTicketId);
-    setSelectedTicket(target);
-    setShowQR(true);
-    setDownloadDone(false);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('ticket');
-      return next;
-    }, { replace: true });
-  }, [autoOpenTicketId, combinedTickets, setSelectedTicket, setSearchParams]);
 
   const { upcoming, past } = useTicketGroups(combinedTickets);
 
