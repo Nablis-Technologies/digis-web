@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
-  X, Phone, Lock, Mail, ArrowRight, Eye, EyeOff,
+  X, Phone, Lock, Mail, User, ArrowRight, Eye, EyeOff,
   AlertCircle, Check, ShieldCheck, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
+import { mapFieldErrors } from '@/lib/errors';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
@@ -65,11 +66,15 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
   const auth = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // Per-field messages (keyed by field) plus a form-level line for anything
+  // that names no field — so a failure points at the exact input, not the form.
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState(false);
 
   // form state
   const [identifier, setIdentifier] = useState(''); // unified entry (phone or email)
+  const [fullName, setFullName] = useState(''); // signup only
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState(''); // signup only — optional server-side
   const [password, setPassword] = useState('');
@@ -89,7 +94,15 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
   const bgPanel = isDark ? '#0a0a0a' : '#ffffff';
   const borderSoft = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)';
 
-  const switchMode = (m: 'signin' | 'signup') => { setError(''); setMode(m); };
+  const clearAllErrors = () => { setErrors({}); setFormError(''); };
+  const clearField = (field: string) => setErrors((prev) => {
+    if (!prev[field]) return prev;
+    const next = { ...prev };
+    delete next[field];
+    return next;
+  });
+
+  const switchMode = (m: 'signin' | 'signup') => { clearAllErrors(); setMode(m); };
 
   const finishAuthed = () => {
     setSuccess(true);
@@ -97,48 +110,51 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
   };
 
   const handleSignIn = async () => {
-    setError(''); setLoading(true);
+    clearAllErrors(); setLoading(true);
     const res = await auth.signIn(buildPhone(identifier, country.dial), password);
     setLoading(false);
     if (res.ok) finishAuthed();
-    else setError(res.error || 'Could not log in.');
+    else setFormError(res.error || 'Could not log in.');
   };
   const handleSignUp = async () => {
-    setError('');
+    clearAllErrors();
+    const trimmedName = fullName.trim();
     const e164 = buildPhone(phone, country.dial);
+    const trimmedEmail = email.trim();
     // Client-side policy — the backend currently enforces none of these
-    // (BACKEND_GAPS.md #10), so the signup form is the only gate.
-    if (!/^\+[1-9]\d{6,14}$/.test(e164)) {
-      setError('Enter a valid mobile number for the selected country.');
-      return;
-    }
+    // (BACKEND_GAPS.md #10), so the signup form is the only gate. Each message
+    // is attached to the field it concerns. Name is collected here and sent to
+    // the backend, which does not persist it yet (BACKEND_GAPS.md #8).
+    const next: Record<string, string> = {};
+    if (!trimmedName) next.name = 'Enter your full name.';
+    if (!/^\+[1-9]\d{6,14}$/.test(e164)) next.phone = 'Enter a valid mobile number for the selected country.';
     // Email is optional (`Core::User` validates it with `allow_blank`), so only
     // shape-check it when the user supplies one.
-    const trimmedEmail = email.trim();
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError('Enter a valid email address, or leave it blank.');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) next.email = 'Enter a valid email address, or leave it blank.';
+    if (password.length < 8) next.password = 'Password must be at least 8 characters.';
+    if (password !== confirmPassword) next.passwordConfirmation = 'Passwords do not match.';
+    if (Object.keys(next).length) { setErrors(next); return; }
+
     setLoading(true);
     const res = await auth.signUp({
+      name: trimmedName,
       phone: e164,
       ...(trimmedEmail ? { email: trimmedEmail } : {}),
       password,
       passwordConfirmation: confirmPassword,
     });
     setLoading(false);
-    if (res.ok) finishAuthed();
-    // Backend per-field messages (e.g. "Phone has already been taken") are
-    // more useful than the generic signup copy — show them verbatim.
-    else setError(res.fieldErrors?.join(' ') || res.error || 'Could not create account.');
+    if (res.ok) { finishAuthed(); return; }
+
+    // Backend per-field messages (e.g. "Phone has already been taken") map to
+    // the exact input; whatever names no field shows as a form-level line.
+    const { fields, general } = mapFieldErrors(res.fieldErrors);
+    const mapped: Record<string, string> = {};
+    for (const key of ['name', 'phone', 'email', 'password', 'passwordConfirmation']) {
+      if (fields[key]) mapped[key] = fields[key];
+    }
+    setErrors(mapped);
+    setFormError(general.join(' ') || (Object.keys(mapped).length ? '' : res.error || 'Could not create account.'));
   };
 
   const titles = {
@@ -256,28 +272,29 @@ export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
                     <PhoneField
                       country={country} onCountryChange={setCountry}
                       placeholder="Phone number or email"
-                      value={identifier} onChange={(v) => { setIdentifier(v); setError(''); }}
+                      value={identifier} onChange={(v) => { setIdentifier(v); clearField('identifier'); }} error={errors.identifier}
                       isDark={isDark} onEnter={handleSignIn}
                     />
-                    <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Your password" onEnter={handleSignIn} />
-                    <ErrorLine error={error} />
+                    <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Your password" onEnter={handleSignIn} />
+                    <ErrorLine error={formError} />
                     <PrimaryButton onClick={handleSignIn} loading={loading} isDark={isDark} label="Log in" disabled={!identifier.trim() || !password} />
                   </>
                 )}
 
                 {mode === 'signup' && (
                   <>
+                    <NameField value={fullName} onChange={(v) => { setFullName(v); clearField('name'); }} error={errors.name} isDark={isDark} onEnter={handleSignUp} />
                     <PhoneField
                       country={country} onCountryChange={setCountry}
                       placeholder="Phone number"
-                      value={phone} onChange={(v) => { setPhone(v); setError(''); }}
+                      value={phone} onChange={(v) => { setPhone(v); clearField('phone'); }} error={errors.phone}
                       isDark={isDark} onEnter={handleSignUp}
                     />
-                    <EmailField value={email} onChange={(v) => { setEmail(v); setError(''); }} isDark={isDark} onEnter={handleSignUp} />
-                    <PasswordField value={password} onChange={(v) => { setPassword(v); setError(''); }} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleSignUp} />
-                    <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); setError(''); }} isDark={isDark} placeholder="Confirm your password" onEnter={handleSignUp} />
-                    <ErrorLine error={error} />
-                    <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!phone.trim() || !password || !confirmPassword} />
+                    <EmailField value={email} onChange={(v) => { setEmail(v); clearField('email'); }} error={errors.email} isDark={isDark} onEnter={handleSignUp} />
+                    <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleSignUp} />
+                    <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); clearField('passwordConfirmation'); }} error={errors.passwordConfirmation} isDark={isDark} placeholder="Confirm your password" onEnter={handleSignUp} />
+                    <ErrorLine error={formError} />
+                    <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!fullName.trim() || !phone.trim() || !password || !confirmPassword} />
                     <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                       By continuing you agree to Digis’ Terms & Privacy Policy.
                     </p>
@@ -434,69 +451,117 @@ function CountrySelector({ country, onChange, isDark }: {
   );
 }
 
+/** Red border when the field has an error, else the focus/neutral border. */
+function fieldBorder(error: string | undefined, focused: boolean, isDark: boolean): string {
+  if (error) return 'rgba(248,113,113,0.7)';
+  if (focused) return isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)';
+  return isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
+}
+
+/** Field-attached error message, announced to assistive tech. */
+function FieldError({ error }: { error?: string }) {
+  if (!error) return null;
+  return (
+    <p role="alert" className="flex items-center gap-1.5 mt-1.5 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>
+      <AlertCircle className="w-3 h-3 flex-shrink-0" strokeWidth={2} />{error}
+    </p>
+  );
+}
+
 /* ─── PhoneField (with dial selector) ─────────────────────── */
-function PhoneField({ country, onCountryChange, placeholder, value, onChange, isDark, onEnter }: {
+function PhoneField({ country, onCountryChange, placeholder, value, onChange, isDark, onEnter, error }: {
   country: Country; onCountryChange: (c: Country) => void;
   placeholder?: string; value: string; onChange: (v: string) => void;
-  isDark: boolean; onEnter?: () => void;
+  isDark: boolean; onEnter?: () => void; error?: string;
 }) {
   const [focused, setFocused] = useState(false);
   return (
-    <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all"
-      style={{
-        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-        border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
-      }}>
-      <CountrySelector country={country} onChange={onCountryChange} isDark={isDark} />
-      <AppInput
-        type="tel" value={value} placeholder={placeholder || 'Phone number'}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
-        noFocusRing
-        style={{ ...inputStyle(isDark), paddingLeft: '10px' }}
-      />
+    <div>
+      <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
+          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+        }}>
+        <CountrySelector country={country} onChange={onCountryChange} isDark={isDark} />
+        <AppInput
+          type="tel" value={value} placeholder={placeholder || 'Phone number'}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
+          noFocusRing aria-invalid={error ? true : undefined}
+          style={{ ...inputStyle(isDark), paddingLeft: '10px' }}
+        />
+      </div>
+      <FieldError error={error} />
+    </div>
+  );
+}
+
+/* ─── Full name field (signup only) ──────────────────────── */
+function NameField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
+  const [focused, setFocused] = useState(false);
+  const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
+          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+        }}>
+        <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
+        <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="Full name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+      </div>
+      <FieldError error={error} />
     </div>
   );
 }
 
 /* ─── Email field (signup only — optional server-side) ────── */
-function EmailField({ value, onChange, isDark, onEnter }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void }) {
+function EmailField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
-      style={{
-        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-        border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
-      }}>
-      <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
-      <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder="Email (optional)" style={inputStyle(isDark)}
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+    <div>
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
+          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+        }}>
+        <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
+        <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="Email (optional)" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+      </div>
+      <FieldError error={error} />
     </div>
   );
 }
 
-function PasswordField({ value, onChange, isDark, placeholder, onEnter }: { value: string; onChange: (v: string) => void; isDark: boolean; placeholder: string; onEnter?: () => void }) {
+function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; placeholder: string; onEnter?: () => void; error?: string }) {
   const [show, setShow] = useState(false);
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
-      style={{
-        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-        border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
-      }}>
-      <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Lock className="w-4 h-4" /></span>
-      <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder} style={inputStyle(isDark)}
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
-      <AppButton type="button" onClick={() => setShow((s) => !s)} className="cursor-pointer flex-shrink-0" style={{ color: textDim }}>
-        {show ? <EyeOff className="w-4 h-4" strokeWidth={1.75} /> : <Eye className="w-4 h-4" strokeWidth={1.75} />}
-      </AppButton>
+    <div>
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
+          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+        }}>
+        <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Lock className="w-4 h-4" /></span>
+        <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+        <AppButton type="button" onClick={() => setShow((s) => !s)} className="cursor-pointer flex-shrink-0" style={{ color: textDim }}>
+          {show ? <EyeOff className="w-4 h-4" strokeWidth={1.75} /> : <Eye className="w-4 h-4" strokeWidth={1.75} />}
+        </AppButton>
+      </div>
+      <FieldError error={error} />
     </div>
   );
 }

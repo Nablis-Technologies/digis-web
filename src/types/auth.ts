@@ -3,8 +3,9 @@
  * /auth endpoints).
  *
  * Backend user fields: `id, email, phone, verified_at, permissions, roles`.
- * There is NO `name`, `photo`, or `provider` — `name` is derived client-side
- * (email local-part / phone) so the UI can keep showing a display name.
+ * There is NO `name` yet (BACKEND_GAPS.md #8) — the signup form collects it and
+ * sends it, and the UI falls back to a derived display name (email local-part /
+ * phone) until the backend persists and serializes it.
  *
  * Session shape (src/lib/session.ts): `{ access_token, refresh_token, user }`.
  */
@@ -18,7 +19,7 @@ export type AuthRole = {
 
 export type AuthUser = {
   id: string;
-  /** Derived client-side from email/phone — the backend has no `name`. */
+  /** Server name when the backend provides one; else derived from email/phone. */
   name: string;
   email?: string;
   phone?: string;
@@ -30,6 +31,7 @@ export type AuthUser = {
 /** Raw user as the backend serializes it (Core::UserAuthSerializer). */
 export type AuthUserWire = {
   id: string;
+  name?: string | null;
   email?: string | null;
   phone?: string | null;
   verified_at?: string | null;
@@ -55,9 +57,12 @@ export type SignInResponse = AuthResult<AuthSession>;
  * POST /auth/signup body. Phone-first: phone is the identity, email is
  * optional (`Core::User` validates `email` with `allow_blank`), and the backend
  * validates `password_confirmation` — so we send the confirmation explicitly
- * instead of echoing the password. There is no `name` field (BACKEND_GAPS #8).
+ * instead of echoing the password. `name` is collected and sent; the backend
+ * does not persist it yet (BACKEND_GAPS #8), so it is dropped server-side until
+ * the `name` column / serializer field lands.
  */
 export type SignUpRequest = {
+  name: string;
   phone: string;
   email?: string;
   password: string;

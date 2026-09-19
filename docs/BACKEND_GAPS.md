@@ -57,7 +57,7 @@
 | 39 | resolved | `GET /marketplace/seller/payout_accounts/banks` + provider rail types; frontend fetches destinations |
 | 41 | open — degrading | a released order permanently burns its registration (`idx_one_order_item_per_registration` ignores order status) |
 | 42 | open — degrading | wallet resale policy omits the percentage-cap basis → the seller can't know the max asking price |
-| 8 | open — degrading | no user `name` column / serializer field |
+| 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 33 | open — degrading | guest payment-refresh re-validates the quote token on accepted payments |
 | 34 | open — degrading | past events remain purchasable (no date/sales-window check) |
@@ -236,12 +236,22 @@ through the real UI (resale → Payout methods → Add → Save) and persisted.
 
 `Core::UserAuthSerializer` returns `id, email, phone, verified_at, created_at,
 updated_at, permissions` only (`app/serializers/core/user_auth_serializer.rb:3`)
-— no `name`. Frontend derives display name from email local-part.
+— no `name`. `Core::AuthController#user_params` permits only
+`email, phone, password, password_confirmation`
+(`app/controllers/core/auth_controller.rb:141-148`), so the `name` the signup
+form now sends is silently dropped by `permit` (Rails logs an unpermitted
+param; it does not 400). Frontend still derives a display name from the email
+local-part / phone until the server field lands.
 
-**Fix:** add a `name` column and serializer field if the product wants a real
-display name.
+**Why it blocks:** the signup form collects a real **Full name** field and sends
+`name`; the backend discards it, so every account loses the name the user
+typed. Display name is then a fabricated email-local-part/phone derivative.
 
-**Status: open — verified 2026-09-09.**
+**Fix:** add a `name` column to `core_users` and `name` to
+`Core::UserAuthSerializer`, and permit `:name` on signup (optionally require it).
+
+**Status: open — blocking (filed 2026-09-09; the signup form now sends `name`
+as of 2026-09-19, verified against `auth_controller.rb:141` + the serializer).**
 
 ### #9. No self-service `PATCH /auth/me` or `PATCH /users/me`
 

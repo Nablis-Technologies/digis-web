@@ -141,6 +141,49 @@ export function messageForCode(code: string | undefined, fallback: string): stri
   return (code && CODE_MESSAGES[code]) || fallback;
 }
 
+/* ─── Backend per-field error attribution ─── */
+
+export type FieldErrorMap = {
+  /** Message keyed by the form field it names (e.g. `{ phone: "…" }`). */
+  fields: Record<string, string>;
+  /** Messages that name no known field — show as a form-level banner. */
+  general: string[];
+};
+
+/**
+ * Recognized field tokens, most-specific first. Matching is on the message
+ * text because the backend sends `e.record.errors.full_messages` (e.g.
+ * "Phone has already been taken") with no machine-readable field key.
+ */
+const FIELD_MATCHERS: ReadonlyArray<{ field: string; pattern: RegExp }> = [
+  { field: 'passwordConfirmation', pattern: /password confirmation|passwords? (?:do(?:es)? not|don'?t) match|confirmation/i },
+  { field: 'phone', pattern: /phone|mobile/i },
+  { field: 'email', pattern: /email/i },
+  { field: 'name', pattern: /\bname\b/i },
+  { field: 'password', pattern: /password/i },
+];
+
+/**
+ * Split a backend `fieldErrors` array into per-field messages plus a remainder.
+ * First message wins per field; unrecognized messages go to `general`.
+ */
+export function mapFieldErrors(fieldErrors?: string[] | null): FieldErrorMap {
+  const fields: Record<string, string> = {};
+  const general: string[] = [];
+  for (const raw of fieldErrors ?? []) {
+    const message = raw?.trim();
+    if (!message) continue;
+    const hit = FIELD_MATCHERS.find((matcher) => matcher.pattern.test(message));
+    if (hit) {
+      // First message wins; later messages for the same field are dropped.
+      if (!fields[hit.field]) fields[hit.field] = message;
+    } else {
+      general.push(message);
+    }
+  }
+  return { fields, general };
+}
+
 /**
  * Normalize any thrown value into an `ApiError`. Understands axios errors
  * (error.response), the backend envelope ({ error, code }), and plain Errors.

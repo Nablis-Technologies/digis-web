@@ -11,14 +11,20 @@ function focusRing(noFocusRing?: boolean): string {
 export const AppInput = forwardRef<HTMLInputElement, React.ComponentProps<typeof PrimitiveInput> & FieldChrome>(function AppInput({ label, helpText, error, icon, wrapperClassName, labelClassName, iconClassName, helpClassName, errorClassName, noFocusRing, className = "", id, ...props }, ref) {
   const generatedId = useId(); const inputId = id ?? generatedId;
   const ring = focusRing(noFocusRing);
-  const field = <div className={wrapperClassName}>{label ? <label htmlFor={inputId} className={labelClassName}>{label}</label> : null}<div className={icon ? "relative" : undefined}>{icon ? <span className={iconClassName}>{icon}</span> : null}<PrimitiveInput ref={ref} id={inputId} unstyled className={`${ring} ${className}`} aria-invalid={error ? true : props["aria-invalid"]} {...props} /></div>{helpText ? <p className={helpClassName}>{helpText}</p> : null}{error ? <p className={errorClassName}>{error}</p> : null}</div>;
+  const helpId = helpText ? `${inputId}-help` : undefined;
+  const errorId = error ? `${inputId}-error` : undefined;
+  const describedBy = [props["aria-describedby"], helpId, errorId].filter(Boolean).join(' ') || undefined;
+  const field = <div className={wrapperClassName}>{label ? <label htmlFor={inputId} className={labelClassName}>{label}</label> : null}<div className={icon ? "relative" : undefined}>{icon ? <span className={iconClassName}>{icon}</span> : null}<PrimitiveInput ref={ref} id={inputId} unstyled className={`${ring} ${className}`} {...props} aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={describedBy} /></div>{helpText ? <p id={helpId} className={helpClassName}>{helpText}</p> : null}{error ? <p id={errorId} role="alert" className={errorClassName}>{error}</p> : null}</div>;
   return wrapperClassName || label || helpText || error || icon ? field : <PrimitiveInput ref={ref} id={inputId} unstyled className={`${ring} ${className}`} {...props} />;
 });
 
 export const AppTextArea = forwardRef<HTMLTextAreaElement, React.ComponentProps<typeof PrimitiveTextArea> & Omit<FieldChrome, "icon">>(function AppTextArea({ label, helpText, error, wrapperClassName, labelClassName, helpClassName, errorClassName, noFocusRing, className = "", id, ...props }, ref) {
   const generatedId = useId(); const inputId = id ?? generatedId;
   const ring = focusRing(noFocusRing);
-  const field = <div className={wrapperClassName}>{label ? <label htmlFor={inputId} className={labelClassName}>{label}</label> : null}<PrimitiveTextArea ref={ref} id={inputId} unstyled className={`${ring} ${className}`} aria-invalid={error ? true : props["aria-invalid"]} {...props} />{helpText ? <p className={helpClassName}>{helpText}</p> : null}{error ? <p className={errorClassName}>{error}</p> : null}</div>;
+  const helpId = helpText ? `${inputId}-help` : undefined;
+  const errorId = error ? `${inputId}-error` : undefined;
+  const describedBy = [props["aria-describedby"], helpId, errorId].filter(Boolean).join(' ') || undefined;
+  const field = <div className={wrapperClassName}>{label ? <label htmlFor={inputId} className={labelClassName}>{label}</label> : null}<PrimitiveTextArea ref={ref} id={inputId} unstyled className={`${ring} ${className}`} {...props} aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={describedBy} />{helpText ? <p id={helpId} className={helpClassName}>{helpText}</p> : null}{error ? <p id={errorId} role="alert" className={errorClassName}>{error}</p> : null}</div>;
   return wrapperClassName || label || helpText || error ? field : <PrimitiveTextArea ref={ref} id={inputId} unstyled className={`${ring} ${className}`} {...props} />;
 });
 

@@ -127,6 +127,9 @@ test.describe('auth', () => {
     // keeps the exiting signin form mounted briefly — a substring match on
     // "Phone number" would hit the dying signin input instead).
     await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
+    // Full name is collected on registration (BACKEND_GAPS #8 — the backend
+    // does not persist it yet, so it is currently dropped server-side).
+    await page.getByPlaceholder('Full name', { exact: true }).fill('Test User');
     await page.getByPlaceholder('Phone number', { exact: true }).fill(phone);
     // Registration carries the identity fields the backend accepts: an optional
     // email plus an explicit password confirmation.

@@ -42,11 +42,15 @@ export interface AuthSessionWire {
 
 /* ─── Wire -> domain mapping ─── */
 
-/** Derive a display name — the backend has no `name` (BACKEND_GAPS.md #8). */
+/**
+ * Display name: the server value once the backend persists it (BACKEND_GAPS.md
+ * #8), else derived from email local-part / phone so the UI always has one.
+ */
 export function toAuthUser(wire: AuthUserWire): AuthUser {
   const email = wire.email ?? undefined;
   const phone = wire.phone ?? undefined;
   const name =
+    wire.name?.trim() ||
     (email ? email.split("@")[0] : "") ||
     (phone ? phone.slice(-4) : "") ||
     "Member";
@@ -95,6 +99,7 @@ export const authService = {
         method: "POST",
         body: {
           user: {
+            name: input.name,
             phone: input.phone,
             ...(input.email ? { email: input.email } : {}),
             password: input.password,

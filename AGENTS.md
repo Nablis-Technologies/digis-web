@@ -115,7 +115,9 @@ sweep is the rule that prevents that.
   date (`EventDate` ends_at/status) or the product `sales_end_at` window; the
   frontend disables buying on ended events (eventEnded) until the backend
   enforces it
-- **#8/9** No `name` on user / no self-service profile update
+- **#8** No `name` column/serializer — the signup form collects **Full name**
+  and sends it, but the backend `permit`s it away (silently dropped). Blocking.
+- **#9** No self-service profile update (`PATCH /auth/me`)
 
 Resolved (do NOT keep mocks against): #1 (config whitelist), #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),

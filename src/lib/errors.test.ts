@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { messageForCode, mapApiError, ApiError } from '@/lib/errors';
+import { messageForCode, mapApiError, mapFieldErrors, ApiError } from '@/lib/errors';
 
 describe('resale + payout error copy', () => {
   it('maps every buyer-reachable resale code to actionable copy', () => {
@@ -53,5 +53,43 @@ describe('resale + payout error copy', () => {
   it('mapApiError reads the backend flat code', () => {
     const err = new ApiError('the resale listing is already reserved', 422, 'listing_reserved');
     expect(mapApiError(err)).toContain('beat you to it');
+  });
+});
+
+describe('mapFieldErrors', () => {
+  it('attributes backend full_messages to form fields', () => {
+    const { fields, general } = mapFieldErrors([
+      'Phone has already been taken',
+      'Email is invalid',
+      'Name can’t be blank',
+      'Password is too short (minimum is 8 characters)',
+    ]);
+    expect(fields.phone).toContain('Phone');
+    expect(fields.email).toContain('Email');
+    expect(fields.name).toContain('Name');
+    expect(fields.password).toContain('Password');
+    expect(general).toEqual([]);
+  });
+
+  it('routes confirmation mismatch to passwordConfirmation, not password', () => {
+    const { fields } = mapFieldErrors(["Password confirmation doesn't match Password"]);
+    expect(fields.passwordConfirmation).toBeTruthy();
+    expect(fields.password).toBeUndefined();
+  });
+
+  it('sends unrecognized messages to general and dedupes per field', () => {
+    const { fields, general } = mapFieldErrors([
+      'Phone has already been taken',
+      'Phone is too long',
+      'Something unspecified broke',
+    ]);
+    expect(Object.keys(fields)).toEqual(['phone']);
+    expect(general).toEqual(['Something unspecified broke']);
+  });
+
+  it('handles empty/undefined input', () => {
+    expect(mapFieldErrors(undefined)).toEqual({ fields: {}, general: [] });
+    expect(mapFieldErrors([])).toEqual({ fields: {}, general: [] });
+    expect(mapFieldErrors(['  '])).toEqual({ fields: {}, general: [] });
   });
 });
