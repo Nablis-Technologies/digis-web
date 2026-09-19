@@ -109,8 +109,12 @@ async function doRefresh(): Promise<string | null> {
     }
     clearSession();
     return null;
-  } catch {
-    clearSession();
+  } catch (e) {
+    // Only a definitive auth rejection signs the user out. A transient failure
+    // (rate limit 429, 5xx, offline) must keep the stored session — otherwise a
+    // momentary backend hiccup silently logs the user out on the next reload.
+    const status = axios.isAxiosError(e) ? e.response?.status : undefined;
+    if (status === 401 || status === 403) clearSession();
     return null;
   }
 }

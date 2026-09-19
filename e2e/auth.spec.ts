@@ -38,6 +38,9 @@ async function loginThroughUi(page: Page, identifier = SEED_IDENTIFIER, password
   // backend container, so allow a wide window (no fixed sleeps — still
   // event-driven, the 1.4s screen only closes after it appears).
   await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 20_000 });
+  // The success screen self-closes after ~1.4s; wait for that so callers see the
+  // settled state (and the URL back at the return path, not /login).
+  await expect(page.getByText('Welcome to Digis')).toBeHidden({ timeout: 20_000 });
   await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({
     timeout: 20_000,
   });
@@ -54,6 +57,11 @@ async function expectAuthenticated(page: Page) {
   await expect(page.locator('button[aria-label="Account menu"]').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
 }
+
+// These tests share the seeded accounts and one of them revokes the refresh
+// token on logout, so running them concurrently (fullyParallel) makes them
+// race each other and the auth throttle. Run the file serially.
+test.describe.configure({ mode: 'serial' });
 
 test.describe('auth', () => {
   test('logs in with valid credentials', async ({ page }) => {
@@ -143,6 +151,8 @@ test.describe('auth', () => {
     // credentials, so the success screen appears only after both round-trips.
     // The chain is slow (~5-10s) and the screen self-closes after 1.4s.
     await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 25_000 });
+    // Wait for the success screen to self-close before asserting the settled UI.
+    await expect(page.getByText('Welcome to Digis')).toBeHidden({ timeout: 25_000 });
     await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({
       timeout: 25_000,
     });

@@ -128,9 +128,29 @@ function AppContent() {
   }, [detailMissing, navigate]);
   const navigateToView = useCallback((view: AppView) => navigate(VIEW_PATHS[view]), [navigate]);
   const [resaleTicket, setResaleTicket] = useState<UserTicket | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState(false);
-  const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
+  // Search lives in the URL (?q=) so it is shareable, refresh-safe, and
+  // back/forward-able. `searchMode` stays UI state (is the search UI active).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = useMemo(
+    () => new URLSearchParams(location.search).get('q') ?? '',
+    [location.search],
+  );
+  const [searchMode, setSearchMode] = useState(Boolean(searchQuery));
+  const setSearchQuery = useCallback((next: string) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next) params.set('q', next);
+      else params.delete('q');
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
+  // Auth is a real route (/login, /signup). CTAs navigate there with a
+  // `returnTo` so the user lands back where they were after signing in.
+  const requestAuth = useCallback((mode: 'signin' | 'signup' = 'signin') => {
+    navigate(mode === 'signup' ? '/signup' : '/login', {
+      state: { returnTo: location.pathname + location.search },
+    });
+  }, [navigate, location.pathname, location.search]);
   const { isAuthenticated } = useAuth();
   const [heroSearchInView, setHeroSearchInView] = useState(true);
   const heroSearchRef = useRef<HTMLDivElement>(null);
@@ -384,7 +404,7 @@ function AppContent() {
           currentView={currentView}
           showSearchButton={currentView === 'discover' && !heroSearchInView}
           onSearchClick={focusHeroSearch}
-          onRequestAuth={(mode) => setAuthModal(mode)}
+          onRequestAuth={requestAuth}
           onNavigate={(view) => {
             if (view !== 'resale') setResaleTicket(null);
             navigateToView(view);
@@ -421,7 +441,7 @@ function AppContent() {
                 }}
                 onPurchase={() => navigateToView('tickets')}
                 onNavigate={(view) => navigateToView(view as AppView)}
-                onRequestAuth={() => setAuthModal('signin')}
+                onRequestAuth={requestAuth}
               />
             </motion.div>
           ) : detailLoading ? (
@@ -522,7 +542,7 @@ function AppContent() {
                   loadError={isAuthenticated && walletError}
                   onRetry={() => void refetchWallet()}
                   isAuthenticated={isAuthenticated}
-                  onRequestAuth={() => setAuthModal('signin')}
+                  onRequestAuth={requestAuth}
                   onDiscover={() => navigateToView('discover')} onListForResale={(ticket) => {
                   setResaleTicket(ticket);
                   navigateToView('resale');
@@ -535,7 +555,7 @@ function AppContent() {
                     onOpenSettings={() => navigateToView('settings')}
                   />
                 ) : (
-                  <SignInGate isDark={isDark} onSignIn={() => setAuthModal('signin')} />
+                  <SignInGate isDark={isDark} onSignIn={requestAuth} />
                 )
               ) : currentView === 'create' ? (
                 null
@@ -544,7 +564,7 @@ function AppContent() {
               ) : currentView === 'settings' ? (
                 <SettingsView
                   onBack={() => navigateToView('profile')}
-                  onRequestAuth={() => setAuthModal('signin')}
+                  onRequestAuth={requestAuth}
                 />
               ) : null}
             </motion.div>
@@ -556,7 +576,7 @@ function AppContent() {
         <div className="lg:hidden">
           <Navigation
             currentView={currentView}
-            onRequestAuth={() => setAuthModal('signin')}
+            onRequestAuth={requestAuth}
             onNavigate={(view) => {
               if (view !== 'resale') setResaleTicket(null);
               navigateToView(view);
@@ -564,10 +584,6 @@ function AppContent() {
           />
         </div>
       )}
-
-      <AnimatePresence>
-        {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
-      </AnimatePresence>
 
       {/* Returned from Chapa as an unauthenticated user. If guest credentials
           are stored (guest checkout flow), the guest return confirmation starts
@@ -603,7 +619,7 @@ function AppContent() {
                 your ticket.
               </p>
               <button
-                onClick={() => setAuthModal('signin')}
+                onClick={() => requestAuth('signin')}
                 className="w-full py-3.5 rounded-2xl cursor-pointer"
                 style={{
                   background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
@@ -711,6 +727,37 @@ function SignInGate({ isDark, onSignIn }: { isDark: boolean; onSignIn: () => voi
   );
 }
 
+/**
+ * Standalone auth route (`/login`, `/signup`). The modal IS the page, so its
+ * presence is exactly the route — deterministic on direct link, refresh, and
+ * Back. `returnTo` travels in route state (relative-only) so a signed-in or
+ * dismissed modal returns the user where they came from.
+ */
+function AuthRoute({ mode }: { mode: 'signin' | 'signup' }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  const state = location.state as { returnTo?: string } | null;
+  const returnTo =
+    state?.returnTo && state.returnTo.startsWith('/') && !state.returnTo.startsWith('//')
+      ? state.returnTo
+      : '/';
+  // Already signed in (e.g. a reload lands here mid-success): don't show the
+  // auth form — go straight back. Captured once so logging in via this route
+  // still shows the success beat before closing.
+  const authedOnMount = useRef(isAuthenticated).current;
+  useEffect(() => {
+    if (authedOnMount) navigate(returnTo, { replace: true });
+  }, [authedOnMount, navigate, returnTo]);
+  const close = () => navigate(returnTo, { replace: true });
+  const switchMode = (next: 'signin' | 'signup') =>
+    navigate(next === 'signup' ? '/signup' : '/login', { replace: true, state: { returnTo } });
+  return <AuthModal key={mode} initialMode={mode} onModeChange={switchMode} onClose={close} />;
+}
+
+function AuthLoginRoute() { return <AuthRoute mode="signin" />; }
+function AuthSignupRoute() { return <AuthRoute mode="signup" />; }
+
 function ClaimRoute() {
   const navigate = useNavigate();
   const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
@@ -755,6 +802,8 @@ export function AppRouterProvider() {
       { path: '/resale', Component: AppContent },
       { path: '/create', Component: CreateRedirect },
       { path: '/settings', Component: AppContent },
+      { path: '/login', Component: AuthLoginRoute },
+      { path: '/signup', Component: AuthSignupRoute },
       { path: '/claim/:id', Component: ClaimRoute },
       { path: '/ui-preview', Component: UIPreviewPage },
     ])

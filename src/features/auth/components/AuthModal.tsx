@@ -56,16 +56,28 @@ function buildPhone(value: string, dial: string): string {
 interface AuthModalProps {
   onClose: () => void;
   onAuthed?: () => void;
+  /** Mode to open in — the route (`/login` | `/signup`) seeds it. */
+  initialMode?: 'signin' | 'signup';
+  /** Notified on a user mode switch so the route can stay in sync. */
+  onModeChange?: (mode: 'signin' | 'signup') => void;
 }
 
 /**
  * Phone-first auth, matching digis_backend's identifier+password surface.
  * No OTP / Google / password-reset (the backend has none — see BACKEND_GAPS.md #8).
+ *
+ * Mode is local state seeded from the route: switching flips the UI immediately
+ * and the parent mirrors it into the URL. It must not depend on the route round
+ * trip to re-render (that made the form lag behind the URL).
  */
-export function AuthModal({ onClose, onAuthed }: AuthModalProps) {
+export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeChange }: AuthModalProps) {
   const { isDark } = useTheme();
   const auth = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setModeState] = useState<'signin' | 'signup'>(initialMode);
+  const setMode = (next: 'signin' | 'signup') => {
+    setModeState(next);
+    onModeChange?.(next);
+  };
   const [loading, setLoading] = useState(false);
   // Per-field messages (keyed by field) plus a form-level line for anything
   // that names no field — so a failure points at the exact input, not the form.
