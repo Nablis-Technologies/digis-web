@@ -8,6 +8,7 @@ import { useProminentHue } from '@/lib/hooks/useProminentHue';
 import { readableAccent } from '@/lib/utils/color';
 import { BoldCard, NightCard, ShareIconButton, StubCard } from '@/features/tickets/components/ShareCardParts';
 import { AppButton } from '@/components/primitives/AppButton';
+import { toastError } from '@/lib/feedback';
 
 interface ShareCardProps {
   event: {
@@ -56,7 +57,7 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
       link.href = dataUrl;
       link.click();
     } catch (err) {
-      console.error('Failed to generate image:', err);
+      toastError(err, 'Couldn’t generate the share image. Please try again.');
     }
     setDownloading(false);
   }, [event.name]);
@@ -173,11 +174,12 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
           className="w-full space-y-3"
         >
           <AppButton
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={{ scale: downloading ? 1 : 1.02 }}
+            whileTap={{ scale: downloading ? 1 : 0.97 }}
             onClick={handleDownload}
-            className="w-full h-[54px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer"
-            style={{ background: BRAND }}
+            disabled={downloading}
+            className="w-full h-[54px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
+            style={{ background: BRAND, opacity: downloading ? 0.7 : 1 }}
           >
             {downloading ? (
               <motion.div

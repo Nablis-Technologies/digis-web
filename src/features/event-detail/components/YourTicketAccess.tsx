@@ -13,6 +13,7 @@ import type { UserTicket } from '@/types';
 import { tierTheme } from '@/lib/utils/tierTheme';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { toastError } from '@/lib/feedback';
 
 /**
  * Second access point for a ticket the user already owns.
@@ -63,7 +64,7 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
       setDownloadDone(true);
       setTimeout(() => setDownloadDone(false), 2500);
     } catch (err) {
-      console.error('Failed to download ticket:', err);
+      toastError(err, 'Couldn’t save your ticket image. Please try again.');
     } finally {
       setDownloading(false);
     }

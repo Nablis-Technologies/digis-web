@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiFetch } from '@/lib/api';
+import { ApiError } from '@/lib/errors';
 import { audienceModule } from '@/lib/audience';
 
 vi.mock('@/lib/api', () => ({
@@ -51,12 +52,21 @@ describe('audienceModule.authorizeAny — gate across tiers', () => {
     expect(ok).toBe(true);
   });
 
-  it('is false when every tier rejects or errors', async () => {
+  it('is false when every tier definitively rejects (422)', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({ data: { authorized: false, reason: 'public' } } as never)
-      .mockRejectedValueOnce(new Error('boom'));
+      .mockRejectedValueOnce(new ApiError('invalid code', 422, 'no_valid_code_or_invitation'));
     const ok = await audienceModule.authorizeAny(['tt-1', 'tt-2'], { accessCode: 'CODE' });
     expect(ok).toBe(false);
+  });
+
+  it('propagates a transient failure instead of blaming the code', async () => {
+    mockedApiFetch
+      .mockResolvedValueOnce({ data: { authorized: false, reason: 'public' } } as never)
+      .mockRejectedValueOnce(new ApiError('network error', 0, 'network_error'));
+    await expect(
+      audienceModule.authorizeAny(['tt-1', 'tt-2'], { accessCode: 'CODE' }),
+    ).rejects.toThrow('network error');
   });
 
   it('is false for an empty tier list', async () => {

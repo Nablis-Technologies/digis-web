@@ -15,6 +15,7 @@ import type { AcceptedTransfer } from '@/lib/transfer';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { toastError } from '@/lib/feedback';
 
 const ACCENT_HEX = '#d6f905';
 
@@ -114,7 +115,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
       setDownloadDone(true);
       setTimeout(() => setDownloadDone(false), 2500);
     } catch (err) {
-      console.error('Failed to download ticket:', err);
+      toastError(err, 'Couldn’t save your ticket image. Please try again.');
     } finally {
       setDownloading(false);
     }

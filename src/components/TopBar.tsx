@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bell, Settings, LogOut, HelpCircle, Globe, Ticket, Tag, Sparkles, Calendar, Search, User, LogIn, Send } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { NAV_ITEMS } from '@/components/Navigation';
 import { UserAvatar } from '@/components/UserAvatar';
-import { useNotifications, notificationsStore, fetchNotifications } from '@/lib/notifications';
+import { useNotifications, notificationsStore, fetchNotifications, markNotificationRead } from '@/lib/notifications';
 import type { NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -33,6 +33,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   const [openMenu, setOpenMenu] = useState<'none' | 'notif' | 'profile'>('none');
   const notifications = useNotifications();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated, signOut } = useAuth();
 
@@ -47,14 +48,16 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   // Live inbox when authenticated (#7 resolved): hydrate the store so the bell,
   // badge, and panel all read backend rows. Guests keep the local seed/simulated
   // store (no auth — the endpoint would 401).
-  const { data: liveNotifications = [] } = useQuery({
+  const { data: liveNotifications, isError: notificationsError, refetch: refetchNotifications } = useQuery({
     queryKey: ['notifications', isAuthenticated] as const,
     queryFn: fetchNotifications,
     enabled: isAuthenticated,
     staleTime: 0,
   });
   useEffect(() => {
-    if (!isAuthenticated) return;
+    // Only hydrate on a successful fetch — an error must not wipe the store and
+    // masquerade as an empty "all caught up" inbox.
+    if (!isAuthenticated || liveNotifications === undefined) return;
     notificationsStore.replace(liveNotifications);
   }, [liveNotifications, isAuthenticated]);
 
@@ -88,7 +91,21 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   const accentSoft = isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)';
   const accentBorder = isDark ? 'rgba(214,249,5,0.3)' : 'rgba(214,249,5,0.18)';
 
-  const markAllRead = () => notificationsStore.markAllRead();
+  const markRead = (id: string) => {
+    notificationsStore.markRead(id);
+    if (!isAuthenticated) return;
+    // Persist so a refetch doesn't resurrect the unread state.
+    void markNotificationRead(id)
+      .catch(() => undefined)
+      .finally(() => queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] }));
+  };
+  const markAllRead = () => {
+    const unreadIds = notifications.filter((n) => n.unread).map((n) => n.id);
+    notificationsStore.markAllRead();
+    if (!isAuthenticated || unreadIds.length === 0) return;
+    void Promise.allSettled(unreadIds.map((id) => markNotificationRead(id)))
+      .finally(() => queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] }));
+  };
 
   const panelStyle = {
     background: isDark
@@ -218,21 +235,34 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             </div>
 
             <div className="relative z-10 max-h-[380px] overflow-y-auto scrollbar-hide py-1">
-              {notifications.length === 0 && (
+              {isAuthenticated && notificationsError ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
+                    Couldn't load your notifications.
+                  </p>
+                  <AppButton
+                    onClick={() => void refetchNotifications()}
+                    className="mt-2 text-[12px] underline cursor-pointer"
+                    style={{ fontFamily: "'Inter', sans-serif", color: accentFg }}
+                  >
+                    Try again
+                  </AppButton>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div
                   className="px-4 py-10 text-center text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}
                 >
                   You're all caught up.
                 </div>
-              )}
+              ) : null}
               {notifications.map((n) => {
                 const Icon = NOTIF_ICON[n.type];
                 return (
                   <AppButton
                     key={n.id}
                     onClick={() => {
-                      notificationsStore.markRead(n.id);
+                      markRead(n.id);
                       if (n.link) {
                         setOpenMenu('none');
                         navigate(n.link);

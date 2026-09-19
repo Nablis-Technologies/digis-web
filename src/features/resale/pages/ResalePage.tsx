@@ -74,7 +74,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings() });
   // Seller earnings — read straight from the seller reports endpoints.
   const { data: sellerBalance = [], isError: balanceError, refetch: refetchBalance } = useQuery({ queryKey: sellerReportsKeys.balance, queryFn: () => sellerReportsService.fetchBalance() });
-  const { data: sellerHistory = [] } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
+  const { data: sellerHistory = [], isError: historyError, refetch: refetchHistory } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
   const [showAllHistory, setShowAllHistory] = useState(false);
   // Skeletons only appear if loading persists.
   const showBrowseLoading = useShowSkeleton(browsePending);
@@ -256,13 +256,17 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
   const confirmRemoveListing = () => {
     if (!pendingRemoveId) return;
     const id = pendingRemoveId;
-    setPendingRemoveId(null);
-    // Brief "delisted" flash on the row before it disappears.
-    setRemovedFlashId(id);
-    setTimeout(() => {
-      removeListingMutation.mutate(id);
-      setRemovedFlashId(null);
-    }, 400);
+    // Keep the sheet open (spinner via `removing`) until the server confirms,
+    // then flash the row as it disappears. Never show "delisted" for a request
+    // that is still in flight or that may fail.
+    removeListingMutation.mutate(id, {
+      onSuccess: () => {
+        setPendingRemoveId(null);
+        setRemovedFlashId(id);
+        setTimeout(() => setRemovedFlashId(null), 600);
+      },
+      onError: () => setPendingRemoveId(null),
+    });
   };
 
   return (
@@ -559,6 +563,21 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                       </p>
                     )}
 
+                    {/* Payment already accepted server-side (no hosted redirect):
+                        confirm it instead of looking like nothing happened. */}
+                    {resalePurchase.pendingOrder && (
+                      <div className="mb-3 rounded-2xl px-4 py-3"
+                        style={{
+                          background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.14)',
+                          border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.4)'}`,
+                        }}>
+                        <p className="text-[12px] leading-snug"
+                          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#3a3a00' }}>
+                          Your purchase is being confirmed — the ticket will appear in My Tickets once the payment settles.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Flat sales list */}
                     <div className="flex flex-col gap-2">
                       {eventListings.map((listing, index) => {
@@ -692,6 +711,28 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                       )}
                       <LineupSection lineup={selectedEvent.lineup} isDark={isDark} />
                       <OrganizerCard organizers={resolveOrganizers(selectedEvent)} isDark={isDark} />
+                    </div>
+                  )}
+
+                  {/* The event info is enrichment — a failed fetch degrades, but
+                      says so with a retry rather than silently vanishing. */}
+                  {selectedEventQuery.isError && (
+                    <div className="px-5 lg:px-8 mt-8">
+                      <div className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
+                        style={{
+                          background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                        }}>
+                        <span className="text-[12px]"
+                          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
+                          Couldn’t load this event’s details.
+                        </span>
+                        <AppButton onClick={() => void selectedEventQuery.refetch()}
+                          className="text-[12px] underline cursor-pointer flex-shrink-0"
+                          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
+                          Retry
+                        </AppButton>
+                      </div>
                     </div>
                   )}
                   </div>
@@ -884,7 +925,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                     </div>
                   </div>
 
-                  {sellerHistory.length > 0 && (
+                  {sellerHistory.length > 0 ? (
                     <div className="mt-3 pt-3 space-y-2.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
                       {(showAllHistory ? sellerHistory : sellerHistory.slice(0, 3)).map((entry) => (
                         <div key={entry.id} className="flex items-center justify-between gap-3">
@@ -908,7 +949,19 @@ export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMark
                         </AppButton>
                       )}
                     </div>
-                  )}
+                  ) : historyError ? (
+                    <div className="mt-3 pt-3 flex items-center justify-between gap-3"
+                      style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                      <span className="text-[11px]"
+                        style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                        Couldn’t load your activity.
+                      </span>
+                      <AppButton onClick={() => void refetchHistory()} className="cursor-pointer flex-shrink-0"
+                        style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                        Retry
+                      </AppButton>
+                    </div>
+                  ) : null}
                 </div>
               )}
 

@@ -9,7 +9,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
-export function AddExtrasDialog({ ticket, products, isSaving = false, done = false, onClose, onConfirm, isLoading = false }: {
+export function AddExtrasDialog({ ticket, products, isSaving = false, done = false, onClose, onConfirm, isLoading = false, error = false, onRetry }: {
   ticket: UserTicket;
   products: EventProduct[];
   isSaving?: boolean;
@@ -17,6 +17,8 @@ export function AddExtrasDialog({ ticket, products, isSaving = false, done = fal
   onClose: () => void;
   onConfirm: (items: SelectedEventProduct[]) => void;
   isLoading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
 }) {
   const { isDark } = useTheme();
   const [selected, setSelected] = useState<SelectedEventProduct[]>([]);
@@ -59,6 +61,16 @@ export function AddExtrasDialog({ ticket, products, isSaving = false, done = fal
         <div className="relative flex-1 overflow-y-auto scrollbar-hide px-6 py-5">
           {isLoading ? (
             <p className="text-[13px] py-8 text-center" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Loading extras…</p>
+          ) : error ? (
+            <div className="py-8 text-center">
+              <p className="text-[13px] mb-3" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+                Couldn’t load extras for this event.
+              </p>
+              <AppButton onClick={onRetry} className="cursor-pointer"
+                style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                Try again
+              </AppButton>
+            </div>
           ) : products.length ? (
             <ExtrasStep products={products} selected={selected} onChange={setSelected} isDark={isDark} compact />
           ) : (

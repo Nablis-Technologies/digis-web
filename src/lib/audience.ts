@@ -14,6 +14,7 @@
  */
 
 import { apiFetch } from "@/lib/api";
+import { ApiError } from "@/lib/errors";
 
 /* ─── Wire types ─── */
 
@@ -57,8 +58,11 @@ export const audienceModule = {
   /**
    * Authorize one code/invitation against EVERY gated tier — valid for any of
    * them opens the gate (tiers may share one code or carry distinct ones).
-   * Shared by GatedTierGate + InviteOnlySection. Any authorize error counts as
-   * "not authorized" for that tier.
+   * Shared by GatedTierGate + InviteOnlySection.
+   *
+   * A 422 from the backend is a definitive "this code is not valid" (returns
+   * false). Any other failure (network, 5xx) is re-thrown so callers show a
+   * retryable "couldn't verify" message rather than blaming the user's code.
    */
   async authorizeAny(ticketTypeIds: string[], input: { accessCode?: string; invitationToken?: string }): Promise<boolean> {
     if (ticketTypeIds.length === 0) return false;
@@ -67,7 +71,10 @@ export const audienceModule = {
         audienceModule
           .authorize({ ticketTypeId: id, ...input })
           .then((r) => r.authorized)
-          .catch(() => false),
+          .catch((e) => {
+            if (e instanceof ApiError && e.status === 422) return false;
+            throw e;
+          }),
       ),
     );
     return results.some(Boolean);

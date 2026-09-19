@@ -23,6 +23,7 @@ import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { useGuestDeviceTickets } from '@/features/tickets/hooks/useGuestDeviceTickets';
 import { ClaimGuestSheet } from '@/features/tickets/components/ClaimGuestSheet';
+import { toastError } from '@/lib/feedback';
 
 interface TicketViewProps {
   tickets: UserTicket[];
@@ -78,23 +79,27 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   const [extrasCheckout, setExtrasCheckout] = useState<{ ticket: UserTicket; products: EventProduct[] } | null>(null);
   const [extrasProducts, setExtrasProducts] = useState<EventProduct[]>([]);
   const [extrasLoading, setExtrasLoading] = useState(false);
+  const [extrasError, setExtrasError] = useState(false);
+  const [extrasReload, setExtrasReload] = useState(0);
   // Fetch the ticket's event extras when the Add Extras dialog opens — the
   // dialog offers what the backend actually sells for that event (parking,
-  // merch, food, ...). Empty = no extras available (backend has none or none
-  // priced), which the dialog renders as "No extras are available".
+  // merch, food, ...). An empty list with no error = genuinely no extras; a
+  // failed fetch is tracked separately so it never masquerades as "none".
   useEffect(() => {
     if (!addingExtrasTicket?.eventSlug) {
       setExtrasProducts([]);
+      setExtrasError(false);
       return;
     }
     let alive = true;
     setExtrasLoading(true);
+    setExtrasError(false);
     productsModule.fetchForEvent(addingExtrasTicket.eventSlug)
       .then(({ extras }) => { if (alive) setExtrasProducts(extras); })
-      .catch(() => { if (alive) setExtrasProducts([]); })
+      .catch(() => { if (alive) { setExtrasProducts([]); setExtrasError(true); } })
       .finally(() => { if (alive) setExtrasLoading(false); });
     return () => { alive = false; };
-  }, [addingExtrasTicket]);
+  }, [addingExtrasTicket, extrasReload]);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   // Just-returned-from-Chapa: the router lands here with ?ticket=<id> once the
@@ -154,7 +159,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
       setDownloadDone(true);
       setTimeout(() => setDownloadDone(false), 2500);
     } catch (err) {
-      console.error('Failed to download ticket:', err);
+      toastError(err, 'Couldn’t save your ticket image. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -325,6 +330,8 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
             ticket={addingExtrasTicket}
             products={extrasProducts}
             isLoading={extrasLoading}
+            error={extrasError}
+            onRetry={() => setExtrasReload((n) => n + 1)}
             onClose={() => setAddingExtrasTicket(null)}
             onConfirm={(items) => {
               const ticket = addingExtrasTicket;

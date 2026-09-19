@@ -25,6 +25,7 @@ import { ticketsService, ticketKeys, mapWalletTicket } from '@/lib/tickets';
 import { orderModule, findGuestReturnCreds } from '@/lib/order';
 import { guestWallet } from '@/lib/guest-wallet';
 import { toApiError } from '@/lib/errors';
+import { toastWarning } from '@/lib/feedback';
 import type { UserTicket } from '@/types';
 
 /**
@@ -135,7 +136,10 @@ export function useGuestPaymentReturnConfirmation(
             try {
               await guestWallet.saveTickets(wired);
             } catch (saveError) {
+              // The payment is confirmed, but the device copy failed — tell the
+              // buyer instead of silently losing the ticket on their next visit.
               console.error('[guest-wallet] save failed — device tickets will not persist', saveError);
+              toastWarning('Payment confirmed, but we could not save this ticket to your device. Sign in or use the SMS link so you can open it again.');
             }
             queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
             clearCheckoutResumeKeys();

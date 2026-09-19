@@ -14,6 +14,7 @@
  */
 
 import { apiFetch } from "@/lib/api";
+import { ApiError } from "@/lib/errors";
 import { backendEventToEvent, type BackendEvent } from "@/lib/events-adapter";
 import type { Event } from "@/types";
 
@@ -35,17 +36,23 @@ export const eventsModule = {
     return fetchAllEvents();
   },
 
-  /** Mirror GET /public/events/:slug. Returns null when the backend can't serve it. */
+  /**
+   * Mirror GET /public/events/:slug.
+   *
+   * `null` means the event genuinely does not exist (404) — callers treat that
+   * as absence. Any other failure (network, 5xx) is thrown so the caller can
+   * show an error state instead of silently claiming the event is missing.
+   */
   async fetchById(idOrSlug: string): Promise<Event | null> {
     try {
       const { data: be } = await apiFetch<BackendEvent>(
         `public/events/${idOrSlug}`,
       );
-      if (be) return backendEventToEvent(be);
-    } catch {
-      /* return null below */
+      return be ? backendEventToEvent(be) : null;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
     }
-    return null;
   },
 
   /** Featured events for the discovery carousel/filter. */

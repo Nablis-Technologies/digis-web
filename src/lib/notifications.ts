@@ -186,3 +186,11 @@ export async function fetchNotifications(): Promise<AppNotification[]> {
   const { data } = await apiFetch<NotificationWire[]>('notifications');
   return (Array.isArray(data) ? data : []).map(mapNotification);
 }
+
+/**
+ * Persist a notification's read state (POST /notifications/:id/read). Without
+ * this the local mark reverts on the next inbox refetch (staleTime 0).
+ */
+export async function markNotificationRead(id: string): Promise<void> {
+  await apiFetch(`notifications/${id}/read`, { method: 'POST' });
+}

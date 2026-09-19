@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogIn, UserCircle } from 'lucide-react';
+import { AlertTriangle, LogIn, UserCircle } from 'lucide-react';
 import { ticketsService, ticketKeys } from '@/lib/tickets';
 import { eventsModule } from '@/lib/events';
 import { productsModule } from '@/lib/products';
@@ -25,6 +25,7 @@ import { TopBar } from '@/components/TopBar';
 import { usePaymentReturnConfirmation, useGuestPaymentReturnConfirmation } from '@/lib/payment-return';
 import { closeCheckoutPopup } from '@/lib/checkout-popup';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
+import { AppButton } from '@/components/primitives/AppButton';
 
 export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings';
 
@@ -428,6 +429,63 @@ function AppContent() {
             // mock must never appear while loading (user rule).
             <motion.div key="detail-loading">
               <EventDetailSkeleton />
+            </motion.div>
+          ) : detailQuery.isError ? (
+            // A transient failure is NOT a missing event: show an error with
+            // retry instead of silently bouncing to discovery.
+            <motion.div
+              key="detail-error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="min-h-[70vh] flex items-center justify-center px-5"
+            >
+              <div
+                className="relative w-full max-w-md rounded-[28px] p-8 text-center"
+                style={{
+                  background: isDark ? '#0f0f10' : '#ffffff',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                }}
+              >
+                <div
+                  className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5"
+                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}
+                >
+                  <AlertTriangle className="w-6 h-6" style={{ color: '#ef4444' }} strokeWidth={1.8} />
+                </div>
+                <h1
+                  className="text-[22px] font-light tracking-[-0.3px]"
+                  style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#0a0a0a' }}
+                >
+                  Couldn't load this event
+                </h1>
+                <p
+                  className="mt-2 text-[13px]"
+                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}
+                >
+                  Something went wrong while loading the event. Check your connection and try again.
+                </p>
+                <div className="mt-6 flex items-center justify-center gap-2">
+                  <AppButton
+                    onClick={() => void detailQuery.refetch()}
+                    className="px-5 py-3 rounded-full cursor-pointer"
+                    style={{ background: '#d6f905', color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13 }}
+                  >
+                    Try again
+                  </AppButton>
+                  <AppButton
+                    onClick={() => navigate('/')}
+                    className="px-5 py-3 rounded-full cursor-pointer"
+                    style={{
+                      background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                      color: isDark ? '#fff' : '#0a0a0a',
+                      fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13,
+                    }}
+                  >
+                    Browse events
+                  </AppButton>
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div

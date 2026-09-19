@@ -19,3 +19,8 @@ export function toastError(error: unknown, fallback?: string): void {
 export function toastSuccess(message: string): void {
   toast.success(message);
 }
+
+/** Toast a non-blocking warning (the action partly succeeded). */
+export function toastWarning(message: string): void {
+  toast.warning(message);
+}
