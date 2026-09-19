@@ -10,6 +10,8 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { registrationModule, type SchemaQuestion, type ConsentDocument } from '@/lib/registration';
 import { mapApiError } from '@/lib/errors';
+import { copyText } from '@/lib/utils/clipboard';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface RsvpSectionProps {
   event: any;
@@ -511,8 +513,16 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
                   <ShareChannel
                     label="More" icon={<Share2Icon />} color={accent}
                     onClick={() => {
+                      const url = buildShareUrl(event);
                       if (navigator.share) {
-                        navigator.share({ title: event.name, url: buildShareUrl(event) }).catch(() => {});
+                        // The user can dismiss the share sheet — not an error.
+                        navigator.share({ title: event.name, url }).catch(() => {});
+                      } else {
+                        // No Web Share support: fall back to copy, with feedback.
+                        void copyText(url).then((ok) => {
+                          if (ok) toastSuccess('Link copied.');
+                          else toastError(new Error('clipboard unavailable'), 'Couldn’t share or copy the link.');
+                        });
                       }
                     }}
                     isDark={isDark} />
@@ -521,9 +531,14 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
                 {/* Copy link */}
                 <AppButton
                   onClick={() => {
-                    void navigator.clipboard?.writeText(buildShareUrl(event)).catch(() => {});
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1800);
+                    void copyText(buildShareUrl(event)).then((ok) => {
+                      if (ok) {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1800);
+                      } else {
+                        toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+                      }
+                    });
                   }}
                   className="relative w-full flex items-center gap-3 overflow-hidden px-4 py-3 rounded-2xl cursor-pointer"
                   style={{

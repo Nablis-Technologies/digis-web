@@ -8,6 +8,8 @@ import type { UserTicket } from '@/types';
 import { TicketQRCode } from './TicketQRCode';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { copyText } from '@/lib/utils/clipboard';
+import { toastError } from '@/lib/feedback';
 
 const extraIconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
 
@@ -480,9 +482,14 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
             <AppButton
               whileTap={{ scale: 0.97 }}
               onClick={() => {
-                void navigator.clipboard?.writeText(ticket.ticketViewUrl!).catch(() => {});
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 1800);
+                void copyText(ticket.ticketViewUrl!).then((ok) => {
+                  if (ok) {
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 1800);
+                  } else {
+                    toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+                  }
+                });
               }}
               className="relative w-full rounded-2xl overflow-hidden py-3 px-4 flex items-center gap-3 cursor-pointer"
               style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>

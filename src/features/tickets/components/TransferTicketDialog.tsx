@@ -20,6 +20,7 @@ import { Money } from '@/lib/money';
 import { Field, Row, TicketPreview } from '@/features/tickets/components/TransferTicketParts';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { copyText } from '@/lib/utils/clipboard';
+import { toastError } from '@/lib/feedback';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
@@ -146,7 +147,10 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
 
   const handleCopy = () => {
     if (!shareLink) return;
-    copyText(shareLink).then((didCopy) => { if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); } });
+    copyText(shareLink).then((didCopy) => {
+      if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+      else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+    });
   };
 
   const stepTitle =

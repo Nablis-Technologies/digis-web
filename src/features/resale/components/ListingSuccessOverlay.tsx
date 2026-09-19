@@ -5,6 +5,7 @@ import { Check, Copy, Shield, Sparkles } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
 import { Money } from '@/lib/money';
 import { copyText } from '@/lib/utils/clipboard';
+import { toastError } from '@/lib/feedback';
 import { AppButton } from '@/components/primitives/AppButton';
 
 export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClose }: { ticket: UserTicket; price: number; listingId: string; isDark: boolean; onClose: () => void }) {
@@ -13,6 +14,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
   const copyListingLink = async () => {
     const link = typeof window === 'undefined' ? `#resale/listing/${listingId}` : `${window.location.origin}${window.location.pathname}#resale/listing/${listingId}`;
     if (await copyText(link)) setCopied(true);
+    else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
   };
 
   return (

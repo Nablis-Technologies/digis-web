@@ -63,7 +63,10 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
   }, [event.name]);
 
   const handleCopyLink = () => {
-    copyText(`https://digis.app/event/${event.name.replace(/\s+/g, '-').toLowerCase()}`).then((didCopy) => { if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); } });
+    copyText(`https://digis.app/event/${event.name.replace(/\s+/g, '-').toLowerCase()}`).then((didCopy) => {
+      if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+      else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+    });
   };
 
   const styles: { key: CardStyle; label: string }[] = [
