@@ -30,10 +30,6 @@ import { useDominantColor } from '@/features/event-detail/hooks/useDominantColor
 import { useTicketPricing } from '@/features/event-detail/hooks/useTicketPricing';
 import { EndedBar } from '@/features/event-detail/components/EndedBar';
 import { eventEnded } from '@/lib/eventDates';
-import { Money } from '@/lib/money';
-import { useResalePurchase } from '@/features/resale/hooks/useResalePurchase';
-import type { ResaleListing } from '@/types';
-import { Shield } from 'lucide-react';
 
 interface EventDetailProps {
   event: Event;
@@ -41,16 +37,9 @@ interface EventDetailProps {
   onPurchase: () => void;
   onNavigate?: (view: string) => void;
   onRequestAuth?: () => void;
-  /**
-   * Resale mode: the same detail page, buying ONE listing instead of a primary
-   * ticket. The listing supplies the price; the page keeps every other section.
-   */
-  resaleListing?: ResaleListing | null;
-  /** The viewer owns this listing — show "Your listing", never a Buy CTA. */
-  resaleIsOwn?: boolean;
 }
 
-export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAuth = () => {}, resaleListing = null, resaleIsOwn = false }: EventDetailProps) {
+export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAuth = () => {} }: EventDetailProps) {
   const [selectedTicketType, setSelectedTicketType] = useState<string | null>(null);
   const ticketsSectionRef = useRef<HTMLDivElement>(null);
 
@@ -75,8 +64,6 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
   // BACKEND_GAPS #34 mitigation: the backend still quotes/orders for past
   // events, so the frontend disables the buy entry once every date has ended.
   const ended = useMemo(() => eventEnded(event), [event]);
-  // Resale mode reuses this whole page; only the purchase command differs.
-  const resalePurchase = useResalePurchase();
   const { isDark } = useTheme();
   const { rgb } = useImageColor(event.image);
 
@@ -253,42 +240,6 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
                 Tickets are no longer available — this event has finished.
               </p>
             </motion.div>
-          ) : resaleListing ? (
-          /* Resale: one specific listing instead of the primary ticket tiers. */
-          <div className="rounded-2xl p-4"
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-            }}>
-            <p className="text-[10px] tracking-[1.8px] uppercase mb-2.5"
-              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', fontWeight: 700 }}>
-              Resale listing
-            </p>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] truncate"
-                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }}>
-                {resaleListing.ticketType || 'Ticket'}
-              </span>
-              <span className="text-[16px] flex-shrink-0"
-                style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                {Money.fromMinor(resaleListing.askingPriceMinor, resaleListing.currency).format()}
-              </span>
-            </div>
-            {typeof resaleListing.originalPriceMinor === 'number' && (
-              <p className="mt-1 text-[11px]"
-                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                Face value {Money.fromMinor(resaleListing.originalPriceMinor, resaleListing.currency).format()}
-              </p>
-            )}
-            <div className="mt-3 pt-3 flex items-start gap-2"
-              style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
-              <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={1.6} />
-              <p className="text-[11px] leading-[1.5]"
-                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
-                Your ticket is transferred to you the moment the payment is confirmed.
-              </p>
-            </div>
-          </div>
           ) : (
           <GatedTierGate
             gatedTicketTypeIds={gatedTicketTypeIds}
@@ -316,54 +267,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
         className="fixed bottom-0 left-0 right-0 z-[25]">
         <div className="relative px-5 lg:px-8 pb-8 lg:pb-6 pt-3 max-w-5xl lg:max-w-2xl mx-auto">
-          {resaleListing ? (
-            resalePurchase.pendingOrder ? (
-              <div className="w-full rounded-2xl flex items-center justify-center gap-2.5 py-4"
-                style={{
-                  background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.1)',
-                  border: `1px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(180,210,0,0.3)'}`,
-                }}>
-                <motion.div className="w-4 h-4 rounded-full"
-                  style={{ border: '2px solid rgba(214,249,5,0.3)', borderTopColor: '#d6f905' }}
-                  animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} />
-                <span className="text-[13px]"
-                  style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#d6f905' : '#5a6b00' }}>
-                  Confirming your payment…
-                </span>
-              </div>
-            ) : resaleIsOwn ? (
-              <div className="w-full rounded-2xl flex items-center justify-center py-4"
-                style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
-                <span className="text-[13px]"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
-                  Your listing
-                </span>
-              </div>
-            ) : (
-              <>
-                {resalePurchase.error && (
-                  <p className="text-[11px] mb-3 leading-[1.5]"
-                    style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
-                    {resalePurchase.error}
-                  </p>
-                )}
-                <div style={resalePurchase.purchasing ? { opacity: 0.7, pointerEvents: 'none' } : undefined}>
-                  <PurchaseBar
-                    isDark={isDark}
-                    selectedTicket={null}
-                    selectedTicketType={resaleListing.ticketType || null}
-                    selectedTicketAccentReadable="255,255,255"
-                    totalPrice={resaleListing.askingPriceMinor}
-                    minPrice={resaleListing.askingPriceMinor}
-                    onGift={() => {}}
-                    hideGift
-                    label={resalePurchase.purchasing ? 'Starting payment…' : 'Buy resale ticket'}
-                    onPurchase={() => void resalePurchase.buy(resaleListing)}
-                  />
-                </div>
-              </>
-            )
-          ) : isInvite ? (
+          {isInvite ? (
             <InviteOnlyBar
               event={event}
               inviteUnlock={inviteUnlock}

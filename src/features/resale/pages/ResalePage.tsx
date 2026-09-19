@@ -11,6 +11,11 @@ import {
 import { ResaleEventCard } from '@/features/resale/components/ResaleEventCard';
 import type { ResaleListing, UserTicket } from '@/types';
 import { resaleModule } from '@/lib/resale';
+import { eventsModule } from '@/lib/events';
+import { useResalePurchase } from '@/features/resale/hooks/useResalePurchase';
+import { InfoCardsGrid } from '@/features/event-detail/components/InfoCards';
+import { LineupSection } from '@/features/event-detail/components/LineupSection';
+import { OrganizerCard, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
 import { FilterPanel } from '@/features/resale/components/FilterPanel';
 
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
@@ -32,14 +37,12 @@ import { EventCardSkeleton, ListingRowSkeleton, LoadErrorCard, useShowSkeleton }
 interface ResaleMarketplaceProps {
   userTickets: UserTicket[];
   initialListTicket?: UserTicket | null;
-  /** Open a listing on the shared event detail page (resale mode). */
-  onOpenListing: (listing: ResaleListing, isOwn: boolean) => void;
 }
 
 /* ═══════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════ */
-export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListing }: ResaleMarketplaceProps) {
+export function ResaleMarketplace({ userTickets, initialListTicket }: ResaleMarketplaceProps) {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -182,6 +185,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListin
         const first = all[0];
         return {
           eventId: first.event_id,
+          eventSlug: first.eventSlug,
           eventName: first.eventName,
           eventDate: first.eventDate,
           eventTime: first.eventTime,
@@ -204,13 +208,23 @@ export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListin
       })
     : [];
 
+  // Resale purchase — the shared command used by every resale buy surface.
+  const resalePurchase = useResalePurchase();
+  // The event behind the selected group, for the ticket-detail elements the
+  // event page shows (about / lineup / organizer). Absent data renders nothing.
+  const selectedEventQuery = useQuery({
+    queryKey: eventsModule.keys.detail(selectedGroup?.eventSlug ?? ''),
+    queryFn: () => eventsModule.fetchById(selectedGroup!.eventSlug),
+    enabled: Boolean(selectedGroup?.eventSlug),
+  });
+  const selectedEvent = selectedEventQuery.data ?? null;
+
   const handleListTicket = (ticket: UserTicket) => {
     // Clear any error from a previous attempt so the sheet opens clean.
     createListingMutation.reset();
     setListingTicket(ticket);
     setShowListSheet(true);
   };
-
   // A failed listing keeps the sheet open, so the message renders inline
   // (mirrors the purchase error) instead of vanishing into a toast.
   const listingError = createListingMutation.error
@@ -537,6 +551,14 @@ export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListin
                       </div>
                     )}
 
+                    {/* Purchase failures stay on the page next to the rows. */}
+                    {resalePurchase.error && (
+                      <p className="text-[11px] mb-3 leading-[1.5]"
+                        style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+                        {resalePurchase.error}
+                      </p>
+                    )}
+
                     {/* Flat sales list */}
                     <div className="flex flex-col gap-2">
                       {eventListings.map((listing, index) => {
@@ -551,13 +573,10 @@ export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListin
                         const isVIP = listing.ticketType === 'VIP';
                         const accent = isDark ? '#d6f905' : '#0a0a0a';
                         return (
-                          <AppButton key={listing.id}
+                          <motion.div key={listing.id}
                             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.04 }}
-                            whileHover={{ x: 2 }}
-                            whileTap={{ scale: 0.99 }}
-                            onClick={() => onOpenListing(listing, myListings.some((l) => l.id === listing.id))}
-                            className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl cursor-pointer text-left"
+                            className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left"
                             style={{
                               background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
                               border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
@@ -626,14 +645,55 @@ export function ResaleMarketplace({ userTickets, initialListTicket, onOpenListin
                               </div>
                             </div>
 
-                            {/* Chevron */}
-                            <ChevronRight className="w-4 h-4 flex-shrink-0"
-                              style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} strokeWidth={1.5} />
-                          </AppButton>
+                            {/* Buy — own listings are not purchasable */}
+                            {myListings.some((l) => l.id === listing.id) ? (
+                              <span className="text-[11px] flex-shrink-0 tracking-[0.5px] uppercase"
+                                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                                Your listing
+                              </span>
+                            ) : (
+                              <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                onClick={() => void resalePurchase.buy(listing)}
+                                disabled={resalePurchase.purchasing}
+                                className="flex-shrink-0 px-4 py-2.5 rounded-xl cursor-pointer disabled:cursor-not-allowed"
+                                style={{ background: 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)', color: '#0a0a0a' }}>
+                                <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Buy</span>
+                              </AppButton>
+                            )}
+                          </motion.div>
                         );
                       })}
                     </div>
                     </div>
+
+                  {/* Same elements as the ticket detail page — date/time/venue
+                      cards, about, lineup and organizer. Absent data renders
+                      nothing rather than inventing it. */}
+                  {selectedEvent && (
+                    <div className="px-5 lg:px-8 mt-8 lg:mt-10">
+                      <InfoCardsGrid
+                        items={[
+                          { icon: <Calendar className="w-4 h-4" />, label: 'Date', value: selectedGroup!.eventDate },
+                          { icon: <Clock className="w-4 h-4" />, label: 'Time', value: selectedGroup!.eventTime },
+                          { icon: <MapPin className="w-4 h-4" />, label: 'Venue', value: selectedGroup!.venue },
+                        ]}
+                      />
+                      {selectedEvent.description && (
+                        <>
+                          <h2 className="text-[13px] tracking-[2px] uppercase mb-4 mt-8"
+                            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(214,249,5,0.8)' : 'rgba(0,0,0,0.7)' }}>
+                            About
+                          </h2>
+                          <p className="text-[14px] leading-relaxed font-light"
+                            style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.6)' }}>
+                            {selectedEvent.description}
+                          </p>
+                        </>
+                      )}
+                      <LineupSection lineup={selectedEvent.lineup} isDark={isDark} />
+                      <OrganizerCard organizers={resolveOrganizers(selectedEvent)} isDark={isDark} />
+                    </div>
+                  )}
                   </div>
                 </motion.div>
               ) : null}
