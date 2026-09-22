@@ -1,5 +1,20 @@
-import { describe, it, expect } from 'vitest';
-import { mapNotification, type NotificationWire } from '@/lib/notifications';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { apiFetch } from '@/lib/api';
+import {
+  mapNotification, channelPreferences, fetchNotificationPreferences, updateChannelPreference,
+  type NotificationWire, type NotificationPreferenceWire,
+} from '@/lib/notifications';
+
+vi.mock('@/lib/api', () => ({
+  apiFetch: vi.fn(),
+  randomUuid: () => '00000000-0000-4000-8000-000000000000',
+}));
+
+const mockedApiFetch = vi.mocked(apiFetch);
+
+beforeEach(() => {
+  mockedApiFetch.mockReset();
+});
 
 function wire(overrides: Partial<NotificationWire> = {}): NotificationWire {
   return {
@@ -41,5 +56,50 @@ describe('mapNotification (#7 live inbox)', () => {
     const n = mapNotification(wire({ notification_type: 'payment_succeeded', data: { amount_minor: 102500 } }));
     expect(n.body).toContain('1,025');
     expect(n.body).toContain('ETB');
+  });
+});
+
+/* ─── Notification preferences (#7 wiring) ─── */
+
+const CATEGORIES = ['transactional', 'security', 'credential', 'legal'];
+const CHANNELS = ['in_app', 'email', 'sms'];
+
+function pref(category: string, channel: string, enabled = true): NotificationPreferenceWire {
+  return { id: null, category, channel, enabled, created_at: null, updated_at: null };
+}
+const MATRIX: NotificationPreferenceWire[] = CATEGORIES.flatMap((category) =>
+  CHANNELS.map((channel) => pref(category, channel)),
+);
+
+describe('notification preferences (#7)', () => {
+  it('treats a missing row as enabled (the backend default)', () => {
+    expect(channelPreferences([])).toEqual({ in_app: true, email: true, sms: true });
+  });
+
+  it('a channel is on only when every category on it is enabled', () => {
+    const matrix = MATRIX.map((p) =>
+      p.channel === 'email' && p.category === 'legal' ? { ...p, enabled: false } : p,
+    );
+    expect(channelPreferences(matrix)).toEqual({ in_app: true, email: false, sms: true });
+  });
+
+  it('fetchNotificationPreferences unwraps the matrix, tolerating a missing body', async () => {
+    mockedApiFetch.mockResolvedValueOnce({ data: MATRIX } as never);
+    await expect(fetchNotificationPreferences()).resolves.toHaveLength(12);
+    expect(mockedApiFetch).toHaveBeenCalledWith('notification_preferences');
+
+    mockedApiFetch.mockResolvedValueOnce({ data: undefined } as never);
+    await expect(fetchNotificationPreferences()).resolves.toEqual([]);
+  });
+
+  it('updateChannelPreference PATCHes every category on the channel', async () => {
+    mockedApiFetch.mockResolvedValueOnce({ data: MATRIX } as never);
+    await updateChannelPreference('email', false);
+    expect(mockedApiFetch).toHaveBeenCalledWith('notification_preferences', {
+      method: 'PATCH',
+      body: {
+        preferences: CATEGORIES.map((category) => ({ category, channel: 'email', enabled: false })),
+      },
+    });
   });
 });

@@ -5,17 +5,13 @@ import { Money } from '@/lib/money';
 import type { AppNotification, NotificationType } from '@/types/notification';
 
 /**
- * Notification deep module. The local store keeps the signed-out/offline UX
- * (seed + simulated incoming), while authenticated reads come from the live
- * inbox (`GET /notifications` — BACKEND_GAPS #7 resolved 2026-09-08).
+ * Notification deep module. The local store backs the signed-out/offline UX —
+ * which has no inbox, so guests see nothing. Authenticated reads come from the
+ * live inbox (`GET /notifications`). Never seed fabricated notifications: a
+ * signed-out user must not see invented activity.
  */
 
-const INITIAL: AppNotification[] = [
-  { id: 'n1', type: 'ticket', title: 'Ticket confirmed', body: 'Your VIP ticket for Rophnan Live is ready.', time: '2m ago', unread: true },
-  { id: 'n2', type: 'price', title: 'Price drop · -15%', body: 'A resale ticket for Ethio Jazz Night just dropped.', time: '4m ago', unread: true },
-  { id: 'n3', type: 'event', title: 'Starts in 2 hours', body: 'Mereb Cultural Festival begins at 7:00 PM.', time: '1h ago', unread: false },
-  { id: 'n4', type: 'promo', title: 'EARLYBIRD25 unlocked', body: 'Save 25% on your next 3 events.', time: 'Yesterday', unread: false },
-];
+const INITIAL: AppNotification[] = [];
 
 const STORAGE_KEY = 'digis.notifications.v2';
 
@@ -193,4 +189,68 @@ export async function fetchNotifications(): Promise<AppNotification[]> {
  */
 export async function markNotificationRead(id: string): Promise<void> {
   await apiFetch(`notifications/${id}/read`, { method: 'POST' });
+}
+
+/* ─── Notification preferences (GET/PATCH /notification_preferences) ─── */
+
+/** Backend delivery channels (Messaging::NotificationDelivery::CHANNELS). */
+export type NotificationChannel = 'in_app' | 'email' | 'sms';
+
+/**
+ * Backend notification categories (Messaging::Notification::CATEGORIES). The
+ * preference API stores one row per category × channel, so a channel toggle
+ * writes every category on that channel.
+ */
+export const PREFERENCE_CATEGORIES = ['transactional', 'security', 'credential', 'legal'] as const;
+
+/**
+ * Wire shape (Messaging::NotificationPreferenceSerializer). `id` is null for an
+ * unsaved default: the backend returns the full category × channel matrix and
+ * represents a missing row as `enabled: true`.
+ */
+export interface NotificationPreferenceWire {
+  id: string | null;
+  category: string;
+  channel: string;
+  enabled: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/** Per-channel on/off state derived from the preference matrix. */
+export type ChannelPreferences = Record<NotificationChannel, boolean>;
+
+/** GET /notification_preferences — the effective matrix (missing rows = enabled). */
+export async function fetchNotificationPreferences(): Promise<NotificationPreferenceWire[]> {
+  const { data } = await apiFetch<NotificationPreferenceWire[]>('notification_preferences');
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Collapse the category × channel matrix to one flag per channel. A channel is
+ * "on" only when every category on it is enabled, so the toggle shows the
+ * conservative state; flipping it writes every category on that channel.
+ */
+export function channelPreferences(matrix: NotificationPreferenceWire[]): ChannelPreferences {
+  const enabled = (channel: NotificationChannel) =>
+    PREFERENCE_CATEGORIES.every((category) => {
+      const row = matrix.find((p) => p.category === category && p.channel === channel);
+      return row ? row.enabled : true;
+    });
+  return { in_app: enabled('in_app'), email: enabled('email'), sms: enabled('sms') };
+}
+
+/**
+ * PATCH /notification_preferences — set every category on one channel. The
+ * required Idempotency-Key is injected by `apiFetch`.
+ */
+export async function updateChannelPreference(
+  channel: NotificationChannel,
+  enabled: boolean,
+): Promise<NotificationPreferenceWire[]> {
+  const { data } = await apiFetch<NotificationPreferenceWire[]>('notification_preferences', {
+    method: 'PATCH',
+    body: { preferences: PREFERENCE_CATEGORIES.map((category) => ({ category, channel, enabled })) },
+  });
+  return Array.isArray(data) ? data : [];
 }

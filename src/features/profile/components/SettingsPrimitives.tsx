@@ -173,9 +173,10 @@ export function ValuePill({ value, isDark }: { value: string; isDark: boolean })
   );
 }
 
-export function Toggle({ checked, onChange, isDark }: { checked: boolean; onChange: () => void; isDark: boolean }) {
+export function Toggle({ checked, onChange, isDark, disabled = false }: { checked: boolean; onChange: () => void; isDark: boolean; disabled?: boolean }) {
   return (
-    <Switch checked={checked} onCheckedChange={onChange} unstyled aria-label="Toggle setting" className="relative rounded-full cursor-pointer transition-colors duration-300"
+    <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} unstyled aria-label="Toggle setting"
+      className={`relative rounded-full transition-colors duration-300 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       style={{ width: 44, height: 26, background: checked ? (isDark ? '#d6f905' : '#0a0a0a') : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.14)') }}
       thumbClassName="absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-[transform,background-color] duration-300 data-[state=unchecked]:translate-x-[3px] data-[state=checked]:translate-x-[21px] dark:data-[state=checked]:bg-[#0a0a0a]" />
   );

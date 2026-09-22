@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Moon, Sun, Bell, Mail, Phone, Ticket, ArrowUpDown,
+  ArrowLeft, Moon, Sun, Bell, Mail, Phone,
   Globe, CreditCard, Languages, Shield, Lock, Eye, FileText, HelpCircle,
   ChevronRight, LogOut, User, BadgeCheck, Sparkles, Pencil, Loader2,
   X, ShieldCheck,
@@ -9,6 +9,10 @@ import {
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { flatAvatarColor } from '@/lib/utils/avatarColor';
+import {
+  fetchNotificationPreferences, channelPreferences, updateChannelPreference,
+  type NotificationChannel, type ChannelPreferences,
+} from '@/lib/notifications';
 import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill } from '@/features/profile/components/SettingsPrimitives';
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -23,11 +27,46 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated, signOut } = useAuth();
 
+  // Notification channel preferences — the backend stores a category × channel
+  // matrix (GET/PATCH /notification_preferences); each toggle writes every
+  // category on its channel. Fetched only while signed in (the endpoint is
+  // authenticated), and never faked: load/save failures are surfaced.
+  const [channelPrefs, setChannelPrefs] = useState<ChannelPreferences | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [savingChannel, setSavingChannel] = useState<NotificationChannel | null>(null);
+
+  const loadPreferences = useCallback(async () => {
+    if (!isAuthenticated) { setChannelPrefs(null); return; }
+    setPrefsLoading(true);
+    setPrefsError(null);
+    try {
+      setChannelPrefs(channelPreferences(await fetchNotificationPreferences()));
+    } catch {
+      setChannelPrefs(null);
+      setPrefsError('Couldn’t load your notification settings.');
+    } finally {
+      setPrefsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => { void loadPreferences(); }, [loadPreferences]);
+
+  const toggleChannel = async (channel: NotificationChannel) => {
+    if (!channelPrefs || savingChannel) return;
+    setSavingChannel(channel);
+    setPrefsError(null);
+    try {
+      // Reflect the change only once the server confirms it.
+      setChannelPrefs(channelPreferences(await updateChannelPreference(channel, !channelPrefs[channel])));
+    } catch {
+      setPrefsError('Couldn’t save your notification settings. Please try again.');
+    } finally {
+      setSavingChannel(null);
+    }
+  };
+
   // Toggles
-  const [pushNotifs, setPushNotifs] = useState(true);
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [eventReminders, setEventReminders] = useState(true);
-  const [resaleAlerts, setResaleAlerts] = useState(false);
   const [publicProfile, setPublicProfile] = useState(true);
 
   // Preferences
@@ -100,19 +139,40 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         />
       </Section>
 
-      {/* Notifications */}
+      {/* Notifications — per-channel preferences from GET/PATCH
+          /notification_preferences. The backend stores one row per category ×
+          channel; each toggle writes every category on its channel. */}
       <Section title="Notifications" isDark={isDark}>
-        <Row icon={<Bell className="w-4 h-4" />} label="Push notifications" isDark={isDark}
-          right={<Toggle checked={pushNotifs} onChange={() => setPushNotifs(v => !v)} isDark={isDark} />} />
+        {prefsError && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+              {prefsError}
+            </span>
+            <AppButton
+              onClick={() => void loadPreferences()}
+              className="text-[12px] underline cursor-pointer flex-shrink-0"
+              style={{ fontFamily: "'Inter', sans-serif", color: accentText }}
+            >
+              Retry
+            </AppButton>
+          </div>
+        )}
+        <Row icon={<Bell className="w-4 h-4" />} label="Push notifications" hint="In-app alerts" isDark={isDark}
+          right={<Toggle checked={channelPrefs?.in_app ?? true} onChange={() => void toggleChannel('in_app')}
+            disabled={!isAuthenticated || channelPrefs === null || savingChannel !== null} isDark={isDark} />} />
         <Divider isDark={isDark} />
-        <Row icon={<Mail className="w-4 h-4" />} label="Email updates" isDark={isDark}
-          right={<Toggle checked={emailNotifs} onChange={() => setEmailNotifs(v => !v)} isDark={isDark} />} />
+        <Row icon={<Mail className="w-4 h-4" />} label="Email updates" hint="To your account email" isDark={isDark}
+          right={<Toggle checked={channelPrefs?.email ?? true} onChange={() => void toggleChannel('email')}
+            disabled={!isAuthenticated || channelPrefs === null || savingChannel !== null} isDark={isDark} />} />
         <Divider isDark={isDark} />
-        <Row icon={<Ticket className="w-4 h-4" />} label="Event reminders" hint="Before doors open" isDark={isDark}
-          right={<Toggle checked={eventReminders} onChange={() => setEventReminders(v => !v)} isDark={isDark} />} />
-        <Divider isDark={isDark} />
-        <Row icon={<ArrowUpDown className="w-4 h-4" />} label="Resale alerts" hint="When prices drop" isDark={isDark}
-          right={<Toggle checked={resaleAlerts} onChange={() => setResaleAlerts(v => !v)} isDark={isDark} />} />
+        <Row icon={<Phone className="w-4 h-4" />} label="Text messages" hint="SMS to your phone" isDark={isDark}
+          right={<Toggle checked={channelPrefs?.sms ?? true} onChange={() => void toggleChannel('sms')}
+            disabled={!isAuthenticated || channelPrefs === null || savingChannel !== null} isDark={isDark} />} />
+        {!isAuthenticated && (
+          <p className="px-4 pt-2 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: subtle }}>
+            Sign in to manage your notification settings.
+          </p>
+        )}
       </Section>
 
       {/* Preferences */}
