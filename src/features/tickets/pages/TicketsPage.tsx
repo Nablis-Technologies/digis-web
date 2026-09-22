@@ -64,10 +64,19 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   // merged into the normal upcoming/past list, not a separate section.
   const guestDevice = useGuestDeviceTickets();
   // When signed out, the account wallet is empty and the on-device guest
-  // tickets ARE the collection — render them like any other ticket.
-  const combinedTickets: UserTicket[] = isAuthenticated
-    ? tickets
-    : [...tickets, ...guestDevice.tickets];
+  // tickets ARE the collection — render them like any other ticket. De-dupe by
+  // ticket id: the wallet and the device guest wallet can both hold the same
+  // ticket (a guest purchase later signed in / claimed), and a repeated refetch
+  // must never render one ticket as two cards.
+  const combinedTickets: UserTicket[] = (() => {
+    const list = isAuthenticated ? tickets : [...tickets, ...guestDevice.tickets];
+    const seen = new Set<string>();
+    return list.filter((t) => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  })();
   const deviceCount = guestDevice.tickets.length;
   // The open ticket is route-driven (`/tickets/:id`) so it is deep-linkable and
   // Back closes it. `pendingOpenTicket` covers the post-purchase instant-open
@@ -283,6 +292,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
         {visibleTickets.map((ticket, index) => (
           <motion.div
             key={ticket.id}
+            data-ticket-id={ticket.id}
             initial={{ opacity: 0, y: 30, rotateX: 5 }}
             animate={{ opacity: 1, y: 0, rotateX: 0 }}
             transition={{ delay: index * 0.15, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}

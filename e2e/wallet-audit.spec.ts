@@ -30,4 +30,16 @@ test('wallet renders real GET /tickets, not the mock store', async ({ page }) =>
   expect(await page.getByText('Ethio Jsssazz Night').count()).toBe(0);
   // The real wallet is empty for this user — the empty state shows.
   console.log('empty-state visible:', await page.getByText(/no tickets|nothing here|get your first/i).count());
+
+  // Regression guard — a ticket must never render twice. The account wallet and
+  // the on-device guest wallet can both hold the same ticket (a guest purchase
+  // later signed in / claimed), and a repeated refetch must not duplicate a
+  // card. This is the "duplicate tickets after purchase" bug.
+  const renderedIds = await page
+    .locator('[data-ticket-id]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-ticket-id') ?? ''));
+  expect(
+    new Set(renderedIds).size,
+    `duplicate ticket cards rendered: ${JSON.stringify(renderedIds)}`,
+  ).toBe(renderedIds.length);
 });
