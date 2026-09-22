@@ -15,7 +15,7 @@ import { InviteOnlySection } from '@/features/event-detail/components/InviteOnly
 import { GatedTierGate } from '@/features/event-detail/components/GatedTierGate';
 import type { Event, RsvpStatus, InviteUnlockState } from '@/types';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
-import { OrganizerCard, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
+import { OrganizerCard, OrganizerInline, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
 import { VenueSection } from '@/features/event-detail/components/VenueMap';
 import { YourTicketAccess } from '@/features/event-detail/components/YourTicketAccess';
 import { TicketSelector } from '@/features/event-detail/components/TicketSelector';
@@ -187,7 +187,12 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
         {/* Organizer(s) — mobile/tablet only (desktop renders inside hero rail) */}
         {(!isInvite || inviteUnlock.unlocked) && (
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.31 }} className="mb-10 lg:hidden">
-          <OrganizerCard organizers={resolveOrganizers(event)} isDark={isDark} compact />
+          {(() => {
+            const organizers = resolveOrganizers(event);
+            return organizers.length === 1
+              ? <OrganizerInline organizer={organizers[0]} isDark={isDark} />
+              : <OrganizerCard organizers={organizers} isDark={isDark} compact />;
+          })()}
         </motion.div>
         )}
 

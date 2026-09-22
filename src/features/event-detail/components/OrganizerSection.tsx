@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, BadgeCheck, Calendar, Check, ChevronRight, Clock, MapPin, Share2, UserPlus, Users, X } from 'lucide-react';
@@ -8,62 +8,55 @@ import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { followEntity, unfollowEntity } from '@/lib/follows';
+import { fetchOrganizationProfile, type OrganizationProfile } from '@/lib/organizations';
+import { toastError, toastWarning } from '@/lib/feedback';
 
 export function resolveOrganizers(event: any): any[] {
+  // The backend nests a single organization summary `{ id, name, slug }`.
+  // Render only what it provides — never invent co-hosts, handles, or stats.
   if (Array.isArray(event.organizers) && event.organizers.length > 0) {
-    return event.organizers.map((o: any, i: number) => ({
-      name: o.name || 'Digis Events Co.',
-      handle: o.handle || '@digisevents',
-      bio: o.bio || 'Curating Ethiopia\'s most memorable cultural and music experiences since 2019.',
-      verified: o.verified ?? (i === 0),
-      followers: o.followers ?? 12400,
-      eventsHosted: o.eventsHosted ?? 47,
-      rating: o.rating ?? 4.8,
-      avatar: o.avatar,
-      role: o.role || (i === 0 ? 'Lead Organizer' : 'Co-Host'),
-      gradient: o.gradient || ['linear-gradient(135deg, #1a1a1a 0%, #d6f905 100%)',
-        'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)',
-        'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
-        'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-        'linear-gradient(135deg, #fb923c 0%, #d6f905 100%)'][i % 5],
-    }));
+    return event.organizers;
   }
-  // Demo fallback: lead + two co-hosts so the design works out of the box.
-  const lead = {
-    name: event.organizer?.name || 'Digis Events Co.',
-    handle: event.organizer?.handle || '@digisevents',
-    bio: event.organizer?.bio || 'Curating Ethiopia\'s most memorable cultural and music experiences since 2019.',
-    verified: true,
-    followers: event.organizer?.followers || 12400,
-    eventsHosted: event.organizer?.eventsHosted || 47,
-    rating: event.organizer?.rating || 4.8,
-    avatar: event.organizer?.avatar,
-    role: 'Lead Organizer',
-    gradient: 'linear-gradient(135deg, #1a1a1a 0%, #d6f905 100%)',
-  };
-  return [
-    lead,
-    { name: 'Habesha Sound', handle: '@habeshasound', bio: 'Live music collective amplifying East African artists.',
-      verified: true, followers: 8200, eventsHosted: 31, rating: 4.7, role: 'Co-Host',
-      gradient: 'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)' },
-    { name: 'Mereb Studios', handle: '@merebstudios', bio: 'Production house behind Ethiopia\'s most cinematic events.',
-      verified: false, followers: 3100, eventsHosted: 12, rating: 4.6, role: 'Co-Host',
-      gradient: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)' },
-  ];
+  if (event.organizer || event.organizerId) {
+    return [{ id: event.organizerId, name: event.organizer || '', slug: event.organizerSlug }];
+  }
+  return [];
 }
 
 export function OrganizerCard({ organizers, isDark, compact = false, reflectionSettings }: { organizers: any[]; isDark: boolean; compact?: boolean; reflectionSettings?: GlassReflectionSettings }) {
+  const { isAuthenticated } = useAuth();
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  const [pendingFollow, setPendingFollow] = useState<string | null>(null);
   const [profileTarget, setProfileTarget] = useState<any | null>(null);
   const [listOpen, setListOpen] = useState(false);
 
   const accent = isDark ? '#d6f905' : '#d6f905';
-  const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
   const initialsOf = (name: string) => name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+
+  // Follow is a real backend command (`POST|DELETE /organizations/:id/follow`),
+  // keyed by the organization id — never a local-only toggle.
+  const toggleFollow = async (id?: string) => {
+    if (!id) return;
+    if (!isAuthenticated) { toastWarning('Sign in to follow organizers.'); return; }
+    if (pendingFollow) return;
+    const next = !(followingMap[id] || false);
+    setPendingFollow(id);
+    try {
+      if (next) await followEntity('organizations', id);
+      else await unfollowEntity('organizations', id);
+      setFollowingMap((prev) => ({ ...prev, [id]: next }));
+    } catch (e) {
+      toastError(e, 'Couldn’t update your follow. Please try again.');
+    } finally {
+      setPendingFollow(null);
+    }
+  };
+
+  if (organizers.length === 0) return null;
   const lead = organizers[0];
   const coHosts = organizers.slice(1);
-  const leading = followingMap[lead.handle] || false;
-  const toggleFollow = (handle: string) => setFollowingMap(prev => ({ ...prev, [handle]: !prev[handle] }));
   const initials = initialsOf(lead.name);
 
   // Compact: every host collapses into a single row — an overlapping avatar
@@ -94,7 +87,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
           <span aria-hidden="true" className="absolute inset-0 z-[1] pointer-events-none rounded-[inherit]" style={glassEdgeReflection(isDark, reflectionSettings)} />
           <div className="relative z-10 flex items-center flex-shrink-0">
             {stack.map((o, idx) => (
-              <div key={o.handle} className="relative"
+              <div key={o.id ?? o.name} className="relative"
                 style={{ marginLeft: idx === 0 ? 0 : -9, zIndex: stack.length - idx }}>
                 {o.avatar ? (
                   <img src={o.avatar} alt={o.name} className="w-8 h-8 rounded-full object-cover"
@@ -158,8 +151,8 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
             />
           )}
           {profileTarget && (
-            <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.handle] || false}
-              onToggleFollow={() => toggleFollow(profileTarget.handle)}
+            <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.id] || false}
+              onToggleFollow={() => toggleFollow(profileTarget.id)}
               onClose={() => setProfileTarget(null)} isDark={isDark} />
           )}
         </AnimatePresence>
@@ -185,7 +178,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
         }}>
         <GlassReflection isDark={isDark} />
         {organizers.map((o, idx) => (
-          <div key={o.handle}
+          <div key={o.id ?? o.name}
             className="relative z-10 flex items-center gap-3 px-4 py-2.5"
             style={{
               borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(81,72,101,0.075)'}`,
@@ -220,17 +213,17 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
               </p>
             </AppButton>
             <AppButton whileTap={{ scale: 0.95 }}
-              onClick={() => toggleFollow(o.handle)}
+              onClick={() => toggleFollow(o.id)}
               className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
               style={{
-                background: (followingMap[o.handle] || false)
+                background: (followingMap[o.id] || false)
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                   : (isDark ? 'rgba(214,249,5,0.1)' : accent),
-                border: `1px solid ${(followingMap[o.handle] || false)
+                border: `1px solid ${(followingMap[o.id] || false)
                   ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
                   : (isDark ? 'rgba(214,249,5,0.22)' : 'transparent')}`,
               }}>
-              {(followingMap[o.handle] || false) ? (
+              {(followingMap[o.id] || false) ? (
                 <Check className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
               ) : (
                 <UserPlus className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
@@ -242,12 +235,138 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
 
       <AnimatePresence>
         {profileTarget && (
-          <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.handle] || false}
-            onToggleFollow={() => toggleFollow(profileTarget.handle)}
+          <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.id] || false}
+            onToggleFollow={() => toggleFollow(profileTarget.id)}
             onClose={() => setProfileTarget(null)} isDark={isDark} />
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/**
+ * Inline organizer profile — the profile the sheet shows, rendered directly on
+ * the event detail page. Used when there is a single organizer, so there is no
+ * popup to open. Reuses the public profile fetch + the follow command.
+ */
+export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark: boolean }) {
+  const { isAuthenticated } = useAuth();
+  const [following, setFollowing] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [profile, setProfile] = useState<OrganizationProfile | null>(null);
+  const [profileError, setProfileError] = useState(false);
+
+  useEffect(() => {
+    if (!organizer?.id) return;
+    let alive = true;
+    setProfileError(false);
+    fetchOrganizationProfile(organizer.id)
+      .then((p) => { if (alive) { setProfile(p); setFollowing(!!p.is_following); } })
+      .catch(() => { if (alive) setProfileError(true); });
+    return () => { alive = false; };
+  }, [organizer?.id]);
+
+  const toggleFollow = async () => {
+    if (!organizer?.id) return;
+    if (!isAuthenticated) { toastWarning('Sign in to follow organizers.'); return; }
+    if (pending) return;
+    const next = !following;
+    setPending(true);
+    try {
+      if (next) await followEntity('organizations', organizer.id);
+      else await unfollowEntity('organizations', organizer.id);
+      setFollowing(next);
+    } catch (e) {
+      toastError(e, 'Couldn’t update your follow. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const accent = isDark ? '#d6f905' : '#0a0a0a';
+  const initials = (organizer.name || '?').split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  const description: string | undefined = profile?.description ?? organizer.bio ?? undefined;
+  const followerCount: number | undefined = profile?.follower_count;
+  const followerLabel = followerCount != null
+    ? (followerCount >= 1000 ? `${(followerCount / 1000).toFixed(1)}k` : `${followerCount}`)
+    : undefined;
+  const socialLinks = profile?.social_links ?? null;
+  const socials: [string, string][] = socialLinks
+    ? (Object.entries(socialLinks).filter(([, u]) => typeof u === 'string' && u) as [string, string][])
+    : [];
+
+  return (
+    <div
+      className="relative rounded-2xl overflow-hidden px-4 py-4"
+      style={{
+        background: isDark
+          ? 'linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))'
+          : 'linear-gradient(145deg, rgba(255,255,255,0.72), rgba(234,231,242,0.58))',
+        boxShadow: isDark
+          ? 'inset 0 1px 0 rgba(255,255,255,0.025)'
+          : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 14px 32px rgba(54,47,70,0.055)',
+      }}
+    >
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 flex items-center gap-3">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: flatAvatarColor(organizer.name || 'Digis') }}>
+          <span className="text-[13px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>{initials}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="text-[14px] truncate" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500, color: isDark ? '#fff' : '#1a1a1a' }}>{organizer.name}</p>
+            {organizer.verified && <BadgeCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accent }} strokeWidth={2.5} />}
+          </div>
+          {followerLabel && (
+            <p className="text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+              {followerLabel} followers
+            </p>
+          )}
+        </div>
+        {/* Subtle outlined follow button — the quiet treatment used on the
+            venue / organizer rows, not a solid accent CTA. */}
+        <AppButton
+          whileTap={{ scale: 0.97 }}
+          onClick={() => void toggleFollow()}
+          disabled={pending}
+          className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer disabled:cursor-not-allowed"
+          style={{
+            background: 'transparent',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)'}`,
+            color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)',
+          }}
+        >
+          {following ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} /> : <UserPlus className="w-3.5 h-3.5" strokeWidth={2} />}
+          <span className="text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>{following ? 'Following' : 'Follow'}</span>
+        </AppButton>
+      </div>
+
+      {description && (
+        <p className="relative z-10 mt-3 text-[12.5px] leading-relaxed"
+          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>
+          {description}
+        </p>
+      )}
+
+      {socials.length > 0 && (
+        <div className="relative z-10 mt-3 flex flex-wrap gap-3">
+          {socials.map(([key, url]) => (
+            <a key={key} href={url} target="_blank" rel="noreferrer noopener"
+              className="text-[11px] underline capitalize"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
+              {key}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {profileError && (
+        <p className="relative z-10 mt-3 text-[11px]" style={{ color: '#e5484d', fontFamily: "'Inter', sans-serif" }}>
+          Couldn’t load this organizer’s profile.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -313,9 +432,9 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
 
         <div className="relative z-10 overflow-y-auto overscroll-contain p-3" style={{ WebkitOverflowScrolling: 'touch' }}>
           {organizers.map((o) => {
-            const following = followingMap[o.handle] || false;
+            const following = followingMap[o.id] || false;
             return (
-              <div key={o.handle}
+              <div key={o.id ?? o.name}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
                 style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
                 <AppButton onClick={() => onOpenProfile(o)} className="relative flex-shrink-0 cursor-pointer">
@@ -348,7 +467,7 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
                   </p>
                 </AppButton>
                 <AppButton whileTap={{ scale: 0.95 }}
-                  onClick={() => onToggleFollow(o.handle)}
+                  onClick={() => onToggleFollow(o.id)}
                   className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer"
                   style={{
                     background: following
@@ -384,9 +503,43 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
 }) {
   const initials = organizer.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
   const accent = isDark ? '#d6f905' : '#d6f905';
-  const accentRgb = isDark ? '214,249,5' : '214,249,5';
   const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
   const [eventsTab, setEventsTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [profile, setProfile] = useState<OrganizationProfile | null>(null);
+  const [profileError, setProfileError] = useState(false);
+
+  // The event payload carries only `{ id, name, slug }`; fetch the public
+  // organization profile for the description / counts / socials, and surface a
+  // failed load rather than inventing them.
+  useEffect(() => {
+    if (!organizer.id) return;
+    let alive = true;
+    setProfileError(false);
+    fetchOrganizationProfile(organizer.id)
+      .then((p) => { if (alive) setProfile(p); })
+      .catch(() => { if (alive) setProfileError(true); });
+    return () => { alive = false; };
+  }, [organizer.id]);
+
+  const description: string | undefined = profile?.description ?? organizer.bio ?? undefined;
+  const followerCount: number | undefined = profile?.follower_count;
+  const eventsCount: number | undefined = profile?.events_count;
+  const socialLinks = profile?.social_links ?? null;
+  const stats = [
+    ...(eventsCount != null ? [{ icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Events', value: `${eventsCount}` }] : []),
+    ...(followerCount != null ? [{ icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(followerCount) }] : []),
+  ];
+  // Real social links only — the profile's `social_links` map, never fabricated.
+  const socialEntries: [string, string][] = socialLinks
+    ? Object.entries(socialLinks).filter(([, url]) => typeof url === 'string' && url.length > 0) as [string, string][]
+    : [];
+  const socialIcon = (key: string) => {
+    const k = key.toLowerCase();
+    if (k.includes('instagram')) return <BrandInstagram />;
+    if (k.includes('tiktok')) return <BrandTikTok isDark={isDark} />;
+    if (k.includes('youtube')) return <BrandYouTube />;
+    return <BrandWebsite isDark={isDark} />;
+  };
 
   const sheet = (
     <motion.div
@@ -450,25 +603,32 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
               <BadgeCheck className="w-4 h-4" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2.5} />
             )}
           </div>
-          <p className="text-[12px] mb-3"
-            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
-            {organizer.handle}
-          </p>
-          <p className="text-[13px] leading-relaxed font-light mb-5"
-            style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
-            {organizer.bio}
-          </p>
+          {organizer.slug && (
+            <p className="text-[12px] mb-3"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+              @{organizer.slug}
+            </p>
+          )}
+          {description && (
+            <p className="text-[13px] leading-relaxed font-light mb-5"
+              style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
+              {description}
+            </p>
+          )}
+          {profileError && (
+            <p className="text-[11px] mb-4" style={{ color: '#e5484d', fontFamily: "'Inter', sans-serif" }}>
+              Couldn’t load this organizer’s profile.
+            </p>
+          )}
 
-          {/* Stats */}
+          {/* Stats — rendered only when the backend provides them. */}
+          {stats.length > 0 && (
           <div className="relative flex items-stretch overflow-hidden py-3.5 mb-5 rounded-2xl"
             style={{
               background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
             }}>
             <GlassReflection isDark={isDark} />
-            {[
-              { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Events', value: `${organizer.eventsHosted}` },
-              { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(organizer.followers) },
-            ].map((s, i) => (
+            {stats.map((s, i) => (
               <div key={s.label} className="relative z-10 flex-1 flex items-stretch">
                 {i > 0 && (
                   <div className="w-px self-stretch my-1"
@@ -490,6 +650,7 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
               </div>
             ))}
           </div>
+          )}
 
           {/* Follow + Share */}
           <div className="flex items-stretch gap-2 mb-5">
@@ -535,55 +696,42 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
             </AppButton>
           </div>
 
-          {/* Socials */}
-          <div className="mb-5">
-            <span className="text-[10px] tracking-[1.8px] uppercase block mb-2.5"
-              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-              Socials
-            </span>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-1"
-              style={{ WebkitOverflowScrolling: 'touch' }}>
-              {[
-                { label: 'Instagram', icon: <BrandInstagram /> },
-                { label: 'TikTok', icon: <BrandTikTok isDark={isDark} /> },
-                { label: 'YouTube', icon: <BrandYouTube /> },
-                { label: 'Website', icon: <BrandWebsite isDark={isDark} /> },
-              ].map((s) => (
-                <AppButton key={s.label} whileTap={{ scale: 0.95 }}
-                  className="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer">
-                  <div className="relative w-[60px] h-[60px] rounded-2xl overflow-hidden flex items-center justify-center"
-                    style={{
-                      background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(20,18,40,0.85)',
-                    }}>
-                    <GlassReflection isDark={isDark} />
-                    <span className="relative z-10 flex items-center justify-center">{s.icon}</span>
-                  </div>
-                  <span className="text-[10px] tracking-[0.2px]"
-                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)' }}>
-                    {s.label}
-                  </span>
-                </AppButton>
-              ))}
+          {/* Socials — real links only (the backend profile's social_links). */}
+          {socialEntries.length > 0 && (
+            <div className="mb-5">
+              <span className="text-[10px] tracking-[1.8px] uppercase block mb-2.5"
+                style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
+                Socials
+              </span>
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-1"
+                style={{ WebkitOverflowScrolling: 'touch' }}>
+                {socialEntries.map(([key, url]) => (
+                  <a key={key} href={url} target="_blank" rel="noreferrer noopener"
+                    className="flex-shrink-0 flex flex-col items-center gap-1.5">
+                    <div className="relative w-[60px] h-[60px] rounded-2xl overflow-hidden flex items-center justify-center"
+                      style={{
+                        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                        color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(20,18,40,0.85)',
+                      }}>
+                      <GlassReflection isDark={isDark} />
+                      <span className="relative z-10 flex items-center justify-center">{socialIcon(key)}</span>
+                    </div>
+                    <span className="text-[10px] tracking-[0.2px] capitalize"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)' }}>
+                      {key}
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Events with segmented control */}
           {(() => {
-            const upcoming = (Array.isArray((organizer as any).upcomingEvents) && (organizer as any).upcomingEvents.length > 0)
-              ? (organizer as any).upcomingEvents
-              : [
-                  { name: 'Addis Vibes Festival', date: 'Mar 15, 2026', venue: 'Millennium Hall', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)' },
-                  { name: 'Skyline Sessions Vol. 4', date: 'Apr 02, 2026', venue: 'Sheraton Addis', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #d6f905 0%, #1a1a1a 100%)' },
-                  { name: 'Bahir Dar Lakeside', date: 'May 10, 2026', venue: 'Blue Nile Resort', city: 'Bahir Dar', gradient: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)' },
-                ];
-            const past = (Array.isArray((organizer as any).pastEvents) && (organizer as any).pastEvents.length > 0)
-              ? (organizer as any).pastEvents
-              : [
-                  { name: 'Digis Nights: NYE 2025', date: 'Dec 31, 2025', venue: 'Skylight Hotel', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', attendees: 2400 },
-                  { name: 'Meskel Square Live', date: 'Sep 27, 2025', venue: 'Meskel Square', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #7c3aed 0%, #4338ca 100%)', attendees: 5800 },
-                  { name: 'Lalibela Sunrise', date: 'Jan 07, 2025', venue: 'Ben Abeba', city: 'Lalibela', gradient: 'linear-gradient(135deg, #b45309 0%, #78350f 100%)', attendees: 1200 },
-                ];
+            // No fabricated history: there is no events-by-organizer endpoint
+            // (BACKEND_GAPS #49), so render only what the payload carries.
+            const upcoming = Array.isArray((organizer as any).upcomingEvents) ? (organizer as any).upcomingEvents : [];
+            const past = Array.isArray((organizer as any).pastEvents) ? (organizer as any).pastEvents : [];
             const active = eventsTab === 'upcoming' ? upcoming : past;
             const isPast = eventsTab === 'past';
             return (
@@ -605,6 +753,12 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                   })}
                 />
                 <div className="space-y-2">
+                  {active.length === 0 && (
+                    <p className="text-[12px] px-1 py-3"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
+                      No {eventsTab} events to show.
+                    </p>
+                  )}
                   {active.map((ev: any, i: number) => (
                     <AppButton key={ev.name + i} whileTap={{ scale: 0.99 }}
                       className="relative w-full flex items-center gap-3 overflow-hidden p-2.5 rounded-2xl text-left cursor-pointer"

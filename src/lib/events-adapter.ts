@@ -17,7 +17,8 @@
  *                          foreign_currency, event_type, seat_map,
  *                          answer_edit_window_hours, rsvp_going, rsvp_capacity,
  *                          allows_plus_one, max_guests, rsvp_requirements,
- *                          access_mode, invite_only_paid, on_guest_list.
+ *                          access_mode, invite_only_paid, on_guest_list,
+ *                          age_restriction.
  *                          `access_codes`/`guest_name`/`invite_tickets`
  *                          stay private by design.
  *   All 17 config keys are mapped below; `foreign_currency` is intentionally
@@ -154,6 +155,8 @@ export function backendEventToEvent(be: BackendEvent): Event {
     venue: date0?.venue?.name ?? "",
     city: date0?.venue?.city ?? "",
     organizer: be.organization?.name,
+    organizerId: be.organization?.id,
+    organizerSlug: be.organization?.slug,
     image,
     ...(imageThumb ? { imageThumb } : {}),
     images: gallery,
@@ -182,5 +185,10 @@ export function backendEventToEvent(be: BackendEvent): Event {
     accessMode: asEnum(config.access_mode, ["code", "guestlist", "both", "request"] as const),
     inviteOnlyPaid: asBoolean(config.invite_only_paid),
     onGuestList: asBoolean(config.on_guest_list),
+    ageRestriction: typeof config.age_restriction === "string" ? config.age_restriction : undefined,
+    lineup: Array.isArray(config.lineup) ? config.lineup : undefined,
+    organizers: Array.isArray(config.organizers) ? config.organizers : undefined,
+    inviteWaitlistOnly: asBoolean(config.invite_waitlist_only),
+    waitlistAhead: asNumber(config.waitlist_ahead),
   };
 }

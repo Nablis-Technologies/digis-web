@@ -3,7 +3,7 @@ import { Calendar, Clock, MapPin, Users } from 'lucide-react';
 import type { Event } from '@/types';
 import { InfoStrip } from './InfoCards';
 import { LineupSection } from './LineupSection';
-import { OrganizerCard, resolveOrganizers } from './OrganizerSection';
+import { OrganizerCard, OrganizerInline, resolveOrganizers } from './OrganizerSection';
 
 export function EventInfoRail({
   event,
@@ -77,7 +77,13 @@ export function EventInfoRail({
         <div className="mt-6 flex flex-col gap-5">
           <LineupSection lineup={event.lineup} isDark={isDark} compact />
 
-          <OrganizerCard organizers={organizers} isDark={isDark} compact />
+          {/* A single organizer shows its full profile inline (the same card the
+              popup would show); several keep the compact list + sheet. */}
+          {organizers.length === 1 ? (
+            <OrganizerInline organizer={organizers[0]} isDark={isDark} />
+          ) : (
+            <OrganizerCard organizers={organizers} isDark={isDark} compact />
+          )}
         </div>
       )}
     </motion.div>

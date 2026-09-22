@@ -162,6 +162,10 @@ export interface Event {
   description?: string;
   /** Display name of the organizer/promoter. */
   organizer?: string;
+  /** Backend organization id — the followable for organizer follow/unfollow. */
+  organizerId?: string;
+  /** Backend organization slug. */
+  organizerSlug?: string;
   /** Aggregate event rating (0–5). */
   rating?: number;
   /** Explicitly mark an event as sold out regardless of ticketsLeft. */
