@@ -37,10 +37,13 @@ export function InfoStrip({ items, rgb, reflectionSettings }: {
       <GlassReflection isDark={isDark} settings={reflectionSettings} />
       <div className="absolute inset-0 z-0 pointer-events-none"
         style={{ background: `radial-gradient(circle at 0% 0%, rgba(${r},${g},${b},0.15), transparent 60%)` }} />
-      <div className="relative z-10 grid grid-cols-2 lg:grid-cols-4 -ml-px -mt-px">
+      {/* Mobile keeps the 2×2 grid; on desktop each cell takes only the width
+          its content needs, spread across the full strip (justify-between) so
+          the row still spans the whole width together. */}
+      <div className="relative z-10 grid grid-cols-2 lg:flex lg:flex-nowrap lg:justify-between -ml-px -mt-px">
         {items.map((item) => (
           <div key={item.label}
-            className="flex flex-col gap-2 px-4 py-4 min-w-0"
+            className="flex flex-col gap-2 px-4 py-4 min-w-0 lg:px-5"
             style={{ borderLeft: `1px solid ${dividerColor}`, borderTop: `1px solid ${dividerColor}` }}>
             <div className="flex items-center gap-1.5" style={{ color: iconColor }}>
               {item.icon}
