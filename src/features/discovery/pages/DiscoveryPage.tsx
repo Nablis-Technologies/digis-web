@@ -1,7 +1,8 @@
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { eventsModule } from "@/lib/events";
+import { fetchCategories, categoryKeys } from "@/lib/categories";
 import { eventEnded } from "@/lib/eventDates";
 import { eventSoldOut } from "@/lib/eventAvailability";
 import { useTheme } from "@/app/components/ThemeContext";
@@ -70,6 +71,18 @@ export function EventDiscovery({
     queryKey: eventsModule.keys.all,
     queryFn: eventsModule.fetchAll,
   });
+
+  // Category pills come from the backend taxonomy (GET /categories), limited to
+  // the categories that actually have events so no pill leads to an empty grid.
+  const { data: backendCategories = [] } = useQuery({
+    queryKey: categoryKeys.all,
+    queryFn: fetchCategories,
+  });
+  const categoryNames = useMemo(() => {
+    const present = new Set(events.map((e) => e.category).filter((c): c is string => !!c));
+    const fromBackend = backendCategories.map((c) => c.name).filter((n) => present.has(n));
+    return fromBackend.length > 0 ? fromBackend : Array.from(present).sort();
+  }, [backendCategories, events]);
 
   const filteredEvents = useEventFilter(events, {
     searchQuery,
@@ -177,6 +190,7 @@ export function EventDiscovery({
       />
 
       <CategoryFilter
+        categories={categoryNames}
         selectedCategory={selectedCategory}
         onChange={setSelectedCategory}
       />
