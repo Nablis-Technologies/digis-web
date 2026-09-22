@@ -73,18 +73,6 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
     return () => document.removeEventListener('mousedown', handler);
   }, [openMenu]);
 
-  // Simulated real-time incoming notification
-  useEffect(() => {
-    const t = setTimeout(() => {
-      notificationsStore.push({
-        type: 'price',
-        title: 'New resale listing',
-        body: 'A standard ticket for Tibeb Sounds is now available.',
-      });
-    }, 18000);
-    return () => clearTimeout(t);
-  }, []);
-
   const accent = isDark ? '#d6f905' : '#d6f905';
   // Foreground accent for text/icons — lime is illegible on the light panel, so use dark ink.
   const accentFg = isDark ? '#d6f905' : '#0a0a0a';

@@ -50,7 +50,7 @@ export function EventInfoRail({
         </div>
       )}
 
-      {(!isInvite || inviteUnlocked) && (
+      {(!isInvite || inviteUnlocked) && event.description && (
         <div className="mt-5">
           <h2 className="text-[11px] tracking-[2px] uppercase mb-2.5"
             style={{
@@ -62,9 +62,7 @@ export function EventInfoRail({
           </h2>
           <p className="text-[13px] leading-relaxed font-light"
             style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>
-            Experience an unforgettable evening of music, culture, and community.
-            Join us for a celebration that brings together the best of Ethiopian
-            entertainment with world-class production.
+            {event.description}
           </p>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, HelpCircle, Users, Plus, Minus, Sparkles, CalendarCheck, UserPlus, CalendarPlus, Send, Copy, MessageCircle, Mail, Phone, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { CustomQuestion, RsvpStatus } from '@/types';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -22,20 +22,6 @@ interface RsvpSectionProps {
   onRegister: () => void;
   onRequestAuth: () => void;
 }
-
-const ATTENDEE_GRADIENTS = [
-  'linear-gradient(135deg, #1a1a1a 0%, #d6f905 100%)',
-  'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)',
-  'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
-  'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-  'linear-gradient(135deg, #fb923c 0%, #d6f905 100%)',
-  'linear-gradient(135deg, #f87171 0%, #dc2626 100%)',
-];
-
-const ATTENDEE_NAMES = [
-  'Selam', 'Dawit', 'Hanna', 'Yonas', 'Mahlet', 'Eyob',
-  'Tigist', 'Bereket', 'Liya', 'Naod', 'Saron', 'Abel',
-];
 
 function buildIcsDataUri(event: any): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -59,9 +45,10 @@ function buildIcsDataUri(event: any): string {
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
 }
 
+// Share the real, resolvable event route — never a fabricated domain.
 function buildShareUrl(event: any): string {
-  const slug = (event.name || 'event').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `https://digis.events/e/${slug}`;
+  const slug = event.slug || (event.name || 'event').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return `${typeof window === 'undefined' ? '' : window.location.origin}/events/${slug}`;
 }
 
 export function RsvpSection({ event, status, onStatusChange, guests, onGuestsChange, onRegister, onRequestAuth }: RsvpSectionProps) {
@@ -93,14 +80,6 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
     : undefined;
   const isFull = spotsLeft === 0;
   const isAlmostFull = spotsLeft != null && spotsLeft > 0 && spotsLeft <= capacity * 0.1;
-
-  const attendees = useMemo(() => {
-    return ATTENDEE_NAMES.slice(0, 6).map((n, i) => ({
-      name: n,
-      gradient: ATTENDEE_GRADIENTS[i % ATTENDEE_GRADIENTS.length],
-      initial: n[0],
-    }));
-  }, []);
 
   return (
     <div>
@@ -202,41 +181,14 @@ export function RsvpSection({ event, status, onStatusChange, guests, onGuestsCha
             </p>
           )}
 
-          {/* Attendee preview */}
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {attendees.map((a, i) => (
-                <motion.div key={a.name}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.05 * i, duration: 0.3 }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{
-                    background: a.gradient,
-                    border: `2px solid ${isDark ? '#0e0e14' : '#fff'}`,
-                    zIndex: 10 - i,
-                  }}>
-                  <span className="text-[11px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
-                    {a.initial}
-                  </span>
-                </motion.div>
-              ))}
-              <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{
-                  background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                  border: `2px solid ${isDark ? '#0e0e14' : '#fff'}`,
-                }}>
-                <span className="text-[9px] tracking-[0.5px]"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>
-                  +{Math.max(0, totalGoing - attendees.length)}
-                </span>
-              </div>
-            </div>
-            <p className="text-[11px] flex-1"
+          {/* Going count — backend-provided only; never fabricated. */}
+          {totalGoing != null && (
+            <p className="text-[11px]"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
-              <span style={{ color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)' }}>{attendees[0].name}</span>, {attendees[1].name} and {Math.max(0, totalGoing - 2)} others are going
+              <span style={{ color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)' }}>{totalGoing}</span>
+              {totalGoing === 1 ? ' person is going' : ' people are going'}
             </p>
-          </div>
+          )}
         </div>
       </motion.div>
 

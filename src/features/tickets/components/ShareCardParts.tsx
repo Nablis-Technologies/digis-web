@@ -6,7 +6,6 @@ import { getCategoryColor } from '@/lib/categoryColors';
 import { AppButton } from '@/components/primitives/AppButton';
 
 const BRAND = '#d6f905';
-const STATUS = 'Ticket Secured';
 
 export type ShareCardEvent = { name: string; date: string; time?: string; venue: string; image: string; category?: string; price?: number; };
 
@@ -43,6 +42,8 @@ type CardProps = {
   isVIP?: boolean;
   hued: string;        // "r,g,b" — image-extracted accent
   accentText: string;  // "r,g,b" — legibility-clamped accent for text on dark
+  /** True only when the user owns the ticket; drives the status pill copy. */
+  purchased?: boolean;
 };
 
 
@@ -117,14 +118,14 @@ export function TierBadge({ ticketType, isVIP, tier }: { ticketType?: string; is
 }
 
 /** Small status pill. */
-export function StatusChip({ accentText }: { accentText: string }) {
+export function StatusChip({ accentText, label = 'Ticket Secured' }: { accentText: string; label?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
       style={{
         fontFamily: "'Inter', sans-serif", fontWeight: 700,
         background: `rgba(${accentText},0.16)`, border: `1px solid rgba(${accentText},0.45)`, color: `rgb(${accentText})`,
       }}>
-      {STATUS}
+      {label}
     </span>
   );
 }
@@ -290,7 +291,7 @@ export function BoldCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
    CARD 2: AFTER DARK — cinematic full-bleed poster, huge title,
    verified trust mark, moody two-tone wash.
    ==================================================================== */
-export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentText }: CardProps) {
+export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentText, purchased }: CardProps) {
   const tier = tierTheme(ticketType, ticketLevel);
   const second = secondTone(hued);
   const titleSize = eventTitleSize(event.name, 46, 37, 30);
@@ -329,7 +330,7 @@ export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentT
           style={{ background: `rgba(${accentText},0.14)`, border: `1px solid rgba(${accentText},0.5)` }}>
           <Check className="w-3.5 h-3.5" strokeWidth={3} style={{ color: `rgb(${accentText})` }} />
           <span className="text-[11px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: `rgb(${accentText})` }}>
-            {STATUS}
+            {purchased ? 'Ticket Secured' : 'Get Tickets'}
           </span>
         </div>
 

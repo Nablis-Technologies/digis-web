@@ -161,7 +161,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
         </motion.div>
 
         {/* About — mobile/tablet only (desktop renders inside hero rail) */}
-        {(!isInvite || inviteUnlock.unlocked) && (
+        {(!isInvite || inviteUnlock.unlocked) && event.description && (
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-10 lg:hidden">
           <h2 className="text-[13px] tracking-[2px] uppercase mb-4"
             style={{
@@ -172,9 +172,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
           </h2>
           <p className="text-[14px] leading-relaxed font-light"
             style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.6)' }}>
-            Experience an unforgettable evening of music, culture, and community. 
-            Join us for a celebration that brings together the best of Ethiopian 
-            entertainment with world-class production.
+            {event.description}
           </p>
         </motion.div>
         )}
@@ -386,6 +384,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
           <ShareCard
             event={{
               name: event.name,
+              slug: event.slug,
               date: event.date,
               time: event.time,
               venue: event.venue,

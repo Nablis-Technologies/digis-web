@@ -419,6 +419,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
           <ShareCard
             event={{
               name: sharingTicket.eventName,
+              slug: sharingTicket.eventSlug,
               date: sharingTicket.eventDate,
               time: sharingTicket.eventTime,
               venue: sharingTicket.venue,

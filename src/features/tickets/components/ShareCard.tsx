@@ -13,6 +13,7 @@ import { toastError } from '@/lib/feedback';
 interface ShareCardProps {
   event: {
     name: string;
+    slug?: string;
     date: string;
     time?: string;
     venue: string;
@@ -31,11 +32,10 @@ type CardStyle = 'bold' | 'night' | 'stub';
 
 const BRAND = '#d6f905';
 const INK = '#0a0a0a';
-const STATUS = 'Ticket Secured';
 
 /* ── modal shell ─────────────────────────────────────────── */
 
-export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCardProps) {
+export function ShareCard({ event, ticketType, ticketLevel, purchased = false, onClose }: ShareCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVIP = ticketType?.toUpperCase().includes('VIP');
   const [activeStyle, setActiveStyle] = useState<CardStyle>('bold');
@@ -63,7 +63,11 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
   }, [event.name]);
 
   const handleCopyLink = () => {
-    copyText(`https://digis.app/event/${event.name.replace(/\s+/g, '-').toLowerCase()}`).then((didCopy) => {
+    // Real, resolvable event route — never a fabricated domain.
+    const slug = (event as { slug?: string }).slug
+      || event.name.replace(/\s+/g, '-').toLowerCase();
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    copyText(`${origin}/events/${slug}`).then((didCopy) => {
       if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
       else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
     });
@@ -75,7 +79,7 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
     { key: 'stub', label: 'Ticket Cut' },
   ];
 
-  const cardProps = { event, ticketType, ticketLevel, isVIP, hued, accentText };
+  const cardProps = { event, ticketType, ticketLevel, isVIP, hued, accentText, purchased };
 
   return (
     <motion.div
