@@ -25,6 +25,7 @@ import { AuthModal } from '@/features/auth/components/AuthModal';
 import { TopBar } from '@/components/TopBar';
 import { usePaymentReturnConfirmation, useGuestPaymentReturnConfirmation } from '@/lib/payment-return';
 import { closeCheckoutPopup } from '@/lib/checkout-popup';
+import { usePageTitle } from '@/lib/usePageTitle';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 import { AppButton } from '@/components/primitives/AppButton';
 
@@ -137,6 +138,18 @@ function AppContent() {
   useEffect(() => {
     if (detailMissing) navigate('/', { replace: true });
   }, [detailMissing, navigate]);
+  // Dynamic document title — the tab, history, and shared links name the current
+  // surface rather than a static "Digis".
+  usePageTitle(useMemo(() => {
+    const name =
+      selectedEvent ? selectedEvent.name :
+      currentView === 'tickets' ? (ticketId ? 'Ticket' : 'My Tickets') :
+      currentView === 'resale' ? (resaleEventSlug ? 'Resale listing' : 'Resale') :
+      currentView === 'profile' ? 'Profile' :
+      currentView === 'settings' ? 'Settings' :
+      'Discover events';
+    return `${name} · Digis`;
+  }, [selectedEvent, currentView, ticketId, resaleEventSlug]));
   const navigateToView = useCallback((view: AppView) => navigate(VIEW_PATHS[view]), [navigate]);
   const [resaleTicket, setResaleTicket] = useState<UserTicket | null>(null);
   // Search lives in the URL (?q=) so it is shareable, refresh-safe, and
@@ -757,6 +770,7 @@ function AuthRoute({ mode }: { mode: 'signin' | 'signup' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
+  usePageTitle(mode === 'signup' ? 'Create account · Digis' : 'Log in · Digis');
   const state = location.state as { returnTo?: string } | null;
   const returnTo =
     state?.returnTo && state.returnTo.startsWith('/') && !state.returnTo.startsWith('//')
@@ -817,6 +831,7 @@ function ResaleListingRedirect() {
 
 function ClaimRoute() {
   const navigate = useNavigate();
+  usePageTitle('Claim your ticket · Digis');
   const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
   const { isDark } = useTheme();
   const { id = '' } = useParams();
