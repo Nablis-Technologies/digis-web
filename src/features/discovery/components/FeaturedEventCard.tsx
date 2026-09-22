@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { ArrowUpRight, MapPin } from "lucide-react";
+import { ArrowUpRight, Lock, MapPin } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
@@ -10,6 +10,10 @@ import { EventDateBadge } from "@/components/EventDateBadge";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { AppButton } from '@/components/primitives/AppButton';
 import { eventActionLabel } from "@/lib/eventAction";
+
+// Invite-only distinguisher accent — a fixed amber, matching the grid card so a
+// gated event reads the same everywhere in discovery.
+const INVITE_ACCENT_RGB = "245,158,11";
 
 export function FeaturedEventCard({
   event,
@@ -73,7 +77,7 @@ export function FeaturedEventCard({
             }}
           />
 
-          <div className="absolute top-5 left-5">
+          <div className="absolute top-5 left-5 flex items-center gap-2">
             <div
               className="px-3 py-1.5 rounded-full text-[10px] tracking-[2px] uppercase"
               style={{
@@ -87,6 +91,22 @@ export function FeaturedEventCard({
             >
               {event.category}
             </div>
+            {event.eventType === "inviteOnly" && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[2px] uppercase"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color: `rgb(${INVITE_ACCENT_RGB})`,
+                  background: `rgba(${INVITE_ACCENT_RGB},0.16)`,
+                  border: `1px solid rgba(${INVITE_ACCENT_RGB},0.4)`,
+                  backdropFilter: "blur(12px)",
+                  fontWeight: 600,
+                }}
+              >
+                <Lock className="w-3 h-3" strokeWidth={2.5} />
+                Invite only
+              </div>
+            )}
           </div>
           <EventDateBadge date={event.date} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
           <div className="absolute bottom-3 left-5 right-5">

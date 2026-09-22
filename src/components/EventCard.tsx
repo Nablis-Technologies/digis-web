@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronRight, Clock, Hourglass, Lock, MapPin, Radio, CalendarX } from "lucide-react";
+import { ChevronRight, Clock, Lock, MapPin, Radio } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
@@ -11,6 +11,10 @@ import { glassShadow } from "@/lib/ui/glass";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { eventEnded } from "@/lib/eventDates";
 import { eventActionLabel } from "@/lib/eventAction";
+
+// Invite-only distinguisher accent — a fixed amber, deliberately not the
+// per-event category hue, so a gated event reads distinctly.
+const INVITE_ACCENT_RGB = "245,158,11";
 
 /** Combine an event's date ("June 29, 2026") + time ("8:00 PM") into a Date. */
 export function getEventStart(dateStr: string, timeStr?: string): Date {
@@ -145,34 +149,6 @@ export function CountdownBadge({ event }: { event: Event }) {
     return () => clearInterval(id);
   }, [urgency]);
 
-  // BACKEND_GAPS #34 mitigation: a past event stays on the grid but is flagged
-  // Ended (the backend still accepts orders for it; purchase is disabled on the
-  // detail page).
-  if (eventEnded(event)) {
-    return (
-      <div className="absolute bottom-3 right-3 z-20">
-        <motion.span
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center h-[22px] gap-1.5 px-2.5 rounded-full text-[9px] tracking-[1.2px] uppercase leading-none tabular-nums"
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontWeight: 700,
-            color: "#fff",
-            background: "rgba(10,10,10,0.55)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-          }}
-        >
-          <CalendarX className="w-2.5 h-2.5" strokeWidth={2.5} style={{ color: "#d6f905" }} />
-          <span style={{ color: "#d6f905" }}>Ended</span>
-        </motion.span>
-      </div>
-    );
-  }
-
   if (!urgency) return null;
 
   const diff = start.getTime() - now;
@@ -258,6 +234,11 @@ export function EventCard({
   // Sold out only when the backend says so — a missing tickets_left value
   // must not read as zero left.
   const isSoldOut = event.soldOut === true || event.ticketsLeft === 0;
+  // BACKEND_GAPS #34 mitigation: a past event stays on the grid but is flagged
+  // Ended — the same "not buyable" treatment as Sold Out (the backend still
+  // accepts orders for it; purchase is disabled on the detail page).
+  const isEnded = eventEnded(event);
+  const isInactive = isSoldOut || isEnded;
   const isLow =
     typeof event.ticketsLeft === "number" && event.ticketsLeft > 0 && event.ticketsLeft <= 45;
   const accent = isDark ? "#d6f905" : "#d6f905";
@@ -302,7 +283,7 @@ export function EventCard({
           fetchPriority={eager ? "high" : "auto"}
           decoding="async"
           style={{
-            filter: isSoldOut
+            filter: isInactive
               ? "saturate(0.3) brightness(0.65)"
               : "none",
           }}
@@ -315,7 +296,7 @@ export function EventCard({
           }}
         />
 
-        {isSoldOut && (
+        {isInactive && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9, rotate: -28 }}
             animate={{ opacity: 1, scale: 1, rotate: -28 }}
@@ -346,23 +327,25 @@ export function EventCard({
                   textShadow: `0 2px 10px rgba(0,0,0,0.5)`,
                 }}
               >
-                Sold Out
+                {isSoldOut ? "Sold Out" : "Ended"}
               </span>
             </div>
           </motion.div>
         )}
 
-        {/* Top-left: tickets left chip (only when the backend serves the count) */}
-        {!isSoldOut && typeof event.ticketsLeft === "number" && (
+        {/* Top-left status chip: invite-only takes precedence over the count —
+            a gated event isn't "N left", it's "Invite only" (and stays shown
+            even if the gated tier is sold out). */}
+        {!isEnded && (event.eventType === "inviteOnly" || (!isSoldOut && typeof event.ticketsLeft === "number")) && (
           <div className="absolute top-3 left-3 z-20">
             <motion.span
               animate={
-                isLow
+                isLow && event.eventType !== "inviteOnly"
                   ? { opacity: [0.72, 1, 0.72] }
                   : { opacity: 1 }
               }
               transition={
-                isLow
+                isLow && event.eventType !== "inviteOnly"
                   ? {
                       duration: 2,
                       repeat: Infinity,
@@ -373,30 +356,45 @@ export function EventCard({
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] tracking-[1.6px] uppercase leading-none"
               style={{
                 fontFamily: "'Inter', sans-serif",
-                background: isLow
-                  ? "rgba(220,38,38,0.88)"
-                  : "rgba(0,0,0,0.5)",
+                background:
+                  event.eventType === "inviteOnly"
+                    ? `rgba(${INVITE_ACCENT_RGB},0.9)`
+                    : isLow
+                      ? "rgba(220,38,38,0.88)"
+                      : "rgba(0,0,0,0.5)",
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
-                color: "#fff",
+                color: event.eventType === "inviteOnly" ? "#1a1200" : "#fff",
                 fontWeight: 600,
                 border: `1px solid ${
-                  isLow
+                  isLow || event.eventType === "inviteOnly"
                     ? "rgba(255,255,255,0.28)"
                     : "rgba(255,255,255,0.18)"
                 }`,
-                boxShadow: isLow
-                  ? "0 8px 20px rgba(220,38,38,0.25)"
-                  : "none",
+                boxShadow:
+                  event.eventType === "inviteOnly"
+                    ? "0 8px 20px rgba(245,158,11,0.3)"
+                    : isLow
+                      ? "0 8px 20px rgba(220,38,38,0.25)"
+                      : "none",
               }}
             >
-              {isLow && (
-                <span
-                  className="w-1 h-1 rounded-full"
-                  style={{ background: "#fff" }}
-                />
+              {event.eventType === "inviteOnly" ? (
+                <>
+                  <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
+                  Invite only
+                </>
+              ) : (
+                <>
+                  {isLow && (
+                    <span
+                      className="w-1 h-1 rounded-full"
+                      style={{ background: "#fff" }}
+                    />
+                  )}
+                  {event.ticketsLeft} Left
+                </>
               )}
-              {event.ticketsLeft} Left
             </motion.span>
           </div>
         )}
@@ -422,36 +420,10 @@ export function EventCard({
               </span>
             );
           })()}
-          {event.eventType === "inviteOnly" && (
-            <span
-              className="relative inline-flex items-center h-[22px] gap-1 overflow-hidden px-2 rounded-full text-[9px] tracking-[1.4px] uppercase leading-none"
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                background: "rgba(0,0,0,0.55)",
-                backdropFilter: "blur(10px)",
-                color: "#fff",
-                fontWeight: 600,
-              }}
-            >
-              <GlassReflection isDark={isDark} />
-              {event.inviteWaitlistOnly ? (
-                <Hourglass
-                  className="relative z-10 w-2.5 h-2.5"
-                  strokeWidth={2.25}
-                />
-              ) : (
-                <Lock
-                  className="relative z-10 w-2.5 h-2.5"
-                  strokeWidth={2.5}
-                />
-              )}
-              <span className="relative z-10">{event.inviteWaitlistOnly ? "Waitlist" : "Invite"}</span>
-            </span>
-          )}
         </div>
 
         {/* Live countdown — same-day & tomorrow only */}
-        {!isSoldOut && <CountdownBadge event={event} />}
+        {!isInactive && <CountdownBadge event={event} />}
       </div>
 
       {/* Footer */}
@@ -521,17 +493,17 @@ export function EventCard({
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full"
             style={{
-              background: isSoldOut
+              background: isInactive
                 ? isDark
                   ? "rgba(255,255,255,0.10)"
                   : "rgba(0,0,0,0.10)"
                 : accent,
-              color: isSoldOut
+              color: isInactive
                 ? isDark
                   ? "rgba(255,255,255,0.55)"
                   : "rgba(0,0,0,0.55)"
                 : "#0a0a0a",
-              border: isSoldOut
+              border: isInactive
                 ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}`
                 : "1px solid transparent",
               boxShadow: "none",
@@ -544,7 +516,7 @@ export function EventCard({
                 fontWeight: 700,
               }}
             >
-              {isSoldOut ? "Sold Out" : eventActionLabel(event.eventType)}
+              {isSoldOut ? "Sold Out" : isEnded ? "Ended" : eventActionLabel(event.eventType)}
             </span>
             <ChevronRight
               className="w-2.5 h-2.5"
