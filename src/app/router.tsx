@@ -246,46 +246,52 @@ function AppContent() {
   const isPaymentReturn =
     typeof window !== 'undefined' &&
     new URLSearchParams(location.search).get('status') === 'return';
-  // Event scope for the return confirmation: without it ANY fresh wallet
-  // ticket resolves the sheet — including an older purchase's ticket that
-  // landed first — so "View My Ticket" opens the wrong ticket.
-  const returnEventId = useMemo(() => {
+  // Return scope = the event + payment attempt the confirmation sheet
+  // reconciles against. Resolved ON DEMAND, never snapshotted at mount: the
+  // in-app popup flow writes `digis:payment-id:*` (and the guest creds) AFTER
+  // this component mounted, so a mount-time memo would miss them — the guest
+  // refresh poll would never start and the Chapa tab would never close.
+  // Keyed to the specific order when known, so a stale earlier order in
+  // storage is never reconciled by mistake.
+  const resolveReturnScope = (orderId?: string) => {
+    const read = (key: string) =>
+      sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
+    let eventId: string | undefined;
+    let paymentId: string | undefined;
     try {
       const urlEvent = new URLSearchParams(location.search).get('event_id');
-      if (urlEvent) return urlEvent;
-      for (let i = 0; i < sessionStorage.length; i++) {
+      if (urlEvent) eventId = urlEvent;
+      if (orderId) {
+        eventId = eventId ?? read(`digis:payment-event:${orderId}`) ?? undefined;
+        paymentId = read(`digis:payment-id:${orderId}`) ?? undefined;
+      }
+      for (let i = 0; !paymentId && i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith('digis:payment-id:')) {
+          const v = read(k);
+          if (v) paymentId = v;
+        }
+      }
+      for (let i = 0; !eventId && i < sessionStorage.length; i++) {
         const k = sessionStorage.key(i);
         if (k?.startsWith('digis:payment-event:')) {
           const v = sessionStorage.getItem(k);
-          if (v) return v;
+          if (v) eventId = v;
         }
       }
-    } catch { /* ignore */ }
-    return undefined;
-  }, [location.search, isPaymentReturn]);
-  // Buyer-owned attempt id persisted at redirect time (order.ts startPayment).
-  // Drives the POST /payments/:id/refresh reconciliation on the return screen.
-  const returnPaymentId = useMemo(() => {
-    try {
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const k = sessionStorage.key(i);
-        if (k?.startsWith('digis:payment-id:')) {
-          const v = sessionStorage.getItem(k) ?? window.localStorage.getItem(k);
-          if (v) return v;
-        }
-      }
-    } catch { /* ignore */ }
-    return undefined;
-  }, [location.search, isPaymentReturn]);
+    } catch { /* storage unavailable — scope stays empty */ }
+    return { eventId, paymentId };
+  };
+  const [returnScope, setReturnScope] = useState(() => resolveReturnScope());
   const returnController = usePaymentReturnConfirmation(
-    returnEventId,
+    returnScope.eventId,
     userTickets,
     isAuthenticated,
-    returnPaymentId,
+    returnScope.paymentId,
   );
   const guestReturnController = useGuestPaymentReturnConfirmation(
-    returnEventId,
-    returnPaymentId,
+    returnScope.eventId,
+    returnScope.paymentId,
   );
   const { state: returnState, start: startReturnConfirm } = returnController;
   const { state: guestReturnState, start: startGuestReturnConfirm } = guestReturnController;
@@ -321,6 +327,7 @@ function AppContent() {
     sp.delete('status');
     const next = sp.toString();
     navigate(location.pathname + (next ? `?${next}` : ''), { replace: true });
+    setReturnScope(resolveReturnScope());
     if (isAuthenticated) {
       kickReturnVerification();
       startReturnConfirm();
@@ -334,8 +341,15 @@ function AppContent() {
   // signals THIS still-open tab (digis:awaiting-confirm) to start confirming.
   // Keep the latest start fn in a ref so the listener never needs re-binding.
   const confirmStartRef = useRef<() => void>(() => {});
-  confirmStartRef.current = () =>
-    isAuthenticated ? startReturnConfirm() : startGuestReturnConfirm();
+  confirmStartRef.current = () => {
+    // `digis:awaiting-confirm` holds the order id whose hosted checkout just
+    // opened — resolve the scope for THAT order before starting the poll.
+    let orderId: string | undefined;
+    try { orderId = sessionStorage.getItem('digis:awaiting-confirm') ?? undefined; } catch { /* ignore */ }
+    setReturnScope(resolveReturnScope(orderId));
+    if (isAuthenticated) startReturnConfirm();
+    else startGuestReturnConfirm();
+  };
   useEffect(() => {
     const handler = () => confirmStartRef.current();
     window.addEventListener('digis:awaiting-confirm', handler);

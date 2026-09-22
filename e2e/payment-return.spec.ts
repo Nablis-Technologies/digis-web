@@ -56,3 +56,37 @@ test('payment return confirms when the wallet holds a ticket', async ({ page }) 
   expect(page.url()).not.toContain('payment=success');
   await expect(page.getByText('Scan at entry').first()).toBeVisible({ timeout: 15_000 });
 });
+
+test('guest in-app return reconciles with the payment id written after mount', async ({ page }) => {
+  // Regression: Chapa V2 opens the hosted checkout in a NEW tab, so the app tab
+  // is already mounted when `startPayment` writes `digis:payment-id:*` and the
+  // popup signals `digis:awaiting-confirm`. The return scope must be resolved at
+  // signal time — a mount-time snapshot missed it, so the guest refresh poll
+  // never ran and the Chapa tab never closed.
+  const refreshCalls: string[] = [];
+  await page.route('http://localhost:3000/public/events**', (r) => r.fulfill({ json: { success: true, data: [], pagination: {} } }));
+  await page.route('http://localhost:3000/categories**', (r) => r.fulfill({ json: { success: true, data: [] } }));
+  await page.route('http://localhost:3000/guest/payments/**/refresh', (r) => {
+    refreshCalls.push(r.request().url());
+    return r.fulfill({ json: { success: true, data: { state: 'ready', payment: {}, order: {}, tickets: [WALLET_WIRE] } } });
+  });
+
+  // Guest app mounts with no return storage yet.
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible({ timeout: 15_000 });
+
+  // startPayment writes these AFTER mount; then the hosted tab signals confirm.
+  await page.evaluate(() => {
+    sessionStorage.setItem('digis:awaiting-confirm', 'order-1');
+    sessionStorage.setItem('digis:payment-id:order-1', 'pay-1');
+    sessionStorage.setItem('digis:guest:quoteToken:order-1', 'qt-1');
+    sessionStorage.setItem('digis:guest:phone:order-1', '+251900000000');
+    sessionStorage.setItem('digis:payment-event:order-1', 'evt-1');
+    window.dispatchEvent(new Event('digis:awaiting-confirm'));
+  });
+
+  // The guest refresh runs (→ the Chapa tab would be closed), and the sheet
+  // confirms.
+  await expect.poll(() => refreshCalls.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect(page.getByText("You're going!")).toBeVisible({ timeout: 20_000 });
+});
