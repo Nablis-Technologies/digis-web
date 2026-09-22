@@ -21,7 +21,18 @@ Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
 ## Integration status (IMPORTANT)
 
 The frontend is being wired from 100% mock data to the real Rails backend.
-**The user is the FRONTEND developer — do NOT change the backend schema.**
+**The user is the FRONTEND developer — do NOT make backend product changes.**
+Backend product changes = architecture, schema/migrations, models, controllers,
+routes, serializers, policies, services — anything in `digis_backend` that
+changes what the API *is* or *returns*. When the frontend needs a backend surface
+that does not exist (or is wrong), **file it in `docs/BACKEND_GAPS.md`** for the
+backend developer to fix. Never implement it yourself, even when it would unblock
+you — an endpoint we wrote is not a resolved gap.
+
+The one exception is **dev-environment setup**: seeds, `config.hosts`, dev jobs,
+tunnels, helper scripts. That is setup, not a product change, and it belongs in a
+separate `chore(dev)` commit — never bundled with frontend work.
+
 Before doing integration work, read:
 
 - `docs/superpowers/plans/2026-08-28-frontend-backend-integration.md` — the plan
@@ -122,6 +133,11 @@ serializer/policy gap). **Setup is NOT a gap** — seeds, dev env config
 registration, API keys, webhook secret hashes, env vars, tunnels, deploys. Never
 file a setup chore as a gap.
 
+**Filing is the whole action.** Fixing a gap is backend product work and is never
+ours — do not patch `digis_backend` to close a gap, and do not mark a gap
+resolved because a local, uncommitted backend change makes it work. Only the
+backend developer's committed change resolves a gap.
+
 **When you discover a backend gap** (during verification, a live API probe, a
 code read, or a route grep) — **file it yourself in `docs/BACKEND_GAPS.md`
 immediately, without asking or re-explaining it in chat.** Give it the next
@@ -164,8 +180,27 @@ sweep is the rule that prevents that.
 - **#8** No `name` column/serializer — the signup form collects **Full name**
   and sends it, but the backend `permit`s it away (silently dropped). Blocking.
 - **#9** No self-service profile update (`PATCH /auth/me`)
+- **#39** No endpoint exposing payout `bank_slug`s, and `TYPES` is narrower than
+  the provider's rails → no payout method can be added. Blocking. The frontend is
+  currently wired to a **local, uncommitted** backend change — that does not
+  resolve the gap (see BACKEND_GAPS.md).
+- **#1** Public `event_setting.config` truncated to 2 keys
+  (`allow_waitlist`, `public_guest_limit`) — discovery degrades (featured,
+  sold_out, rating, seat_map, rsvp). It had been marked resolved by a **local-only
+  commit of ours**; re-filed open and the patch reverted.
+- **#43** RSVP rejects `access_code` / `invitation_token` → an audience-gated RSVP
+  event cannot be registered for. Blocking.
+- **#44** Event-level `event_type` / `access_mode` / `rsvp_*` config is inert and
+  unwritable → the public payload can't say rsvp vs inviteOnly vs ticketed.
+- **#45** RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored.
+- **#46–#51** Consumer surfaces with no backend (all filed in BACKEND_GAPS.md):
+  saved-events / home feed (`GET /feed` has no controller) / reviews / social
+  graph (#46), gift tickets (#47), account preferences + 2FA + password (#48),
+  public-event search/filter/sort/pagination (#49), wallet answers + capability
+  flags + buyer history (#50), events-by-followable + profile stats (#51),
+  venue/artist detail omit `is_following` (#52).
 
-Resolved (do NOT keep mocks against): #1 (config whitelist), #1b (detail-by-slug),
+Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),
 #3-nuance (`requires_ticket`), #4 (resale display fields), #5 (`GET /tickets`
 wallet), #6 (free orders fulfill), #7 (notifications — inbox live), #10 (signup
@@ -188,9 +223,7 @@ copyable "Ticket link" on guest tickets), #30 (parking products seeded with
 the true ticket "from" price), #16 (Chapa API V2 — `api.chapa.global`,
 `CHAPA_TEST_`/`CHAPA_LIVE_` keys), #26 (seller payout destination create now
 succeeds — Chapa V2 direct transfer; frontend rewired to the flat
-`bank_slug`/`account_number`/`holder_name` payload), #39 (seller-scoped
-`GET /marketplace/seller/payout_accounts/banks` + provider rail types; the
-frontend fetches destinations instead of hardcoding `telebirr`/`cbe`/`boa`).
+`bank_slug`/`account_number`/`holder_name` payload).
 
 ## Agent skills
 

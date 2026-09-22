@@ -37,6 +37,14 @@
 > exposed — G-07 — but still not enforced). Still open: #17, #8, #9, #33, #34,
 > #39. Informational: #11, #36, #37, #38. The dev `.env.chapa` had to migrate from
 > a V1 `CHASECK_TEST-` key to a V2 `CHAPA_TEST_` key to boot at all.
+>
+> **Re-verified 2026-09-21 against the local backend tree** (`dc1d9df` +7 unpushed;
+> `origin/feat/launch-hardening-telemetry` is stale at `a470c76`, 2026-09-14 — there
+> was nothing newer to pull). **Sweep result: every open gap is still open** — #17,
+> #40, #41, #8, #9, #33, #34, #42, #36, #37, #38. **#39 and #1 re-filed open**: both
+> had been marked resolved on the strength of patches *of ours* (uncommitted for
+> #39, a local-only commit for #1), which do not resolve a gap (see `AGENTS.md`).
+> Both have been reverted. No frontend wiring was needed.
 
 ## Status key
 
@@ -54,13 +62,24 @@
 |---|---|---|
 | 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
 | 40 | open — blocking | `ExpireCheckout` aborts the sweep on an elapsed-grace payment → abandoned checkouts never expire |
-| 39 | resolved | `GET /marketplace/seller/payout_accounts/banks` + provider rail types; frontend fetches destinations |
+| 39 | open — blocking | no endpoint exposing payout banks; `TYPES` too narrow for the provider's rails → no payout method can be added |
 | 41 | open — degrading | a released order permanently burns its registration (`idx_one_order_item_per_registration` ignores order status) |
 | 42 | open — degrading | wallet resale policy omits the percentage-cap basis → the seller can't know the max asking price |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 33 | open — degrading | guest payment-refresh re-validates the quote token on accepted payments |
 | 34 | open — degrading | past events remain purchasable (no date/sales-window check) |
+| 1 | open — degrading | public `event_setting.config` truncated to 2 keys — discovery degrades (featured / sold_out / rating / seat_map / rsvp) |
+| 43 | open — blocking | RSVP rejects `access_code` / `invitation_token` → an audience-gated RSVP event can never be registered for |
+| 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert + unwritable; only 2 keys exposed, neither seeded nor enforced |
+| 45 | open — degrading | RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored |
+| 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
+| 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
+| 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change/reset |
+| 49 | open — degrading | `GET /public/events` has no search/filter/sort/pagination; no events-by-organizer/artist/venue |
+| 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/registration/transfer history, unread-count/mark-all-read |
+| 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
+| 52 | open — degrading | `GET /venues/:id` and `/artists/:id` omit `is_following` (organizations has it) → follow state can't be read back |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 37 | informational | no public waitlist-join / invite-request endpoint |
@@ -139,6 +158,27 @@ config; the gap itself is the code path above.
 "start fresh".
 
 **Status: open — filed 2026-09-16 (frontend does not change backend code).**
+
+### #43. RSVP rejects `access_code` / `invitation_token` → audience-gated RSVP is impossible
+
+`Ticketing::PublicRsvpsController#create` permits only
+`ticket_type_id, phone, verification_token, package_quantity,
+selected_event_date_id, answers, consents`
+(`app/controllers/ticketing/public_rsvps_controller.rb:98-110`) — there is **no**
+`access_code` or `invitation_token`. `Ticketing::Rsvps::Submit` then delegates
+with a hard-coded empty proof: `audience_proof: {}`
+(`app/services/ticketing/rsvps/submit.rb:46`), so `Ticketing::Audience::Authorize`
+(`app/services/ticketing/registrations/submit.rb:50-54`) fails for any ticket type
+whose `audience != "public"`. Only the paid guest/auth registration endpoints
+accept audience proofs (`registrations_controller.rb:22`,
+`guest_registrations_controller.rb:28`).
+
+**Why it blocks:** a free RSVP event whose ticket type is `access_code`,
+`invitation`, or `code_or_invitation` cannot be registered for through the public
+RSVP flow at all — the code/token is never accepted.
+
+**Fix:** permit and forward `access_code` / `invitation_token` on both RSVP
+endpoints and pass them through as `audience_proof` to `Registrations::Submit`.
 
 ---
 
@@ -223,14 +263,24 @@ against this backend/provider, and the sole working destination is Chapa's
 `link` rail. Two backend-side issues combine: the `TYPES` allow-list is narrower
 than the provider's own `type` values, and there is no discovery endpoint.
 
-**Status: resolved 2026-09-18.** `GET /marketplace/seller/payout_accounts/banks`
-(seller-scoped) now returns the provider's supported destinations, and the rail
-`type` allow-list was widened to the provider's own types
-(`TYPES = %w[bank mobile_money store_value]`). The frontend fetches the list and
-renders it — no hardcoded slugs. Verified live: the endpoint returns
-`{ bank_slug: "link", bank_name: "Link", type: "store_value", … }` and a create
-with that pair returns 201 `pending_verification`; the same flow was driven
-through the real UI (resale → Payout methods → Add → Save) and persisted.
+**Status: open — verified 2026-09-18 (live 422/201 pair + serializer read).**
+This is a **backend product change** (new endpoint + widened `TYPES` + migration
+/ constraint), so the backend developer must make it — see the rule in
+`AGENTS.md`. A local, uncommitted implementation exists in `digis_backend`
+(`seller_payout_accounts_controller#banks`, `TYPES` widened, `config/routes.rb`,
+migration + `structure.sql`), but an uncommitted local patch does **not** resolve
+a gap; only the backend dev's committed change does.
+
+**Needed from the backend dev:**
+- `GET /marketplace/seller/payout_accounts/banks` (seller-scoped) returning the
+  provider's destinations (`bank_slug`, `bank_name`, `type`, …).
+- Widen `Marketplace::SellerPayoutAccount::TYPES` to the provider's own rail
+  types (`bank`, `mobile_money`, `store_value`), keeping
+  `marketplace_payout_accounts_type_check` in sync.
+
+**Frontend state:** currently wired to that endpoint (`src/lib/payout.ts` fetches
+the list instead of hardcoding slugs) — the payout-methods flow therefore depends
+on this gap landing.
 
 ### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column
 
@@ -305,9 +355,12 @@ sales window. `Orders::BuildQuote#normalize_item_request`
   dates `completed` when `ends_at` passes, nothing refuses a quote for a
   finished date.
 - the product sales window `sales_start_at` / `sales_end_at`
-  (`app/models/catalog/event_product.rb`). `Catalog::Public::ProductAvailability`
-  respects it but is DISPLAY-only; `Catalog::Inventory::Reserve` (box-office)
-  enforces it — the online guest/auth checkout path does not.
+  (`app/models/catalog/event_product.rb`). **Update 2026-09-21:** this IS now
+  enforced on the online path — `Catalog::Inventory::Reserve#validate_sales_window!`
+  (`app/services/catalog/inventory/reserve.rb:62-66`) runs for every item via
+  `CreateCheckout#reserve_inventory!` (`create_checkout.rb:256-269`), for both
+  authenticated and guest checkout. It blocks at order creation (surfacing as
+  `inventory_unavailable`), not at quote. `BuildQuote` still ignores it.
 - `Events::Event.publicly_visible` is `status: "published" AND visibility:
   "public"` with no date filter, so past published events stay listed/quotable.
 
@@ -323,13 +376,183 @@ only future dates; the discovery grid keeps the event visible with an "Ended"
 badge.
 
 **Fix (backend):** reject a quote when the event has no future purchasable date
-(or the requested event_date has passed / is `completed`/`cancelled`), and
-enforce the product `sales_end_at` window in `BuildQuote` (or
-`StartPaymentAttempt` as the last gate). Optionally auto-mark dates `completed`
-when `ends_at` passes and/or filter `publicly_visible` to events with a future
-date.
+(or the requested event_date has passed / is `completed`/`cancelled`). The
+`sales_end_at` half is already enforced at order creation (see above), so what
+remains is the event-date gate. Optionally auto-mark dates `completed` when
+`ends_at` passes and/or filter `publicly_visible` to events with a future date.
 
-**Status: open — verified 2026-09-09.**
+**Status: open (partial) — re-verified 2026-09-21.** The product sales window is
+enforced online; the event-date / `completed` gate is still absent, so a
+finished published event remains quotable and payable.
+
+### #1. Public `event_setting.config` projection truncated to 2 keys
+
+`Events::Public::EventSettingSerializer` whitelists only
+`%w[allow_waitlist public_guest_limit]`
+(`app/serializers/events/public/event_setting_serializer.rb:8`). The frontend
+`src/lib/events-adapter.ts` consumes 17 config keys for discovery: `featured`,
+`rating`, `sold_out`, `tickets_left`, `price_foreign_from_minor`,
+`foreign_currency`, `event_type`, `seat_map`, `answer_edit_window_hours`,
+`rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`,
+`rsvp_requirements`, `access_mode`, `invite_only_paid`, `on_guest_list`. Absent
+keys render **absent** (ADR-0002): no featured ordering, no Sold Out badge, no
+ratings, no seat map, no RSVP capacity/going counts.
+
+**Why it degrades:** the frontend cannot source the discovery config the design
+uses; those surfaces collapse to their empty/absent state.
+
+**Fix (backend):** widen `PUBLIC_CONFIG_KEYS` to the 17 public-safe keys the
+frontend consumes (or expose a dedicated public config projection).
+
+**Status: open — re-filed 2026-09-21.** It had been recorded resolved on the
+strength of a **local-only commit of ours** (`648d21d`, which widened the
+whitelist to 19 keys) that is **not on the backend branch** (`origin` still has
+the 2-key whitelist). A patch of ours does not resolve a gap (see `AGENTS.md`);
+that change has been reverted.
+
+### #44. Event-level `event_setting.config` type/access keys are inert and unwritable
+
+`event_type`, `access_mode`, `invite_only_paid`, `rsvp_going`, `rsvp_capacity`,
+`allows_plus_one`, `max_guests`, `rsvp_requirements` are written only by dev seeds
+(`db/seeds_events.rb:587-599`, `db/pazimo_seed.rb:63,117-121`) and are **never read
+by any application code** — the only real gates are
+`ticketing_ticket_types.audience` / `waitlist_enabled` / `approval_mode` and
+whether a product has a zero-amount price. There is **no API to read or write**
+`event_setting.config` (`Events::Create` writes `{}`; no EventSetting controller),
+and the two keys the public serializer *does* expose (`allow_waitlist`,
+`public_guest_limit`) are themselves never seeded or enforced.
+
+**Why it degrades:** the consumer frontend cannot distinguish `rsvp` /
+`inviteOnly` / `ticketed`, nor show going/capacity/plus-one — the event-level
+config is decorative. (See also #1: the public serializer strips it entirely.)
+
+**Fix:** decide whether the event-level type/access model is real. If yes, compute
+and expose it (extend `PUBLIC_CONFIG_KEYS`, read it in the RSVP/invite gates) and
+make it organizer-writable. If no, drop the inert keys so they stop implying a
+contract.
+
+### #45. RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored
+
+RSVP capacity is enforced only implicitly by `Catalog::Inventory::Reserve`
+(`app/services/ticketing/registrations/support.rb:32-40`); a full RSVP surfaces as
+a generic reserve failure, not a dedicated `rsvp_capacity_reached`, and nothing
+enqueues the attendee into a waitlist (`Ticketing::Rsvps::Submit` has no
+waitlist branch). `rsvp_capacity` (event config) is ignored; `public_guest_limit`
+is exposed but never enforced; there is no public going/capacity counter.
+
+**Why it degrades:** the UI cannot honestly show "full" or offer a waitlist — the
+RSVP section currently renders "At capacity · Waitlist open" with no action.
+
+**Fix:** return a dedicated full/capacity code and, when `waitlist_enabled`,
+auto-enqueue (or expose capacity/going counts so the frontend can render
+honestly). Related: #37 (no public waitlist-join endpoint).
+
+### #46. No saved-events / favourites, home feed, reviews, or social graph
+
+`POST/DELETE /events/:id/save` + `GET /saved_events` do not exist (no
+saved/wishlist/favourite table). The **`GET /feed` route is declared but broken**:
+`config/routes.rb` points it at `core/feed#index`, yet there is **no
+`app/controllers/core/feed_controller.rb`**. There is no consumer review/rating
+endpoint (`core_reviews` is the organizer-verification workflow), and no
+user-to-user follow/friends/suggestions (follows are one-directional to
+`venues|artists|organizations` only).
+
+**Frontend today:** the event hero heart is local-only (`EventDetailPage.tsx`),
+and Profile/RSVP render fabricated "suggested friends" (now removed) — nothing
+persists.
+
+**Fix:** a saved-events table + routes; implement `Core::FeedController` (or drop
+the route); a consumer reviews endpoint; optional social graph.
+
+### #47. No gift-ticket endpoint
+
+There is no `POST /tickets/:id/gift` or gift-claim flow anywhere in the backend.
+`GiftTicketDialog.tsx` fabricates a client-side `#gift/<id>` link and its `onSend`
+is never invoked — a re-skinned transfer with a dead link.
+
+**Fix (if the product wants gifting):** a gift command + a public claim flow
+(like transfers), or remove the gift entry point.
+
+### #48. No consumer account preferences, 2FA, or password change/reset
+
+No user-preference surface (language/currency/region), no 2FA (enroll/verify/
+disable, recovery codes), and no password change/forgot/reset. `GET /auth/me` is
+read-only and `Core::User` has no name/photo/preferences columns (see #8, #9).
+Settings renders language/currency/region pickers, a "Public profile" toggle, a
+2FA sheet, and a disabled "Change password · Coming soon" row — all local-only.
+
+**Fix:** `PATCH /auth/me` (with name/photo/preferences — #9), password-change +
+reset endpoints, and a 2FA surface if required.
+
+### #49. `GET /public/events` has no search/filter/sort/pagination
+
+`Events::PublicEventsController#index` applies no query/category/city/date/price
+filters, no sort, and no `Core::Pagination` — it returns the full set ordered
+`published_at desc`. There is also no `GET /organizations/:id/events`,
+`/artists/:id/events`, or `/venues/:id/events`.
+
+**Frontend today:** discovery search/filter/sort runs client-side over a single
+page (`useEventFilter.ts`), so it silently misses events beyond page one.
+
+**Fix:** server-side query/category/city/date/price/sort + pagination on the
+public events index; events-by-followable endpoints.
+
+### #50. Wallet & history gaps
+
+`TicketWalletSerializer` omits the ticket's **registration answers and edit
+window**, so `EditTicketAnswersDialog` can never open for a live ticket (the
+backend *does* expose `POST /registration_answers/:id/revise`, but the wallet
+carries no answer ids/window). It also has no per-ticket `can_transfer` /
+`can_resell` / `can_cancel`. Separately there is no `GET /orders`,
+`GET /registrations`, `GET /tickets/:id`, `GET /ticket_transfers` (incoming), or
+`GET /credential_claims` (pending), and no `GET /notifications/unread_count` /
+`POST /notifications/read_all`.
+
+**Fix:** project answers + `answers_editable_until` + capability flags on the
+wallet serializer; add buyer-scoped list endpoints; add unread-count/mark-all.
+
+### #51. No events-by-followable; no profile stats
+
+**Corrected 2026-09-21.** The public DETAIL endpoints *do* carry stats/socials —
+`GET /organizations/:id` exposes `description`, `social_links`, `events_count`,
+`follower_count`, `verified`, `is_following`; `/venues/:id` and `/artists/:id`
+expose `is_following` too. The event payload's organization summary is minimal by
+design. The frontend now fetches the organization profile and wires follow/unfollow
+(`src/lib/organizations.ts`, `src/lib/follows.ts`).
+
+What remains genuinely missing:
+- **event history per followable** — there is no `GET /organizations|venues|artists/:id/events`
+  (see #49), so the organizer/venue/artist "upcoming/past" lists cannot be sourced;
+  the fabricated lists were removed.
+- **venue stats/amenities** — `VenueSummarySerializer` has no media/coords (#36);
+  the venue sheet's followers/amenities/history were fabricated (still to remove).
+- **profile gamification** — ProfilePage's tier/XP/events-attended/total-spent/
+  achievements have no backend surface at all (product decision).
+
+**Fix:** events-by-followable (#49); venue media/coords (#36); decide gamification.
+
+### #52. Venue/artist detail omit `is_following`
+
+`GET /venues/:id` (`app/serializers/events/public/venue_detail_serializer.rb`) and
+`GET /artists/:id` expose the profile (description, socials, media, coords,
+`follower_count`) but **not `is_following`** — only
+`Organizations::Public::OrganizationDetailSerializer` has it
+(`organization_detail_serializer.rb:13,24-26`). The follow write-path works for
+all three (`POST|DELETE /:type/:id/follow`, type `venues|artists|organizations`,
+`config/routes.rb:68-73`) and returns `{ following, follower_count }`, so only the
+*initial* read is missing: a profile sheet cannot show whether the user already
+follows the entity.
+
+**Fix:** add `attribute :is_following { object.followed_by?(instance_options[:current_user]) }`
+to the venue + artist detail serializers (mirroring the organization one) and to
+their policy `VISIBILITY[:show]` field lists.
+
+### #49 addendum — no city aggregation
+
+There is no endpoint returning cities (or events-by-city counts); `GET /venues`
+filters by `?city=` but does not aggregate. The frontend derives cities
+client-side from the loaded events (no counts). A `/cities` (or counts on the
+venue list serializer) would be needed for a counted location picker.
 
 ---
 
@@ -486,7 +709,6 @@ history). Every item below was re-verified against the pulled
 | 5 | `GET /tickets` owner wallet (`TicketWalletSerializer`) | live HTTP + frontend wired |
 | 6 | Free orders fulfill → issue tickets (`accept_zero_total!`) | code |
 | 15 | Mock-mirror dev events seeded with `platform_default` fee schedule | live 2026-09-04 |
-| 1 | `PUBLIC_CONFIG_KEYS` 19-key projection — `event_setting_serializer.rb`; frontend `events-adapter.ts` maps all 17 keys (`featured`, `rating`, `sold_out`, `tickets_left`, `event_type`, `seat_map`, `rsvp_*`, `access_mode`, `invite_only_paid`, `price_foreign_from_minor`, …) | live HTTP 2026-09-10 (mirror events serve `featured`×8, `sold_out`×11, `seat_map`×3) |
 | 13 | `price_from_minor` computed on the public list serializer | live HTTP 2026-09-08 (`on-on` → 10000) |
 | 3-nuance | `requires_ticket` projected from product `metadata` | code 2026-09-08 |
 | 19 | Public `GET public/events/:slug/ticket_types/:id/registration_schema` | live HTTP 2026-09-08 |
@@ -498,7 +720,7 @@ history). Every item below was re-verified against the pulled
 | 12 | `Core::AuthThrottle` 10/min per IP + identifier on auth endpoints | code 2026-09-08 |
 | 18 | `POST /payments/:id/refresh` buyer-scoped reconciliation + frontend return-screen wiring (`ready`/`pending`/`terminal`) | code + live HTTP 2026-09-08 |
 | 20 | Audience gating — `POST ticketing/audience_authorizations` + `GatedTierGate` frontend wiring | live HTTP 2026-09-08 |
-| 7 (notifications) | `GET /notifications` + `POST /notifications/:id/read` + preferences live; TopBar bell wired | live HTTP 2026-09-08 |
+| 7 (notifications) | `GET /notifications` + `POST /notifications/:id/read` live; TopBar bell wired. **Preferences now wired too** (2026-09-21): Settings renders per-channel toggles (in_app / email / sms) from `GET`/`PATCH /notification_preferences` | live HTTP 2026-09-08; preferences wired 2026-09-21 |
 | 28 | Dev DB re-synced to the edited `create_payments` migration (`structure.sql` regenerated) | live 2026-09-08 |
 | 14 | Guest shadow checkout: OTP flow, guest registration, guest quote/order/payment, claim-guest upgrade, public ticket views (backend complete; frontend slices 1–3 wired) | code + live HTTP 2026-09-09 |
 | 30 (crash half) | `Parking::FulfillOrderItem` keyword-arg crash fixed (`status:` keyword) | code 2026-09-09 |

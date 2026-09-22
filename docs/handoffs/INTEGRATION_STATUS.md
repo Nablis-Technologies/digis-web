@@ -7,6 +7,85 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-21 — full gap sweep; NO backend fixes landed; #39 re-filed open
+
+**Backend source:** `origin/feat/launch-hardening-telemetry` is **stale** (last push
+`a470c76`, 2026-09-14); the local clone is **7 commits ahead, unpushed** — so the
+local working tree is the latest code available. Swept all 12 open gaps against it
+(local `dc1d9df` + uncommitted). **Result: none fixed.** No frontend wiring needed.
+
+| Gap | Verdict (committed backend) |
+|---|---|
+| #17 `cbe` payment method | not fixed — `fee_component.rb:23` = `%w[telebirr card bank]` |
+| #40 `ExpireCheckout` aborts the sweep | not fixed — `expire_checkout.rb:63` still raises `ExpiryFailure` |
+| #41 released order burns registration | not fixed — `idx_one_order_item_per_registration` unchanged |
+| #8 user `name` | not fixed — no column / serializer field / `permit :name` |
+| #9 `PATCH /auth/me` | not fixed — routes expose `GET auth/me` only |
+| #33 guest refresh re-decodes quote token | not fixed — `guest_payment_refresh_controller.rb:15-23` |
+| #34 past events purchasable | not fixed — `build_quote.rb` has no date/sales-window check |
+| #42 wallet cap basis | not fixed — `ticket_wallet_serializer.rb:29-45` |
+| #36 public participants + venue media/coords | not fixed — `venue_summary` = `{id,name,city}` |
+| #37 public waitlist / access-request | not fixed — waitlist routes are authenticated only |
+| #38 `requires_ticket` enforcement | not fixed — no `requires_ticket` in `app/services/orders/` |
+| #39 payout banks endpoint | **re-filed open** — only "fixed" by our uncommitted local patch |
+| #1 `event_setting.config` 2-key whitelist | **re-filed open** — only "fixed" by our local-only commit `648d21d` |
+
+**#39 re-filed open (blocking).** It had been marked resolved on the strength of a
+local, uncommitted backend patch (`seller_payout_accounts_controller#banks`, widened
+`TYPES`, route, migration, `structure.sql`). The frontend is currently wired to that
+endpoint (`src/lib/payout.ts`), so the payout-methods flow depends on the backend dev
+landing the fix — it should be un-wired (disabled/hidden) per ADR-0002 until then.
+
+**Rule recorded in `AGENTS.md`:** no backend product changes (architecture, schema
+/migrations, models, controllers, routes, serializers, policies, services) — file
+them in `BACKEND_GAPS.md`. Dev-environment setup is the only exception and goes in a
+separate `chore(dev)` commit. "Filing is the whole action": a local, uncommitted
+patch does not resolve a gap.
+
+**#1 re-filed open too.** A second product change of ours was found in the audit:
+`648d21d` (local-only, not on `origin`) widened `EventSettingSerializer`
+`PUBLIC_CONFIG_KEYS` from 2 to 19 keys. `origin` still has the 2-key whitelist, so
+discovery config (`featured`, `sold_out`, `rating`, `seat_map`, `rsvp_*`) is an open
+gap — the frontend degrades to absent. The serializer has been reverted to the 2-key
+version.
+
+**Full re-verification of EVERY gap (open + resolved) — 2026-09-21.** Re-checked
+against the whole backend tree, not just the new commits. **No open gap is fixed:**
+#17, #40, #41, #8, #9, #33, #34, #42, #36, #37, #38, #11. One correction: **#34 is
+partial** — the product `sales_end_at` window *is* enforced online at order creation
+(`Catalog::Inventory::Reserve#validate_sales_window!` via `CreateCheckout`); only the
+event-date / `completed` gate is missing. The resolved archive has **no backend
+regressions**, but three gaps are under-wired on the frontend:
+
+- **#7 notification preferences — WIRED (2026-09-21).** Backend has `GET`/`PATCH
+  /notification_preferences` (category × channel: `transactional/security/credential/
+  legal` × `in_app/email/sms`). Settings now renders **per-channel** toggles (Push =
+  `in_app`, Email = `email`, Text messages = `sms`); each toggle writes every category
+  on its channel. The two toggles with no backend equivalent (Event reminders, Resale
+  alerts) were removed. Lib: `src/lib/notifications.ts`
+  (`fetchNotificationPreferences` / `channelPreferences` / `updateChannelPreference`),
+  unit-tested.
+- **#19 registration schema `response_scope`** — schema + `form_version_id` wired,
+  but per-slot answers (`package_unit_number` / `admission_position`) are never
+  rendered or submitted.
+- **#27 public RSVP** — wired but unreachable on the committed backend: `event_type`
+  comes from `event_setting.config` (open #1) and zero-price RSVP tiers are filtered
+  out of `displayTicketTypes`.
+
+**Mock/placeholder sweep + wiring (2026-09-21, later).** Inventoried every remaining
+mock/stub surface and wired the ones whose backend exists:
+- Event **About** now renders the real `event.description` (was hardcoded on every event).
+- **Share links** now use the real `/events/:slug` route (ShareCard + RsvpSection); the
+  ShareCard status is honest ("Ticket Secured" only when `purchased`, else "Get Tickets").
+- Removed fabricated data: the simulated TopBar notification, the guest notification
+  seed, and the RSVP attendee / suggested-friends lists.
+- **Organizer follow is now real** — `src/lib/follows.ts` → `POST|DELETE
+  /organizations/:id/follow`; the fabricated demo co-hosts and invented stats are gone,
+  and the profile sheet fetches `GET /organizations/:id` (description / counts / socials)
+  with honest absent/empty states (`src/lib/organizations.ts`).
+- Filed **#46–#51** for the surfaces with no backend. Mocks are intentionally **kept**
+  (unused) for now.
+
 ## Session 2026-09-16 — Chapa V2 payments WORK end-to-end locally (HTTPS tunnels); #40 filed
 
 **Tunnels:** the **backend** is exposed over public HTTPS by a **stable ngrok dev
