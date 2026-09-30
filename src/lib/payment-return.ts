@@ -113,9 +113,7 @@ export function useGuestPaymentReturnConfirmation(
         return;
       }
       try {
-        const result = await orderModule.guestRefreshPayment(
-          paymentId, guestCreds.quoteToken, guestCreds.phone,
-        );
+        const result = await orderModule.guestRefreshPayment(paymentId, guestCreds);
         if (!alive) return;
         if (result.state === 'ready') {
           const scoped = (result.tickets ?? [])

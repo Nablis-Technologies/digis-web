@@ -1,10 +1,11 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { orderModule, type CheckoutOrder, type OrderQuote } from '@/lib/order';
+import { orderModule, type OrderQuote } from '@/lib/order';
 import { ticketsService } from '@/lib/tickets';
 import { clearCheckoutResumeKeys } from '@/lib/payment-return';
 import { openHostedCheckout as openHostedCheckoutTab } from '@/lib/checkout-popup';
 import { registrationModule, type ConsentDocument } from '@/lib/registration';
+import { admissionModule, type AdmissionResult } from '@/lib/admission';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { ApiError, messageForCode } from '@/lib/errors';
 import { randomUuid } from '@/lib/api';
@@ -224,57 +225,20 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
 
   const completeCheckoutMutation = useMutation({
     mutationKey: ['checkout', 'complete'],
-    // Returns the order + payment attempt (`payment` is null for free orders,
-    // which the backend fulfills without payment). A Chapa attempt comes back
-    // status "processing" with a checkout_url the buyer must be redirected to.
-    mutationFn: async ({ quoteToken, eventId: evId, payMethod: method, guestPhone }: { quoteToken?: string; eventId?: string; payMethod: PaymentMethod; guestPhone?: string }) => {
-      // Mirror the backend order pipeline: create order from the quote token,
-      // then start a payment attempt. The backend charges total_minor
-      // server-side. A prior dead checkout bound to this registration makes
-      // order creation 409 (idempotency_conflict, via
-      // idx_one_order_item_per_registration) — recover through restart, which
-      // closes the dead order and creates the replacement with the same
-      // registration.
-      const order = await orderModule.createOrder({ eventId: evId, quoteToken: quoteToken ?? '', guestPhone }).catch(async (createError) => {
-        const stuck = stuckOrderIdRef.current;
-        if (!stuck) throw createError;
-        // 409 (same registration bound to the dead checkout) → restart it.
-        if (createError instanceof ApiError && createError.status === 409) {
-          return restartStuckCheckout(stuck, quoteToken ?? '');
-        }
-        // 422 active_checkout_exists (a retry after the order was already
-        // created — e.g. failed payment init, back-navigation, double Pay):
-        // restart the stuck checkout instead of dead-ending for 10 minutes.
-        if (createError instanceof ApiError && createError.code === 'active_checkout_exists') {
-          return restartStuckCheckout(stuck, quoteToken ?? '');
-        }
-        throw createError;
-      });
-      stuckOrderIdRef.current = order.id;
-      if (stuckOrderKey) {
-        try {
-          // Persist across sessions: a buyer who abandons a Chapa checkout and
-          // returns (fresh tab/browser) must be able to resume it — the backend
-          // 409s order creation with active_checkout_exists and Chapa's hosted
-          // checkout_url stays reopenable for its retry window.
-          window.localStorage.setItem(stuckOrderKey, order.id);
-          sessionStorage.setItem(stuckOrderKey, order.id);
-        } catch { /* storage unavailable — resume just won't survive reload */ }
-      }
-      // Free orders (RSVP / fully discounted) carry no payable amount — the
-      // backend fulfills them server-side, and StartPaymentAttempt rejects
-      // total_minor <= 0 with payment_amount_invalid. Skip the attempt.
-      if (order.total_minor === 0) return { order, payment: null };
-      const guest = guestPhone && quoteToken ? { quoteToken, phone: guestPhone } : undefined;
-      const { payment } = await orderModule.startPayment({ orderId: order.id, provider: 'chapa', paymentMethod: method, eventId: evId, guest });
-      return { order, payment };
+    // Admission selection → registration(s) + quote + ONE order. The backend
+    // owns pricing, registration, and idempotency (its replay store replaces
+    // the old register → quote → create-order pipeline). payNow branches on the
+    // returned `next_action`.
+    mutationFn: async ({ guestPhone }: { payMethod: PaymentMethod; guestPhone?: string }): Promise<AdmissionResult> => {
+      return admissionModule.create(
+        eventSlug!,
+        buildSelectionInput(guestPhone),
+        checkoutKeyRef.current ?? randomUuid(),
+      );
     },
-    // Success/error are handled PER-CALL in payNow (the only caller). TanStack
-    // Query v5 fires BOTH the hook-level and the mutate-level callbacks, so a
-    // handler here would double-run the open/finalize logic for every attempt.
   });
 
-  const finalizeSuccess = (order: CheckoutOrder) => {
+  const finalizeSuccess = (order: { id: string }) => {
     // Terminal outcome — drop per-checkout resume keys so the NEXT purchase
     // of the same tier starts fresh instead of replaying this registration.
     clearCheckoutResumeKeys();
@@ -544,80 +508,42 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   };
 
   /**
-   * Submit the registration (Phase 3). Returns the registration outcome's
-   * next_action. Only "requires_order" proceeds to quote/order — manual
-   * ticket types come back "awaiting_approval" (organizer decides via the
-   * backend decision endpoints; no buyer action exists) and free automatic
-   * types "requires_confirmation" (ConfirmFree has no buyer route; the
-   * confirm path is organizer/complimentary-side).
+   * Build the admission selection from the cart. The backend turns this into
+   * the registration(s) + quote + ONE order (replacing the old
+   * register → quote → create-order pipeline). Only consents the buyer actually
+   * accepted are sent; the backend re-validates required ones.
    */
-  const submitRegistration = async (): Promise<string | null> => {
-    if (!isLiveTicket || registrationId) return 'requires_order';
-    // Required consents must be loaded AND accepted — the backend rejects a
-    // registration whose required buyer consents carry no acceptance.
-    if (consentsError) { setRegistrationError(consentsError); return null; }
-    if (consentsLoading) { setRegistrationError('Loading event terms...'); return null; }
-    const missing = consents.filter((c) => c.required && !acceptedConsents[c.versionId]);
-    if (missing.length > 0) {
-      setRegistrationError(`Please accept ${missing[0].title} to continue.`);
-      return null;
-    }
-    if (registeringRef.current) return null;
-    registeringRef.current = true;
-    setRegistrationError(undefined);
-    try {
-      const requiredConsents = consents.filter((c) => c.required && acceptedConsents[c.versionId]);
-      const regPhone = user?.phone ?? contactDetails.phone;
-      const outcome = isAuthenticated
-        ? await registrationModule.register({
-            ticketTypeId: ticketTypeId!,
-            phone: regPhone,
-            packageQuantity: quantity,
-            selectedEventDateId,
-            formVersionId: formVersionId ?? undefined,
-            answers: questions.map((q) => ({ questionKey: q.id, value: answers[q.id] })),
-            consents: requiredConsents,
-            ...(accessCode ? { accessCode } : {}),
-            ...(invitationToken ? { invitationToken } : {}),
-            idempotencyKey: checkoutKeyRef.current ?? randomUuid(),
-            requestUuid: checkoutKeyRef.current ?? randomUuid(),
-          })
-        : await registrationModule.guestRegister({
-            ticketTypeId: ticketTypeId!,
-            phone: regPhone,
-            fullName: contactDetails.name || undefined,
-            email: contactDetails.email || undefined,
-            packageQuantity: quantity,
-            selectedEventDateId,
-            formVersionId: formVersionId ?? undefined,
-            answers: questions.map((q) => ({ questionKey: q.id, value: answers[q.id] })),
-            consents: requiredConsents,
-            ...(accessCode ? { accessCode } : {}),
-            ...(invitationToken ? { invitationToken } : {}),
-            idempotencyKey: checkoutKeyRef.current ?? randomUuid(),
-            requestUuid: checkoutKeyRef.current ?? randomUuid(),
-          });
-      // Capture synchronously — goNext's fresh quote reads the local, not the
-      // async state update that would only land on the next render.
-      registrationIdRef.current = outcome.registrationId;
-      setRegistrationId(outcome.registrationId);
-      return outcome.nextAction;
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'active_registration_conflict') {
-        // Registration from an EARLIER checkout (not this tab's retry —
-        // retries replay the same digest and succeed). Never a dead-end:
-        // open the choice sheet (continue that checkout / view Tickets).
-        openConflictSheet('registration');
-        return null;
-      }
-      const msg = e instanceof ApiError
-        ? messageForCode(e.code, e.message)
-        : 'Registration failed. Please try again.';
-      setRegistrationError(msg);
-      return null;
-    } finally {
-      registeringRef.current = false;
-    }
+  const buildSelectionInput = (guestPhone?: string) => {
+    const accepted = consents.filter((c) => acceptedConsents[c.versionId]);
+    const ticketItem = {
+      eventProductId: ticketProductId ?? `ticket:${ticketType}`,
+      quantity,
+      ...(selectedEventDateId ? { selectedEventDateId } : {}),
+      ...(accessCode ? { accessCode } : {}),
+      ...(invitationToken ? { invitationToken } : {}),
+      answers: questions.map((q) => ({
+        ...(formVersionId ? { formVersionId } : {}),
+        questionKey: q.id,
+        value: answers[q.id],
+      })),
+      consents: accepted,
+    };
+    const addOnItems = addOns
+      .filter((a) => a.quantity > 0)
+      .map((a) => ({ eventProductId: a.productId, quantity: a.quantity, answers: [], consents: [] }));
+    return {
+      items: [ticketItem, ...addOnItems],
+      chargeCurrency: 'ETB' as const,
+      ...(promoCode ? { promotionCode: promoCode } : {}),
+      ...(!isAuthenticated && guestPhone
+        ? {
+            phone: guestPhone,
+            phoneConfirmation: true,
+            ...(contactDetails.name ? { fullName: contactDetails.name } : {}),
+            ...(contactDetails.email ? { email: contactDetails.email } : {}),
+          }
+        : {}),
+    };
   };
 
   const goNext = async () => {
@@ -670,150 +596,69 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   };
 
   const payNow = async () => {
-      // Resume path: a previous Pay already started a hosted payment for the
-      // stuck order (we redirected or the tab reloaded). Restarting would 409
-      // checkout_restart_payment_in_progress — send the buyer back to the
-      // payment page instead of creating a duplicate order.
-      const stuck = stuckOrderIdRef.current;
-      if (stuck && !registrationId && !registrationIdRef.current) {
-        const resumeUrl = readResumeUrl(stuck);
-        if (resumeUrl) {
-          window.location.href = resumeUrl;
-          return;
-        }
-        // Stale pointer to a finished checkout: drop it so this Pay starts a
-        // genuinely new order instead of restarting a dead one.
-        stuckOrderIdRef.current = undefined;
-        if (stuckOrderKey) {
-          try {
-            window.localStorage.removeItem(stuckOrderKey);
-            sessionStorage.removeItem(stuckOrderKey);
-          } catch { /* ignore */ }
-        }
-      }
-      // Registration happens at Pay (the submit moment) — consents and answers
-      // are final by now, and the idempotent submit is safe to retry.
-      const nextAction = await submitRegistration();
-      if (!nextAction) return;
-      // Non-order outcomes stop here: the organizer must approve first
-      // (awaiting_approval), or the registration needs an organizer-side
-      // confirm (requires_confirmation). Neither has a buyer next step.
-      if (nextAction !== 'requires_order') {
-        enterPending(
-          nextAction === 'awaiting_approval'
-            ? 'Your request was received. The organizer will review it and you’ll be notified once it’s approved.'
-            : 'Your registration was received and is being confirmed. Check Tickets shortly.',
-        );
+    const guestPhone = !isAuthenticated && validGuestPhone ? validGuestPhone : undefined;
+    setPaying(true);
+    setStep('processing');
+    try {
+      // One call: registration(s) + quote + order, then branch on next_action.
+      const result = await completeCheckoutMutation.mutateAsync({ payMethod, guestPhone });
+      const { nextAction, order, guestOrderToken } = result;
+
+      // Free / fully-discounted admission — the backend confirms + issues.
+      if (nextAction.type === 'confirmed' || nextAction.type === 'issuing') {
+        finalizeSuccess(order ?? { id: nextAction.orderId ?? '' });
         return;
       }
-      setPaying(true);
-      try {
-        // Build the quote input INLINE with the just-created registration id —
-        // `quoteInput` here is a stale closure that still lacks it, and the
-        // backend rejects ticket orders without the registration bound.
-        const freshRegistrationId = registrationIdRef.current;
-        const freshRegPhone = !isAuthenticated && contactDetails.phone.replace(/\s/g, '').length >= 10
-    ? contactDetails.phone : undefined;
-        const buildFreshQuoteInput = () => ({
-          eventId,
-          items: [
-            { eventProductId: ticketProductId ?? `ticket:${ticketType}`, quantity, unitPriceMinor: basePrice, registrationId: freshRegistrationId },
-            ...addOns.filter((a) => a.quantity > 0).map((a) => ({ eventProductId: a.productId, quantity: a.quantity, unitPriceMinor: a.unitPrice })),
-          ],
-          chargeCurrency: 'ETB' as const,
-          promotionCode: promoCode ?? undefined,
-          guestPhone: freshRegPhone,
-        });
-        let freshQuote: OrderQuote;
-        try {
-          freshQuote = await orderModule.quote(buildFreshQuoteInput());
-        } catch (quoteError) {
-          // A slow buyer can outlive the 10-minute quote hold: re-quote once
-          // (the registration is still valid) instead of failing outright.
-          if (!(quoteError instanceof ApiError && quoteError.code === 'quote_expired')) throw quoteError;
-          freshQuote = await orderModule.quote(buildFreshQuoteInput());
-        }
-        setStep('processing');
-        completeCheckoutMutation.mutate(
-          { quoteToken: freshQuote.quote_token, eventId, payMethod, guestPhone: isAuthenticated ? undefined : contactDetails.phone },
-          {
-            onError: (e) => {
-              setStep('payment');
-              if (e instanceof ApiError && e.code === 'checkout_restart_payment_in_progress') {
-                // The stuck order has a live payment attempt — restarting is
-                // forbidden. Resume the hosted payment if we kept its URL,
-                // else tell the buyer to finish it before retrying.
-                const resumeUrl = stuckOrderIdRef.current
-                  ? readResumeUrl(stuckOrderIdRef.current)
-                  : null;
-                if (resumeUrl) {
-                  window.location.href = resumeUrl;
-                  return;
-                }
-              }
-              if (
-                e instanceof ApiError &&
-                (e.code === 'payment_already_accepted' || e.code === 'payment_succeeded_pending_acceptance')
-              ) {
-                // Money already moved — this is a confirmation wait, not a
-                // failure. The wallet picks the tickets up once fulfilled.
-                enterPending('Your payment is being confirmed. Check Tickets shortly — your tickets will appear there.');
-                return;
-              }
-              if (e instanceof ApiError && e.code === 'checkout_restart_unavailable') {
-                // The stuck order already finished (paid/expired/cancelled):
-                // keys are cleared, so offer the finished sheet (View Tickets)
-                // instead of an inline dead-end.
-                openConflictSheet('finished');
-                return;
-              }
-              if (
-                e instanceof ApiError &&
-                (e.code === 'active_checkout_exists' || e.code === 'idempotency_conflict')
-              ) {
-                // A previous checkout for this buyer+event is still active
-                // (draft/pending_payment) and this session doesn't know its id
-                // (fresh tab) — or a dead order still holds this registration
-                // (idx_one_order_item_per_registration is unique per
-                // registration regardless of the order's status). Offer the
-                // conflict sheet, never a bare inline error: "Discard & start
-                // fresh" releases the registration and retries as a new one.
-                openConflictSheet('finished');
-                return;
-              }
-              setPaymentError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Payment could not be started. Please try again.');
-            },
-            // onSuccess: with live Chapa the attempt returns "processing" +
-            // checkout_url and the hook redirects the browser; the success
-            // screen then renders on return. A synchronous success (free/
-            // stubbed provider) lands here.
-            onSuccess: ({ order, payment }) => {
-              if (!payment || payment.status === 'succeeded') {
-                finalizeSuccess(order);
-                return;
-              }
-              if (payment.status === 'processing' && payment.checkout_url) {
-                try {
-                  const payload = JSON.stringify({ url: payment.checkout_url, at: Date.now() });
-                  sessionStorage.setItem(paymentUrlKey(order.id), payload);
-                  window.localStorage.setItem(paymentUrlKey(order.id), payload);
-                } catch { /* storage full/blocked — resume link just won't exist */ }
-                openHostedCheckout(order.id, payment.checkout_url);
-                return;
-              }
-              // Failed / URL-less attempt (returned as a 200 payload) is not a
-              // completed purchase — surface it instead of a false "confirmed".
-              setStep('payment');
-              setPaymentError('Payment could not be started. Please try again.');
-            },
-          },
-        );
-      } catch (e) {
-        setStep('payment');
-        setPaymentError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Something went wrong. Please try again.');
-      } finally {
-        setPaying(false);
+      if (nextAction.type === 'awaiting_approval') {
+        enterPending('Your request was received. The organizer will review it and you’ll be notified once it’s approved.');
+        return;
       }
+      if (nextAction.type === 'waitlist_available') {
+        setStep('payment');
+        setPaymentError('One or more of those tickets just sold out — try joining the waitlist instead.');
+        return;
+      }
+      if (nextAction.type === 'checkout_required' && nextAction.orderId && order) {
+        const guest = guestPhone ? { orderAccessToken: guestOrderToken, phone: guestPhone } : undefined;
+        const { payment } = await orderModule.startPayment({
+          orderId: nextAction.orderId,
+          provider: 'chapa',
+          paymentMethod: payMethod,
+          eventId,
+          ...(guest ? { guest } : {}),
+        });
+        if (!payment || payment.status === 'succeeded') { finalizeSuccess(order); return; }
+        if (payment.status === 'processing' && payment.checkout_url) {
+          try {
+            const payload = JSON.stringify({ url: payment.checkout_url, at: Date.now() });
+            sessionStorage.setItem(paymentUrlKey(order.id), payload);
+            window.localStorage.setItem(paymentUrlKey(order.id), payload);
+          } catch { /* storage full/blocked — resume link just won't exist */ }
+          openHostedCheckout(order.id, payment.checkout_url);
+          return;
+        }
+        setStep('payment');
+        setPaymentError('Payment could not be started. Please try again.');
+        return;
+      }
+      enterPending('Your registration was received and is being confirmed. Check Tickets shortly.');
+    } catch (e) {
+      setStep('payment');
+      if (e instanceof ApiError && (e.code === 'payment_already_accepted' || e.code === 'payment_succeeded_pending_acceptance')) {
+        // Money already moved — a confirmation wait, not a failure.
+        enterPending('Your payment is being confirmed. Check Tickets shortly — your tickets will appear there.');
+        return;
+      }
+      if (e instanceof ApiError && (e.code === 'active_checkout_exists' || e.code === 'idempotency_conflict')) {
+        // A previous checkout for this buyer+event is still open — offer the
+        // choice sheet (resume / view Tickets), never a bare inline dead-end.
+        openConflictSheet('finished');
+        return;
+      }
+      setPaymentError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Something went wrong. Please try again.');
+    } finally {
+      setPaying(false);
+    }
   };
   const goBack = () => { if (step === 'pending') { setStep('payment'); return; } if (step === 'date') { if (hasSeats) setStep('seat'); else onClose(); } if (step === 'review') { if (multiDate) setStep('date'); else if (hasSeats) setStep('seat'); else onClose(); } else if (step === 'extras') setStep('review'); else if (step === 'details') setStep(hasExtras ? 'extras' : 'review'); else if (step === 'questions') setStep(needsDetails ? 'details' : (hasExtras ? 'extras' : 'review')); else if (step === 'payment') setStep(hasQuestions ? 'questions' : (needsDetails ? 'details' : (hasExtras ? 'extras' : (multiDate ? 'date' : 'review')))); else onClose(); };
   const toggleSeat = (seat: SelectedSeat) => {

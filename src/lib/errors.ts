@@ -81,6 +81,25 @@ const CODE_MESSAGES: Record<string, string> = {
   // configured purchase limit on the ticket type to commit its allocations.
   purchase_limit_allocations_missing: 'This ticket type has no purchase limit configured — the organizer needs to set one.',
   purchase_limit_exceeded: 'You have reached the purchase limit for this ticket type.',
+  // Composable admission selection (Orders::AdmissionSelections) — the unified
+  // selection → order path that replaced register → quote → create-order.
+  phone_verification_required: 'Verify your phone number to confirm this free admission.',
+  phone_confirmation_required: 'Confirm your phone number to continue.',
+  phone_verification_invalid: 'That verification code is invalid or expired — please request a new one.',
+  phone_identity_invalid: 'Enter a valid phone number.',
+  admission_selection_invalid: 'We couldn’t process that ticket selection — please review and try again.',
+  admission_selection_manual_approval_mixed: 'Approval-required tickets must be requested on their own.',
+  items_required: 'Select at least one ticket to continue.',
+  duplicate_product: 'Each ticket type can only be selected once.',
+  quantity_invalid: 'That quantity isn’t available — adjust it and try again.',
+  product_not_found: 'One of those tickets is no longer available.',
+  product_unavailable: 'One of those tickets is no longer available.',
+  inventory_unavailable: 'One of those tickets just sold out.',
+  inventory_not_configured: 'Tickets for this event aren’t set up yet.',
+  inventory_validation_failed: 'We couldn’t reserve those tickets — please try again.',
+  event_date_unavailable: 'That date is no longer available.',
+  event_dates_event_mismatch: 'That date doesn’t belong to this event.',
+  venue_dates_required: 'Choose a date to continue.',
   // Audience gating (invite-only / access-code events).
   no_valid_code_or_invitation: 'This access code or invitation is not valid for this event.',
   // Seller payout destinations (Marketplace) — verified against the backend

@@ -161,26 +161,40 @@ export interface StartPaymentInput {
    *  newly issued wallet ticket to THIS purchase instead of any fresh ticket. */
   eventId?: string;
   /** Guest credentials (BACKEND_GAPS #14). When set (unauthenticated buyer),
-   *  the quote_token + phone are persisted beside the payment id so the guest
-   *  return screen can reconcile via POST /guest/payments/:id/refresh. */
-  guest?: { quoteToken: string; phone: string };
+   *  the guest access material + phone are persisted beside the payment id so
+   *  the guest return screen can reconcile via POST /guest/payments/:id/refresh.
+   *  `orderAccessToken` is the `guest_order_token` from the admission selection
+   *  (the current flow); `quoteToken` is the legacy quote's token. */
+  guest?: GuestCreds;
+}
+
+/** Guest checkout access material. Exactly one of `orderAccessToken` (current
+ *  admission-selection flow) or `quoteToken` (legacy) is present. */
+export interface GuestCreds {
+  phone: string;
+  orderAccessToken?: string;
+  quoteToken?: string;
 }
 
 /** Storage-key helpers (mirroring digis:payment-id:* / digis:payment-event:*). */
-export const guestReturnKey = (suffix: 'quoteToken' | 'phone'): string =>
+export const guestReturnKey = (suffix: 'quoteToken' | 'orderToken' | 'phone'): string =>
   `digis:guest:${suffix}:`;
 
+const readStore = (key: string): string | null => {
+  try { return sessionStorage.getItem(key) ?? window.localStorage.getItem(key); } catch { return null; }
+};
+
 /** Read the persisted guest credentials for a completed payment attempt. */
-export function readGuestReturnCreds(orderId: string): { quoteToken: string; phone: string } | null {
-  try {
-    const qt = sessionStorage.getItem(`${guestReturnKey('quoteToken')}${orderId}`)
-      ?? window.localStorage.getItem(`${guestReturnKey('quoteToken')}${orderId}`);
-    const ph = sessionStorage.getItem(`${guestReturnKey('phone')}${orderId}`)
-      ?? window.localStorage.getItem(`${guestReturnKey('phone')}${orderId}`);
-    return qt && ph ? { quoteToken: qt, phone: ph } : null;
-  } catch {
-    return null;
-  }
+export function readGuestReturnCreds(orderId: string): GuestCreds | null {
+  const ph = readStore(`${guestReturnKey('phone')}${orderId}`);
+  const ot = readStore(`${guestReturnKey('orderToken')}${orderId}`);
+  const qt = readStore(`${guestReturnKey('quoteToken')}${orderId}`);
+  if (!ph || (!ot && !qt)) return null;
+  return {
+    phone: ph,
+    ...(ot ? { orderAccessToken: ot } : {}),
+    ...(!ot && qt ? { quoteToken: qt } : {}),
+  };
 }
 
 /**
@@ -204,7 +218,13 @@ export function readGuestReturnCreds(orderId: string): { quoteToken: string; pho
 export function findGuestReturnCreds(
   paymentId?: string,
   eventId?: string,
-): { quoteToken: string; phone: string; orderId: string } | null {
+): (GuestCreds & { orderId: string }) | null {
+  const orderIdFromKey = (k: string): string | null => {
+    for (const prefix of [guestReturnKey('orderToken'), guestReturnKey('quoteToken')]) {
+      if (k.startsWith(prefix)) return k.slice(prefix.length);
+    }
+    return null;
+  };
   try {
     if (paymentId) {
       for (const store of [sessionStorage, window.localStorage]) {
@@ -220,21 +240,17 @@ export function findGuestReturnCreds(
       return null;
     }
     if (eventId) {
-      const matches: Array<{ quoteToken: string; phone: string; orderId: string }> = [];
+      const matches: Array<GuestCreds & { orderId: string }> = [];
       for (const store of [sessionStorage, window.localStorage]) {
         for (let i = 0; i < store.length; i++) {
           const k = store.key(i);
-          if (k?.startsWith(guestReturnKey('quoteToken'))) {
-            const orderId = k.slice(guestReturnKey('quoteToken').length);
-            const creds = readGuestReturnCreds(orderId);
-            if (!creds) continue;
-            const mapped = { ...creds, orderId };
-            const evKey = `digis:payment-event:${orderId}`;
-            const ev = (store === sessionStorage ? sessionStorage.getItem(evKey) : null)
-              ?? window.localStorage.getItem(evKey);
-            if (ev === eventId) return mapped;
-            matches.push(mapped);
-          }
+          const orderId = k ? orderIdFromKey(k) : null;
+          if (!orderId) continue;
+          const creds = readGuestReturnCreds(orderId);
+          if (!creds) continue;
+          const mapped = { ...creds, orderId };
+          if (readStore(`digis:payment-event:${orderId}`) === eventId) return mapped;
+          matches.push(mapped);
         }
       }
       if (matches.length) return matches[0];
@@ -243,11 +259,10 @@ export function findGuestReturnCreds(
     for (const store of [sessionStorage, window.localStorage]) {
       for (let i = 0; i < store.length; i++) {
         const k = store.key(i);
-        if (k?.startsWith(guestReturnKey('quoteToken'))) {
-          const orderId = k.slice(guestReturnKey('quoteToken').length);
-          const creds = readGuestReturnCreds(orderId);
-          if (creds) return { ...creds, orderId };
-        }
+        const orderId = k ? orderIdFromKey(k) : null;
+        if (!orderId) continue;
+        const creds = readGuestReturnCreds(orderId);
+        if (creds) return { ...creds, orderId };
       }
     }
   } catch { /* ignore */ }
@@ -458,7 +473,12 @@ export const orderModule = {
         provider: input.provider,
         payment_method: input.paymentMethod,
         ...(input.guest
-          ? { quote_token: input.guest.quoteToken, phone: input.guest.phone }
+          ? {
+              phone: input.guest.phone,
+              ...(input.guest.orderAccessToken
+                ? { order_access_token: input.guest.orderAccessToken }
+                : { quote_token: input.guest.quoteToken }),
+            }
           : {}),
       },
     };
@@ -476,9 +496,16 @@ export const orderModule = {
       window.localStorage.setItem(`digis:payment-id:${input.orderId}`, data.id);
       if (input.eventId) sessionStorage.setItem(`digis:payment-event:${input.orderId}`, input.eventId);
       if (input.guest) {
-        const k = `${guestReturnKey('quoteToken')}${input.orderId}`;
-        sessionStorage.setItem(k, input.guest.quoteToken);
-        window.localStorage.setItem(k, input.guest.quoteToken);
+        if (input.guest.quoteToken) {
+          const k = `${guestReturnKey('quoteToken')}${input.orderId}`;
+          sessionStorage.setItem(k, input.guest.quoteToken);
+          window.localStorage.setItem(k, input.guest.quoteToken);
+        }
+        if (input.guest.orderAccessToken) {
+          const k = `${guestReturnKey('orderToken')}${input.orderId}`;
+          sessionStorage.setItem(k, input.guest.orderAccessToken);
+          window.localStorage.setItem(k, input.guest.orderAccessToken);
+        }
         const pk = `${guestReturnKey('phone')}${input.orderId}`;
         sessionStorage.setItem(pk, input.guest.phone);
         window.localStorage.setItem(pk, input.guest.phone);
@@ -524,7 +551,7 @@ export const orderModule = {
    * quote_token + phone to authenticate the request. Same response shape as
    * refreshPayment (payment + order + wallet tickets + state).
    */
-  async guestRefreshPayment(paymentId: string, quoteToken: string, phone: string): Promise<PaymentRefreshResult> {
+  async guestRefreshPayment(paymentId: string, creds: GuestCreds): Promise<PaymentRefreshResult> {
     const { data } = await apiFetch<PaymentRefreshResult>(
       `guest/payments/${paymentId}/refresh`,
       {
@@ -532,8 +559,10 @@ export const orderModule = {
         headers: { "Idempotency-Key": randomUuid() },
         body: {
           payment_refresh: {
-            phone,
-            quote_token: quoteToken,
+            phone: creds.phone,
+            ...(creds.orderAccessToken
+              ? { order_access_token: creds.orderAccessToken }
+              : { quote_token: creds.quoteToken }),
           },
         },
       },
