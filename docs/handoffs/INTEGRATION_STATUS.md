@@ -82,8 +82,9 @@ the legacy stuck-order/restart/conflict machinery was unreachable: removed
 `restartStuckCheckout`, the `digis:stuck-order:*` / `digis:payment-url:*` storage
 and `orders/:id/restart` client path, and the registration-conflict bookkeeping.
 `active_checkout_exists` / `idempotency_conflict` now surface a plain notice sheet
-with **View Tickets** — a "start fresh" path still needs a backend release route
-(filed under #40).
+with **View Tickets**. #40's sweep fix now expires abandoned checkouts, but the
+409 still carries no order id and there is no buyer-scoped order lookup, so
+Continue/start-fresh needs a backend route — re-filed as **#58**.
 
 Verified: tsc, vitest **124/124**, build, full Playwright suite **26/26**.
 

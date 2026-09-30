@@ -106,6 +106,7 @@
 | 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/registration/transfer history, unread-count/mark-all-read |
 | 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
 | 52 | open — degrading | `GET /venues/:id` and `/artists/:id` omit `is_following` (organizations has it) → follow state can't be read back |
+| 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -145,7 +146,7 @@ disabled as a workaround.
 
 **Status: open — verified 2026-09-09.**
 
-### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts
+### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts — RESOLVED 2026-09-30
 
 `Orders::ExpireCheckout` is what releases an abandoned `pending_payment` order,
 which is what unblocks `active_checkout_exists`. When the sweep aborts, those
@@ -192,7 +193,10 @@ config; the gap itself is the code path above.
 `active_checkout_exists` 409 so the client can offer a restart, not just
 "start fresh".
 
-**Status: open — filed 2026-09-16 (frontend does not change backend code).**
+**Status: resolved 2026-09-30** — `Orders::ExpireCheckout` now reconciles an
+elapsed-grace payment (`action: :reconcile_grace`) / releases the stale order
+instead of raising, so the sweep no longer aborts. The residual "the 409 carries
+no order id" ask (the optional fix above) is filed separately as **#58**.
 
 ### #43. RSVP rejects `access_code` / `invitation_token` → audience-gated RSVP is impossible
 
@@ -704,6 +708,40 @@ follows the entity.
 **Fix:** add `attribute :is_following { object.followed_by?(instance_options[:current_user]) }`
 to the venue + artist detail serializers (mirroring the organization one) and to
 their policy `VISIBILITY[:show]` field lists.
+
+### #58. `active_checkout_exists` 409 carries no order id → the client can't resume or discard the open checkout
+
+When `POST /public/events/:slug/admission_selections` finds an existing
+`draft`/`pending_payment` order for the same buyer+event,
+`Orders::CreateCheckout#active_checkout_conflict!`
+(`app/services/orders/create_checkout.rb:104-108`) aborts with a **409
+`active_checkout_exists`** whose body is only `{ success:false, error, code }` —
+**no `order_id`**. There is no buyer-scoped order lookup either:
+`config/routes.rb` exposes `resources :orders` as `only: :create` plus the member
+`restart` / `payment_attempts` actions — no index or show. The one recovery route,
+`POST /orders/:id/restart`, needs the id the client was never given.
+
+**Why it matters:** #40's sweep fix means this is no longer a permanent lock —
+abandoned checkouts now expire. But for the length of the hold (10 min, longer
+while the sweep catches up) the buyer sees only a dead end. The frontend conflict
+sheet can offer "View Tickets" and nothing else; it cannot resume the open
+checkout or start fresh, even though the rest of the flow supports resume.
+
+**Fix (preferred — composable):** when the dispatcher hits an existing active
+order for the buyer+event, don't 409 — return it as the selection outcome
+(`next_action: checkout_required` with that `order_id` + `expires_at`). The
+replay store already models this for same-key replays; extend it to the
+buyer+event case so a resumed submit stays idempotent.
+
+**Fix (minimal):** include `order_id` (and `checkout_url` / `expires_at` when
+known) in the 409 payload so the client can offer **Continue checkout** (open the
+hosted page) or **Restart**.
+
+**Evidence:** `app/services/orders/create_checkout.rb:104-108`;
+`app/controllers/orders/admission_selections_controller.rb:64-83`;
+`config/routes.rb` (orders member-only).
+
+**Status: open — filed 2026-09-30 (frontend does not change backend code).**
 
 ### #49 addendum — no city aggregation
 
