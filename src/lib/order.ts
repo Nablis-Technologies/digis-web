@@ -147,12 +147,6 @@ export interface CreateOrderInput {
   guestPhone?: string;
 }
 
-export interface RestartOrderInput {
-  /** The stuck/expired pending order to close and replace. */
-  oldOrderId: string;
-  quoteToken: string;
-}
-
 export interface StartPaymentInput {
   orderId: string;
   provider: string;
@@ -425,24 +419,6 @@ export const orderModule = {
     }
     const { data } = await apiFetch<CheckoutOrder>(
       `events/${input.eventId}/orders`,
-      { method: "POST", body: { order: { quote_token: input.quoteToken } } },
-    );
-    return data;
-  },
-
-  /**
-   * POST /orders/:order_id/restart (body { order: { quote_token } } +
-   * Idempotency-Key). Closes a stuck/expired pending_payment checkout and
-   * creates its replacement reusing the SAME registration — the recovery path
-   * when order creation 409s with idempotency_conflict. That conflict happens
-   * because the backend enforces one order item per registration, ever
-   * (idx_one_order_item_per_registration), and nothing expires a registration
-   * when its checkout dies. RestartCheckout closes the dead order and re-binds
-   * the registration to a fresh one. Needs the OLD order id.
-   */
-  async restartOrder(input: RestartOrderInput): Promise<CheckoutOrder> {
-    const { data } = await apiFetch<CheckoutOrder>(
-      `orders/${input.oldOrderId}/restart`,
       { method: "POST", body: { order: { quote_token: input.quoteToken } } },
     );
     return data;

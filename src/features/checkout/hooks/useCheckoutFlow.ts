@@ -95,34 +95,27 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   // ticket type publishes no form (single-line/answer-free tickets still work).
   const [formVersionId, setFormVersionId] = useState<string>();
   const [registrationId, setRegistrationId] = useState<string>();
-  // Synchronous mirror of registrationId — a fresh quote built right after
-  // registering must see the id without waiting for a React re-render.
-  const registrationIdRef = useRef<string | undefined>(undefined);
   const [registrationError, setRegistrationError] = useState<string>();
   const [paymentError, setPaymentError] = useState<string>();
+  // Guest free-admission phone proof. The backend demands it only for an
+  // unauthenticated buyer whose selection prices to $0 (paid checkouts prove
+  // the phone at the guest payment boundary instead); it arrives as the
+  // `phone_verification_required` error, never a next_action. The verified
+  // token is re-submitted with the selection.
+  const [guestOtp, setGuestOtp] = useState<{ challengeId: string; phone: string } | null>(null);
+  const [guestOtpError, setGuestOtpError] = useState<string>();
+  const [guestOtpLoading, setGuestOtpLoading] = useState(false);
+  const [guestOtpVerifying, setGuestOtpVerifying] = useState(false);
+  const verificationTokenRef = useRef<string | undefined>(undefined);
   // Guard against double-registration when the user bounces payment ↔ details.
   const registeringRef = useRef(false);
   // Single-flight Pay: two taps must not open two checkouts.
   const payingRef = useRef(false);
-  // A dead pending checkout bound to this registration (order creation 409s
-  // with idempotency_conflict because one order item may ever reference a
-  // registration). Tracked so the retry goes through orders/:id/restart, which
-  // closes the dead checkout and re-binds the registration to a fresh order.
-  // Persisted per tab: there is no backend "my orders" endpoint to discover it.
-  const stuckOrderKey = eventId && ticketTypeId ? `digis:stuck-order:${eventId}:${ticketTypeId}` : null;
-  const stuckOrderIdRef = useRef<string | undefined>(
-    stuckOrderKey
-      ? window.localStorage.getItem(stuckOrderKey) ??
-        sessionStorage.getItem(stuckOrderKey) ??
-        undefined
-      : undefined,
-  );
-  // Stable per-checkout keys so a retried Pay click replays the SAME
-  // registration instead of conflicting: the backend keys idempotency on the
-  // Idempotency-Key header AND fingerprints answers/consents (which embed our
-  // request_uuid) into the request digest. Fresh random UUIDs per retry change
-  // the digest → active_registration_conflict. Persisted per tab alongside the
-  // stuck order so remounts stay stable too.
+  // Stable per-checkout key so a retried Pay click replays the SAME admission
+  // selection instead of creating a second order: the backend's admission
+  // replay store keys on the Idempotency-Key header AND fingerprints the
+  // selection into a request digest, so a fresh key per retry would create a
+  // duplicate order. Persisted per tab so remounts stay stable too.
   const checkoutKeyName = eventId && ticketTypeId ? `digis:checkout-key:${eventId}:${ticketTypeId}` : null;
   const checkoutKeyRef = useRef<string | null>(null);
   if (checkoutKeyRef.current === null) {
@@ -137,7 +130,6 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     }
     checkoutKeyRef.current = key;
   }
-  const paymentUrlKey = (orderId: string) => `digis:payment-url:${orderId}`;
 
   // Event terms (consent docs) are per-ticket-type on the backend — fetched on
   // checkout open so they're normally ready by the review step. The consent
@@ -176,36 +168,6 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   };
 
   /**
-   * Restart a stuck checkout. When the stuck order is already terminal
-   * (fulfilled after a completed purchase, expired, cancelled) the backend
-   * refuses — that stored pointer belongs to a FINISHED purchase, so drop
-   * all resume state and fail with a start-fresh message instead of looping
-   * on the dead order (or worse, redirecting to its old Chapa page).
-   */
-  const restartStuckCheckout = async (stuckOrderId: string, quoteToken: string) => {
-    try {
-      return await orderModule.restartOrder({ oldOrderId: stuckOrderId, quoteToken });
-    } catch (restartError) {
-      if (restartError instanceof ApiError && restartError.code === 'checkout_restart_unavailable') {
-        stuckOrderIdRef.current = undefined;
-        if (stuckOrderKey) {
-          try {
-            window.localStorage.removeItem(stuckOrderKey);
-            sessionStorage.removeItem(stuckOrderKey);
-          } catch { /* ignore */ }
-        }
-        clearCheckoutResumeKeys();
-        throw new ApiError(
-          'That earlier checkout is already finished. Please start a new order.',
-          409,
-          'checkout_restart_unavailable',
-        );
-      }
-      throw restartError;
-    }
-  };
-
-  /**
    * Chapa V2 does NOT redirect the buyer back to the app (verified: the receipt
    * page stays put, and the API `return_url` is ignored). So open the hosted
    * checkout in a NEW tab and keep THIS tab alive to confirm — the webhook
@@ -229,10 +191,10 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     // owns pricing, registration, and idempotency (its replay store replaces
     // the old register → quote → create-order pipeline). payNow branches on the
     // returned `next_action`.
-    mutationFn: async ({ guestPhone }: { payMethod: PaymentMethod; guestPhone?: string }): Promise<AdmissionResult> => {
+    mutationFn: async ({ guestPhone, verificationToken }: { payMethod: PaymentMethod; guestPhone?: string; verificationToken?: string }): Promise<AdmissionResult> => {
       return admissionModule.create(
         eventSlug!,
-        buildSelectionInput(guestPhone),
+        buildSelectionInput(guestPhone, verificationToken),
         checkoutKeyRef.current ?? randomUuid(),
       );
     },
@@ -271,105 +233,15 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   };
 
   /**
-   * Choice sheet state: the buyer ran into a checkout they already started
-   * (active registration from an earlier checkout, or a finished stuck
-   * order). This is never rendered as a bare error — the sheet offers
-   * Continue (resume/restart the old checkout) and View Tickets.
-   * `canContinue` is true when a fresh resume link or a restartable stuck
-   * order exists; otherwise only View Tickets is offered.
+   * Notice state: the backend refused to supersede a checkout this buyer
+   * already has open for the event (`active_checkout_exists` /
+   * `idempotency_conflict`). The 409 carries no order id and there is no
+   * buyer-scoped order lookup, so the sheet offers only "View Tickets" — a
+   * Continue/start-fresh action needs a backend release route (#40).
    */
-  const [conflict, setConflict] = useState<{
-    kind: 'registration' | 'finished';
-    canContinue: boolean;
-    canReplace: boolean;
-  } | null>(null);
-  const openConflictSheet = (kind: 'registration' | 'finished') => {
-    // Continue is only offered when it can actually proceed: a fresh resume
-    // link (redirect), or a stuck order plus this purchase's registration
-    // (restart with a fresh quote). Otherwise the sheet offers View Tickets
-    // only — a Continue button that loops back into the same conflict would
-    // be a fake option.
-    const stuck = stuckOrderIdRef.current;
-    const resumeUrl = stuck ? readResumeUrl(stuck) : null;
-    const restartable = !!stuck && !!registrationIdRef.current;
-    // "Start fresh" is also possible when the conflict is our own registration
-    // (no stored order id): replaceConflictCheckout releases it so the next
-    // submit is genuinely new. Without this, a fresh session whose checkout was
-    // started elsewhere had no way forward at all.
-    const ownRegistration = !!registrationIdRef.current;
-    setConflict({ kind, canContinue: !!resumeUrl || restartable, canReplace: restartable || ownRegistration });
-    setStep('payment');
-  };
-  const closeConflictSheet = () => setConflict(null);
-
-  /**
-   * Sheet action: continue the earlier checkout. Prefers the stored hosted
-   * payment link; otherwise restarts the stuck order with this purchase's
-   * registration (payNow already routes both ways).
-   */
-  const continueConflictCheckout = async () => {
-    closeConflictSheet();
-    const stuck = stuckOrderIdRef.current;
-    const resumeUrl = stuck ? readResumeUrl(stuck) : null;
-    if (resumeUrl) {
-      window.location.href = resumeUrl;
-      return;
-    }
-    if (stuck && registrationIdRef.current && !payingRef.current && !completeCheckoutMutation.isPending) {
-      payingRef.current = true;
-      try {
-        await payNow();
-      } finally {
-        payingRef.current = false;
-      }
-    }
-  };
-
-  /**
-   * Sheet action: discard the interrupted checkout and replace it — restart
-   * closes the old order and binds the same registration to a fresh one
-   * built from the buyer's current selections. Never offered (or attempted)
-   * when the old payment already completed: restart refuses terminal orders
-   * and the buyer is sent to Tickets instead.
-   */
-  const replaceConflictCheckout = async () => {
-    const stuck = stuckOrderIdRef.current;
-    // #22 resolved: when the conflict is OUR OWN pending registration (not a
-    // finished order), release it first so the next submit starts genuinely
-    // fresh — otherwise "start fresh" would conflict again on the same slot.
-    const ownRegistrationId = registrationIdRef.current;
-    if (!stuck && ownRegistrationId) {
-      try {
-        await registrationModule.release(ownRegistrationId);
-      } catch { /* release is best-effort — a stale/dead registration release is idempotent */ }
-      registrationIdRef.current = undefined;
-      // Drop the stable checkout key so the retry computes a fresh digest
-      // instead of replaying the released registration's identity.
-      checkoutKeyRef.current = null;
-      if (checkoutKeyName) {
-        try { sessionStorage.removeItem(checkoutKeyName); } catch { /* ignore */ }
-      }
-      closeConflictSheet();
-      return;
-    }
-    if (!stuck) {
-      closeConflictSheet();
-      return;
-    }
-    try {
-      sessionStorage.removeItem(paymentUrlKey(stuck));
-      window.localStorage.removeItem(paymentUrlKey(stuck));
-    } catch { /* ignore */ }
-    closeConflictSheet();
-    if (registrationIdRef.current && !payingRef.current && !completeCheckoutMutation.isPending) {
-      payingRef.current = true;
-      try {
-        await payNow();
-      } finally {
-        payingRef.current = false;
-      }
-    }
-  };
+  const [conflict, setConflict] = useState(false);
+  const openConflictSheet = () => { setConflict(true); setStep('payment'); };
+  const closeConflictSheet = () => setConflict(false);
 
   const promoCode = promoApplied?.code;
 
@@ -513,7 +385,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
    * register → quote → create-order pipeline). Only consents the buyer actually
    * accepted are sent; the backend re-validates required ones.
    */
-  const buildSelectionInput = (guestPhone?: string) => {
+  const buildSelectionInput = (guestPhone?: string, verificationToken?: string) => {
     const accepted = consents.filter((c) => acceptedConsents[c.versionId]);
     const ticketItem = {
       eventProductId: ticketProductId ?? `ticket:${ticketType}`,
@@ -539,6 +411,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         ? {
             phone: guestPhone,
             phoneConfirmation: true,
+            ...(verificationToken ? { verificationToken } : {}),
             ...(contactDetails.name ? { fullName: contactDetails.name } : {}),
             ...(contactDetails.email ? { email: contactDetails.email } : {}),
           }
@@ -567,32 +440,54 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   };
 
   /**
-   * Stored resume links die with the checkout hold: the backend hold lasts 10
-   * minutes, so a resume older than 15 minutes belongs to a finished (or
-   * long-dead) purchase. Following it would teleport the buyer to another
-   * checkout's Chapa page — e.g. an "already paid" receipt — instead of
-   * starting their new order.
+   * Ask the backend for a phone-verification code for a $0 guest selection,
+   * then show the inline OTP step. The endpoint preflights the exact quote, so
+   * it fails the same way `create` would (e.g. a stale product) — that error is
+   * surfaced on the payment step rather than stranding the buyer on OTP.
    */
-  const readResumeUrl = (stuckOrderId: string): string | null => {
-    let raw: string | null = null;
+  const beginGuestOtp = async (guestPhone: string) => {
+    setGuestOtpLoading(true);
+    setGuestOtpError(undefined);
     try {
-      raw = window.localStorage.getItem(paymentUrlKey(stuckOrderId)) ?? sessionStorage.getItem(paymentUrlKey(stuckOrderId));
-    } catch {
-      return null;
+      const challenge = await admissionModule.requestOtp(
+        eventSlug!,
+        buildSelectionInput(guestPhone, verificationTokenRef.current),
+      );
+      setPaymentError(undefined);
+      setGuestOtp({ challengeId: challenge.challengeId, phone: guestPhone });
+      setStep('otp');
+    } catch (e) {
+      setStep('payment');
+      setPaymentError(
+        e instanceof ApiError
+          ? messageForCode(e.code, e.message)
+          : 'We could not send a verification code. Please try again.',
+      );
+    } finally {
+      setGuestOtpLoading(false);
     }
-    if (!raw) return null;
+  };
+
+  /** Trade the OTP code for a verification token, then retry the selection. */
+  const verifyGuestOtp = async (code: string) => {
+    if (!guestOtp || guestOtpVerifying) return;
+    setGuestOtpVerifying(true);
+    setGuestOtpError(undefined);
     try {
-      const parsed = JSON.parse(raw) as { url?: string; at?: number };
-      if (parsed && typeof parsed.url === 'string') {
-        if (typeof parsed.at === 'number' && Date.now() - parsed.at > 15 * 60 * 1000) return null;
-        return parsed.url;
-      }
-    } catch {
-      // Legacy plain-URL value (pre-timestamp): honor it — it can only be a
-      // few days old at most and the payment page itself states its outcome.
-      return raw;
+      const { verificationToken } = await registrationModule.verifyPhoneOtp(guestOtp.challengeId, code);
+      verificationTokenRef.current = verificationToken;
+      await payNow();
+    } catch (e) {
+      setGuestOtpError(
+        e instanceof ApiError ? messageForCode(e.code, e.message) : 'That code didn’t work. Please try again.',
+      );
+    } finally {
+      setGuestOtpVerifying(false);
     }
-    return null;
+  };
+
+  const resendGuestOtp = () => {
+    if (guestOtp) void beginGuestOtp(guestOtp.phone);
   };
 
   const payNow = async () => {
@@ -601,7 +496,12 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     setStep('processing');
     try {
       // One call: registration(s) + quote + order, then branch on next_action.
-      const result = await completeCheckoutMutation.mutateAsync({ payMethod, guestPhone });
+      // A verified guest phone proof (from the OTP step) rides every submit.
+      const result = await completeCheckoutMutation.mutateAsync({
+        payMethod,
+        guestPhone,
+        verificationToken: verificationTokenRef.current,
+      });
       const { nextAction, order, guestOrderToken } = result;
 
       // Free / fully-discounted admission — the backend confirms + issues.
@@ -629,11 +529,6 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         });
         if (!payment || payment.status === 'succeeded') { finalizeSuccess(order); return; }
         if (payment.status === 'processing' && payment.checkout_url) {
-          try {
-            const payload = JSON.stringify({ url: payment.checkout_url, at: Date.now() });
-            sessionStorage.setItem(paymentUrlKey(order.id), payload);
-            window.localStorage.setItem(paymentUrlKey(order.id), payload);
-          } catch { /* storage full/blocked — resume link just won't exist */ }
           openHostedCheckout(order.id, payment.checkout_url);
           return;
         }
@@ -651,8 +546,20 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
       }
       if (e instanceof ApiError && (e.code === 'active_checkout_exists' || e.code === 'idempotency_conflict')) {
         // A previous checkout for this buyer+event is still open — offer the
-        // choice sheet (resume / view Tickets), never a bare inline dead-end.
-        openConflictSheet('finished');
+        // notice sheet (View Tickets), never a bare inline dead-end.
+        openConflictSheet();
+        return;
+      }
+      // A $0 guest selection needs the phone proved before the backend will
+      // accept it. An invalid/expired proof is re-requested from scratch.
+      if (
+        e instanceof ApiError && guestPhone &&
+        (e.code === 'phone_verification_required' ||
+          e.code === 'phone_confirmation_required' ||
+          e.code === 'phone_verification_invalid')
+      ) {
+        verificationTokenRef.current = undefined;
+        await beginGuestOtp(guestPhone);
         return;
       }
       setPaymentError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Something went wrong. Please try again.');
@@ -660,7 +567,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
       setPaying(false);
     }
   };
-  const goBack = () => { if (step === 'pending') { setStep('payment'); return; } if (step === 'date') { if (hasSeats) setStep('seat'); else onClose(); } if (step === 'review') { if (multiDate) setStep('date'); else if (hasSeats) setStep('seat'); else onClose(); } else if (step === 'extras') setStep('review'); else if (step === 'details') setStep(hasExtras ? 'extras' : 'review'); else if (step === 'questions') setStep(needsDetails ? 'details' : (hasExtras ? 'extras' : 'review')); else if (step === 'payment') setStep(hasQuestions ? 'questions' : (needsDetails ? 'details' : (hasExtras ? 'extras' : (multiDate ? 'date' : 'review')))); else onClose(); };
+  const goBack = () => { if (step === 'pending') { setStep('payment'); return; } if (step === 'otp') { setGuestOtp(null); setGuestOtpError(undefined); verificationTokenRef.current = undefined; setStep('payment'); return; } if (step === 'date') { if (hasSeats) setStep('seat'); else onClose(); } if (step === 'review') { if (multiDate) setStep('date'); else if (hasSeats) setStep('seat'); else onClose(); } else if (step === 'extras') setStep('review'); else if (step === 'details') setStep(hasExtras ? 'extras' : 'review'); else if (step === 'questions') setStep(needsDetails ? 'details' : (hasExtras ? 'extras' : 'review')); else if (step === 'payment') setStep(hasQuestions ? 'questions' : (needsDetails ? 'details' : (hasExtras ? 'extras' : (multiDate ? 'date' : 'review')))); else onClose(); };
   const toggleSeat = (seat: SelectedSeat) => {
     setSelectedSeats((prev) => {
       const exists = prev.some((s) => s.id === seat.id);
@@ -678,5 +585,5 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
   }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId]);
 
-  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, closeConflictSheet, continueConflictCheckout, replaceConflictCheckout, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId };
+  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, closeConflictSheet, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp };
 }

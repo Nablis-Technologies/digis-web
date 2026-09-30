@@ -49,9 +49,10 @@ existing paid checkout (the legacy register→quote→order routes still exist) 
 only what the new model enables (free / manual / gated / waitlist), filing gaps where
 the backend lacks a surface. Plan: `docs/superpowers/plans/2026-09-30-composable-admission-selections.md`.
 
-**Still to do (Slice C/F):** event-detail offer UI (Free label, **Apply**, **Join
-waitlist**, `choose_one` date) + selection submit; `order_access_token` in guest
-payment; `admissions_per_unit` in quantity/seat math.
+**Event-detail offer UI (Slices C/E) — landed.** `TicketTypeCard`/`TicketSelector`/
+`PurchaseBar` render offers from live products (Free label, **Apply** for manual
+approval, **Join waitlist** when `available=false` + `waitlist_enabled`,
+`choose_one` date step), and `WaitlistSheet` joins a sold-out offer with guest OTP.
 
 **Checkout migrated to `admission_selections` (wholesale, 2026-09-30).** The
 checkout no longer does register → quote → create-order: at Pay it submits one
@@ -60,14 +61,25 @@ order) and branches on `next_action` (checkout_required → pay the returned ord
 confirmed/issuing → done; awaiting_approval → pending; waitlist_available →
 sold-out notice). Guest payment/refresh carry the returned `order_access_token`
 (`guest_order_token`) — the guest return keys moved from a `quoteToken` to an
-`orderToken`. Verified: checkout e2e + the full Playwright suite **25/25**, tsc,
-vitest, build.
+`orderToken`.
 
-**Known follow-up from the migration:** the legacy stuck-order/restart/conflict
-machinery is now mostly unused (the selection's replay store owns idempotency);
-`active_checkout_exists` still routes to the conflict sheet, but "start fresh"
-needs a backend release path. Clean-up ticket: remove the dead restart/stuck-order
-code once confirmed.
+**Guest $0 admission inline OTP (Slice D) — landed.** A guest whose selection
+prices to `$0` is refused with the 422 `phone_verification_required` error; the
+checkout now catches it, calls `admission_selections/request_otp`, shows an inline
+`PhoneOtpStep`, verifies via `phone_verifications/:id/verify`, and re-submits the
+selection with the traded `verification_token`. New e2e
+`e2e/guest-free-otp.spec.ts` mocks the selection/OTP/quote wire (the seed has no
+free product) and asserts the token rides the second submission.
+
+**Dead machinery retired.** With the selection's replay store owning idempotency,
+the legacy stuck-order/restart/conflict machinery was unreachable: removed
+`restartStuckCheckout`, the `digis:stuck-order:*` / `digis:payment-url:*` storage
+and `orders/:id/restart` client path, and the registration-conflict bookkeeping.
+`active_checkout_exists` / `idempotency_conflict` now surface a plain notice sheet
+with **View Tickets** — a "start fresh" path still needs a backend release route
+(filed under #40).
+
+Verified: tsc, vitest **124/124**, build, full Playwright suite **26/26**.
 
 **Auth (same day):** reported "Phone has already been taken" after buying as a
 guest → filed **#56** (signup can't take over the shadow phone; no claim-on-signup,

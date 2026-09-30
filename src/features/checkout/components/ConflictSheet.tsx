@@ -4,25 +4,18 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 /**
- * Bottom sheet shown when the buyer runs into a checkout they already
- * started (active registration from an earlier checkout, or a finished
- * stuck order). Never a bare error: every state offers at least one
- * working action — continue that checkout, replace it, or view Tickets.
+ * Bottom sheet shown when the backend refuses to supersede an open checkout
+ * for this buyer+event (`active_checkout_exists` / `idempotency_conflict`).
+ * The 409 carries no order id and there is no buyer-scoped order lookup, so
+ * the only honest action is View Tickets — a continue/start-fresh path needs
+ * a backend release route (BACKEND_GAPS #40).
  */
 export function ConflictSheet({
   open,
-  canContinue,
-  canReplace,
-  onContinue,
-  onReplace,
   onViewTickets,
   onClose,
 }: {
   open: boolean;
-  canContinue: boolean;
-  canReplace: boolean;
-  onContinue: () => void;
-  onReplace: () => void;
   onViewTickets: () => void;
   onClose: () => void;
 }) {
@@ -71,60 +64,24 @@ export function ConflictSheet({
               className="text-[12.5px] leading-relaxed mb-6"
               style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}
             >
-              A checkout for this event was started but not finished — you don&apos;t have a ticket for
-              it yet. Continue where you left off, or discard it and start fresh.
+              A checkout for this event was started but not finished. If you completed a payment, your
+              ticket is in Tickets — otherwise please wait a moment and try again.
             </p>
 
-            <div className="flex flex-col gap-2.5">
-              {canContinue && (
-                <AppButton
-                  whileTap={{ scale: 0.98 }}
-                  onClick={onContinue}
-                  className="w-full py-4 rounded-2xl cursor-pointer"
-                  style={{
-                    background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
-                    color: '#000',
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '14px',
-                    fontWeight: 500,
-                  }}
-                >
-                  Continue checkout
-                </AppButton>
-              )}
-              {canReplace && (
-                <AppButton
-                  whileTap={{ scale: 0.98 }}
-                  onClick={onReplace}
-                  className="w-full py-4 rounded-2xl cursor-pointer relative overflow-hidden"
-                  style={{
-                    background: 'transparent',
-                    color: textPrimary,
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '14px',
-                    fontWeight: 500,
-                  }}
-                >
-                  <GlassReflection isDark={isDark} />
-                  <span className="relative z-10">Discard &amp; start fresh</span>
-                </AppButton>
-              )}
-              <AppButton
-                whileTap={{ scale: 0.98 }}
-                onClick={onViewTickets}
-                className="w-full py-4 rounded-2xl cursor-pointer relative overflow-hidden"
-                style={{
-                  background: 'transparent',
-                  color: textMuted,
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: '14px',
-                  fontWeight: 500,
-                }}
-              >
-                <GlassReflection isDark={isDark} />
-                <span className="relative z-10">View Tickets</span>
-              </AppButton>
-            </div>
+            <AppButton
+              whileTap={{ scale: 0.98 }}
+              onClick={onViewTickets}
+              className="w-full py-4 rounded-2xl cursor-pointer relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
+                color: '#000',
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '14px',
+                fontWeight: 500,
+              }}
+            >
+              View Tickets
+            </AppButton>
             </div>
           </motion.div>
         </motion.div>

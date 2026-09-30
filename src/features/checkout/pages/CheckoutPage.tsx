@@ -10,6 +10,7 @@ import { ExtrasStep } from '@/features/checkout/components/ExtrasStep';
 import { DetailsStep } from '@/features/checkout/components/DetailsStep';
 import { QuestionsStep } from '@/features/checkout/components/QuestionsStep';
 import { PaymentStep } from '@/features/checkout/components/PaymentStep';
+import { PhoneOtpStep } from '@/features/checkout/components/PhoneOtpStep';
 import { ProcessingView } from '@/features/checkout/components/ProcessingView';
 import { SuccessView } from '@/features/checkout/components/SuccessView';
 import { CheckoutSheetFrame } from '@/features/checkout/components/CheckoutSheetFrame';
@@ -190,7 +191,8 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
     quoteLoading, quoteError, isLiveTicket, consents, consentsLoading, consentsError,
     reloadConsents, acceptedConsents, toggleConsent,
     consentError, registrationError, paymentError, pendingNotice,
-    conflict, closeConflictSheet, continueConflictCheckout, replaceConflictCheckout,
+    conflict, closeConflictSheet,
+    guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp,
     eventDates: flowDates, selectedEventDateId, setSelectedEventDateId,
   } = flow;
 
@@ -211,12 +213,17 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
   const textDim = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(26,26,46,0.4)';
   const borderSoft = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)';
 
-  const inStepFlow = step !== 'processing' && step !== 'success';
+  // The OTP step owns its own submit button (Verify), so it renders like the
+  // processing/success states: no step indicator, no Continue/Pay footer.
+  const inStepFlow = step !== 'processing' && step !== 'success' && step !== 'otp';
+  const stepTitle = step === 'otp'
+    ? 'Verify your phone'
+    : steps.find(s => s.id === step)?.label ?? '';
 
   return (
     <CheckoutSheetFrame
       isDark={isDark}
-      title={step === 'success' ? 'Confirmed' : step === 'processing' ? 'Securing your spot' : steps.find(s => s.id === step)?.label ?? ''}
+      title={step === 'success' ? 'Confirmed' : step === 'processing' ? 'Securing your spot' : stepTitle}
       onBack={goBack}
       onClose={onClose}
       hideSteps={!inStepFlow}
@@ -301,6 +308,18 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
         {step === 'details' && <StepFrame key="details"><DetailsStep name={contactDetails.name} setName={(name: string) => setContactDetails((prev) => ({ ...prev, name }))} email={contactDetails.email} setEmail={(email: string) => setContactDetails((prev) => ({ ...prev, email }))} phone={contactDetails.phone} setPhone={(phone: string) => setContactDetails((prev) => ({ ...prev, phone }))} contactMethod={contactDetails.contactMethod} setContactMethod={(contactMethod: 'email' | 'phone') => setContactDetails((prev) => ({ ...prev, contactMethod }))} errors={errors} setErrors={setErrors} isDark={isDark} /></StepFrame>}
         {step === 'questions' && <StepFrame key="questions"><QuestionsStep questions={questions} answers={answers} setAnswers={setAnswers} questionErrors={questionErrors} setQuestionErrors={setQuestionErrors} isDark={isDark} /></StepFrame>}
         {step === 'payment' && <StepFrame key="payment"><PaymentStep method={payMethod} setMethod={setPayMethod} cardNumber={cardNumber} setCardNumber={setCardNumber} cardExpiry={cardExpiry} setCardExpiry={setCardExpiry} cardCvc={cardCvc} setCardCvc={setCardCvc} subtotal={subtotal} discountTotal={discountTotal} promoCode={promoCode} serviceFee={serviceFee} total={total} isDark={isDark} promoApplied={promoApplied} promoCodeInput={promoCodeInput} setPromoCodeInput={setPromoCodeInput} promoExpanded={promoExpanded} setPromoExpanded={setPromoExpanded} promoError={promoError} setPromoError={setPromoError} promoLoading={promoLoading} validatePromo={validatePromo} removePromo={removePromo} discountAmount={discountAmount} /></StepFrame>}
+        {step === 'otp' && guestOtp && (
+          <StepFrame key="otp">
+            <PhoneOtpStep
+              phone={guestOtp.phone}
+              isDark={isDark}
+              loading={guestOtpLoading || guestOtpVerifying}
+              error={guestOtpError}
+              onVerify={(code) => void verifyGuestOtp(code)}
+              onResend={resendGuestOtp}
+            />
+          </StepFrame>
+        )}
         {step === 'processing' && <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-20"><ProcessingView isDark={isDark} method={payMethod} mode="payment" /></motion.div>}
         {step === 'pending' && (
           <motion.div key="pending" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-center py-10">
@@ -322,11 +341,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
       </AnimatePresence>
 
       <ConflictSheet
-        open={!!conflict}
-        canContinue={conflict?.canContinue ?? false}
-        canReplace={conflict?.canReplace ?? false}
-        onContinue={() => void continueConflictCheckout()}
-        onReplace={() => void replaceConflictCheckout()}
+        open={conflict}
         onViewTickets={onComplete}
         onClose={closeConflictSheet}
       />

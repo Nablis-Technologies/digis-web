@@ -31,9 +31,10 @@ import type { UserTicket } from '@/types';
 /**
  * Clear per-checkout resume state after a payment reaches a terminal outcome.
  * Keys are per event+ticketType (or per order) and must not leak into the
- * NEXT purchase of the same tier — a stale checkout key replays the same
- * registration digest (→ active_registration_conflict) and a stale stuck-order
- * id diverts order creation through restart for a dead order.
+ * NEXT purchase of the same tier — a stale checkout key would replay the same
+ * admission-selection digest instead of starting the buyer's new order. The
+ * `digis:stuck-order:*` / `digis:payment-url:*` prefixes are legacy (the
+ * restart/resume machinery was retired) and are swept only to clear old tabs.
  */
 export function clearCheckoutResumeKeys(): void {
   try {
