@@ -11,6 +11,7 @@ import { useNotifications, notificationsStore, fetchNotifications, markNotificat
 import type { NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 interface TopBarProps {
   currentView?: string;
@@ -77,7 +78,6 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   // Foreground accent for text/icons — lime is illegible on the light panel, so use dark ink.
   const accentFg = isDark ? '#d6f905' : '#0a0a0a';
   const accentSoft = isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)';
-  const accentBorder = isDark ? 'rgba(214,249,5,0.3)' : 'rgba(214,249,5,0.18)';
 
   const markRead = (id: string) => {
     notificationsStore.markRead(id);
@@ -204,7 +204,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                       fontFamily: "'Inter', sans-serif",
                       background: accentSoft,
                       color: accentFg,
-                      border: `1px solid ${accentBorder}`,
+                      ...glassEdge(isDark),
                     }}
                   >
                     {unreadCount} new
@@ -268,7 +268,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                       className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{
                         background: accentSoft,
-                        border: `1px solid ${accentBorder}`,
+                        ...glassEdge(isDark),
                       }}
                     >
                       <Icon className="w-[15px] h-[15px]" strokeWidth={1.75} style={{ color: accentFg }} />

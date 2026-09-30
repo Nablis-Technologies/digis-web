@@ -7,7 +7,7 @@ import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
-import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
+import { glassEdgeReflection, glassReflection, glassEdge, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFollow, reflectionSettings }: {
@@ -110,7 +110,7 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
               className="flex items-center justify-center w-9 h-9 rounded-full cursor-pointer"
               style={{
                 background: 'transparent',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
+                ...glassEdge(isDark),
               }}>
               {following
                 ? <Check className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
@@ -123,7 +123,7 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer"
             style={{
               background: isDark ? 'rgba(214,249,5,0.12)' : accent,
-              border: `1px solid ${isDark ? 'rgba(214,249,5,0.3)' : 'transparent'}`,
+              ...glassEdge(isDark),
             }}>
             <NavigationIcon className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2.25} />
             <span className="text-[11px] tracking-[0.3px]"
@@ -278,7 +278,7 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                 className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer self-center"
                 style={{
                   background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)',
-                  border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.2)'}`,
+                  ...glassEdge(isDark),
                 }}>
                 <NavigationIcon className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
                 <span className="text-[11px] tracking-[0.3px]"
@@ -486,9 +486,7 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                       background: isDark
                         ? (isPast ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.03)')
                         : (isPast ? 'rgba(0,0,0,0.015)' : 'rgba(0,0,0,0.02)'),
-                      border: `1px solid ${isDark
-                        ? (isPast ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.06)')
-                        : (isPast ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.05)')}`,
+                      ...glassEdge(isDark),
                     }}>
                     <div className="relative w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
                       style={{ background: ev.gradient, filter: isPast ? 'saturate(0.7)' : undefined }}>

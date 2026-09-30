@@ -47,22 +47,22 @@ function ExtraCard({ item, index, isDark }: { item: import('@/types').SelectedEv
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05 * index, duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="relative rounded-2xl p-3 flex items-center gap-2.5"
+      className="relative rounded-2xl overflow-hidden p-3 flex items-center gap-2.5"
       style={{
         background: isDark ? `rgba(${s.rgb},0.09)` : 'rgba(255,255,255,0.78)',
-        border: `1px solid rgba(${s.rgb},${isDark ? 0.2 : 0.22})`,
         backdropFilter: 'blur(20px)',
       }}>
-      <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0"
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 w-8 h-8 rounded-lg grid place-items-center shrink-0"
         style={{ background: `rgba(${s.rgb},${isDark ? 0.16 : 0.13})`, color: accent }}>
         <Icon className="w-4 h-4" strokeWidth={1.9} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="relative z-10 min-w-0 flex-1">
         <p className="text-[8.5px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: accent, fontWeight: 600 }}>{s.label}</p>
         <p className="text-[12px] leading-tight truncate" style={{ fontFamily: "'Inter', sans-serif", color: t.text, fontWeight: 500 }}>{item.name}</p>
       </div>
       {item.quantity > 1 && (
-        <span className="shrink-0 text-[10px] tabular-nums px-1.5 py-0.5 rounded-full"
+        <span className="relative z-10 shrink-0 text-[10px] tabular-nums px-1.5 py-0.5 rounded-full"
           style={{ fontFamily: "'Inter', sans-serif", color: accent, background: `rgba(${s.rgb},0.12)` }}>×{item.quantity}</span>
       )}
     </motion.div>

@@ -15,6 +15,7 @@ import type { AcceptedTransfer } from '@/lib/transfer';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { toastError } from '@/lib/feedback';
 
 const ACCENT_HEX = '#d6f905';
@@ -219,7 +220,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
       </AppButton>
     ) : (
       <div className="space-y-2.5">
-        <AppButton onClick={onRequestAuth} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}>
+        <AppButton onClick={onRequestAuth} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: surfaceSoft, ...glassEdge(isDark), color: text, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}>
           <LogIn className="w-4 h-4" strokeWidth={2} />
           Sign in with your phone
         </AppButton>
@@ -264,9 +265,10 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
               <p className="mt-1 text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                 {transfer.ticket.product.name} · {transfer.ticket.status}
               </p>
-              <div className="mt-4 rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: surfaceSoft, border: `1px solid ${border}` }}>
-                <Phone className="w-4 h-4 flex-shrink-0" style={{ color: textDim }} strokeWidth={1.8} />
-                <p className="text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+              <div className="relative mt-4 rounded-2xl overflow-hidden px-4 py-3 flex items-center gap-3" style={{ background: surfaceSoft }}>
+                <GlassReflection isDark={isDark} />
+                <Phone className="relative z-10 w-4 h-4 flex-shrink-0" style={{ color: textDim }} strokeWidth={1.8} />
+                <p className="relative z-10 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                   A code will be sent to <span style={{ color: text, fontWeight: 500 }}>{transfer.recipient.phone}</span>
                 </p>
               </div>

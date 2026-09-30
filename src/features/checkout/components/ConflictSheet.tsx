@@ -48,12 +48,13 @@ export function ConflictSheet({
             exit={{ y: 60, opacity: 0 }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] px-6 pt-6 pb-6"
+            className="relative overflow-hidden w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] px-6 pt-6 pb-6"
             style={{
               background: isDark ? '#0a0a0a' : '#ffffff',
-              border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.12)'}`,
             }}
           >
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10">
             <p
               className="text-[9px] tracking-[3px] uppercase mb-2"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}
@@ -124,9 +125,10 @@ export function ConflictSheet({
                 <span className="relative z-10">View Tickets</span>
               </AppButton>
             </div>
+            </div>
           </motion.div>
         </motion.div>
-      )}
+        )}
     </AnimatePresence>
   );
 }

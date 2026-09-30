@@ -3,6 +3,7 @@ import { Check, ChevronRight, Loader2, Moon, Sun, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { Switch } from '@/components/ui/switch';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
@@ -60,7 +61,7 @@ export function CancelBtn({ onClick, isDark, value, cardBorder, label = 'Cancel'
       onClick={onClick}
       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl cursor-pointer"
       style={{
-        background: 'transparent', border: `1px solid ${cardBorder}`,
+        background: 'transparent', ...glassEdge(isDark),
         color: value, fontFamily: "'Inter', sans-serif", fontSize: '13px', fontWeight: 600,
       }}
     >
@@ -188,7 +189,7 @@ export function ThemeSwitch({ checked, onToggle, isDark }: { checked: boolean; o
       style={{
         width: 64, height: 30,
         background: isDark ? 'rgba(217,255,0,0.15)' : 'rgba(0,0,0,0.06)',
-        border: `1px solid ${isDark ? 'rgba(217,255,0,0.25)' : 'rgba(0,0,0,0.08)'}`,
+        ...glassEdge(isDark),
       }}
       aria-pressed={checked}>
       <motion.div className="absolute rounded-full flex items-center justify-center"

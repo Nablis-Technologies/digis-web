@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function InlineCountdown({ expiresAt, accentColor, accentRgb }: { expiresAt: number; accentColor: string; accentRgb: string }) {
   const isDark = true;
@@ -25,7 +26,7 @@ export function InlineCountdown({ expiresAt, accentColor, accentRgb }: { expires
         <span key={s.l} className="flex items-baseline gap-0.5 px-1.5 py-0.5 rounded-md tabular-nums"
           style={{
             background: `rgba(${accentRgb}, ${isDark ? '0.1' : '0.18'})`,
-            border: `1px solid rgba(${accentRgb}, ${isDark ? '0.2' : '0.3'})`,
+            ...glassEdge(isDark),
           }}>
           <span className="text-[11px] leading-none"
             style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : 'rgba(0,0,0,0.85)', fontWeight: 300 }}>

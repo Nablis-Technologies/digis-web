@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { SearchBar } from "@/components/SearchBar";
 import { LocationSelector } from "@/components/LocationSelector";
 import { useTheme } from "@/app/components/ThemeContext";
+import { glassEdge } from "@/lib/ui/glass";
 import { FilterPanel } from "./FilterPanel";
 import type { EventAccessFilter, EventPriceFilter, EventSortBy } from "@/features/discovery/hooks/useEventFilter";
 
@@ -128,7 +129,7 @@ export function HeroSearch({
                   background: isDark
                     ? "rgba(14,14,18,0.40)"
                     : "rgba(255,255,255,0.68)",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.09)"}`,
+                  ...glassEdge(isDark),
                   backdropFilter: "blur(40px) saturate(1.6)",
                   WebkitBackdropFilter:
                     "blur(40px) saturate(1.6)",

@@ -25,6 +25,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { mapApiError } from '@/lib/errors';
 
 interface TransferTicketProps {
@@ -200,7 +201,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                 whileTap={{ scale: 0.92 }}
                 onClick={() => setStep(step - 1)}
                 className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ background: surfaceSoft, border: `1px solid ${border}` }}
+                style={{ background: surfaceSoft, ...glassEdge(isDark) }}
                 aria-label="Back"
               >
                 <ArrowLeft className="w-4 h-4" style={{ color: textDim }} strokeWidth={1.8} />
@@ -229,7 +230,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                 whileTap={{ scale: 0.92 }}
                 onClick={onClose}
                 className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ background: surfaceSoft, border: `1px solid ${border}` }}
+                style={{ background: surfaceSoft, ...glassEdge(isDark) }}
                 aria-label="Close"
               >
                 <X className="w-4 h-4" style={{ color: textDim }} strokeWidth={1.8} />
@@ -331,8 +332,9 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
 
             {step === 1 && (
               <motion.div key="note" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }} className="mt-3 space-y-4">
-                <div className="rounded-2xl p-3.5" style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}>
-                  <p className="text-[12px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add a short personal note if you’d like. It will travel with the secure claim link.</p>
+                <div className="relative rounded-2xl overflow-hidden p-3.5" style={{ background: accentSoft }}>
+                  <GlassReflection isDark={isDark} />
+                  <p className="relative z-10 text-[12px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add a short personal note if you’d like. It will travel with the secure claim link.</p>
                 </div>
                 <div className="relative">
                   <AppTextArea placeholder="Write something thoughtful…" value={note} onChange={(e) => setNote(e.target.value.slice(0, 140))} rows={2} className={`w-full px-4 py-3 rounded-2xl text-[13.5px] outline-none resize-none ${placeholderClass}`} style={{ background: surfaceSoft, border: `1px solid ${note ? accentBorder : borderSoft}`, color: text, fontFamily: "'Inter', sans-serif" }} />
@@ -539,13 +541,14 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.62 }}
-                    className="mt-4 w-full max-w-[300px] rounded-2xl px-4 py-3 flex items-center gap-3"
-                    style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}
+                    className="relative mt-4 w-full max-w-[300px] rounded-2xl overflow-hidden px-4 py-3 flex items-center gap-3"
+                    style={{ background: accentSoft }}
                   >
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: isDark ? 'rgba(214,249,5,0.14)' : 'rgba(214,249,5,0.25)' }}>
+                    <GlassReflection isDark={isDark} />
+                    <div className="relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: isDark ? 'rgba(214,249,5,0.14)' : 'rgba(214,249,5,0.25)' }}>
                       <Bell className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
                     </div>
-                    <p className="text-left text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
+                    <p className="relative z-10 text-left text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
                       They have a Digis account — a notification is already waiting in their app.
                     </p>
                   </motion.div>
@@ -565,7 +568,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     <AppButton
                       onClick={handleCopy}
                       className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3"
-                      style={{ background: surfaceSoft, border: `1px solid ${borderSoft}` }}
+                      style={{ background: surfaceSoft, ...glassEdge(isDark) }}
                     >
                       <Link2 className="w-4 h-4 flex-shrink-0" style={{ color: textDim }} strokeWidth={1.8} />
                       <span className="flex-1 text-left text-[12px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>

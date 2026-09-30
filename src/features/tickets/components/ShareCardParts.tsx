@@ -2,7 +2,9 @@ import { motion } from 'motion/react';
 import { Check, Crown, MapPin, Share2 } from 'lucide-react';
 import { formatETB } from '@/lib/utils/format';
 import type { ReactNode } from 'react';
+import { useTheme } from '@/app/components/ThemeContext';
 import { getCategoryColor } from '@/lib/categoryColors';
+import { glassEdge } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
 
 const BRAND = '#d6f905';
@@ -48,11 +50,12 @@ type CardProps = {
 
 
 export function ShareIconButton({ icon, color }: { icon: React.ReactNode; color: string }) {
+  const { isDark } = useTheme();
   return (
     <AppButton
       whileTap={{ scale: 0.9 }}
       className="w-[48px] h-[48px] rounded-xl flex items-center justify-center cursor-pointer"
-      style={{ background: `${color}1f`, border: `1px solid ${color}40`, color }}
+      style={{ background: `${color}1f`, ...glassEdge(isDark), color }}
     >
       {icon}
     </AppButton>

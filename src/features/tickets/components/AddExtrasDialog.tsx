@@ -8,6 +8,7 @@ import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function AddExtrasDialog({ ticket, products, isSaving = false, done = false, onClose, onConfirm, isLoading = false, error = false, onRetry }: {
   ticket: UserTicket;
@@ -53,7 +54,7 @@ export function AddExtrasDialog({ ticket, products, isSaving = false, done = fal
             <p className="text-[9px] tracking-[3px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add extras</p>
             <p className="text-[13px] mt-0.5 truncate max-w-[240px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary, fontWeight: 300 }}>{ticket.eventName}</p>
           </div>
-          <AppButton whileTap={{ scale: 0.9 }} onClick={() => { if (!isSaving) onClose(); }} className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', border: `1px solid ${borderSoft}` }}>
+          <AppButton whileTap={{ scale: 0.9 }} onClick={() => { if (!isSaving) onClose(); }} className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', ...glassEdge(isDark) }}>
             <X className="w-4 h-4" strokeWidth={1.8} style={{ color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)' }} />
           </AppButton>
         </div>

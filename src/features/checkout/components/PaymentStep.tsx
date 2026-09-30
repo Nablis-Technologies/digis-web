@@ -8,6 +8,8 @@ import { Money } from '@/lib/money';
 import { ProviderLogo } from '@/components/ProviderLogo';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function PaymentStep({
   method, setMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, total, subtotal, discountTotal, promoCode, serviceFee, isDark,
@@ -91,15 +93,15 @@ export function PaymentStep({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="rounded-xl p-4 flex items-center gap-3"
+            className="relative overflow-hidden rounded-xl p-4 flex items-center gap-3"
             style={{
               background: isDark ? 'rgba(217,255,0,0.06)' : 'rgba(214,249,5,0.05)',
-              border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.12)'}`,
             }}
           >
-            <ChevronRight className="w-4 h-4" strokeWidth={1.5}
+            <GlassReflection isDark={isDark} />
+            <ChevronRight className="relative z-10 w-4 h-4" strokeWidth={1.5}
               style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
-            <p className="text-[11px] leading-relaxed"
+            <p className="relative z-10 text-[11px] leading-relaxed"
               style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
               You'll be redirected to {method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to authorize{' '}
               <span style={{ color: textPrimary, fontWeight: 500 }}>{Money.fromMinor(total, "ETB").format()}</span>.
@@ -139,7 +141,7 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
         style={{
           background: `${option.accent}20`,
           color: option.accent,
-          border: `1px solid ${option.accent}33`,
+          ...glassEdge(isDark),
         }}>
         {option.icon}
       </div>
@@ -149,7 +151,7 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
           {option.label}
           {option.note && (
             <span className="text-[9px] tracking-[1px] uppercase px-1.5 py-0.5 rounded-full"
-              style={{ fontFamily: "'Inter', sans-serif", color: textDim, border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(26,26,46,0.15)'}` }}>
+              style={{ fontFamily: "'Inter', sans-serif", color: textDim, ...glassEdge(isDark) }}>
               {option.note}
             </span>
           )}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useTransform, type MotionValue } from "motion/react";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
+import { GlassReflection } from "@/components/primitives/GlassReflection";
 
 const AUTO_SCROLL_MS = 4500; // auto-advance interval
 const INTERACT_PAUSE_MS = 8000; // pause auto-scroll after a user interaction
@@ -262,20 +263,20 @@ function PosterCard({
         display,
         transformPerspective: 2000,
         transformStyle: "preserve-3d",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
         boxShadow: isDark
           ? "0 30px 70px -30px rgba(0,0,0,0.7)"
           : "0 30px 70px -30px rgba(0,0,0,0.35)",
       }}
     >
+      <GlassReflection isDark={isDark} />
       <img
         src={event.image}
         alt={event.name}
-        className="w-full h-full object-cover"
+        className="relative z-10 w-full h-full object-cover"
         draggable={false}
       />
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 z-10 pointer-events-none"
         style={{
           background:
             "linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.4) 100%)",

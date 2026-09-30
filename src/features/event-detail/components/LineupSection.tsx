@@ -7,6 +7,7 @@ import { BrandAppleMusic, BrandInstagram, BrandSoundCloud, BrandSpotify, BrandTi
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function resolveLineup(lineup: any): any[] {
   // Backend-sourced only — never fabricate a lineup or fill missing artist
@@ -59,7 +60,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
           style={{
             fontFamily: "'Inter', sans-serif",
             background: isDark ? 'rgba(214,249,5,0.08)' : 'transparent',
-            border: `1px solid ${isDark ? `rgba(${accentRgb},0.18)` : 'rgba(0,0,0,0.1)'}`,
+            ...glassEdge(isDark),
             color: isDark ? accent : '#0a0a0a',
           }}>
           {artists.length} artists
@@ -86,9 +87,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
                 style={{
                   aspectRatio: '3/4',
                   background: a.image ? undefined : flatAvatarColor(a.name),
-                  border: isHeadliner
-                    ? 'none'
-                    : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                  ...(isHeadliner ? {} : glassEdge(isDark)),
                 }}>
                 {a.image && (
                   <img src={a.image} alt={a.name}

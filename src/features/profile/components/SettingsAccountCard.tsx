@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { BadgeCheck, User } from 'lucide-react';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 interface SettingsAccountCardProps {
   isDark: boolean;
@@ -35,12 +36,12 @@ export function SettingsAccountCard(props: SettingsAccountCardProps) {
         background: isDark
           ? 'linear-gradient(150deg, rgba(217,255,0,0.08), rgba(255,255,255,0.02))'
           : 'linear-gradient(150deg, rgba(214,249,5,0.14), rgba(255,255,255,0.7))',
-        border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.35)'}`,
         backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
       }}
     >
+      <GlassReflection isDark={isDark} />
       {isAuthenticated && user ? (
-        <div className="relative flex items-center gap-4 p-5">
+        <div className="relative z-10 flex items-center gap-4 p-5">
           <UserAvatar user={user} size={56} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">
@@ -65,7 +66,7 @@ export function SettingsAccountCard(props: SettingsAccountCardProps) {
         </div>
       ) : (
         /* Guest card */
-        <div className="relative flex items-center gap-4 p-5">
+        <div className="relative z-10 flex items-center gap-4 p-5">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
             <User className="w-6 h-6" strokeWidth={1.75} style={{ color: subtle }} />

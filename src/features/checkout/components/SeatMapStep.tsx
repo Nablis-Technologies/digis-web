@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import type { SeatSection, SelectedSeat } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { Money } from '@/lib/money';
 
 interface SeatMapStepProps {
@@ -146,7 +147,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
             {selectedSeats.map((s) => (
               <AppButton key={s.id} onClick={() => toggleSeat(s)}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer"
-                style={{ background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.15)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.3)'}` }}>
+                style={{ background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.15)', ...glassEdge(isDark) }}>
                 <span className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#f4ff66' : '#3a4600' }}>
                   {s.row}{s.seat}
                 </span>

@@ -4,6 +4,7 @@ import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import type { CustomQuestion } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 
 function CustomDropdown({
   value, options, placeholder, onChange, onOpenChange, hasError, isDark,
@@ -77,7 +78,6 @@ function CustomDropdown({
             className="absolute left-0 right-0 z-30 mt-2 p-1.5 rounded-xl overflow-hidden origin-top"
             style={{
               background: menuBg,
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,26,46,0.1)'}`,
               backdropFilter: 'blur(24px) saturate(1.6)',
               WebkitBackdropFilter: 'blur(24px) saturate(1.6)',
               boxShadow: isDark
@@ -85,7 +85,8 @@ function CustomDropdown({
                 : '0 16px 40px rgba(26,26,46,0.12)',
             }}
           >
-            <div className="max-h-[220px] overflow-y-auto scrollbar-hide">
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 max-h-[220px] overflow-y-auto scrollbar-hide">
               {options.map((opt) => {
                 const active = value === opt;
                 return (

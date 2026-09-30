@@ -7,6 +7,8 @@ import { Money } from '@/lib/money';
 import { copyText } from '@/lib/utils/clipboard';
 import { toastError } from '@/lib/feedback';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClose }: { ticket: UserTicket; price: number; listingId: string; isDark: boolean; onClose: () => void }) {
   const brand = '#d6f905';
@@ -39,10 +41,10 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           background: isDark
             ? 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.018) 100%)'
             : 'linear-gradient(160deg, rgba(255,255,255,0.95) 0%, rgba(248,247,252,0.9) 100%)',
-          border: `1px solid ${isDark ? 'rgba(217,255,0,0.3)' : 'rgba(180,210,0,0.5)'}`,
           boxShadow: isDark ? '0 32px 80px -20px rgba(0,0,0,0.7)' : '0 32px 80px -24px rgba(40,40,80,0.18)',
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Brand glow behind checkmark */}
         <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full pointer-events-none"
           style={{ background: `radial-gradient(circle, ${isDark ? 'rgba(217,255,0,0.22)' : 'rgba(214,249,5,0.3)'} 0%, transparent 66%)` }} />
@@ -95,7 +97,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.4 }}
-          className="text-[10px] tracking-[2.5px] uppercase mb-2"
+          className="relative z-10 text-[10px] tracking-[2.5px] uppercase mb-2"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: isDark ? brand : '#5a6b00' }}
         >
           You're live
@@ -105,7 +107,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.48, duration: 0.4 }}
-          className="text-[26px] font-light tracking-[-0.4px] mb-2"
+          className="relative z-10 text-[26px] font-light tracking-[-0.4px] mb-2"
           style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#0a0a0a' }}
         >
           Your ticket is listed
@@ -115,7 +117,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55, duration: 0.4 }}
-          className="text-[13px] leading-relaxed mb-7 max-w-[280px]"
+          className="relative z-10 text-[13px] leading-relaxed mb-7 max-w-[280px]"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.6)' }}
         >
           {ticket.eventName} · {Money.fromMinor(price, 'ETB').format()} is now visible to buyers. We'll notify you the moment it sells.
@@ -126,7 +128,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.62, duration: 0.4 }}
-          className="flex items-center gap-4"
+          className="relative z-10 flex items-center gap-4"
         >
           {[
             { Icon: Shield, label: 'Verified' },
@@ -146,8 +148,8 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
           ))}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72, duration: 0.4 }} className="mt-8 w-full flex gap-2.5">
-          <AppButton onClick={copyListingLink} className="flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'}` }}>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72, duration: 0.4 }} className="relative z-10 mt-8 w-full flex gap-2.5">
+          <AppButton onClick={copyListingLink} className="flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)', ...glassEdge(isDark) }}>
             {copied ? <Check className="w-4 h-4" style={{ color: brand }} strokeWidth={2} /> : <Copy className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.72)' : '#1a1a1a' }} strokeWidth={1.7} />}
             <span className="text-[12px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: copied ? brand : (isDark ? '#fff' : '#1a1a1a') }}>{copied ? 'Link copied' : 'Copy link'}</span>
           </AppButton>

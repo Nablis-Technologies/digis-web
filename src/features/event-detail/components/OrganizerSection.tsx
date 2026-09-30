@@ -6,7 +6,7 @@ import { flatAvatarColor } from '@/lib/utils/avatarColor';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
-import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
+import { glassEdgeReflection, glassReflection, glassEdge, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { followEntity, unfollowEntity } from '@/lib/follows';
@@ -333,7 +333,7 @@ export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark:
           className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer disabled:cursor-not-allowed"
           style={{
             background: 'transparent',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)'}`,
+            ...glassEdge(isDark),
             color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)',
           }}
         >

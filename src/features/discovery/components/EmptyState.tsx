@@ -23,6 +23,7 @@ import {
 import { useTheme } from "@/app/components/ThemeContext";
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 const categoryIcons: Record<string, typeof Music> = {
   All: LayoutGrid,
@@ -91,8 +92,6 @@ export function EmptyState({
         "No upcoming events in this category right now.";
 
   const subtle = isDark ? "rgba(255,255,255,0.55)" : "rgba(26,26,46,0.6)";
-  const ring = (a: number) =>
-    isDark ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`;
 
   // Deterministic drifting starfield — generated once.
   const stars = useMemo(
@@ -405,7 +404,7 @@ export function EmptyState({
                   fontSize: "13px",
                   letterSpacing: "0.3px",
                   fontWeight: 600,
-                  border: `1px solid ${ring(isDark ? 0.14 : 0.12)}`,
+                  ...glassEdge(isDark),
                 }}
               >
                 <Bell className="w-4 h-4" strokeWidth={2} />

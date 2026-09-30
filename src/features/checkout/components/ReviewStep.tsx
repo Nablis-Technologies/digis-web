@@ -3,6 +3,7 @@ import { readableCategoryRgb } from '@/lib/categoryColors';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { Money } from '@/lib/money';
 
 export function ReviewStep({
@@ -133,7 +134,7 @@ function Stepper({ symbol, onClick, disabled, isDark }: any) {
           ? disabledSurface(isDark)
           : {
               background: isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.1)',
-              border: `1px solid ${isDark ? 'rgba(217,255,0,0.25)' : 'rgba(214,249,5,0.2)'}`,
+              ...glassEdge(isDark),
               color: isDark ? '#f4ff66' : '#0a0a0a',
             }),
         fontFamily: "'Inter', sans-serif",

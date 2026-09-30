@@ -1,6 +1,7 @@
 import { Car, Coffee, Gift, Heart, Package, Plus, Minus, Smartphone } from 'lucide-react';
 import type { EventProduct, SelectedEventProduct } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { Money } from '@/lib/money';
 
 const iconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
@@ -63,14 +64,14 @@ export function ExtrasStep({ products, selected, onChange, includedProductIds = 
             <div key={product.id} className="relative rounded-xl overflow-hidden px-4 py-3 flex items-center gap-3"
               style={{
                 background: isDark ? s.body : s.lightBody,
-                border: isDark ? undefined : `1px solid rgba(${hue},0.16)`,
                 opacity: active ? 1 : isDark ? 0.9 : 0.96,
               }}>
-              <div className="relative w-10 h-10 rounded-xl grid place-items-center shrink-0" style={{ background: `rgba(${hue},${isDark ? 0.16 : 0.1})`, color: accent }}>
+              <GlassReflection isDark={isDark} />
+              <div className="relative z-10 w-10 h-10 rounded-xl grid place-items-center shrink-0" style={{ background: `rgba(${hue},${isDark ? 0.16 : 0.1})`, color: accent }}>
                 <Icon className="w-[18px] h-[18px]" strokeWidth={1.9} />
               </div>
 
-              <div className="relative min-w-0 flex-1">
+              <div className="relative z-10 min-w-0 flex-1">
                 <p className="text-[8px] tracking-[1.5px] uppercase mb-0.5" style={{ fontFamily: "'Inter', sans-serif", color: accent, fontWeight: 600 }}>{s.label}</p>
                 <p className="text-[13px] leading-tight truncate" style={{ fontFamily: "'Inter', sans-serif", color: nameColor, fontWeight: 600 }}>{product.name}</p>
                 {product.requiresTicket && (
@@ -80,7 +81,7 @@ export function ExtrasStep({ products, selected, onChange, includedProductIds = 
                 )}
               </div>
 
-              <div className="relative shrink-0 flex flex-col items-end gap-1.5">
+              <div className="relative z-10 shrink-0 flex flex-col items-end gap-1.5">
                 {!isIncluded && (
                   <span className="text-[11px] tabular-nums" style={{ fontFamily: "'Inter', sans-serif", color: priceColor, fontWeight: 500 }}>
                     {Money.fromMinor(product.priceMinor, "ETB").format()}

@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Copy, Instagram, Twitter, Check, Share2 } from 'lucide-react';
 import { useRef, useState, useCallback } from 'react';
 import { toPng } from 'html-to-image';
+import { useTheme } from '@/app/components/ThemeContext';
+import { glassEdge } from '@/lib/ui/glass';
 import { useImageColor } from '@/lib/hooks/useImageColor';
 import { useProminentHue } from '@/lib/hooks/useProminentHue';
 import { readableAccent } from '@/lib/utils/color';
@@ -36,6 +38,7 @@ const INK = '#0a0a0a';
 /* ── modal shell ─────────────────────────────────────────── */
 
 export function ShareCard({ event, ticketType, ticketLevel, purchased = false, onClose }: ShareCardProps) {
+  const { isDark } = useTheme();
   const cardRef = useRef<HTMLDivElement>(null);
   const isVIP = ticketType?.toUpperCase().includes('VIP');
   const [activeStyle, setActiveStyle] = useState<CardStyle>('bold');
@@ -104,7 +107,7 @@ export function ShareCard({ event, ticketType, ticketLevel, purchased = false, o
           whileTap={{ scale: 0.9 }}
           onClick={onClose}
           className="absolute -top-2 right-3 z-20 w-10 h-10 rounded-full flex items-center justify-center cursor-pointer"
-          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.14)' }}
+          style={{ background: 'rgba(255,255,255,0.1)', ...glassEdge(isDark) }}
         >
           <X className="w-5 h-5 text-white/80" strokeWidth={1.75} />
         </AppButton>
@@ -210,7 +213,7 @@ export function ShareCard({ event, ticketType, ticketLevel, purchased = false, o
               whileTap={{ scale: 0.95 }}
               onClick={handleCopyLink}
               className="flex-1 h-[48px] rounded-xl flex items-center justify-center gap-2 cursor-pointer"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)' }}
+              style={{ background: 'rgba(255,255,255,0.08)', ...glassEdge(isDark) }}
             >
               {copied ? <Check className="w-4 h-4" style={{ color: BRAND }} strokeWidth={2} /> : <Copy className="w-4 h-4 text-white/70" strokeWidth={1.75} />}
               <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: copied ? BRAND : 'rgba(255,255,255,0.8)', fontWeight: 600 }}>

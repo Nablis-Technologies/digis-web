@@ -32,6 +32,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { EventCardSkeleton, ListingRowSkeleton, LoadErrorCard, useShowSkeleton } from '@/components/loading';
 
 interface ResaleMarketplaceProps {
@@ -307,8 +309,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
           className="relative grid grid-cols-2 rounded-2xl p-1 overflow-hidden"
           style={{
             background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)',
-            border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.15)'}`,
             backdropFilter: 'blur(20px)',
+            ...glassEdge(isDark),
           }}
         >
           {/* Sliding active pill */}
@@ -483,7 +485,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(10,10,20,0.9))' }}
                       />
                       <div className="absolute top-4 left-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                        style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(10px)', ...glassEdge(isDark) }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#d6f905' }} />
                         <span className="text-[10px] tracking-[1.5px] uppercase text-white"
                           style={{ fontFamily: "'Inter', sans-serif" }}>Resale Live</span>
@@ -524,7 +526,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer"
                           style={{
                             background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
+                            ...glassEdge(isDark),
                           }}>
                           <ArrowUpDown className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
                           <span className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
@@ -583,12 +585,12 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                     {/* Payment already accepted server-side (no hosted redirect):
                         confirm it instead of looking like nothing happened. */}
                     {resalePurchase.pendingOrder && (
-                      <div className="mb-3 rounded-2xl px-4 py-3"
+                      <div className="relative mb-3 rounded-2xl px-4 py-3 overflow-hidden"
                         style={{
                           background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.14)',
-                          border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.4)'}`,
                         }}>
-                        <p className="text-[12px] leading-snug"
+                        <GlassReflection isDark={isDark} />
+                        <p className="relative z-10 text-[12px] leading-snug"
                           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#3a3a00' }}>
                           Your purchase is being confirmed — the ticket will appear in My Tickets once the payment settles.
                         </p>
@@ -612,19 +614,19 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                           <motion.div key={listing.id}
                             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.04 }}
-                            className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left"
+                            className="relative w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left overflow-hidden"
                             style={{
                               background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                              border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : '#fff'; }}
                           >
+                            <GlassReflection isDark={isDark} />
                             {/* Type icon */}
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                            <div className="relative z-10 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                               style={{
                                 background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.04)',
-                                border: `1px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(0,0,0,0.06)'}`,
+                                ...glassEdge(isDark),
                               }}>
                               {isVIP ? (
                                 <Crown className="w-4 h-4" style={{ color: accent }} strokeWidth={2} />
@@ -634,7 +636,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                             </div>
 
                             {/* Type + face value */}
-                            <div className="flex-1 min-w-0">
+                            <div className="relative z-10 flex-1 min-w-0">
                               <p className="text-[13px] tracking-[1.5px] uppercase leading-none mb-1.5"
                                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#0a0a0a', fontWeight: 600 }}>
                                 {listing.ticketType}
@@ -648,7 +650,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                             </div>
 
                             {/* Price + delta (delta only with a face value) */}
-                            <div className="flex-shrink-0 text-right">
+                            <div className="relative z-10 flex-shrink-0 text-right">
                               <p className="text-[18px] font-light leading-none tracking-[-0.3px]"
                                 style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#0a0a0a' }}>
                                 {Money.fromMinor(listing.askingPriceMinor, "ETB").format()}
@@ -683,7 +685,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
 
                             {/* Buy — own listings are not purchasable */}
                             {myListings.some((l) => l.id === listing.id) ? (
-                              <span className="text-[11px] flex-shrink-0 tracking-[0.5px] uppercase"
+                              <span className="relative z-10 text-[11px] flex-shrink-0 tracking-[0.5px] uppercase"
                                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
                                 Your listing
                               </span>
@@ -691,7 +693,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                               <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                                 onClick={() => void resalePurchase.buy(listing)}
                                 disabled={resalePurchase.purchasing}
-                                className="flex-shrink-0 px-4 py-2.5 rounded-xl cursor-pointer disabled:cursor-not-allowed"
+                                className="relative z-10 flex-shrink-0 px-4 py-2.5 rounded-xl cursor-pointer disabled:cursor-not-allowed"
                                 style={{ background: 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)', color: '#0a0a0a' }}>
                                 <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Buy</span>
                               </AppButton>
@@ -735,17 +737,17 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       says so with a retry rather than silently vanishing. */}
                   {selectedEventQuery.isError && (
                     <div className="px-5 lg:px-8 mt-8">
-                      <div className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
+                      <div className="relative rounded-2xl px-4 py-3 flex items-center justify-between gap-3 overflow-hidden"
                         style={{
                           background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
                         }}>
-                        <span className="text-[12px]"
+                        <GlassReflection isDark={isDark} />
+                        <span className="relative z-10 text-[12px]"
                           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
                           Couldn’t load this event’s details.
                         </span>
                         <AppButton onClick={() => void selectedEventQuery.refetch()}
-                          className="text-[12px] underline cursor-pointer flex-shrink-0"
+                          className="relative z-10 text-[12px] underline cursor-pointer flex-shrink-0"
                           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
                           Retry
                         </AppButton>
@@ -877,7 +879,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                     className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-pointer text-left"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.065)' : 'rgba(0,0,0,0.055)'}`,
+                      ...glassEdge(isDark),
                     }}>
                     <div className="flex min-w-0 items-center gap-3.5">
                       {ticket.image && (
@@ -899,27 +901,27 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
 
               {/* Seller earnings — balance + ledger from the seller reports API. */}
               {balanceError && (
-                <div className="mt-3 p-4 rounded-2xl text-center"
+                <div className="relative mt-3 p-4 rounded-2xl text-center overflow-hidden"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
                   }}>
-                  <p className="text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                  <GlassReflection isDark={isDark} />
+                  <p className="relative z-10 text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
                     Couldn't load your earnings.
                   </p>
-                  <AppButton onClick={() => void refetchBalance()} className="cursor-pointer"
+                  <AppButton onClick={() => void refetchBalance()} className="relative z-10 cursor-pointer"
                     style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
                     Retry
                   </AppButton>
                 </div>
               )}
               {!balanceError && sellerBalance.length > 0 && (
-                <div className="mt-3 p-4 rounded-2xl"
+                <div className="relative mt-3 p-4 rounded-2xl overflow-hidden"
                   style={{
                     background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
                   }}>
-                  <div className="flex items-center gap-3">
+                  <GlassReflection isDark={isDark} />
+                  <div className="relative z-10 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
                       <TrendingUp className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
@@ -943,7 +945,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                   </div>
 
                   {sellerHistory.length > 0 ? (
-                    <div className="mt-3 pt-3 space-y-2.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                    <div className="relative z-10 mt-3 pt-3 space-y-2.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
                       {(showAllHistory ? sellerHistory : sellerHistory.slice(0, 3)).map((entry) => (
                         <div key={entry.id} className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -967,7 +969,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       )}
                     </div>
                   ) : historyError ? (
-                    <div className="mt-3 pt-3 flex items-center justify-between gap-3"
+                    <div className="relative z-10 mt-3 pt-3 flex items-center justify-between gap-3"
                       style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
                       <span className="text-[11px]"
                         style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
@@ -988,7 +990,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                 className="mt-3 w-full flex items-center gap-3 p-4 rounded-2xl cursor-pointer text-left"
                 style={{
                   background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                  ...glassEdge(isDark),
                 }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>

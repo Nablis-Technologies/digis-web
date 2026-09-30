@@ -6,6 +6,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import type { UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { ProfileRowSkeleton, useShowSkeleton } from '@/components/loading';
 
 interface UserProfileProps {
@@ -107,7 +108,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   background: 'rgba(250,200,60,0.12)',
-                  border: '1px solid rgba(250,200,60,0.25)',
+                  ...glassEdge(isDark),
                   color: '#fac83c',
                 }}>
                 <Crown className="w-2.5 h-2.5" strokeWidth={2.5} />
@@ -255,18 +256,18 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
                   background: ach.unlocked
                     ? (isDark ? 'rgba(255,255,255,0.04)' : '#fff')
                     : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                  border: `1px solid ${ach.unlocked ? `${ach.color}33` : cardBorder}`,
                   opacity: ach.unlocked ? 1 : 0.55,
                 }}>
+                <GlassReflection isDark={isDark} />
                 {ach.unlocked && (
                   <div className="absolute inset-0 pointer-events-none"
                     style={{ background: `linear-gradient(165deg, ${ach.color}14 0%, transparent 50%)` }} />
                 )}
-                <div className="relative">
+                <div className="relative z-10">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5"
                     style={{
                       background: ach.unlocked ? `${ach.color}1f` : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                      border: `1px solid ${ach.unlocked ? `${ach.color}40` : cardBorder}`,
+                      ...glassEdge(isDark),
                       color: ach.unlocked ? ach.color : mutedText,
                     }}>
                     {ach.icon}
@@ -381,7 +382,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     background: 'rgba(250,200,60,0.12)',
-                    border: '1px solid rgba(250,200,60,0.25)',
+                    ...glassEdge(isDark),
                     color: '#fac83c',
                   }}>
                   VIP
@@ -422,7 +423,7 @@ function ActionIcon({ icon, isDark }: { icon: React.ReactNode; isDark: boolean }
       style={{
         background: isDark ? 'rgba(8,8,8,0.5)' : 'rgba(255,255,255,0.6)',
         backdropFilter: 'blur(24px)',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)'}`,
+        ...glassEdge(isDark),
         color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
       }}>
       {icon}

@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 /**
  * The checkout sheet chrome — the rounded-[32px] bottom sheet with header
@@ -54,7 +55,7 @@ export function CheckoutSheetFrame({
             onClick={onBack}
             aria-label="Back"
             className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
-            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', border: `1px solid ${borderSoft}` }}
+            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', ...glassEdge(isDark) }}
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={1.8} style={{ color: textMuted }} />
           </button>
@@ -68,7 +69,7 @@ export function CheckoutSheetFrame({
             onClick={onClose}
             aria-label="Close"
             className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
-            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', border: `1px solid ${borderSoft}` }}
+            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', ...glassEdge(isDark) }}
           >
             <X className="w-4 h-4" strokeWidth={1.8} style={{ color: textMuted }} />
           </button>

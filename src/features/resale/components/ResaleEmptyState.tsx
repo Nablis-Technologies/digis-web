@@ -5,6 +5,7 @@ import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRi
 import type { ResaleListing, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 const RESALE_PARTICLES = [
   { left: '12%', top: '70%', size: 5, delay: 0, dur: 7, kind: 'dot' },
@@ -257,7 +258,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4"
             style={{
               background: isDark ? 'rgba(217,255,0,0.08)' : 'rgba(214,249,5,0.16)',
-              border: `1px solid ${isDark ? 'rgba(217,255,0,0.2)' : 'rgba(214,249,5,0.4)'}`,
+              ...glassEdge(isDark),
             }}
           >
             <span className="relative flex h-1.5 w-1.5">
@@ -318,7 +319,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
-                border: `1px solid ${ring(isDark ? 0.1 : 0.08)}`,
+                ...glassEdge(isDark),
               }}
             >
               <Shield className="w-3.5 h-3.5" strokeWidth={2} style={{ color: isDark ? brand : '#5a6b00' }} />

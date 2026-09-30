@@ -8,6 +8,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { mapFieldErrors } from '@/lib/errors';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
+import { glassEdge } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
@@ -211,7 +212,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
           </p>
           <AppButton whileTap={{ scale: 0.9 }} onClick={onClose}
             className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
-            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', border: `1px solid ${borderSoft}` }}>
+            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)', ...glassEdge(isDark) }}>
             <X className="w-4 h-4" strokeWidth={1.8} style={{ color: textMuted }} />
           </AppButton>
         </div>
@@ -226,7 +227,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                 className="relative w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                 style={{
                   background: isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.16)',
-                  border: `1px solid ${isDark ? 'rgba(217,255,0,0.3)' : 'rgba(214,249,5,0.5)'}`,
+                  ...glassEdge(isDark),
                 }}
               >
                 <DigisMark className="w-7 h-7" color={isDark ? '#d6f905' : '#0a0a0a'} />
@@ -415,12 +416,12 @@ function CountrySelector({ country, onChange, isDark }: {
             className="absolute left-0 top-full mt-2 z-[310] w-64 rounded-2xl overflow-hidden"
             style={{
               background: isDark ? '#111' : '#fff',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,26,46,0.1)'}`,
               boxShadow: isDark ? '0 24px 64px rgba(0,0,0,0.7)' : '0 24px 64px rgba(20,18,40,0.18)',
             }}
           >
+            <GlassReflection isDark={isDark} />
             {/* Search */}
-            <div className="p-2.5" style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)'}` }}>
+            <div className="relative z-10 p-2.5" style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)'}` }}>
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
                 style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(26,26,46,0.04)' }}>
                 <Search className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} style={{ color: textDim }} />
@@ -435,7 +436,7 @@ function CountrySelector({ country, onChange, isDark }: {
               </div>
             </div>
             {/* List */}
-            <div className="overflow-y-auto max-h-52 scrollbar-hide py-1">
+            <div className="relative z-10 overflow-y-auto max-h-52 scrollbar-hide py-1">
               {filtered.map(c => {
                 const active = c.code === country.code;
                 return (

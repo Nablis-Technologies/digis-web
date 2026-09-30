@@ -22,6 +22,7 @@ import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { useGuestDeviceTickets } from '@/features/tickets/hooks/useGuestDeviceTickets';
 import { ClaimGuestSheet } from '@/features/tickets/components/ClaimGuestSheet';
+import { glassEdge } from '@/lib/ui/glass';
 import { toastError } from '@/lib/feedback';
 
 interface TicketViewProps {
@@ -229,7 +230,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
           className="relative grid grid-cols-2 rounded-2xl p-1 overflow-hidden"
           style={{
             background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)',
-            border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.15)'}`,
+            ...glassEdge(isDark),
             backdropFilter: 'blur(20px)',
           }}
         >
