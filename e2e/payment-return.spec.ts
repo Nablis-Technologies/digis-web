@@ -90,3 +90,29 @@ test('guest in-app return reconciles with the payment id written after mount', a
   await expect.poll(() => refreshCalls.length, { timeout: 10_000 }).toBeGreaterThan(0);
   await expect(page.getByText("You're going!")).toBeVisible({ timeout: 20_000 });
 });
+
+test('signed-in in-app popup return reconciles via POST /payments/:id/refresh', async ({ page }) => {
+  // Chapa V2 opens the hosted checkout in a NEW tab; the app tab (this one) is
+  // signalled by digis:awaiting-confirm and reconciles the payment by id.
+  test.setTimeout(60_000);
+  const refreshCalls: string[] = [];
+  await page.route('**/payments/**/refresh', (r) => {
+    refreshCalls.push(r.request().url());
+    return r.fulfill({ json: { success: true, data: { state: 'ready', payment: {}, order: {}, tickets: [WALLET_WIRE] } } });
+  });
+
+  await loginThroughUi(page);
+  // Ensure the app shell (owner of the awaiting-confirm listener) is mounted.
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Worth showing up for.' })).toBeVisible({ timeout: 15_000 });
+
+  await page.evaluate(() => {
+    sessionStorage.setItem('digis:awaiting-confirm', 'order-1');
+    sessionStorage.setItem('digis:payment-id:order-1', 'pay-1');
+    sessionStorage.setItem('digis:payment-event:order-1', 'evt-1');
+    window.dispatchEvent(new Event('digis:awaiting-confirm'));
+  });
+
+  await expect.poll(() => refreshCalls.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect(page.getByText("You're going!")).toBeVisible({ timeout: 20_000 });
+});
