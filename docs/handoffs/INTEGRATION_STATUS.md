@@ -7,6 +7,52 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-09-30 — backend pulled to `326f6a3`; Composable Admission Selection
+
+**Backend source:** `origin/feat/launch-hardening-telemetry` is now at `326f6a3`
+(41 commits ahead of `a470c76`). Local branch merged to it (the one conflict,
+`event_setting_serializer.rb`, resolved **to upstream**); the local product commit
+`648d21d` and the local serializer patch are gone. Safety backup branch:
+`backup/pre-admission-sync-20260930`. Dev setup (tunnels/`config.hosts`,
+`recurring.yml`, seeds) restored on top. Dev DB **rebuilt + reseeded** (two
+migrations were edited in place). `/up` → 200.
+
+**The release ("Composable Admission Selection").** Event-level "RSVP vs Ticketed"
+is gone; an event is a container of offers. Retired: `POST /public/events/:slug/rsvps`
+(+ `/request_otp`), `/public/registrations/:id/waitlist/enqueue|accept`. Canonical:
+`POST /public/events/:slug/admission_selections` (+ `/request_otp`) and offer-scoped
+`POST /public/events/:slug/admission_offers/:product_id/waitlist` (+ `/request_otp`).
+`next_action.type` drives the UI. `event_setting.config` is now **`%w[public_guest_limit]`**.
+
+**Frontend foundation landed (tsc + 129/129):**
+- `src/lib/products.ts` — offers now keep **free** tickets and carry
+  `minPerOrder`/`maxPerOrder`/`approvalMode`/`waitlistEnabled`/`admissionsPerUnit`;
+  ETB price selection.
+- `src/lib/admission.ts` (new) — `requestOtp()` + `create()` for `admission_selections`
+  (full `next_action` mapping, `guest_order_token`, exact answer/consent wire fields).
+- `src/lib/waitlist.ts` (new) — offer-scoped waitlist.
+- `src/types/event.ts` — `TicketTier` offer fields.
+
+**Gap sweep (full list re-verified against `326f6a3`):**
+- **Newly resolved:** #40, #41, #39, #34, #33, #43, #45, #37. **Superseded:** #27
+  (RSVP routes deleted). **Re-scoped:** #1.
+- **New gaps filed:** #53 (public payload drops `age_restriction`/`lineup`/`seat_map`/
+  `featured`/`rating`), #54 (no discovery availability), #55 (detail lacks
+  `price_from_minor`).
+- **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38.
+- **Frontend wire-now obligations:** retire `registrationModule.rsvpRequestOtp`/
+  `rsvpSubmit` (dead routes); the #41 "Discard & start fresh" `release` workaround is
+  now optional.
+
+**Decision — hybrid, stick to the current version.** The user directed: keep the
+existing paid checkout (the legacy register→quote→order routes still exist) and add
+only what the new model enables (free / manual / gated / waitlist), filing gaps where
+the backend lacks a surface. Plan: `docs/superpowers/plans/2026-09-30-composable-admission-selections.md`.
+
+**Still to do (Slice C/F):** event-detail offer UI (Free label, **Apply**, **Join
+waitlist**, `choose_one` date) + selection submit; `order_access_token` in guest
+payment; `admissions_per_unit` in quantity/seat math.
+
 ## Session 2026-09-21 — full gap sweep; NO backend fixes landed; #39 re-filed open
 
 **Backend source:** `origin/feat/launch-hardening-telemetry` is **stale** (last push

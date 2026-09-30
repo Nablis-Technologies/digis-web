@@ -45,6 +45,31 @@
 > had been marked resolved on the strength of patches *of ours* (uncommitted for
 > #39, a local-only commit for #1), which do not resolve a gap (see `AGENTS.md`).
 > Both have been reverted. No frontend wiring was needed.
+>
+> **Re-verified 2026-09-30 against `feat/launch-hardening-telemetry` at `326f6a3`**
+> (merged 41 commits — the **Composable Admission Selection** release). It replaced
+> the event-level "RSVP vs Ticketed" model with an offer-driven one: the RSVP routes
+> are **deleted** (`POST /public/events/:slug/rsvps` + `/rsvps/request_otp`,
+> `/public/registrations/:id/waitlist/enqueue|accept`), replaced by
+> `POST /public/events/:slug/admission_selections` (+ `/request_otp`) and
+> offer-scoped `POST /public/events/:slug/admission_offers/:product_id/waitlist`
+> (+ `/request_otp`). It also **gutting the public `event_setting.config`
+> projection to `%w[public_guest_limit]`** (so the frontend's 17 keys are gone, not
+> just `allow_waitlist`/`event_type`).
+>
+> **Sweep result — newly resolved (backend code, verified):** #41 (index is now
+> `(registration_id, order_id)`), #40 (`ExpireCheckout` reconciles grace instead of
+> aborting the sweep), #39 (`GET .../payout_accounts/destinations` + `TYPES` widened
+> to `bank mobile_money`), #34 (`Orders::EventDateEligibility` now gates both
+> `BuildQuote` and `CreateCheckout`), #33 (`ResolveGuestOrderAccess` accepts an
+> `order_access_token`), #43/#45/#37 (the unified selection accepts `audience_proof`
+> and the offer-scoped public waitlist exists), #27 **superseded** (RSVP routes
+> deleted). **Re-scoped:** #1 (the projection is now a single key — see #53).
+> **New gaps filed:** #53 (public event payload drops the detail fields),
+> #54 (no discovery availability), #55 (detail has no `price_from_minor`).
+> **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38. The frontend's
+> `src/lib/registration.ts` RSVP methods (`rsvpRequestOtp`/`rsvpSubmit`) are now
+> **dead** (routes gone) and must be removed.
 
 ## Status key
 
@@ -61,18 +86,13 @@
 | # | Status | Summary |
 |---|---|---|
 | 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
-| 40 | open — blocking | `ExpireCheckout` aborts the sweep on an elapsed-grace payment → abandoned checkouts never expire |
-| 39 | open — blocking | no endpoint exposing payout banks; `TYPES` too narrow for the provider's rails → no payout method can be added |
-| 41 | open — degrading | a released order permanently burns its registration (`idx_one_order_item_per_registration` ignores order status) |
-| 42 | open — degrading | wallet resale policy omits the percentage-cap basis → the seller can't know the max asking price |
+| 53 | open — blocking | public event payload drops `age_restriction` / `lineup` / `seat_map` / `featured` / `rating` (config now `%w[public_guest_limit]`) |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
-| 33 | open — degrading | guest payment-refresh re-validates the quote token on accepted payments |
-| 34 | open — degrading | past events remain purchasable (no date/sales-window check) |
-| 1 | open — degrading | public `event_setting.config` truncated to 2 keys — discovery degrades (featured / sold_out / rating / seat_map / rsvp) |
-| 43 | open — blocking | RSVP rejects `access_code` / `invitation_token` → an audience-gated RSVP event can never be registered for |
-| 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert + unwritable; only 2 keys exposed, neither seeded nor enforced |
-| 45 | open — degrading | RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored |
+| 42 | open — degrading | wallet resale policy omits the percentage-cap basis → the seller can't know the max asking price |
+| 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
+| 54 | open — degrading | no discovery availability — `GET /public/events` has no `sold_out` / per-offer `available` (products are per-event) |
+| 55 | open — degrading | `EventDetailSerializer` has no `price_from_minor` (only the list serializer does) |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
 | 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change/reset |
@@ -82,8 +102,17 @@
 | 52 | open — degrading | `GET /venues/:id` and `/artists/:id` omit `is_following` (organizations has it) → follow state can't be read back |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
-| 37 | informational | no public waitlist-join / invite-request endpoint |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
+| 1 | resolved 2026-09-30 | public `event_setting.config` is now `%w[public_guest_limit]` — the old "widen to 17 keys" ask is moot; the fields it held are covered by #53/#44 |
+| 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
+| 33 | resolved 2026-09-30 | guest payment resolves via `order_access_token` (`ResolveGuestOrderAccess`) |
+| 34 | resolved 2026-09-30 | `Orders::EventDateEligibility` gates `BuildQuote` + `CreateCheckout` |
+| 37 | resolved 2026-09-30 | offer-scoped public waitlist endpoint exists |
+| 39 | resolved 2026-09-30 | `GET .../payout_accounts/destinations` + `TYPES = %w[bank mobile_money]` |
+| 40 | resolved 2026-09-30 | `ExpireCheckout` reconciles grace instead of aborting the sweep |
+| 41 | resolved 2026-09-30 | `idx_one_order_item_per_registration` is now `(registration_id, order_id)` |
+| 43 | resolved 2026-09-30 | `admission_selections` accepts `access_code` / `invitation_token` as `audience_proof` |
+| 45 | resolved 2026-09-30 | per-offer sold-out → `waitlist_available` + offer waitlist |
 | 8-deferred | deferred | no Google / check-account / password-reset auth |
 | 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) |
 | 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
@@ -182,11 +211,72 @@ endpoints and pass them through as `audience_proof` to `Registrations::Submit`.
 
 ---
 
+### #53. Public event payload no longer exposes the detail fields (config gutted)
+
+`Events::Public::EventSettingSerializer` now whitelists **only**
+`%w[public_guest_limit]` (`app/serializers/events/public/event_setting_serializer.rb`),
+and `EventDetailSerializer` carries no replacement attributes. So the following
+previously-public fields have **no source anywhere in the public API** (grep of
+`app/` confirms the key strings are gone):
+
+`age_restriction`, `lineup`, `seat_map`, `featured`, `rating`,
+`answer_edit_window_hours`, `event_type`, `access_mode`, `invite_only_paid`,
+`on_guest_list`, `invite_waitlist_only`, `waitlist_ahead`, `rsvp_going`,
+`rsvp_capacity`, `allows_plus_one`, `max_guests`, `rsvp_requirements`,
+`price_foreign_from_minor`.
+
+The **admission-related** keys are legitimately replaced by the offer model
+(`ticket_type.approval_mode` / `audience` / `waitlist_enabled`, `price_options`),
+but the **non-admission** ones have no substitute: the event-detail Age info card,
+Lineup section, SeatMap step, and the discovery Featured/rating surfaces all lose
+their data. `age_restriction` in particular is real organizer data the seed writes
+and the public payload used to serve.
+
+**Why it blocks:** those event-detail modules can only render absent. ADR-0002
+forbids fabricating them.
+
+**Fix:** expose the non-admission public-safe fields on the detail serializer —
+at minimum `age_restriction`, `seat_map`, and `lineup` (or a public lineup
+endpoint, see #36); decide explicitly whether `featured`/`rating` are part of the
+public contract.
+
+**Status: open — filed 2026-09-30 (verified against `326f6a3` by code read +
+live `GET /public/events/:slug` → `event_setting.config == {}`).**
+
 ## Open — degrading
 
 Work but suboptimal; the frontend mitigates. Fixing these improves correctness.
 
-### #41. A released order permanently burns its registration
+### #54. Discovery availability has no backend source
+
+`EventListSerializer` (`app/serializers/events/public/event_list_serializer.rb`)
+exposes `price_from_minor` but **no availability**: the old `sold_out` /
+`tickets_left` config keys are gone (#53), and per-offer availability lives only
+on `GET /public/events/:slug/products` (a boolean per product, one request per
+event). So the discovery grid cannot show a Sold Out / "N left" state without an
+N+1 per-card fetch.
+
+**Why it degrades:** the `EventCard` sold-out badge and the low-tickets chip lose
+their only source; events on the grid can't signal availability.
+
+**Fix:** a batched availability projection on the list endpoint (e.g.
+`sold_out` / `has_available_offer` per event), or a `GET /public/events?ids=`
+availability batch.
+
+**Status: open — filed 2026-09-30 (verified against `326f6a3`).**
+
+### #55. `EventDetailSerializer` omits `price_from_minor`
+
+`EventListSerializer` computes `price_from_minor` (over active ticket products)
+but `EventDetailSerializer` does not
+(`app/serializers/events/public/event_detail_serializer.rb`). The detail page must
+derive the "from" price from a second `GET .../products` call.
+
+**Fix:** mirror `price_from_minor` onto the detail serializer.
+
+**Status: open — filed 2026-09-30 (verified against `326f6a3`).**
+
+### #41. A released order permanently burns its registration — RESOLVED 2026-09-30
 
 `idx_one_order_item_per_registration` is `UNIQUE (registration_id) WHERE
 registration_id IS NOT NULL` (`db/structure.sql`) — it does **not** exclude
@@ -200,7 +290,11 @@ registration unusable for a retry: a new order with it 409s
 submit). If a registration is meant to be one-checkout-only that's fine, but a
 *released* order should not keep the slot burned.
 
-**Status: open — verified 2026-09-15 (index definition + live 409).**
+**Status: RESOLVED 2026-09-30** — `db/structure.sql` now reads
+`CREATE UNIQUE INDEX idx_one_order_item_per_registration ON public.orders_order_items USING btree (registration_id, order_id) WHERE (registration_id IS NOT NULL)`
+(the migration was edited in place at `20260811090002_create_order_items.rb`), so a
+released order no longer burns the registration for a retry. **Frontend: the
+"Discard & start fresh" `registrationModule.release` workaround can be retired.**
 
 ### #42. Wallet resale policy omits the value a percentage cap is computed from
 
@@ -733,6 +827,14 @@ history). Every item below was re-verified against the pulled
 | 35 | Checkout purchase limit — **seed-side fix**: `PurchaseLimits::Reserve`/`Commit` require a ticket-type limit (`purchase_limit_allocations_missing` otherwise); the dev free-RSVP fixture now sets `max_packages_per_user: 10` (preview.rb), so guest checkout on it creates + auto-fulfills. Frontend maps friendly copy for the limit errors | live HTTP 2026-09-10 (free guest order 422 → after seed fix: order created, active ticket issued) |
 | 16 | Chapa API V2 migration — `api.chapa.global`, `CHAPA_TEST_`/`CHAPA_LIVE_` key prefixes matching `CHAPA_MODE`, V1 `CHASECK_*` validation removed; `PaymentSerializer` shape unchanged | code read 2026-09-15 (`a470c76`) |
 | 26 | Seller payout destination create now works — Chapa V2 direct transfer: `VerifyPayoutAccount` persists an encrypted destination from a **flat** `payout_account { type, provider, bank_slug, account_number, holder_name }`, verifies via provider or leaves `pending_verification`; frontend `payoutService.addMethod` rewired to the flat payload + new wire fields | code read + local wiring 2026-09-15 (`a470c76`) |
+| 41 | Released-order registration burn fixed — `idx_one_order_item_per_registration` is now `(registration_id, order_id)` (in-place migration edit `20260811090002`) | `db/structure.sql` + migration 2026-09-30 (`326f6a3`) |
+| 40 | `Orders::ExpireCheckout` no longer aborts the sweep on an elapsed-grace payment — it reconciles the grace payment (`action: :reconcile_grace`) / releases the stale order instead of raising `ExpiryFailure` | code read 2026-09-30 (`326f6a3`) |
+| 39 | Payout discovery + rails — `GET .../payout_accounts/destinations` (collection) exists and `Marketplace::SellerPayoutAccount::TYPES = %w[bank mobile_money]` | `config/routes.rb:311-312` + model 2026-09-30 (`326f6a3`) |
+| 34 | Event-date gate — `Orders::EventDateEligibility.error_for` now runs in `Orders::BuildQuote` (quote) **and** `Orders::CreateCheckout#validate_event_date_eligibility!` (order) | code read 2026-09-30 (`326f6a3`) |
+| 33 | Guest order access — `Orders::ResolveGuestOrderAccess` prefers an `order_access_token` (`GuestOrderAccessToken`, purpose `orders.guest_order_access`) and only falls back to the quote token, so an accepted payment reconciles without re-decoding the (crossed/stale) quote token. `guest_payment_attempts` + `guest_payment_refresh` accept `order_access_token` | code read 2026-09-30 (`326f6a3`) |
+| 43 / 45 / 37 | RSVP audience-proof + sold-out/waitlist — the unified `POST /public/events/:slug/admission_selections` accepts `audience_proof { access_code, invitation_token }`, a sold-out cart returns `next_action.type: "waitlist_available"` + `event_product_ids`, and the offer-scoped public waitlist (`/admission_offers/:product_id/waitlist` + `/request_otp`) exists | `config/routes.rb:121-128` + `Orders::AdmissionSelections::Create` 2026-09-30 (`326f6a3`) |
+| 27 | **Superseded** — the public RSVP routes (`/rsvps`, `/rsvps/request_otp`) were deleted; free admission is now a `$0` `admission_selections` (`next_action: confirmed` / `issuing`). Frontend `registrationModule.rsvpRequestOtp`/`rsvpSubmit` are dead code | `config/routes.rb` (no `rsvps`) 2026-09-30 (`326f6a3`) |
+| 1 | **Re-scoped, not widened** — the public projection is now `%w[public_guest_limit]`; the "widen to 17 keys" fix is moot and the lost non-admission fields are tracked as #53 | code + live `GET /public/events/:slug` 2026-09-30 (`326f6a3`) |
 
 ---
 
