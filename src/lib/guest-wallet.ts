@@ -56,6 +56,9 @@ export interface GuestWalletRecord {
   savedAt: string;
   /** ISO instant after which the record is dropped (event end + 30 days). */
   expiresAt: string;
+  /** The phone the guest checked out with — lets the claim flow pre-fill it
+   *  instead of asking the buyer to re-type what we already know. */
+  phone?: string;
 }
 
 const b64ToBuf = (b64: string): Uint8Array<ArrayBuffer> => {
@@ -189,12 +192,13 @@ function expiresFor(wire: TicketWalletWire): string {
   return new Date(base + DEVICE_RETENTION_MS).toISOString();
 }
 
-function toRecord(wire: TicketWalletWire): GuestWalletRecord {
+function toRecord(wire: TicketWalletWire, phone?: string): GuestWalletRecord {
   return {
     ticketId: wire.id,
     wire,
     savedAt: new Date().toISOString(),
     expiresAt: expiresFor(wire),
+    ...(phone ? { phone } : {}),
   };
 }
 
@@ -219,11 +223,11 @@ export const guestWallet = {
    * active tickets) into the device wallet. Called on the guest return screen
    * BEFORE the checkout resume keys are cleared.
    */
-  async saveTickets(wires: TicketWalletWire[]): Promise<void> {
+  async saveTickets(wires: TicketWalletWire[], options: { phone?: string } = {}): Promise<void> {
     if (!wires || wires.length === 0) return;
     const db = await openDb();
     for (const wire of wires) {
-      const record = toRecord(wire);
+      const record = toRecord(wire, options.phone);
       const env: StoredEnvelope = cryptoSupported()
         ? { ticketId: wire.id, ...(await encryptPayload(db, record)) }
         : { ticketId: wire.id, enc: false, v: 1, data: bufToB64(new TextEncoder().encode(JSON.stringify(record))) };
@@ -253,6 +257,16 @@ export const guestWallet = {
       );
     } catch {
       return [];
+    }
+  },
+
+  /** The phone stored with a device ticket, if any (claim pre-fill). */
+  async getPhone(ticketId: string): Promise<string | undefined> {
+    try {
+      const records = await guestWallet.list();
+      return records.find((r) => r.ticketId === ticketId)?.phone;
+    } catch {
+      return undefined;
     }
   },
 

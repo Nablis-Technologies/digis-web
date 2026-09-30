@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { X, Phone, ShieldCheck, KeyRound, Lock, ArrowRight, Check, UserCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { UserTicket } from '@/types';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -8,6 +8,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { registrationModule } from '@/lib/registration';
+import { guestWallet } from '@/lib/guest-wallet';
 import { ApiError, mapApiError, mapFieldErrors } from '@/lib/errors';
 import { FieldError } from '@/components/primitives/FieldError';
 
@@ -34,6 +35,16 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   // carries anything that names no field (API/ownership failures).
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
+
+  // Pre-fill the phone we already captured at guest checkout, so the buyer
+  // never re-types what we know — they only confirm it with the OTP.
+  useEffect(() => {
+    let alive = true;
+    void guestWallet.getPhone(ticket.id).then((stored) => {
+      if (alive && stored) setPhone((cur) => cur || stored);
+    });
+    return () => { alive = false; };
+  }, [ticket.id]);
 
   const text = isDark ? '#fff' : '#1a1a1a';
   const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';

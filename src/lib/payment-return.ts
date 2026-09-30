@@ -134,7 +134,7 @@ export function useGuestPaymentReturnConfirmation(
               (w) => !eventId || w.event.id === eventId,
             );
             try {
-              await guestWallet.saveTickets(wired);
+              await guestWallet.saveTickets(wired, { phone: guestCreds.phone });
             } catch (saveError) {
               // The payment is confirmed, but the device copy failed — tell the
               // buyer instead of silently losing the ticket on their next visit.
