@@ -9,9 +9,9 @@
 # recreates the backend web container. Vite already allows *.trycloudflare.com
 # (see vite.config.ts server.allowedHosts).
 #
-# NOTE: a quick-tunnel URL is EPHEMERAL — it changes every restart, so re-run
-# this script (and re-checkout) whenever you restart the tunnel. The ngrok
-# BACKEND tunnel stays stable (script/dev_tunnels.ps1 in digis_backend).
+# NOTE: a quick-tunnel URL is EPHEMERAL: it changes every restart, so re-run
+# this script (and start a fresh checkout) whenever you restart the tunnel.
+# The ngrok BACKEND tunnel stays stable (script/dev_tunnels.ps1 in digis_backend).
 #
 # Caveat: the buyer's app tab and the return URL must share an origin for
 # localStorage (session, digis:payment-* keys) to carry over. If you browse the
@@ -62,14 +62,14 @@ for ($i = 0; $i -lt 15; $i++) {
   try { if ((Invoke-WebRequest -Uri "$url/?status=return" -TimeoutSec 15 -UseBasicParsing).StatusCode -eq 200) { $reachable = $true; break } } catch { }
   Start-Sleep -Seconds 2
 }
-if (-not $reachable) { Write-Warning "Could not reach $url — wiring CHAPA_RETURN_URL anyway." }
+if (-not $reachable) { Write-Warning "Could not reach $url - wiring CHAPA_RETURN_URL anyway." }
 
 $envPath = Join-Path $BackendDir '.env.chapa'
 if (-not (Test-Path $envPath)) { throw "No .env.chapa at $envPath (set -BackendDir to the digis_backend path)." }
 $text = [System.IO.File]::ReadAllText($envPath, [System.Text.Encoding]::UTF8)
 $text = [System.Text.RegularExpressions.Regex]::Replace($text, '(?m)^CHAPA_RETURN_URL=.*$', "CHAPA_RETURN_URL=$url/?status=return")
 [System.IO.File]::WriteAllText($envPath, $text, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "Wrote CHAPA_RETURN_URL=$url/?status=return to $envPath" -ForegroundColor Green
+Write-Host "Wrote CHAPA_RETURN_URL to $envPath" -ForegroundColor Green
 
 Write-Host 'Recreating the backend web container...' -ForegroundColor Cyan
 docker compose --project-directory $BackendDir up -d --force-recreate web | Out-Null
