@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronDown, Crown, Sparkle, Sparkles, Heart, Flame } from 'lucide-react';
+import { Check, ChevronDown, Crown, Sparkle, Sparkles, Users, Flame } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { TicketTier, TicketTierFeature } from '@/types';
 import { resolveTierAccent } from '@/lib/tierAccents';
@@ -14,7 +14,10 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
   const isPremium = type.isPremium;
   const isElite = type.isElite;
   const isEarlyBird = type.isEarlyBird;
-  const isCouples = type.isCouples;
+  // Admissions granted per package unit (backend `ticket_type.admissions_per_unit`).
+  // >1 means one price buys entry for several people (a pair, a group).
+  const admissionsPerUnit = type.admissionsPerUnit ?? 1;
+  const admitsMultiple = admissionsPerUnit > 1;
   // Tier cards are always the vivid dark-colored cards (white text, bright
   // accents) in both themes — matching main. `pageIsDark` only drives the body
   // gradient + glow (below), never the text/accent styling.
@@ -39,11 +42,11 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
 
   // Full-card background keyed by the RESOLVED accent (rank `accent`, semantic
   // flags fallback). Live backend tiers only carry `accent` — never the legacy
-  // isEarlyBird/isCouples/isPremium/isElite flags — so the body must derive from
-  // the accent, or every card falls through to the standard blue gradient.
+  // isEarlyBird/isPremium/isElite flags — so the body must derive from the
+  // accent, or every card falls through to the standard blue gradient.
   const cardAccent =
     type.accent ??
-    (isEarlyBird ? 'emerald' : isCouples ? 'rose' : isElite ? 'violet' : isPremium ? 'gold' : 'blue');
+    (isEarlyBird ? 'emerald' : isElite ? 'violet' : isPremium ? 'gold' : 'blue');
   const cardBackground =
     pageIsDark
       ? ({
@@ -183,8 +186,8 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
             {isPremium && !isElite && (
               <Sparkle className="w-3 h-3" strokeWidth={1.5} style={{ color: accentColor, fill: `rgba(${accentRgb}, 0.3)` }} />
             )}
-            {isCouples && (
-              <Heart className="w-3 h-3" strokeWidth={2} style={{ fill: `rgba(${accentRgb}, 0.45)`, color: accentColor }} />
+            {admitsMultiple && (
+              <Users className="w-3 h-3" strokeWidth={2} style={{ color: accentColor }} />
             )}
           </div>
           {waitingList ? (
@@ -258,10 +261,10 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : 'rgba(0,0,0,0.88)' }}>
               {isFree ? 'Free' : Money.fromMinor(type.priceMinor, "ETB").formatNumber()}
             </span>
-            {isCouples && (
+            {admitsMultiple && (
               <span className="text-[10px]"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.55)` : mutedInk }}>
-                / pair
+                / {admissionsPerUnit}
               </span>
             )}
           </div>
@@ -273,6 +276,12 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
             style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.6)` : mutedInk }}>
             {!soldOut && (
               <span className="flex-shrink-0">{type.available} left</span>
+            )}
+            {admitsMultiple && (
+              <>
+                {!soldOut && <span style={{ opacity: 0.4 }}>·</span>}
+                <span className="flex-shrink-0">Admits {admissionsPerUnit}</span>
+              </>
             )}
             {type.features?.length > 0 && (
               <>

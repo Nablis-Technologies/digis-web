@@ -63,8 +63,6 @@ export interface TicketTier {
   startedAt?: number;
   expiresAt?: number;
   totalCapacity?: number;
-  isCouples?: boolean;
-  seats?: number;
   /** Rank-based presentation accent (cheapest→emerald, priciest→gold).
    *  Absent for single-tier events and unknown callers — falls back to the
    *  semantic flags below. */

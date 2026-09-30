@@ -320,7 +320,11 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
             includedProductIds={selectedTicket?.includedProductIds}
             answerEditWindowHours={event.answerEditWindowHours}
             seatMap={event.seatMap}
-            requiredSeatCount={selectedTicket?.seats ?? (selectedTicket?.isCouples ? 2 : undefined)}
+            requiredSeatCount={
+              selectedTicket && (selectedTicket.admissionsPerUnit ?? 1) > 1
+                ? selectedTicket.admissionsPerUnit
+                : undefined
+            }
             dateSelection={selectedTicket?.dateSelection}
             eventDates={event.eventDates?.filter((d) => Date.parse(d.startsAt) > Date.now())}
             onClose={() => setShowCheckout(false)}

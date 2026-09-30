@@ -21,7 +21,6 @@ export const TIER_ACCENTS: Record<TierAccent, { rgb: string; bright: string; ink
 export function resolveTierAccent(type: TicketTier) {
   if (type.accent) return TIER_ACCENTS[type.accent];
   if (type.isEarlyBird) return TIER_ACCENTS.emerald;
-  if (type.isCouples) return TIER_ACCENTS.rose;
   if (type.isElite) return TIER_ACCENTS.violet;
   if (type.isPremium) return TIER_ACCENTS.gold;
   return TIER_ACCENTS.blue;

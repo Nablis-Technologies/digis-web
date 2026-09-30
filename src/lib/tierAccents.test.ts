@@ -48,7 +48,6 @@ describe('resolveTierAccent', () => {
 
   it('falls back to semantic flags (mock tiers)', () => {
     expect(resolveTierAccent({ ...tier(1000), isEarlyBird: true } as TicketTier)).toBe(TIER_ACCENTS.emerald);
-    expect(resolveTierAccent({ ...tier(1000), isCouples: true } as TicketTier)).toBe(TIER_ACCENTS.rose);
     expect(resolveTierAccent({ ...tier(1000), isElite: true } as TicketTier)).toBe(TIER_ACCENTS.violet);
     expect(resolveTierAccent({ ...tier(1000), isPremium: true } as TicketTier)).toBe(TIER_ACCENTS.gold);
     expect(resolveTierAccent(tier(1000))).toBe(TIER_ACCENTS.blue);

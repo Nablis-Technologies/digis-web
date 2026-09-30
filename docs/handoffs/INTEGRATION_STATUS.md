@@ -54,6 +54,12 @@ the backend lacks a surface. Plan: `docs/superpowers/plans/2026-09-30-composable
 approval, **Join waitlist** when `available=false` + `waitlist_enabled`,
 `choose_one` date step), and `WaitlistSheet` joins a sold-out offer with guest OTP.
 
+**Slice F — `admissions_per_unit` consumed.** The dead `TicketTier.isCouples` /
+`seats` fields (no producer; the products adapter never set them) are removed.
+Seat math now derives `requiredSeatCount` from `ticket_type.admissions_per_unit`,
+and a tier admitting more than one person shows "Admits N" + a `/N` price suffix.
+`products.test.ts` covers the free-tier/admissions/gate mapping.
+
 **Checkout migrated to `admission_selections` (wholesale, 2026-09-30).** The
 checkout no longer does register → quote → create-order: at Pay it submits one
 `POST /public/events/:slug/admission_selections` (registration(s) + quote + one
