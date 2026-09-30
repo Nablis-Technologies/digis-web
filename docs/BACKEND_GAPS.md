@@ -70,6 +70,10 @@
 > **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38. The frontend's
 > `src/lib/registration.ts` RSVP methods (`rsvpRequestOtp`/`rsvpSubmit`) are now
 > **dead** (routes gone) and must be removed.
+>
+> **Added 2026-09-30 (auth):** #56 (a guest who bought a ticket can't create an
+> account — signup can't take over the shadow phone) and #57 (no forgot-password
+> endpoint) — both blocking, filed on fresh code reads.
 
 ## Status key
 
@@ -86,6 +90,8 @@
 | # | Status | Summary |
 |---|---|---|
 | 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
+| 56 | open — blocking | signup can't take over an existing (shadow) phone → a guest who bought a ticket can never create an account ("Phone has already been taken") |
+| 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
 | 53 | open — blocking | public event payload drops `age_restriction` / `lineup` / `seat_map` / `featured` / `rating` (config now `%w[public_guest_limit]`) |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
@@ -242,6 +248,50 @@ public contract.
 
 **Status: open — filed 2026-09-30 (verified against `326f6a3` by code read +
 live `GET /public/events/:slug` → `event_setting.config == {}`).**
+
+### #56. Signup cannot take over an existing (shadow) phone
+
+A guest checkout creates a **shadow `Core::User`** bound to the buyer's phone
+(`Core::PhoneIdentity::ResolveGuest`; phone-confirmed, no password, unverified).
+`POST /auth/signup` (`Core::AuthController#signup`) does `Core::User.new(phone:)`
+then `user.save!`, so a phone that already owns a shadow user fails its uniqueness
+validation and returns:
+
+```
+422 { code: "signup_failed", errors: ["Phone has already been taken"] }
+```
+
+There is **no distinct code** (nothing like `phone_taken`) and **no claim-on-signup**:
+the only way to take over a shadow user is the registration-scoped
+`POST /registrations/:id/claim_guest` (OTP + password), which the buyer can only
+reach from their ticket. So after buying a ticket as a guest, "Create an account"
+with that phone is a permanent dead end — exactly the reported "Phone has already
+been taken".
+
+**Fix:** make signup resolve the existing phone: if the owner is an unverified
+shadow (no `password_digest`, no `verified_at`) and the phone is proven, **upgrade
+it** (set password + verified) and issue auth tokens; if the owner is a real
+account, return a distinct `422` code (`phone_taken`) so the UI can route to log in.
+Phone proof can reuse `Core::PhoneVerification`.
+
+**Status: open — filed 2026-09-30 (code read + reported UX).**
+
+### #57. No password reset / forgot-password
+
+`config/routes.rb` exposes only `auth/login|signup|refresh|logout|reauthenticate|me`
+and `auth/phone_verifications`. There is **no** forgot/reset/change-password
+endpoint, and password is only ever *set* inside the shadow-user upgrades
+(`Ticketing::Registrations::ClaimGuest`, `Ticketing::Transfers::AcceptGuest`). A
+real account that forgets its password has no recovery path.
+
+**Fix:** a phone-OTP reset reusing the existing `Core::PhoneVerification` infra:
+`POST /auth/password_reset/request_otp { phone }` → challenge, then
+`POST /auth/password_reset { phone, verification_token, password,
+password_confirmation }` → sets the password on the (real) account and returns
+auth tokens. Refuse when the phone belongs to an unverified shadow (that case is
+the claim flow, #56).
+
+**Status: open — filed 2026-09-30 (route grep).**
 
 ## Open — degrading
 

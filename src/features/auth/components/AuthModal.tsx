@@ -167,6 +167,20 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     for (const key of ['name', 'phone', 'email', 'password', 'passwordConfirmation']) {
       if (fields[key]) mapped[key] = fields[key];
     }
+    // The phone already owns an account — either a real one, or the shadow user
+    // a guest checkout created. The backend has no claim-on-signup yet
+    // (BACKEND_GAPS #56), so a guest who bought a ticket cannot create an
+    // account with that phone. Replace the raw "has already been taken" line
+    // with an actionable route instead of a dead end.
+    const phoneTaken =
+      /taken|already/i.test(fields.phone ?? '') || /taken/i.test(res.error ?? '');
+    if (phoneTaken) {
+      setErrors({ ...mapped, phone: 'This phone already has a Digis account.' });
+      setFormError(
+        'Log in with your password — or, if you bought a ticket as a guest, open it under Tickets and set a password there.',
+      );
+      return;
+    }
     setErrors(mapped);
     setFormError(general.join(' ') || (Object.keys(mapped).length ? '' : res.error || 'Could not create account.'));
   };

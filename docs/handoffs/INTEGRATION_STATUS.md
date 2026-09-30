@@ -53,6 +53,12 @@ the backend lacks a surface. Plan: `docs/superpowers/plans/2026-09-30-composable
 waitlist**, `choose_one` date) + selection submit; `order_access_token` in guest
 payment; `admissions_per_unit` in quantity/seat math.
 
+**Auth (same day):** reported "Phone has already been taken" after buying as a
+guest → filed **#56** (signup can't take over the shadow phone; no claim-on-signup,
+no distinct `phone_taken` code) and **#57** (no forgot-password endpoint). Frontend:
+the signup form now replaces the raw taken-phone error with an actionable route
+(log in, or claim the guest ticket under Tickets); no fake reset UI (ADR-0002).
+
 ## Session 2026-09-21 — full gap sweep; NO backend fixes landed; #39 re-filed open
 
 **Backend source:** `origin/feat/launch-hardening-telemetry` is **stale** (last push
