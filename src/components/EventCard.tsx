@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronRight, Clock, Lock, MapPin, Radio } from "lucide-react";
+import { ChevronRight, Clock, MapPin, Radio } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
@@ -14,7 +14,6 @@ import { eventActionLabel } from "@/lib/eventAction";
 
 // Invite-only distinguisher accent — a fixed amber, deliberately not the
 // per-event category hue, so a gated event reads distinctly.
-const INVITE_ACCENT_RGB = "245,158,11";
 
 /** Combine an event's date ("June 29, 2026") + time ("8:00 PM") into a Date. */
 export function getEventStart(dateStr: string, timeStr?: string): Date {
@@ -244,12 +243,7 @@ export function EventCard({
   const accent = isDark ? "#d6f905" : "#d6f905";
   const accentRgb = "214,249,5";
   const priceColor = isDark ? "#d6f905" : "#0a0a0a";
-  const priceLabel =
-    event.eventType === "rsvp"
-      ? "Free RSVP"
-      : event.eventType === "inviteOnly" && !event.inviteOnlyPaid
-        ? "Invite only"
-        : Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
 
   return (
     <motion.div
@@ -333,68 +327,35 @@ export function EventCard({
           </motion.div>
         )}
 
-        {/* Top-left status chip: invite-only takes precedence over the count —
-            a gated event isn't "N left", it's "Invite only" (and stays shown
-            even if the gated tier is sold out). */}
-        {!isEnded && (event.eventType === "inviteOnly" || (!isSoldOut && typeof event.ticketsLeft === "number")) && (
+        {/* Top-left status chip: remaining tickets, when the backend exposes a
+            count (event.type is offer-driven now — no invite-only mode). */}
+        {!isEnded && !isSoldOut && typeof event.ticketsLeft === "number" && (
           <div className="absolute top-3 left-3 z-20">
             <motion.span
-              animate={
-                isLow && event.eventType !== "inviteOnly"
-                  ? { opacity: [0.72, 1, 0.72] }
-                  : { opacity: 1 }
-              }
+              animate={isLow ? { opacity: [0.72, 1, 0.72] } : { opacity: 1 }}
               transition={
-                isLow && event.eventType !== "inviteOnly"
-                  ? {
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }
+                isLow
+                  ? { duration: 2, repeat: Infinity, ease: "easeInOut" }
                   : undefined
               }
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] tracking-[1.6px] uppercase leading-none"
               style={{
                 fontFamily: "'Inter', sans-serif",
-                background:
-                  event.eventType === "inviteOnly"
-                    ? `rgba(${INVITE_ACCENT_RGB},0.9)`
-                    : isLow
-                      ? "rgba(220,38,38,0.88)"
-                      : "rgba(0,0,0,0.5)",
+                background: isLow ? "rgba(220,38,38,0.88)" : "rgba(0,0,0,0.5)",
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
-                color: event.eventType === "inviteOnly" ? "#1a1200" : "#fff",
+                color: "#fff",
                 fontWeight: 600,
                 border: `1px solid ${
-                  isLow || event.eventType === "inviteOnly"
-                    ? "rgba(255,255,255,0.28)"
-                    : "rgba(255,255,255,0.18)"
+                  isLow ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.18)"
                 }`,
-                boxShadow:
-                  event.eventType === "inviteOnly"
-                    ? "0 8px 20px rgba(245,158,11,0.3)"
-                    : isLow
-                      ? "0 8px 20px rgba(220,38,38,0.25)"
-                      : "none",
+                boxShadow: isLow ? "0 8px 20px rgba(220,38,38,0.25)" : "none",
               }}
             >
-              {event.eventType === "inviteOnly" ? (
-                <>
-                  <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
-                  Invite only
-                </>
-              ) : (
-                <>
-                  {isLow && (
-                    <span
-                      className="w-1 h-1 rounded-full"
-                      style={{ background: "#fff" }}
-                    />
-                  )}
-                  {event.ticketsLeft} Left
-                </>
+              {isLow && (
+                <span className="w-1 h-1 rounded-full" style={{ background: "#fff" }} />
               )}
+              {event.ticketsLeft} Left
             </motion.span>
           </div>
         )}
@@ -516,7 +477,7 @@ export function EventCard({
                 fontWeight: 700,
               }}
             >
-              {isSoldOut ? "Sold Out" : isEnded ? "Ended" : eventActionLabel(event.eventType)}
+              {isSoldOut ? "Sold Out" : isEnded ? "Ended" : eventActionLabel()}
             </span>
             <ChevronRight
               className="w-2.5 h-2.5"

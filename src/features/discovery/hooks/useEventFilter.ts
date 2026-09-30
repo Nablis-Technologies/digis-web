@@ -4,7 +4,9 @@ import { eventEnded } from "@/lib/eventDates";
 import { eventSoldOut } from "@/lib/eventAvailability";
 
 export type EventSortBy = "soonest" | "price-low" | "price-high" | "available";
-export type EventAccessFilter = "free-rsvp" | "ticketed" | "invite-only";
+/** Offer-driven: the list payload only distinguishes free (a $0 ticket offer)
+ *  from paid. Per-offer audience/waitlist lives on the products endpoint. */
+export type EventAccessFilter = "free" | "ticketed";
 export type EventPriceFilter = "free" | "under-1000" | "1000-3000" | "3000-plus";
 
 export interface EventFilterOptions {
@@ -42,11 +44,7 @@ export function filterAndSortEvents(events: Event[], options: EventFilterOptions
       // ended event is never available either.
       const matchesAvailable =
         !onlyAvailable || (!eventEnded(event) && !eventSoldOut(event));
-      const eventAccess: EventAccessFilter = event.eventType === "rsvp"
-        ? "free-rsvp"
-        : event.eventType === "inviteOnly"
-          ? "invite-only"
-          : "ticketed";
+      const eventAccess: EventAccessFilter = event.priceFromMinor === 0 ? "free" : "ticketed";
       const matchesAccess = eventTypes.length === 0 || eventTypes.includes(eventAccess);
       const matchesPrice = !priceRange || (
         priceRange === "free" ? event.priceFromMinor === 0

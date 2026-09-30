@@ -30,7 +30,6 @@ const previewEvent: Event = {
   currency: "ETB",
   ticketsLeft: 143,
   ageRestriction: "18+",
-  eventType: "ticketed",
   organizers: [
     { name: "Digis Events Co.", handle: "@digisevents", verified: true, followers: 12400, eventsHosted: 47, rating: 4.8, bio: "Curating memorable cultural and music experiences." },
     { name: "Habesha Sound", handle: "@habeshasound", verified: true, followers: 8200, eventsHosted: 31, rating: 4.7, bio: "Live music collective amplifying East African artists." },

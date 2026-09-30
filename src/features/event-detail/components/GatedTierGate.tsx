@@ -13,7 +13,8 @@ interface GatedTierGateProps {
    *  is validated against ALL of them (a code valid for any opens the gate). */
   gatedTicketTypeIds: string[];
   unlocked: boolean;
-  onUnlocked: () => void;
+  /** Called with the accepted access code so checkout can carry it as proof. */
+  onUnlocked: (accessCode: string) => void;
   children: React.ReactNode;
 }
 
@@ -44,7 +45,7 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
       // the gate (tiers may share one code or carry distinct ones).
       const ok = await audienceModule.authorizeAny(gatedTicketTypeIds, { accessCode: trimmed });
       if (ok) {
-        onUnlocked();
+        onUnlocked(trimmed);
       } else {
         setError('This access code is not valid for this event.');
       }
@@ -58,7 +59,7 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
   if (unlocked) return <>{children}</>;
 
   return (
-    <div className="rounded-3xl overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.025)' : '#fff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
+    <div className="rounded-3xl overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.025)' : '#fff' }}>
       <GlassReflection isDark={isDark} />
       <div className="relative z-10 px-6 py-8 text-center">
         <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-4"
@@ -91,12 +92,12 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
             placeholder="Enter your code"
-            className="flex-1 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
+            className="flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
             style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
           <AppButton whileTap={{ scale: 0.95 }}
             onClick={tryCode}
             disabled={!code.trim() || checking}
-            className="flex-shrink-0 px-4 py-2 rounded-xl disabled:cursor-not-allowed"
+            className="flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-xl disabled:cursor-not-allowed"
             style={
               code.trim() && !checking
                 ? { background: isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a', color: isDark ? '#0a0a0a' : '#fff' }

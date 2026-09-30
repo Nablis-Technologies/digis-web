@@ -9,19 +9,27 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
 import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
 
-export function TicketTypeCard({ type, selected, onSelect, index, reflectionSettings }: { type: TicketTier; selected: boolean; onSelect: () => void; index: number; reflectionSettings?: GlassReflectionSettings }) {
+export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index, reflectionSettings }: { type: TicketTier; selected: boolean; onSelect: () => void; onJoinWaitlist?: () => void; index: number; reflectionSettings?: GlassReflectionSettings }) {
   const { isDark: pageIsDark } = useTheme();
   const isPremium = type.isPremium;
   const isElite = type.isElite;
   const isEarlyBird = type.isEarlyBird;
   const isCouples = type.isCouples;
-  const isDark = pageIsDark;
+  // Tier cards are always the vivid dark-colored cards (white text, bright
+  // accents) in both themes — matching main. `pageIsDark` only drives the body
+  // gradient + glow (below), never the text/accent styling.
+  const isDark = true;
   const [expanded, setExpanded] = useState(false);
   // Backend "available: false" → purchasableCap 0 (products.ts). A sold-out
   // TIER is dimmed + non-selectable even when other tiers on the event remain
   // buyable — clicking it would otherwise sail through checkout to a 409
   // inventory_unavailable at order creation.
   const soldOut = type.available === 0;
+  // A sold-out offer that accepts a waitlist stays actionable (join), so it is
+  // not dimmed like a dead sold-out tier.
+  const waitingList = soldOut && type.waitlistEnabled === true && !!onJoinWaitlist;
+  const dimmed = soldOut && !waitingList;
+  const isFree = type.priceMinor === 0;
 
   // Rank-based accent (cheapest→emerald, priciest→gold; legacy semantic flags
   // as fallback). Dark mode uses the bright shade; light mode the adjacent ink.
@@ -37,7 +45,7 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
     type.accent ??
     (isEarlyBird ? 'emerald' : isCouples ? 'rose' : isElite ? 'violet' : isPremium ? 'gold' : 'blue');
   const cardBackground =
-    isDark
+    pageIsDark
       ? ({
           emerald: 'linear-gradient(155deg, #0a2218 0%, #060f0c 100%)',
           rose: 'linear-gradient(155deg, #2a0f1a 0%, #140709 100%)',
@@ -62,10 +70,10 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08 * index, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-      whileHover={soldOut ? undefined : { scale: 1.01, y: -2 }}
-      whileTap={soldOut ? undefined : { scale: 0.99 }}
-      onClick={() => { if (!soldOut) onSelect(); }}
-      className={`relative rounded-[22px] overflow-visible ${soldOut ? 'opacity-45 grayscale-[0.55] pointer-events-auto select-none' : 'cursor-pointer'}`}
+      whileHover={dimmed ? undefined : { scale: 1.01, y: -2 }}
+      whileTap={dimmed ? undefined : { scale: 0.99 }}
+      onClick={() => { if (waitingList) onJoinWaitlist?.(); else if (!soldOut) onSelect(); }}
+      className={`relative rounded-[22px] overflow-visible ${dimmed ? 'opacity-45 grayscale-[0.55] pointer-events-auto select-none' : 'cursor-pointer'}`}
       style={{
         boxShadow: pageIsDark
           ? undefined
@@ -179,7 +187,21 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
               <Heart className="w-3 h-3" strokeWidth={2} style={{ fill: `rgba(${accentRgb}, 0.45)`, color: accentColor }} />
             )}
           </div>
-          {soldOut ? (
+          {waitingList ? (
+            <AppButton
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => { e.stopPropagation(); onJoinWaitlist?.(); }}
+              className="flex-shrink-0 text-[9px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-md cursor-pointer"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                color: accentColor,
+                border: `1px solid rgba(${accentRgb}, ${isDark ? '0.4' : '0.5'})`,
+                background: `rgba(${accentRgb}, ${isDark ? '0.12' : '0.16'})`,
+              }}>
+              Join Waitlist
+            </AppButton>
+          ) : soldOut ? (
             <span className="flex-shrink-0 text-[9px] tracking-[1.5px] uppercase px-2 py-0.5 rounded-md"
               style={{
                 fontFamily: "'Inter', sans-serif",
@@ -234,7 +256,7 @@ export function TicketTypeCard({ type, selected, onSelect, index, reflectionSett
           <div className="flex items-baseline gap-1 flex-shrink-0">
             <span className="text-[18px] font-light tracking-[-0.3px] tabular-nums"
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : 'rgba(0,0,0,0.88)' }}>
-              {Money.fromMinor(type.priceMinor, "ETB").formatNumber()}
+              {isFree ? 'Free' : Money.fromMinor(type.priceMinor, "ETB").formatNumber()}
             </span>
             {isCouples && (
               <span className="text-[10px]"

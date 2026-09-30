@@ -479,7 +479,6 @@ function AppContent() {
                 }}
                 onPurchase={() => navigateToView('tickets')}
                 onNavigate={(view) => navigateToView(view as AppView)}
-                onRequestAuth={requestAuth}
               />
             </motion.div>
           ) : detailLoading ? (

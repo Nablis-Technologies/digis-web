@@ -10,8 +10,6 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 export function EventHero({
   event,
   isDark,
-  isInvite,
-  inviteUnlocked,
   liked,
   onLikedChange,
   onBack,
@@ -24,8 +22,6 @@ export function EventHero({
 }: {
   event: Event;
   isDark: boolean;
-  isInvite: boolean;
-  inviteUnlocked: boolean;
   liked: boolean;
   onLikedChange: (liked: boolean) => void;
   onBack: () => void;
@@ -186,8 +182,6 @@ export function EventHero({
           <EventInfoRail
             event={event}
             isDark={isDark}
-            isInvite={isInvite}
-            inviteUnlocked={inviteUnlocked}
             posterRgb={posterRgb}
           />
         </div>
@@ -253,14 +247,15 @@ export function EventHero({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.9 }}
             onClick={onBack}
-            className="w-11 h-11 rounded-full flex items-center justify-center border border-white/[0.12]"
+            className="relative w-11 h-11 rounded-full flex items-center justify-center overflow-hidden"
             style={{
               background: "rgba(8,8,8,0.5)",
               backdropFilter: "blur(30px)",
             }}
           >
+            <GlassReflection isDark={isDark} />
             <ArrowLeft
-              className="w-5 h-5 text-white/80"
+              className="relative z-10 w-5 h-5 text-white/80"
               strokeWidth={1.5}
             />
           </AppButton>
@@ -270,14 +265,15 @@ export function EventHero({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => onLikedChange(!liked)}
-              className="w-11 h-11 rounded-full flex items-center justify-center border border-white/[0.12]"
+              className="relative w-11 h-11 rounded-full flex items-center justify-center overflow-hidden"
               style={{
                 background: "rgba(8,8,8,0.5)",
                 backdropFilter: "blur(30px)",
               }}
             >
+              <GlassReflection isDark={isDark} />
               <Heart
-                className={`w-5 h-5 ${liked ? "fill-red-400 text-red-400" : "text-white/80"}`}
+                className={`relative z-10 w-5 h-5 ${liked ? "fill-red-400 text-red-400" : "text-white/80"}`}
                 strokeWidth={1.5}
               />
             </AppButton>
@@ -285,14 +281,15 @@ export function EventHero({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => onShare()}
-              className="w-11 h-11 rounded-full flex items-center justify-center border border-white/[0.12]"
+              className="relative w-11 h-11 rounded-full flex items-center justify-center overflow-hidden"
               style={{
                 background: "rgba(8,8,8,0.5)",
                 backdropFilter: "blur(30px)",
               }}
             >
+              <GlassReflection isDark={isDark} />
               <Share2
-                className="w-5 h-5 text-white/80"
+                className="relative z-10 w-5 h-5 text-white/80"
                 strokeWidth={1.5}
               />
             </AppButton>

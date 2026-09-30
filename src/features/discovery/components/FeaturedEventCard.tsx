@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { ArrowUpRight, Lock, MapPin } from "lucide-react";
+import { ArrowUpRight, MapPin } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
@@ -13,7 +13,6 @@ import { eventActionLabel } from "@/lib/eventAction";
 
 // Invite-only distinguisher accent — a fixed amber, matching the grid card so a
 // gated event reads the same everywhere in discovery.
-const INVITE_ACCENT_RGB = "245,158,11";
 
 export function FeaturedEventCard({
   event,
@@ -34,12 +33,7 @@ export function FeaturedEventCard({
   const hued = useProminentHue(event.image, rgb, isDark);
 
   const isLarge = variant === "large" || large;
-  const priceLabel =
-    event.eventType === "rsvp"
-      ? "Free"
-      : event.eventType === "inviteOnly" && !event.inviteOnlyPaid
-        ? "Invite only"
-        : Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
 
   // Desktop magazine layout — unchanged
   if (isLarge) {
@@ -91,22 +85,7 @@ export function FeaturedEventCard({
             >
               {event.category}
             </div>
-            {event.eventType === "inviteOnly" && (
-              <div
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[2px] uppercase"
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  color: `rgb(${INVITE_ACCENT_RGB})`,
-                  background: `rgba(${INVITE_ACCENT_RGB},0.16)`,
-                  border: `1px solid rgba(${INVITE_ACCENT_RGB},0.4)`,
-                  backdropFilter: "blur(12px)",
-                  fontWeight: 600,
-                }}
-              >
-                <Lock className="w-3 h-3" strokeWidth={2.5} />
-                Invite only
-              </div>
-            )}
+
           </div>
           <EventDateBadge date={event.date} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
           <div className="absolute bottom-3 left-5 right-5">
@@ -307,7 +286,7 @@ export function FeaturedEventCard({
                 fontWeight: 600,
               }}
             >
-              {event.eventType === "rsvp" ? "RSVP" : "From"}
+              From
             </span>
             <span
               className="mt-1 text-[15px] leading-none truncate"
@@ -342,7 +321,7 @@ export function FeaturedEventCard({
                 fontWeight: 700,
               }}
             >
-              {eventActionLabel(event.eventType)}
+              {eventActionLabel()}
             </span>
             <span
               className="flex items-center justify-center w-7 h-7 rounded-full"

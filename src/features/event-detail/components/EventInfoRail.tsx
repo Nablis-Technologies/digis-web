@@ -8,14 +8,10 @@ import { OrganizerCard, OrganizerInline, resolveOrganizers } from './OrganizerSe
 export function EventInfoRail({
   event,
   isDark,
-  isInvite,
-  inviteUnlocked,
   posterRgb,
 }: {
   event: Event;
   isDark: boolean;
-  isInvite: boolean;
-  inviteUnlocked: boolean;
   posterRgb?: [number, number, number] | null;
 }) {
   const organizers = resolveOrganizers(event);
@@ -36,21 +32,19 @@ export function EventInfoRail({
         {event.name}
       </h1>
 
-      {(!isInvite || inviteUnlocked) && (
-        <div className="mt-7">
-          <InfoStrip
-            rgb={posterRgb}
-            items={[
-              { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Date', value: event.date },
-              { icon: <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Time', value: event.time },
-              { icon: <MapPin className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Venue', value: event.venue },
-              { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Age', value: event.ageRestriction || 'Any Age' },
-            ]}
-          />
-        </div>
-      )}
+      <div className="mt-7">
+        <InfoStrip
+          rgb={posterRgb}
+          items={[
+            { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Date', value: event.date },
+            { icon: <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Time', value: event.time },
+            { icon: <MapPin className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Venue', value: event.venue },
+            { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Age', value: event.ageRestriction || 'Any Age' },
+          ]}
+        />
+      </div>
 
-      {(!isInvite || inviteUnlocked) && event.description && (
+      {event.description && (
         <div className="mt-5">
           <h2 className="text-[11px] tracking-[2px] uppercase mb-2.5"
             style={{
@@ -73,19 +67,17 @@ export function EventInfoRail({
         the top of the page. The price and "Get tickets" CTA aren't repeated: the
         docked purchase bar already carries both.
       */}
-      {(!isInvite || inviteUnlocked) && (
-        <div className="mt-6 flex flex-col gap-5">
-          <LineupSection lineup={event.lineup} isDark={isDark} compact />
+      <div className="mt-6 flex flex-col gap-5">
+        <LineupSection lineup={event.lineup} isDark={isDark} compact />
 
-          {/* A single organizer shows its full profile inline (the same card the
-              popup would show); several keep the compact list + sheet. */}
-          {organizers.length === 1 ? (
-            <OrganizerInline organizer={organizers[0]} isDark={isDark} />
-          ) : (
-            <OrganizerCard organizers={organizers} isDark={isDark} compact />
-          )}
-        </div>
-      )}
+        {/* A single organizer shows its full profile inline (the same card the
+            popup would show); several keep the compact list + sheet. */}
+        {organizers.length === 1 ? (
+          <OrganizerInline organizer={organizers[0]} isDark={isDark} />
+        ) : (
+          <OrganizerCard organizers={organizers} isDark={isDark} compact />
+        )}
+      </div>
     </motion.div>
   );
 }

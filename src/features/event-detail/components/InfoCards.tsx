@@ -3,6 +3,8 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
+export type InfoItem = { icon: React.ReactNode; label: string; value: string; onClick?: () => void };
+
 function boostSaturation([r, g, b]: [number, number, number], factor = 1.25): [number, number, number] {
   const avg = (r + g + b) / 3;
   const sat = (c: number) => Math.max(0, Math.min(255, Math.round(avg + (c - avg) * factor)));
@@ -64,7 +66,7 @@ export function InfoStrip({ items, rgb, reflectionSettings }: {
 }
 
 export function InfoCardsGrid({ items, rgb }: {
-  items: { icon: React.ReactNode; label: string; value: string }[];
+  items: InfoItem[];
   rgb?: [number, number, number] | null;
 }) {
   const { isDark } = useTheme();
@@ -91,11 +93,84 @@ export function InfoCardsGrid({ items, rgb }: {
   const labelColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.55)';
   const valueColor = isDark ? '#fff' : '#0a0a0a';
 
+  // Two cards per row.
+  const rows: (typeof items)[] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+
   return (
-    <div className="relative z-10 -mt-10 grid grid-cols-2 gap-2.5">
-      {items.map((item) => (
+    <div className="relative z-10 -mt-10 flex flex-col gap-2.5">
+      {rows.map((row, rowIndex) => (
+        <InfoRow
+          key={rowIndex}
+          items={row}
+          isDark={isDark}
+          cardBg={cardBg}
+          iconColor={iconColor}
+          labelColor={labelColor}
+          valueColor={valueColor}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One row of the mobile info grid. Two discrete modes only, decided by the
+ * measured intrinsic width of the values:
+ *  - equal: both cards fit in half the row → they share it 50/50.
+ *  - compact: a value needs more than half (e.g. a long venue name) → that card
+ *    takes the space it needs and the other shrinks to its own content + padding.
+ * A value still wider than its box is truncated on one line — never wrapped.
+ */
+function InfoRow({ items, isDark, cardBg, iconColor, labelColor, valueColor }: {
+  items: InfoItem[];
+  isDark: boolean;
+  cardBg: string;
+  iconColor: string;
+  labelColor: string;
+  valueColor: string;
+}) {
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  const measureRefs = React.useRef<(HTMLSpanElement | null)[]>([]);
+  const [mode, setMode] = React.useState<{ compact: boolean; widest: number }>({ compact: false, widest: 0 });
+  // Stable dep so the inline `items` array identity doesn't re-run the effect.
+  const valueKey = items.map((i) => i.value).join('\u0000');
+
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      const row = rowRef.current;
+      if (!row) return;
+      const half = (row.clientWidth - 10) / 2; // gap-2.5 = 10px
+      const widths = measureRefs.current.map((el) => (el?.offsetWidth ?? 0) + 32); // px-4 both sides
+      const widest = widths.reduce((m, w, i) => (w > widths[m] ? i : m), 0);
+      const compact = widths[widest] > half;
+      // Return the same reference when unchanged — avoids a render loop.
+      setMode((prev) => (prev.compact === compact && prev.widest === widest ? prev : { compact, widest }));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    if (rowRef.current) ro.observe(rowRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valueKey]);
+
+  return (
+    <div ref={rowRef} className="relative flex gap-2.5">
+      {items.map((item, idx) => (
         <div key={item.label}
-          className="relative rounded-2xl px-4 py-3.5 overflow-hidden"
+          {...(item.onClick ? {
+            role: 'button',
+            tabIndex: 0,
+            onClick: item.onClick,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.onClick?.(); }
+            },
+            'aria-label': `${item.label}: ${item.value}`,
+          } : {})}
+          className={`relative rounded-2xl px-4 py-3.5 overflow-hidden ${
+            !mode.compact || idx === mode.widest ? 'flex-1 min-w-0' : 'flex-none'
+          } ${item.onClick ? 'cursor-pointer' : ''}`}
           style={{
             background: cardBg,
             backdropFilter: 'blur(24px)',
@@ -109,11 +184,20 @@ export function InfoCardsGrid({ items, rgb }: {
               {item.label}
             </span>
           </div>
-          <p className="relative z-10 text-[13.5px] font-light leading-snug break-words"
+          <p className="relative z-10 text-[13.5px] font-light truncate"
             style={{ color: valueColor, fontFamily: "'Inter', sans-serif" }}>
             {item.value}
           </p>
         </div>
+      ))}
+      {/* Off-layout intrinsic-width measurers (same font as the value text). */}
+      {items.map((item, idx) => (
+        <span key={`measure-${item.label}`} aria-hidden="true"
+          ref={(el) => { measureRefs.current[idx] = el; }}
+          className="pointer-events-none invisible absolute left-0 top-0 whitespace-nowrap text-[13.5px] font-light"
+          style={{ fontFamily: "'Inter', sans-serif" }}>
+          {item.value}
+        </span>
       ))}
     </div>
   );

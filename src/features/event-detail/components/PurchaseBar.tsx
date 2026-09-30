@@ -24,8 +24,12 @@ export function PurchaseBar({
   onGift: () => void;
   onPurchase: () => void;
 }) {
-  const priceAmount = Money.fromMinor(selectedTicketType ? totalPrice : minPrice, "ETB").formatNumber();
+  const shownMinor = selectedTicketType ? totalPrice : minPrice;
+  const priceAmount = Money.fromMinor(shownMinor, "ETB").formatNumber();
   const priceCurrency = "ETB";
+  const isFree = shownMinor === 0;
+  const isManual = selectedTicket?.approvalMode === 'manual';
+  const ctaLabel = selectedTicketType ? (isManual ? 'Apply' : 'Buy Now') : 'Get Tickets';
 
   return (
     <div className="relative flex items-center gap-3 min-[380px]:gap-4 overflow-hidden px-4 min-[380px]:px-5 py-3 rounded-2xl"
@@ -61,14 +65,16 @@ export function PurchaseBar({
               fontFamily: "'Zalando Sans Expanded', sans-serif",
               color: isDark ? '#fff' : '#1a1a1a',
               fontVariantNumeric: 'tabular-nums',
-              fontSize: (selectedTicketType ? totalPrice : minPrice) >= 1000 ? 14 : 18,
+              fontSize: shownMinor >= 1000 ? 14 : 18,
             }}>
-            {priceAmount}
+            {isFree ? 'Free' : priceAmount}
           </span>
-          <span className="text-[10px] tracking-[1px] flex-shrink-0"
-            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }}>
-            {priceCurrency}
-          </span>
+          {!isFree && (
+            <span className="text-[10px] tracking-[1px] flex-shrink-0"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }}>
+              {priceCurrency}
+            </span>
+          )}
         </div>
       </div>
       <div className="relative z-10 w-px self-stretch my-1"
@@ -100,7 +106,7 @@ export function PurchaseBar({
         }}>
         <span className="text-[12px] sm:text-[14px] tracking-[0.2px] sm:tracking-[0.3px]"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-          {selectedTicketType ? 'Buy Now' : 'Get Tickets'}
+          {ctaLabel}
         </span>
         <ArrowRight className="w-4 h-4" strokeWidth={2.25} />
       </AppButton>
