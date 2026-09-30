@@ -51,9 +51,11 @@ export interface BackendProduct {
   requires_ticket?: boolean;
   ticket_type?: {
     id?: string;
-    admission?: unknown;
     audience?: string | null;
+    approval_mode?: string | null;
     date_selection?: string | null;
+    waitlist_enabled?: boolean | null;
+    admissions_per_unit?: number | null;
   } | null;
 }
 
@@ -71,10 +73,16 @@ function activePrices(p: BackendProduct, at: string = new Date().toISOString()):
   );
 }
 
-function lowestPriceMinor(p: BackendProduct): number {
+/** The app charges in ETB; a price in another currency only shows if ETB is
+ *  absent. Returns null when nothing is currently purchasable. */
+const CHARGE_CURRENCY = "ETB";
+
+function displayPriceMinor(p: BackendProduct): number | null {
   const actives = activePrices(p);
-  if (actives.length === 0) return 0;
-  return Math.min(...actives.map((o) => o.amount_minor));
+  if (actives.length === 0) return null;
+  const inCurrency = actives.filter((o) => o.currency === CHARGE_CURRENCY);
+  const pool = inCurrency.length > 0 ? inCurrency : actives;
+  return Math.min(...pool.map((o) => o.amount_minor));
 }
 
 function purchasableCap(p: BackendProduct): number {
@@ -83,8 +91,8 @@ function purchasableCap(p: BackendProduct): number {
 
 /** Map non-ticket backend products to checkout extras. */
 function toExtra(p: BackendProduct): EventProduct | null {
-  const priceMinor = lowestPriceMinor(p);
-  if (priceMinor <= 0) return null;
+  const priceMinor = displayPriceMinor(p);
+  if (priceMinor === null || priceMinor <= 0) return null;
   return {
     id: p.id,
     type: p.type,
@@ -97,10 +105,11 @@ function toExtra(p: BackendProduct): EventProduct | null {
   };
 }
 
-/** Map ticket backend products to selectable tiers. */
+/** Map ticket backend products to selectable admission offers. A `0` price is a
+ *  valid FREE offer (the composable model) — it is kept, not dropped. */
 function toTier(p: BackendProduct): TicketTier | null {
-  const priceMinor = lowestPriceMinor(p);
-  if (priceMinor <= 0) return null;
+  const priceMinor = displayPriceMinor(p);
+  if (priceMinor === null) return null;
   return {
     id: p.id,
     // The nested Ticketing::TicketType id — consent_requirements and the
@@ -108,6 +117,11 @@ function toTier(p: BackendProduct): TicketTier | null {
     ticketTypeId: p.ticket_type?.id ?? undefined,
     audience: (p.ticket_type?.audience as TicketTier['audience']) ?? undefined,
     dateSelection: (p.ticket_type?.date_selection === 'choose_one' ? 'choose_one' : 'fixed'),
+    approvalMode: p.ticket_type?.approval_mode === 'manual' ? 'manual' : 'automatic',
+    waitlistEnabled: p.ticket_type?.waitlist_enabled === true,
+    admissionsPerUnit: p.ticket_type?.admissions_per_unit ?? 1,
+    minPerOrder: p.min_per_order ?? 1,
+    maxPerOrder: p.max_per_order ?? undefined,
     name: p.name,
     level: "GENERAL",
     priceMinor,

@@ -269,37 +269,10 @@ export const registrationModule = {
   },
 
   /**
-   * Public RSVP (#27 resolved 2026-09-10, `PublicRsvpsController`). Free
-   * ticket products on RSVP events can be booked by guests via phone OTP or
-   * directly by signed-in attendees.
-   *
-   * POST /public/events/:event_slug/rsvp/request_otp — body
-   * `{ rsvp: { phone, ticket_type_id } }` (Idempotency-Key injected by
-   * apiFetch). Only valid for an unauthenticated free product: a verified
-   * account phone → `guest_requires_authentication`. Returns the
-   * phone-verification challenge to trade for a `verification_token` via
-   * `verifyPhoneOtp`.
-   */
-  async rsvpRequestOtp(
-    slug: string,
-    ticketTypeId: string,
-    phone: string,
-  ): Promise<{ challengeId: string; status: string; expiresAt: string }> {
-    const { data } = await apiFetch<{
-      challenge_id: string;
-      status: string;
-      expires_at: string;
-    }>(`public/events/${slug}/rsvp/request_otp`, {
-      method: "POST",
-      body: { rsvp: { phone, ticket_type_id: ticketTypeId } },
-    });
-    return { challengeId: data.challenge_id, status: data.status, expiresAt: data.expires_at };
-  },
-
-  /**
    * POST /phone_verifications/:challenge_id/verify — trades the OTP code for a
    * `verification_token` (same shared phone-proof endpoint the ticket-transfer
-   * flow uses). The token is consumed by `rsvpSubmit`.
+   * flow uses, and the guest admission/waitlist OTP preflights). The token is
+   * consumed by the admission-selection and offer-waitlist submits.
    */
   async verifyPhoneOtp(challengeId: string, code: string): Promise<{ verificationToken: string }> {
     const { data } = await apiFetch<{ verification_token: string }>(
@@ -365,79 +338,4 @@ export const registrationModule = {
     return { accessToken: data.access_token, refreshToken: data.refresh_token };
   },
 
-  /**
-   * POST /public/events/:event_slug/rsvp — body `{ rsvp: { ticket_type_id,
-   * phone?, verification_token?, package_quantity, answers?, consents? } }`.
-   * Guests must carry the phone + `verification_token` from the OTP flow;
-   * signed-in attendees submit with `phone`/`verification_token` absent and
-   * the backend uses the session identity. Free RSVP products confirm and
-   * issue tickets synchronously (`next_action`: confirmed/issuing/awaiting_approval);
-   * `tickets` uses the wallet serializer.
-   */
-  async rsvpSubmit(
-    slug: string,
-    ticketTypeId: string,
-    input: {
-      /** Guest phone (required for unauthenticated RSVP). */
-      phone?: string;
-      /** Guest proof token from `verifyPhoneOtp` (required unauthenticated). */
-      verificationToken?: string;
-      /** Admissions: the RSVP-er plus plus-ones. Defaults to 1. */
-      packageQuantity?: number;
-      selectedEventDateId?: string;
-      answers?: Array<{ questionKey: string; value: unknown; formVersionId?: string }>;
-      consents?: Array<{ consentDocumentVersionId: string; contentSha256: string }>;
-    },
-  ): Promise<RsvpOutcome> {
-    const body = {
-      rsvp: {
-        ticket_type_id: ticketTypeId,
-        ...(input.phone ? { phone: input.phone } : {}),
-        ...(input.verificationToken ? { verification_token: input.verificationToken } : {}),
-        package_quantity: input.packageQuantity ?? 1,
-        ...(input.selectedEventDateId ? { selected_event_date_id: input.selectedEventDateId } : {}),
-        ...(input.answers && input.answers.length > 0
-          ? {
-              answers: input.answers.map((a) => ({
-                ...(a.formVersionId ? { form_version_id: a.formVersionId } : {}),
-                question_key: a.questionKey,
-                value: a.value,
-              })),
-            }
-          : {}),
-        ...(input.consents && input.consents.length > 0
-          ? {
-              consents: input.consents.map((c) => ({
-                consent_document_version_id: c.consentDocumentVersionId,
-                content_sha256: c.contentSha256,
-              })),
-            }
-          : {}),
-      },
-    };
-    const { data } = await apiFetch<{
-      registration: { id: string; status: string };
-      next_action: { type: string };
-      tickets?: unknown[];
-    }>(`public/events/${slug}/rsvp`, {
-      method: "POST",
-      body,
-    });
-    return {
-      registrationId: data.registration.id,
-      status: data.registration.status,
-      nextAction: data.next_action.type,
-      ticketCount: data.tickets?.length ?? 0,
-    };
-  },
 };
-
-/** Outcome of a public RSVP submit (free product). */
-export interface RsvpOutcome {
-  registrationId: string;
-  status: string;
-  /** "confirmed" | "issuing" | "awaiting_approval" */
-  nextAction: string;
-  /** Tickets issued synchronously (0 when awaiting approval). */
-  ticketCount: number;
-}

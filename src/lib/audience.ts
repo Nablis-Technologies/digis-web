@@ -58,7 +58,7 @@ export const audienceModule = {
   /**
    * Authorize one code/invitation against EVERY gated tier — valid for any of
    * them opens the gate (tiers may share one code or carry distinct ones).
-   * Shared by GatedTierGate + InviteOnlySection.
+   * Shared by GatedTierGate (and the offer waitlist flow).
    *
    * A 422 from the backend is a definitive "this code is not valid" (returns
    * false). Any other failure (network, 5xx) is re-thrown so callers show a

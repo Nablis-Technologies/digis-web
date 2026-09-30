@@ -42,9 +42,19 @@ export interface TicketTier {
   /** Backend ticket-type date selection mode. `choose_one` tiers require a
    *  selected event date at registration (invalid_registration without it). */
   dateSelection?: 'fixed' | 'choose_one';
+  /** `manual` offers are "apply / request to join" and must be submitted as a
+   *  single-offer selection (the backend rejects mixing them). */
+  approvalMode?: 'automatic' | 'manual';
+  /** Sold-out offers with this flag can be joined via the offer-scoped waitlist. */
+  waitlistEnabled?: boolean;
+  /** Admissions granted per unit (≥1) — drives quantity/seat math. */
+  admissionsPerUnit?: number;
+  /** Order bounds from the product. */
+  minPerOrder?: number;
+  maxPerOrder?: number;
   name: string;
   level: string;
-  /** Integer cents (backend `*_minor`). */
+  /** Integer cents (backend `*_minor`). `0` = free admission. */
   priceMinor: number;
   /** Integer cents, when a pre-discount face price exists. */
   originalPriceMinor?: number;
@@ -192,29 +202,13 @@ export interface Event {
   /** Organizer-set answer edit window after purchase. Omit or set 0 to lock responses. */
   answerEditWindowHours?: number | null;
   featured?: boolean;
-  eventType?: "ticketed" | "rsvp" | "inviteOnly";
+  /** Organizer age policy. No public source yet — see BACKEND_GAPS #53. */
   ageRestriction?: string;
+  /** Event lineup. No public source yet — see BACKEND_GAPS #36. */
   lineup?: EventArtist[];
+  /**
+   * Co-organizers, mapped from the backend `event_organizations` association.
+   * Field name kept for the existing OrganizerSection consumers.
+   */
   organizers?: EventOrganizer[];
-  rsvpGoing?: number;
-  rsvpCapacity?: number;
-  allowsPlusOne?: boolean;
-  maxGuests?: number;
-  /** Registration fields the organizer requires before confirming an RSVP. */
-  rsvpRequirements?: RsvpRequirements;
-  // Invite Only
-  accessMode?: "code" | "guestlist" | "both" | "request";
-  accessCodes?: string[];
-  onGuestList?: boolean;
-  guestName?: string;
-  inviteOnlyPaid?: boolean;
-  inviteWaitlistOnly?: boolean;
-  waitlistAhead?: number;
-  inviteTickets?: {
-    name: string;
-    /** Integer cents (backend `*_minor`). */
-    priceMinor: number;
-    perks: string[];
-    premium?: boolean;
-  }[];
 }

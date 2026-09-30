@@ -28,7 +28,7 @@
  * is merged in — absent backend data renders as absent.
  */
 
-import type { Event, RsvpRequirements, SeatMapConfig } from "@/types";
+import type { Event, EventOrganizer } from "@/types";
 import { isoToDisplayDate, isoToDisplayTime } from "@/lib/mappers";
 
 /* ─── Backend wire types ─── */
@@ -64,58 +64,25 @@ export interface BackendEvent {
     id?: string;
     config?: Record<string, unknown>;
   };
+  /** Co-organizers — { id, type, role, status, organization: { id, name, slug } }. */
+  event_organizations?: {
+    role?: string;
+    organization?: { id: string; name: string; slug?: string } | null;
+  }[];
   organization?: { id: string; name: string; slug?: string } | null;
 }
 
 /**
  * Map a backend event (list or detail) onto the frontend `Event` type.
- * Backend fields are the live truth; absent backend data renders as absent.
  *
- * Config parsing is strict by design: a wrong-typed or unknown value maps to
- * absent, never through. A missing value must NOT read as a real one (a
- * missing `tickets_left` is not sold out; a missing price is not free).
- * `priceFromMinor` defaults to 0 only as a last resort when the wire omits
- * `price_from_minor` entirely.
+ * Backend fields are the live truth; absent backend data renders as absent
+ * (ADR-0002). After the 2026-09-30 composable-admission release the public
+ * `event_setting.config` projection carries only `public_guest_limit`, so the
+ * event-level mode/rsvp/access keys are gone; admission is per-offer via
+ * `GET /public/events/:slug/products` (see `products.ts`). `priceFromMinor`
+ * defaults to 0 only when the wire omits `price_from_minor` entirely.
  */
-const asNumber = (v: unknown): number | undefined =>
-  typeof v === "number" ? v : undefined;
-const asBoolean = (v: unknown): boolean | undefined =>
-  typeof v === "boolean" ? v : undefined;
-const asEnum = <T extends string>(
-  v: unknown,
-  allowed: readonly T[],
-): T | undefined =>
-  typeof v === "string" && (allowed as readonly string[]).includes(v)
-    ? (v as T)
-    : undefined;
-const asObject = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : undefined;
-
-function toSeatMap(v: unknown): SeatMapConfig | undefined {
-  const o = asObject(v);
-  if (!o || !Array.isArray(o.sections)) return undefined;
-  // The seed writes snake_case `stage_label`; the domain reads `stageLabel`.
-  const { stage_label: _dropped, ...rest } = o as Record<string, unknown> & {
-    stage_label?: unknown;
-  };
-  void _dropped;
-  return {
-    ...(rest as unknown as SeatMapConfig),
-    ...(typeof o.stage_label === "string" ? { stageLabel: o.stage_label } : {}),
-  };
-}
-
-function toRsvpRequirements(v: unknown): RsvpRequirements | undefined {
-  const o = asObject(v);
-  if (!o) return undefined;
-  return o as unknown as RsvpRequirements;
-}
-
 export function backendEventToEvent(be: BackendEvent): Event {
-  const config = be.event_setting?.config ?? {};
-
   const date0 = be.event_dates?.[0];
   const startsAt = date0?.starts_at;
   const cover =
@@ -134,6 +101,12 @@ export function backendEventToEvent(be: BackendEvent): Event {
   const gallery = (be.event_media ?? [])
     .map(imageUrl)
     .filter((u): u is string => Boolean(u));
+
+  // Co-organizers from the live association (summary = { id, name, slug }).
+  const organizers: EventOrganizer[] = (be.event_organizations ?? [])
+    .map((entry) => entry.organization)
+    .filter((org): org is NonNullable<typeof org> => Boolean(org))
+    .map((org) => ({ id: org.id, name: org.name }));
 
   return {
     id: be.id,
@@ -164,31 +137,12 @@ export function backendEventToEvent(be: BackendEvent): Event {
     category: be.categories?.[0]?.name ?? "",
     priceFromMinor: typeof be.price_from_minor === "number" ? be.price_from_minor : 0,
     currency: (be.currency as Event["currency"]) ?? "ETB",
-    // Served via the public config projection (BACKEND_GAPS #1, resolved).
-    // `foreign_currency` has no domain field (currency is ETB-only) and is
-    // intentionally unmapped; everything else the projection serves is read.
-    ...(typeof config.tickets_left === "number" ? { ticketsLeft: config.tickets_left } : {}),
-    featured: asBoolean(config.featured),
-    rating: asNumber(config.rating),
-    soldOut: asBoolean(config.sold_out),
-    priceForeignFromMinor: asNumber(config.price_foreign_from_minor),
-    eventType: asEnum(config.event_type, ["ticketed", "rsvp", "inviteOnly"] as const),
-    seatMap: toSeatMap(config.seat_map),
-    answerEditWindowHours:
-      asNumber(config.answer_edit_window_hours) ??
-      (config.answer_edit_window_hours === null ? null : undefined),
-    rsvpGoing: asNumber(config.rsvp_going),
-    rsvpCapacity: asNumber(config.rsvp_capacity),
-    allowsPlusOne: asBoolean(config.allows_plus_one),
-    maxGuests: asNumber(config.max_guests),
-    rsvpRequirements: toRsvpRequirements(config.rsvp_requirements),
-    accessMode: asEnum(config.access_mode, ["code", "guestlist", "both", "request"] as const),
-    inviteOnlyPaid: asBoolean(config.invite_only_paid),
-    onGuestList: asBoolean(config.on_guest_list),
-    ageRestriction: typeof config.age_restriction === "string" ? config.age_restriction : undefined,
-    lineup: Array.isArray(config.lineup) ? config.lineup : undefined,
-    organizers: Array.isArray(config.organizers) ? config.organizers : undefined,
-    inviteWaitlistOnly: asBoolean(config.invite_waitlist_only),
-    waitlistAhead: asNumber(config.waitlist_ahead),
+    // Co-organizers come from the live `event_organizations` association. The
+    // event_setting.config projection no longer carries `organizers` (#53).
+    ...(organizers.length > 0 ? { organizers } : {}),
   };
+  // NOTE: `age_restriction`, `lineup`, and `seat_map` have no public source
+  // after the 2026-09-30 backend release and render absent (ADR-0002) — see
+  // BACKEND_GAPS #53 / #36. Per-offer admission (price, availability, audience,
+  // approval, waitlist) comes from `GET /public/events/:slug/products`.
 }

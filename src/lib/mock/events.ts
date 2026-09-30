@@ -472,20 +472,6 @@ export const EVENTS: Event[] =   [
       priceFromMinor: 0,
       currency: "ETB",
       ticketsLeft: 213,
-      eventType: "rsvp",
-      rsvpGoing: 287,
-      rsvpCapacity: 500,
-      allowsPlusOne: true,
-      maxGuests: 2,
-      rsvpRequirements: {
-        requireName: true,
-        requireEmail: true,
-        requirePhone: true,
-        questions: [
-          { id: "industry", type: "select", label: "What best describes your work?", required: true, placeholder: "Choose one", options: ["Founder", "Creative", "Investor", "Student", "Other"] },
-          { id: "intro", type: "textarea", label: "Who would you like to meet?", helper: "Optional — helps shape the room.", placeholder: "A role, field, or name…", maxLength: 160 },
-        ],
-      },
     },
     {
       id: "6",
@@ -500,10 +486,6 @@ export const EVENTS: Event[] =   [
       priceFromMinor: 0,
       currency: "ETB",
       ticketsLeft: 60,
-      eventType: "inviteOnly",
-      accessMode: "code",
-      accessCodes: ["VELVET26", "MEMBER"],
-      inviteOnlyPaid: false,
     },
     {
       id: "7",
@@ -521,35 +503,8 @@ export const EVENTS: Event[] =   [
       ],
       category: "Culture",
       ticketsLeft: 14,
-      eventType: "inviteOnly",
-      accessMode: "guestlist",
-      onGuestList: true,
-      guestName: "Abel",
-      inviteOnlyPaid: true,
       priceFromMinor: 150000,
       currency: "ETB",
-      inviteTickets: [
-        {
-          name: "Member Access",
-          priceMinor: 150000,
-          perks: [
-            "Curated entry",
-            "Welcome pour",
-            "Seasonal tasting menu",
-          ],
-        },
-        {
-          name: "Patron Circle",
-          priceMinor: 450000,
-          perks: [
-            "Reserved seating",
-            "Chef-led pairing",
-            "Signed menu card",
-            "After-dinner lounge",
-          ],
-          premium: true,
-        },
-      ],
     },
     {
       id: "8",
