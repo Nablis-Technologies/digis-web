@@ -361,8 +361,10 @@ submit). If a registration is meant to be one-checkout-only that's fine, but a
 **Status: RESOLVED 2026-09-30** — `db/structure.sql` now reads
 `CREATE UNIQUE INDEX idx_one_order_item_per_registration ON public.orders_order_items USING btree (registration_id, order_id) WHERE (registration_id IS NOT NULL)`
 (the migration was edited in place at `20260811090002_create_order_items.rb`), so a
-released order no longer burns the registration for a retry. **Frontend: the
-"Discard & start fresh" `registrationModule.release` workaround can be retired.**
+released order no longer burns the registration for a retry. **Frontend done
+2026-09-30: the "Discard & start fresh" `registrationModule.release` workaround
+was retired** (the direct `register`/`guestRegister` methods went with the
+`admission_selections` migration too).
 
 ### #42. Wallet resale policy omits the value a percentage cap is computed from
 
