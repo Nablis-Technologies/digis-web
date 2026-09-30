@@ -53,6 +53,22 @@ the backend lacks a surface. Plan: `docs/superpowers/plans/2026-09-30-composable
 waitlist**, `choose_one` date) + selection submit; `order_access_token` in guest
 payment; `admissions_per_unit` in quantity/seat math.
 
+**Checkout migrated to `admission_selections` (wholesale, 2026-09-30).** The
+checkout no longer does register → quote → create-order: at Pay it submits one
+`POST /public/events/:slug/admission_selections` (registration(s) + quote + one
+order) and branches on `next_action` (checkout_required → pay the returned order;
+confirmed/issuing → done; awaiting_approval → pending; waitlist_available →
+sold-out notice). Guest payment/refresh carry the returned `order_access_token`
+(`guest_order_token`) — the guest return keys moved from a `quoteToken` to an
+`orderToken`. Verified: checkout e2e + the full Playwright suite **25/25**, tsc,
+vitest, build.
+
+**Known follow-up from the migration:** the legacy stuck-order/restart/conflict
+machinery is now mostly unused (the selection's replay store owns idempotency);
+`active_checkout_exists` still routes to the conflict sheet, but "start fresh"
+needs a backend release path. Clean-up ticket: remove the dead restart/stuck-order
+code once confirmed.
+
 **Auth (same day):** reported "Phone has already been taken" after buying as a
 guest → filed **#56** (signup can't take over the shadow phone; no claim-on-signup,
 no distinct `phone_taken` code) and **#57** (no forgot-password endpoint). Frontend:
