@@ -268,11 +268,25 @@ reach from their ticket. So after buying a ticket as a guest, "Create an account
 with that phone is a permanent dead end — exactly the reported "Phone has already
 been taken".
 
-**Fix:** make signup resolve the existing phone: if the owner is an unverified
-shadow (no `password_digest`, no `verified_at`) and the phone is proven, **upgrade
-it** (set password + verified) and issue auth tokens; if the owner is a real
-account, return a distinct `422` code (`phone_taken`) so the UI can route to log in.
-Phone proof can reuse `Core::PhoneVerification`.
+**Also: signup has NO phone verification at all.** `Core::AuthController#signup`
+(`user_params` permits `email, phone, password, password_confirmation`) saves the
+user with no OTP — so any phone can be registered without proving ownership. On a
+phone-first platform this is both a hijack hole and the root of the dead end
+below: the phone a guest "confirmed" at checkout is likewise unproven
+(`validate_guest_context!` accepts `phone_confirmation: true` with no OTP), so
+signup and claim disagree about what "the phone" means.
+
+**Fix:** make signup phone-verified and resolve the phone:
+1. `POST /auth/signup` (or a two-step flow) OTP-verifies the phone, reusing
+   `Core::PhoneVerification` (the same proof the claim/transfer flows use).
+2. On a proven phone that already owns a **shadow** (no `password_digest`, no
+   `verified_at`), **upgrade it** (set password + `verified_at`) and issue auth
+   tokens — i.e. unify signup with the claim.
+3. On a proven phone that owns a **real** account, return a distinct `422`
+   `phone_taken` so the UI routes to log in.
+
+This single change fixes "Phone has already been taken" after a guest purchase
+AND removes anonymous phone signup.
 
 **Status: open — filed 2026-09-30 (code read + reported UX).**
 
