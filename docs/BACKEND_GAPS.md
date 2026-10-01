@@ -107,6 +107,7 @@
 | 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
 | 52 | open — degrading | `GET /venues/:id` and `/artists/:id` omit `is_following` (organizations has it) → follow state can't be read back |
 | 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
+| 59 | open — blocking | no invitation link format and no dev sender → an `audience=invitation` offer is unbuyable end-to-end |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -310,6 +311,40 @@ auth tokens. Refuse when the phone belongs to an unverified shadow (that case is
 the claim flow, #56).
 
 **Status: open — filed 2026-09-30 (route grep).**
+
+### #59. No invitation link format or delivery → an `audience=invitation` offer is unbuyable end-to-end
+
+The backend creates invitations and can deliver them, but nothing defines the
+**link the buyer receives**:
+
+- `Ticketing::Invitations::Create` returns a one-time `token`; delivery happens in
+  `Ticketing::DeliverInvitationJob` through a configurable
+  `Rails.application.config.x.invitation_delivery_sender` (`deliver_invitation_job.rb:14`).
+- The job returns early when the sender is unset (no dev sender configured).
+- No public URL/param format exists for the token, so there is nothing for the app
+  to read.
+
+The frontend now consumes `?invitation=<token>` (also accepts `?invitation_token=`)
+on `/events/:slug` and passes it as `invitation_token` to
+`POST /ticketing/audience_authorizations` and to `admission_selections`
+(`audience_proof.invitation_token`). Until the backend emails that link, the
+token never reaches the buyer.
+
+**Why it blocks:** `audience=invitation` offers cannot be unlocked on any real
+path. Dev seed events `origins-2` and `event` (both `invitation`) are dead ends in
+the UI. Access-code offers work.
+
+**Fix:** have the invitation delivery build the event-URL link with the token —
+`<app>/events/<event_slug>?invitation=<token>` — and send it via the configured
+sender. Provide a dev `invitation_delivery_sender` (setup, not the gap) so the
+flow is exercisable. The link format is the contract; the sender is config.
+
+**Evidence:** `app/services/ticketing/invitations/create.rb`;
+`app/jobs/ticketing/deliver_invitation_job.rb:14`; no `invitation_delivery_sender`
+in `config/environments/development.rb`. Frontend plan/built note:
+`.scratch/invite-only-audience/issues/01-invitation-token-wiring.md`.
+
+**Status: open — filed 2026-10-01 (after wiring the frontend half).**
 
 ## Open — degrading
 

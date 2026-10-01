@@ -39,6 +39,9 @@ is gone; an event is a container of offers. Retired: `POST /public/events/:slug/
 - **New gaps filed:** #53 (public payload drops `age_restriction`/`lineup`/`seat_map`/
   `featured`/`rating`), #54 (no discovery availability), #55 (detail lacks
   `price_from_minor`).
+- **Filed later 2026-10-01:** #58 (`active_checkout_exists` 409 has no order id),
+  #59 (no invitation link format/delivery → `audience=invitation` offers are
+  unbuyable end-to-end).
 - **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38.
 - **Frontend wire-now obligations:** retire `registrationModule.rsvpRequestOtp`/
   `rsvpSubmit` (dead routes); the #41 "Discard & start fresh" `release` workaround is
