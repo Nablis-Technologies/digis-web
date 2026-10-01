@@ -73,9 +73,19 @@ sold-out notice). Guest payment/refresh carry the returned `order_access_token`
 prices to `$0` is refused with the 422 `phone_verification_required` error; the
 checkout now catches it, calls `admission_selections/request_otp`, shows an inline
 `PhoneOtpStep`, verifies via `phone_verifications/:id/verify`, and re-submits the
-selection with the traded `verification_token`. New e2e
-`e2e/guest-free-otp.spec.ts` mocks the selection/OTP/quote wire (the seed has no
-free product) and asserts the token rides the second submission.
+selection with the traded `verification_token`. Deterministic e2e
+`e2e/guest-free-otp.spec.ts` mocks the selection/OTP/quote wire (so it needs no
+real OTP) and asserts the token rides the second submission.
+
+**Live guest `$0` OTP drill — PROVEN (2026-10-01).** `e2e/zz-live-guest-otp.spec.ts`
+(run with `RUN_ZZ=1`; excluded from the default suite) drives the real UI on the
+seeded `friends` event's `$0` **Free Entry**: Pay → real `422
+phone_verification_required` → inline OTP step → reads the code from the dev OTP
+sender line (`[DEV OTP] … phone=… code=…` in `digis_backend/log/development.log`)
+→ verifies → resubmits with the real `verification_token`. The backend log
+confirms a real **zero-total order created via `admission_selections`** and an
+issued **`active` ticket** owned by the drill phone. No route mocking; re-ran
+green. (Seed note: `friends` already carries the `$0` offer — no seed edit needed.)
 
 **Dead machinery retired.** With the selection's replay store owning idempotency,
 the legacy stuck-order/restart/conflict machinery was unreachable: removed
