@@ -108,6 +108,7 @@
 | 52 | open — degrading | `GET /venues/:id` and `/artists/:id` omit `is_following` (organizations has it) → follow state can't be read back |
 | 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
 | 59 | open — blocking | no invitation link format and no dev sender → an `audience=invitation` offer is unbuyable end-to-end |
+| 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -345,6 +346,44 @@ in `config/environments/development.rb`. Frontend plan/built note:
 `.scratch/invite-only-audience/issues/01-invitation-token-wiring.md`.
 
 **Status: open — filed 2026-10-01 (after wiring the frontend half).**
+
+### #60. Chapa payment amount is sent 100× too large (minor units, not the provider's major unit)
+
+`Payments::Providers::ChapaClient#payment_payload` sends the amount as the raw
+minor value:
+
+```ruby
+# app/services/payments/providers/chapa_client.rb:142
+amount: integer_amount(request.fetch(:amount_minor)),   # returns amount_minor unchanged (:307-312)
+```
+
+But Chapa's API expresses `amount` in the **currency's major unit** — the
+adapter's own response parsing proves it: `provider_fee_minor: minor_amount(...)`
+multiplies the provider's `charge`/`service_fee` by 100 (`chapa_client.rb:230`,
+`minor_amount` at `:324-328`). So every payment is posted 100× too large.
+
+**Evidence (live, 2026-10-01):** a guest payment for an order totalling
+**153,750.00 ETB** (`amount_minor = 15_375_000`) produced a Chapa hosted page whose
+`data-page` props contain `"amount":15375000,"currency":"ETB"` — i.e. Chapa reads
+**15,375,000 ETB**. Paying then fails with *"amount is greater than the maximum
+amount supported by the currency."*
+
+**Why it matters:** every paid checkout sends 100× the order total to Chapa. In
+test mode the test bank ignores the amount, so small orders appear to work while
+still being inflated; in production this is a 100× overcharge. Only large orders
+surface it, via Chapa's max-amount check.
+
+**Fix:** convert minor → major before sending, in `payment_payload` (`:142`):
+
+```ruby
+amount: format("%.2f", BigDecimal(amount_minor) / 100)
+```
+
+Also check the refund path (`:64`) — confirm whether Chapa refunds expect major or
+minor before changing it. Add a request-shaping test asserting the initialize
+payload amount for a known `amount_minor`.
+
+**Status: open — filed 2026-10-01 (live repro on the Chapa hosted page).**
 
 ## Open — degrading
 

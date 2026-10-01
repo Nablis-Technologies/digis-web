@@ -41,7 +41,8 @@ is gone; an event is a container of offers. Retired: `POST /public/events/:slug/
   `price_from_minor`).
 - **Filed later 2026-10-01:** #58 (`active_checkout_exists` 409 has no order id),
   #59 (no invitation link format/delivery → `audience=invitation` offers are
-  unbuyable end-to-end).
+  unbuyable end-to-end), #60 (Chapa amount sent in minor units = 100× too large →
+  large orders fail with Chapa's max-amount error).
 - **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38.
 - **Frontend wire-now obligations:** retire `registrationModule.rsvpRequestOtp`/
   `rsvpSubmit` (dead routes); the #41 "Discard & start fresh" `release` workaround is
