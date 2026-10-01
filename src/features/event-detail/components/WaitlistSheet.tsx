@@ -16,7 +16,7 @@ import type { TicketTier } from '@/types';
  * Signed-in buyers join directly; guests prove their phone with the shared
  * OTP flow, then join with the verification token.
  */
-export function WaitlistSheet({ slug, offer, onClose }: { slug: string; offer: TicketTier; onClose: () => void }) {
+export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClose }: { slug: string; offer: TicketTier; accessCode?: string; invitationToken?: string; onClose: () => void }) {
   const { isDark } = useTheme();
   const { user, isAuthenticated } = useAuth();
   const accent = '#d6f905';
@@ -40,6 +40,10 @@ export function WaitlistSheet({ slug, offer, onClose }: { slug: string; offer: T
         eventProductId: offer.id ?? '',
         ...(verificationToken ? { verificationToken } : {}),
         ...(phone ? { phone } : {}),
+        // Audience proof for a gated offer — the backend re-authorizes it inside
+        // the waitlist submit, so omitting it fails an invite/access-code offer.
+        ...(accessCode ? { accessCode } : {}),
+        ...(invitationToken ? { invitationToken } : {}),
       });
       setPhase('done');
     } catch (e) {
@@ -58,7 +62,11 @@ export function WaitlistSheet({ slug, offer, onClose }: { slug: string; offer: T
     setLoading(true);
     setError(undefined);
     try {
-      const challenge = await waitlistModule.requestOtp(slug, offer.id ?? '', { phone });
+      const challenge = await waitlistModule.requestOtp(slug, offer.id ?? '', {
+        phone,
+        ...(accessCode ? { accessCode } : {}),
+        ...(invitationToken ? { invitationToken } : {}),
+      });
       setChallengeId(challenge.challengeId);
       setPhase('code');
     } catch (e) {

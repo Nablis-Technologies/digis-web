@@ -189,7 +189,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
           <VenueSection venue={event.venue} isDark={isDark} />
         </motion.div>
 
-        {/* Ticket Selection / RSVP */}
+        {/* Ticket Selection */}
         <motion.div ref={ticketsSectionRef} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mb-6 lg:mb-32 scroll-mt-6">
           {ended ? (
             <motion.div
@@ -234,7 +234,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
       </div>
       </div>
 
-      {/* Purchase / RSVP Bar */}
+      {/* Purchase Bar */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
         className="fixed bottom-0 left-0 right-0 z-[25]">
         <div className="relative px-5 lg:px-8 pb-8 lg:pb-6 pt-3 max-w-5xl lg:max-w-2xl mx-auto">
@@ -292,7 +292,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
       {/* Offer waitlist (sold-out, waitlist-enabled) */}
       <AnimatePresence>
         {waitlistOffer && event.slug && (
-          <WaitlistSheet slug={event.slug} offer={waitlistOffer} onClose={() => setWaitlistOffer(null)} />
+          <WaitlistSheet slug={event.slug} offer={waitlistOffer} accessCode={audienceCode} onClose={() => setWaitlistOffer(null)} />
         )}
       </AnimatePresence>
 

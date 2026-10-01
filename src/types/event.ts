@@ -1,5 +1,4 @@
 import type { ReactElement } from "react";
-import type { CustomQuestion } from "./checkout";
 
 
 export type EventProductType = "ticket" | "parking" | "merchandise" | "donation" | "food" | "digital_addon" | "other";
@@ -139,15 +138,6 @@ export interface EventOrganizer {
   bio?: string;
   image?: string;
   gradient?: string;
-}
-
-export interface RsvpRequirements {
-  /** Name is collected by default for the guest list; set false only for anonymous RSVP events. */
-  requireName?: boolean;
-  requireEmail?: boolean;
-  requirePhone?: boolean;
-  /** Organizer-defined RSVP fields, using the same question model as checkout. */
-  questions?: CustomQuestion[];
 }
 
 export interface Event {

@@ -70,9 +70,6 @@ const CODE_MESSAGES: Record<string, string> = {
   consent_requirement_not_pending: 'This event’s terms changed — please review and accept them again.',
   required_buyer_consent_missing: 'Please accept all required event terms to continue.',
   invalid_submission: 'Some registration details were rejected — please check and try again.',
-  // Public RSVP (Ticketing) — verified against the backend locale.
-  rsvp_product_not_found: 'This RSVP is no longer available.',
-  rsvp_paid_product_requires_checkout: 'This event is booked through paid checkout, not RSVP.',
   // Guest ticket → account claim (guest_claim purpose).
   claim_already_completed: 'This ticket is already linked to an account.',
   verification_invalid: 'That verification code is no longer valid — please try again.',
