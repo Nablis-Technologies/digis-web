@@ -5,6 +5,11 @@
   code then a token). Mixed public+gated also handled. Remaining external
   dependency: the backend must email the invitation link so a buyer receives the
   token.
+- **Automated drill:** `e2e/zz-live-audience-gate.spec.ts` — self-contained
+  (creates its own code + invitation via the organizer API, then drives the UI and
+  cleans up). Run: `$env:RUN_ZZ=1; npx playwright test e2e/zz-live-audience-gate.spec.ts`.
+  This supersedes the manual API/UI steps below as the primary check; keep them for
+  debugging.
 - **Backend evidence:** `Ticketing::Audience::Authorize` (`audience` ∈
   `public` / `access_code` / `invitation` / `code_or_invitation`);
   `POST /ticketing/audience_authorizations` accepts `access_code` or
