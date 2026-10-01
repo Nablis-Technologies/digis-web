@@ -32,6 +32,12 @@ export interface AuthorizeAudienceInput {
   invitationToken?: string;
 }
 
+/** The accepted audience proof to carry into checkout (`audience_proof`). */
+export interface AudienceProof {
+  accessCode?: string;
+  invitationToken?: string;
+}
+
 /* ─── The module ─── */
 
 export const audienceModule = {
@@ -78,5 +84,36 @@ export const audienceModule = {
       ),
     );
     return results.some(Boolean);
+  },
+
+  /**
+   * Resolve a single pasted value (access code OR invitation token) against
+   * every gated tier: try it as an access code, then as an invitation token.
+   * Returns the proof to carry into checkout, or null when neither authorizes.
+   * The two are indistinguishable to the buyer and the backend takes them in
+   * separate fields, so both must be attempted.
+   */
+  async resolveProof(ticketTypeIds: string[], raw: string): Promise<AudienceProof | null> {
+    const value = raw.trim();
+    if (!value || ticketTypeIds.length === 0) return null;
+    if (await audienceModule.authorizeAny(ticketTypeIds, { accessCode: value })) {
+      return { accessCode: value };
+    }
+    if (await audienceModule.authorizeAny(ticketTypeIds, { invitationToken: value })) {
+      return { invitationToken: value };
+    }
+    return null;
+  },
+
+  /**
+   * Authorize an invitation token that arrived from a link (the backend emails
+   * the token in the event URL) against every gated tier.
+   */
+  async proveInvitation(ticketTypeIds: string[], token: string): Promise<AudienceProof | null> {
+    const value = token.trim();
+    if (!value || ticketTypeIds.length === 0) return null;
+    return (await audienceModule.authorizeAny(ticketTypeIds, { invitationToken: value }))
+      ? { invitationToken: value }
+      : null;
   },
 };

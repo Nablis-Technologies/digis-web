@@ -1,54 +1,80 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Lock, KeyRound, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { audienceModule } from '@/lib/audience';
+import { audienceModule, type AudienceProof } from '@/lib/audience';
 
 interface GatedTierGateProps {
-  /** Backend Ticketing::TicketType ids whose audience is NOT public — the code
-   *  is validated against ALL of them (a code valid for any opens the gate). */
+  /** Backend Ticketing::TicketType ids whose audience is NOT public — the proof
+   *  is validated against ALL of them (valid for any opens the gate). */
   gatedTicketTypeIds: string[];
   unlocked: boolean;
-  /** Called with the accepted access code so checkout can carry it as proof. */
-  onUnlocked: (accessCode: string) => void;
+  /** Invitation token that arrived in the event URL (?invitation=…) — the
+   *  backend emails it as a link, so it is auto-tried on mount (no typing). */
+  invitationToken?: string;
+  /** When some tiers are public, keep them visible while the rest stay locked
+   *  (the backend gates per ticket type, not per event). */
+  hasPublicTiers?: boolean;
+  /** Called with the accepted proof so checkout can carry it as audience_proof. */
+  onUnlocked: (proof: AudienceProof) => void;
   children: React.ReactNode;
 }
 
 /**
- * Gate for a ticketed event whose tiers are audience-gated (access_code /
- * invitation / code_or_invitation) but is NOT a config-driven invite-only event.
- * The ticket selector + purchase bar stay hidden until a code that the backend
- * authorizes for ANY gated tier is entered (POST /ticketing/audience_authorizations).
- * This is the server-authoritative version of the old local-only unlock.
+ * Gate for ticket offers whose audience is not public (access_code / invitation
+ * / code_or_invitation). The backend is the only validator
+ * (POST /ticketing/audience_authorizations). A single pasted value is tried as
+ * an access code and then as an invitation token; a token from an invitation
+ * link unlocks automatically.
  */
-export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, children }: GatedTierGateProps) {
+export function GatedTierGate({
+  gatedTicketTypeIds,
+  unlocked,
+  invitationToken,
+  hasPublicTiers = false,
+  onUnlocked,
+  children,
+}: GatedTierGateProps) {
   const { isDark } = useTheme();
-  const accent = isDark ? '#d6f905' : '#d6f905';
-  const accentRgb = isDark ? '214,249,5' : '214,249,5';
+  const accentRgb = '214,249,5';
   const accentText = isDark ? '#d6f905' : '#5a6b00';
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
+  // A token from the invitation link → unlock without the buyer typing anything.
+  const idsKey = gatedTicketTypeIds.join(',');
+  useEffect(() => {
+    if (unlocked || !invitationToken) return;
+    let alive = true;
+    setChecking(true);
+    audienceModule
+      .proveInvitation(gatedTicketTypeIds, invitationToken)
+      .then((proof) => {
+        if (!alive) return;
+        if (proof) onUnlocked(proof);
+        else setError('This invitation link is not valid for this event.');
+      })
+      .catch(() => { if (alive) setError('Could not verify your invitation. Please try again.'); })
+      .finally(() => { if (alive) setChecking(false); });
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invitationToken, unlocked, idsKey]);
+
   const tryCode = async () => {
     const trimmed = code.trim();
-    if (trimmed.length === 0) { setError('Enter the access code from your invitation.'); return; }
+    if (trimmed.length === 0) { setError('Enter the access code or invitation from your link.'); return; }
     setChecking(true);
     setError(null);
     try {
-      // Authorize against EVERY gated tier — a code valid for any of them opens
-      // the gate (tiers may share one code or carry distinct ones).
-      const ok = await audienceModule.authorizeAny(gatedTicketTypeIds, { accessCode: trimmed });
-      if (ok) {
-        onUnlocked(trimmed);
-      } else {
-        setError('This access code is not valid for this event.');
-      }
+      const proof = await audienceModule.resolveProof(gatedTicketTypeIds, trimmed);
+      if (proof) onUnlocked(proof);
+      else setError('That code or invitation is not valid for this event.');
     } catch {
       setError('Could not verify that code. Please try again.');
     } finally {
@@ -58,7 +84,7 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
 
   if (unlocked) return <>{children}</>;
 
-  return (
+  const panel = (
     <div className="rounded-3xl overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.025)' : '#fff' }}>
       <GlassReflection isDark={isDark} />
       <div className="relative z-10 px-6 py-8 text-center">
@@ -68,11 +94,11 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
         </div>
         <h3 className="text-[18px] mb-1.5"
           style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
-          This event requires access
+          {hasPublicTiers ? 'Unlock more tickets' : 'This event requires access'}
         </h3>
         <p className="text-[12px] leading-relaxed mb-5"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
-          Enter the access code from your invitation to unlock tickets.
+          Enter the access code or open the invitation link you received to unlock these tickets.
         </p>
 
         <motion.div
@@ -124,10 +150,22 @@ export function GatedTierGate({ gatedTicketTypeIds, unlocked, onUnlocked, childr
           <ShieldCheck className="w-3 h-3" style={{ color: accentText }} strokeWidth={2} />
           <span className="text-[10px] tracking-[1.5px] uppercase"
             style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-            Private event · Access required
+            Access required
           </span>
         </div>
       </div>
     </div>
   );
+
+  // Mixed event: public tiers stay buyable; the panel sits below to unlock the rest.
+  if (hasPublicTiers) {
+    return (
+      <div className="space-y-6">
+        {children}
+        {panel}
+      </div>
+    );
+  }
+
+  return panel;
 }

@@ -1,7 +1,10 @@
 # Test plan — audience gating (access code vs invitation)
 
-- **Status:** access-code cases PASS now; invitation cases FAIL in the UI until
-  `.scratch/invite-only-audience/issues/01-invitation-token-wiring.md` is done.
+- **Status (2026-10-01):** access-code AND invitation UI cases PASS after ticket 01
+  (invitation via `?invitation=<token>` auto-unlock; a pasted value is tried as a
+  code then a token). Mixed public+gated also handled. Remaining external
+  dependency: the backend must email the invitation link so a buyer receives the
+  token.
 - **Backend evidence:** `Ticketing::Audience::Authorize` (`audience` ∈
   `public` / `access_code` / `invitation` / `code_or_invitation`);
   `POST /ticketing/audience_authorizations` accepts `access_code` or
@@ -60,17 +63,17 @@ Invoke-RestMethod -Uri "http://localhost:3000/events/01a0f179-1c81-7add-90c4-73e
    approval outcome appears normally. The submitted selection carries
    `items[0].audience_proof.access_code = "DRILL-CODE"`.
 
-### Invitation — FAILS today (`origins-2`)
-1. Open `/events/origins-2`; the gate shows.
-2. Paste the invitation token into the input → **Unlock**.
-3. **Today:** it is sent as `access_code` → 422 → *"This access code is not valid
-   for this event."*
-4. **After the fix:** the token arrives via `?invitation=<token>`, the gate sends
-   `invitation_token`, the selector reveals, and checkout carries
-   `audience_proof.invitation_token`. This is the acceptance test for ticket 01.
+### Invitation — PASSES now (`origins-2`)
+1. Open `/events/origins-2?invitation=<token>` → the gate auto-tries the token and
+   the ticket selector reveals (no typing).
+2. Alternatively paste the token into the input → **Unlock** (tried as a code, then
+   as a token) → the selector reveals.
+3. Checkout carries `audience_proof.invitation_token`.
 
-### `code_or_invitation` with an invitation token — FAILS today (`psy-addis-saltland`)
-Same as above: pasting the token as a code fails. With `DRILL-CODE` it passes.
+### `code_or_invitation` (`psy-addis-saltland`)
+- Paste `DRILL-CODE` → unlocks as an access code.
+- Paste the invitation token → unlocks as an invitation.
+- Wrong value → gate stays locked with "not valid".
 
 ## Free `$0` admission (RSVP successor) — PASSES (live drill)
 

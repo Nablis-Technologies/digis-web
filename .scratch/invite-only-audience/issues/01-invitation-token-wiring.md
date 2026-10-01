@@ -1,8 +1,26 @@
 # Invitation-token audience wiring (invite-only tiers)
 
-- **Status:** needs-info — blocked on the invitation link contract (how the app receives the token)
-- **Blocked by:** backend decision — no invitation delivery/link format defined (see "Blocked on")
+- **Status:** frontend BUILT 2026-10-01 — waiting only on the backend to emit the invitation link
+- **Blocked by:** backend — no invitation delivery/link format defined (see "Blocked on")
 - **Related:** `docs/BACKEND_GAPS.md` #20 (audience gating), #44 (event-level config inert; the real gates are per-offer)
+
+## Built (2026-10-01)
+
+- `EventDetailPage` reads `?invitation=` / `?invitation_token=` via `useSearchParams`
+  and passes the token to the gate.
+- `GatedTierGate`: auto-tries a URL token on mount (`proveInvitation`), and one
+  pasted value is tried as an **access code then an invitation token**
+  (`audienceModule.resolveProof`). On success it returns the typed proof.
+- The proof (`{ accessCode? }` or `{ invitationToken? }`) is carried into
+  `admission_selections` (`audience_proof`) and the offer waitlist.
+- **Mixed audience**: only the non-public tiers are gated; public tiers stay
+  selectable while locked (`visibleTicketTypes`), with the unlock panel below.
+- Verified live: `origins-2?invitation=<token>` auto-unlocks; `psy-addis-saltland`
+  unlocks with `DRILL-CODE`; a wrong code stays locked. Unit tests for
+  `resolveProof` / `proveInvitation`.
+- Still frontend-unverifiable end-to-end: the **backend must email the link** so a
+  real buyer receives the token. The app accepts `?invitation=<token>` (and
+  `?invitation_token=`).
 
 ## Problem
 

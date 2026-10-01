@@ -74,3 +74,42 @@ describe('audienceModule.authorizeAny — gate across tiers', () => {
     expect(mockedApiFetch).not.toHaveBeenCalled();
   });
 });
+
+describe('audienceModule.resolveProof — one input, code or invitation', () => {
+  it('returns an access-code proof when the value is a valid code', async () => {
+    mockedApiFetch.mockResolvedValue({ data: { authorized: true, reason: 'access_code' } } as never);
+    expect(await audienceModule.resolveProof(['tt-1'], 'DRILL-CODE')).toEqual({ accessCode: 'DRILL-CODE' });
+  });
+
+  it('falls back to an invitation proof when the code attempt is rejected', async () => {
+    mockedApiFetch
+      .mockRejectedValueOnce(new ApiError('invalid code', 422, 'no_valid_code_or_invitation'))
+      .mockResolvedValueOnce({ data: { authorized: true, reason: 'invitation' } } as never);
+    expect(await audienceModule.resolveProof(['tt-1'], 'tok-1')).toEqual({ invitationToken: 'tok-1' });
+  });
+
+  it('returns null when neither a code nor a token authorizes', async () => {
+    mockedApiFetch.mockRejectedValue(new ApiError('invalid', 422, 'no_valid_code_or_invitation'));
+    expect(await audienceModule.resolveProof(['tt-1'], 'nope')).toBeNull();
+  });
+
+  it('returns null for a blank value or empty tier list without calling the API', async () => {
+    expect(await audienceModule.resolveProof(['tt-1'], '   ')).toBeNull();
+    expect(await audienceModule.resolveProof([], 'CODE')).toBeNull();
+    expect(mockedApiFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('audienceModule.proveInvitation — link token', () => {
+  it('returns an invitation proof when the token authorizes', async () => {
+    mockedApiFetch.mockResolvedValue({ data: { authorized: true, reason: 'invitation' } } as never);
+    expect(await audienceModule.proveInvitation(['tt-1'], 'tok-1')).toEqual({ invitationToken: 'tok-1' });
+    const [, opts] = mockedApiFetch.mock.calls[0];
+    expect((opts?.body as Record<string, unknown>).invitation_token).toBe('tok-1');
+  });
+
+  it('returns null when the token is not valid', async () => {
+    mockedApiFetch.mockRejectedValue(new ApiError('invalid', 422, 'no_valid_code_or_invitation'));
+    expect(await audienceModule.proveInvitation(['tt-1'], 'bad')).toBeNull();
+  });
+});

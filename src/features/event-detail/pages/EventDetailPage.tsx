@@ -1,7 +1,9 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, MapPin, Clock, Users, Gift, Lock, CalendarX, ArrowRight } from 'lucide-react';
 import { useState, useLayoutEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import type { AudienceProof } from '@/lib/audience';
 import { productsModule } from '@/lib/products';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
@@ -50,9 +52,16 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const [showShare, setShowShare] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [gatedUnlocked, setGatedUnlocked] = useState(false);
-  // Audience proof captured when a gated ticket offer is unlocked — passed to
-  // checkout so the registration carries it (the backend re-validates).
-  const [audienceCode, setAudienceCode] = useState<string>();
+  // Audience proof (access code or invitation token) captured when a gated
+  // ticket offer is unlocked — carried into checkout as audience_proof.
+  const [audienceProof, setAudienceProof] = useState<AudienceProof>();
+  // Invitation links carry the token in the event URL (the backend emails them);
+  // a token unlocks the gated offers without the buyer typing anything.
+  const [searchParams] = useSearchParams();
+  const invitationToken = useMemo(
+    () => searchParams.get('invitation') ?? searchParams.get('invitation_token') ?? undefined,
+    [searchParams],
+  );
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [waitlistOffer, setWaitlistOffer] = useState<TicketTier | null>(null);
   const carouselImages = event.images && event.images.length > 0 ? event.images : [event.image];
@@ -88,6 +97,11 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
     .map((t) => t.ticketTypeId)
     .filter((id): id is string => !!id);
   const hasGatedTiers = gatedTicketTypeIds.length > 0;
+  // The backend gates per ticket type, so on a mixed event the public tiers stay
+  // selectable while the gated ones wait behind the unlock panel.
+  const publicTicketTypes = displayTicketTypes.filter((t) => !t.audience || t.audience === 'public');
+  const hasPublicTiers = publicTicketTypes.length > 0;
+  const visibleTicketTypes = hasGatedTiers && !gatedUnlocked ? publicTicketTypes : displayTicketTypes;
   const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes: displayTicketTypes, selectedTicketType, event, isDark });
  const scrollToTicketSelection = () => {
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -214,11 +228,13 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
           <GatedTierGate
             gatedTicketTypeIds={gatedTicketTypeIds}
             unlocked={!hasGatedTiers || gatedUnlocked}
-            onUnlocked={(code) => { setGatedUnlocked(true); setAudienceCode(code); }}
+            invitationToken={invitationToken}
+            hasPublicTiers={hasPublicTiers}
+            onUnlocked={(proof) => { setGatedUnlocked(true); setAudienceProof(proof); }}
           >
           <TicketSelector
             event={event}
-            ticketTypes={displayTicketTypes}
+            ticketTypes={visibleTicketTypes}
             selectedTicketType={selectedTicketType}
             onSelectTicketType={setSelectedTicketType}
             isSoldOut={isSoldOut}
@@ -242,7 +258,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
             <EndedBar isDark={isDark} />
           ) : isSoldOut ? (
             <SoldOutBar isDark={isDark} onNavigate={onNavigate} />
-          ) : hasGatedTiers && !gatedUnlocked ? (
+          ) : hasGatedTiers && !gatedUnlocked && !hasPublicTiers ? (
             <AppButton
               whileTap={{ scale: 0.98 }}
               onClick={scrollToTicketSelection}
@@ -292,7 +308,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
       {/* Offer waitlist (sold-out, waitlist-enabled) */}
       <AnimatePresence>
         {waitlistOffer && event.slug && (
-          <WaitlistSheet slug={event.slug} offer={waitlistOffer} accessCode={audienceCode} onClose={() => setWaitlistOffer(null)} />
+          <WaitlistSheet slug={event.slug} offer={waitlistOffer} accessCode={audienceProof?.accessCode} invitationToken={audienceProof?.invitationToken} onClose={() => setWaitlistOffer(null)} />
         )}
       </AnimatePresence>
 
@@ -313,7 +329,8 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
             ticketLevel={selectedTicket?.level || ''}
             ticketProductId={selectedTicket?.id}
             ticketTypeId={selectedTicket?.ticketTypeId}
-            accessCode={audienceCode}
+            accessCode={audienceProof?.accessCode}
+            invitationToken={audienceProof?.invitationToken}
             basePrice={basePrice}
             eventId={eventId}
             products={displayProducts}
