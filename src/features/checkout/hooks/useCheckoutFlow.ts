@@ -98,8 +98,9 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   const [registrationError, setRegistrationError] = useState<string>();
   const [paymentError, setPaymentError] = useState<string>();
   // Guest free-admission phone proof. The backend demands it only for an
-  // unauthenticated buyer whose selection prices to $0 (paid checkouts prove
-  // the phone at the guest payment boundary instead); it arrives as the
+  // unauthenticated buyer whose selection prices to $0 (a paid selection just
+  // declares `phone_confirmation: true` and is bound to the phone by a signed
+  // order-access token, so it is never asked to prove it); it arrives as the
   // `phone_verification_required` error, never a next_action. The verified
   // token is re-submitted with the selection.
   const [guestOtp, setGuestOtp] = useState<{ challengeId: string; phone: string } | null>(null);

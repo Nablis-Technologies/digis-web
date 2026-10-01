@@ -7,12 +7,13 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 /**
  * Guest free-admission phone proof, shown inline as its own checkout step.
  *
- * The backend only demands it for an unauthenticated buyer whose selection
+ * The backend demands the OTP only for an unauthenticated buyer whose selection
  * prices to $0 (`Orders::AdmissionSelections::CheckoutDispatcher` →
- * `phone_verification_required`): paid checkouts prove the phone at the guest
- * payment boundary instead. The code is requested via
- * `admission_selections/request_otp` and traded for a `verification_token` that
- * the caller re-submits with the selection.
+ * `phone_verification_required`). A paid guest selection is not asked to prove
+ * the phone: it declares `phone_confirmation: true`, and the backend binds the
+ * Order to that phone with a signed order-access token (no provider check). The
+ * code is requested via `admission_selections/request_otp` and traded for a
+ * `verification_token` that the caller re-submits with the selection.
  */
 export function PhoneOtpStep({
   phone,
