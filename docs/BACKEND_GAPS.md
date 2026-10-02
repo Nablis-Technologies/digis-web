@@ -123,6 +123,7 @@
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
 | 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
+| 64 | open — degrading | wallet ticket omits the acquisition (sold) price → the resale sheet can't default the asking price to what the buyer paid |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -921,6 +922,29 @@ can't carry add-ons, so "ticket + parking" is un-buyable in one order.
 
 **Evidence:** code read 2026-10-01; live products probe shows only
 `chapa-test-event` currently has available extras.
+
+**Status: open — filed 2026-10-01 (frontend wiring audit).**
+
+### #64. Wallet ticket omits the acquisition (sold) price → the resale default can't be "what you paid"
+
+`Ticketing::TicketWalletSerializer#resale_policy` computes the cap from
+`object.current_acquisition_product_value_minor` (`calculate_resale_price_cap_minor`,
+serializer lines ~48-57) but **never serializes that value**. So the frontend has
+the resale *cap* (`resale_price_cap_minor`) but not the price the ticket was
+actually sold for, and `SellTicketSheet` falls back to a hard-coded default
+(`useState(2000)`), unrelated to the buyer's purchase.
+
+**Why it degrades:** the natural default asking price is the acquisition price;
+today the seller must type it blind.
+
+**Fix:** expose the acquisition/face price on the wallet ticket — e.g.
+`acquisition_product_value_minor` (+ `acquisition_currency`) or a
+`paid_unit_amount_minor` — ideally also on the resale policy. The frontend then
+defaults `SellTicketSheet`'s price to it.
+
+**Note:** it is derivable on the client only for a `percentage` cap
+(`cap × 10000 / bps`), not for a `fixed` cap, and that would be frontend money
+math — so a served field is the right fix.
 
 **Status: open — filed 2026-10-01 (frontend wiring audit).**
 
