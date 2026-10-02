@@ -74,6 +74,17 @@
 > **Added 2026-09-30 (auth):** #56 (a guest who bought a ticket can't create an
 > account — signup can't take over the shadow phone) and #57 (no forgot-password
 > endpoint) — both blocking, filed on fresh code reads.
+>
+> **Re-verified 2026-10-01 against `feat/launch-hardening-telemetry` at `ed6309a`**
+> (9 commits since `326f6a3`; all organizer/admin surfaces plus one consumer fix).
+> **Only #42 resolved and frontend-wired** — the wallet resale policy now serves
+> `resale_price_cap_minor` (`d7aa4ff`). Every other open gap re-checked and still
+> open: #17, #8, #9, #44, #54, #55, #46–#52, #58, #11, #36, #38. Filed since the
+> last sweep: **#58** (`active_checkout_exists` 409 carries no order id), **#59**
+> (no invitation link format/delivery), **#60** (Chapa payment amount sent 100×
+> too large). Local backend synced to `ed6309a` with dev setup preserved; the
+> stale organizer `attendee_export.request` grant from the old seed was removed.
+> No upstream change required new frontend wiring beyond #42.
 
 ## Status key
 
