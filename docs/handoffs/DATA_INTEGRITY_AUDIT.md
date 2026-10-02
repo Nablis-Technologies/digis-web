@@ -66,13 +66,17 @@ Recorded in `AGENTS.md` → "Data integrity (seeds + e2e)".
 
 ## Fix plan (prioritized)
 
-**P0 — actively broken / direct consequence of the latest change**
-1. Seed a seller payout account (verified, chapa, a valid rail) + a positive seller
-   ledger balance, so `/payouts` and a `succeeded`-path drill work from a clean seed.
-2. Fix `zz-live-payment.spec.ts` (slug → `…-2`, tier `Final Wave`) and
-   `zz-deathnote.spec.ts` (use an existing tier), or make them resolve data at runtime.
-3. `routing.spec.ts`: stop depending on a manual ticket; seed one for the buyer or
-   make the spec self-provision.
+**P0 — DONE 2026-10-02**
+1. ✅ Seller payout seed — `db/seeds/dev_demo.rb` (a verified `test` destination +
+   a 500000 ETB `adjustment` balance for `+251900123456`), loaded last via
+   `db/seeds/dev_extensions.rb`. Backend `chore(dev)` commit.
+2. ✅ `zz-live-payment` → `avenida-desperados-pregame-edition-2` + `Final Wave`;
+   `zz-deathnote` tier → `Regular` (frontend commit).
+3. ✅ `routing.spec` now deep-links the seeded `attendee` (`+251911000003`, who
+   owns a ticket) instead of the buyer who owns none after a clean reseed.
+
+Verified: full `DIGIS_SEED_PROFILE=dev` reseed → seller balance 500000 + verified
+destination, attendee 1 ticket, buyer 0; Playwright suite **28/28**.
 
 **P1 — contract cleanup**
 4. Guard the `seeds_events.rb` `IN ()` path; reconcile `TEST_EVENT_SLUGS` so dev
