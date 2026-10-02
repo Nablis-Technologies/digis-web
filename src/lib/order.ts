@@ -491,21 +491,6 @@ export const orderModule = {
   },
 
   /**
-   * Local-dev return-URL verify. Chapa can't reach localhost, so the hosted
-   * return is the ONLY signal the backend gets: replay the attempt's tx_ref
-   * to the unauthenticated callback endpoint, which verifies with Chapa
-   * (verify-before-trust) and records the durable payment event. The wallet
-   * poll then picks up the issued ticket. Production (public callback URL +
-   * webhook) doesn't need this but it's a harmless idempotent replay there.
-   */
-  async kickReturnVerification(txRef: string): Promise<void> {
-    await apiFetch(
-      `payments/chapa/callback?provider=chapa&trx_ref=${encodeURIComponent(txRef)}&status=success`,
-      { method: "GET" },
-    );
-  },
-
-  /**
    * POST /payments/:payment_id/refresh (Idempotency-Key auto-injected).
    * Buyer-scoped reconciliation (payment_refresh#create): verifies a pending
    * attempt server-side and returns payment + order + wallet tickets + a

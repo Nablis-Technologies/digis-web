@@ -296,31 +296,6 @@ function AppContent() {
   const { state: returnState, start: startReturnConfirm } = returnController;
   const { state: guestReturnState, start: startGuestReturnConfirm } = guestReturnController;
 
-  // Local-dev return-URL verify: Chapa can't reach localhost, so replay
-  // each attempt tx_ref to the callback endpoint (verify-before-trust
-  // server-side), then poll the wallet for the issued ticket. Chapa appends
-  // `trx_ref` to the return URL, so use it directly when present (covers a
-  // reload/resume where the sessionStorage payment-keys may be gone); the
-  // stored keys cover attempts whose tx_ref Chapa did not echo back.
-  const kickReturnVerification = useCallback(() => {
-    try {
-      const keys: string[] = [];
-      const urlTxRef = new URLSearchParams(location.search).get('trx_ref');
-      if (urlTxRef) keys.push(urlTxRef);
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const k = sessionStorage.key(i);
-        if (k?.startsWith('digis:payment-key:')) {
-          const v = sessionStorage.getItem(k);
-          if (v) keys.push(v);
-        }
-      }
-      const unique = [...new Set(keys)];
-      if (unique.length > 0) {
-        Promise.allSettled(unique.map((txRef) => orderModule.kickReturnVerification(txRef)));
-      }
-    } catch { /* storage unavailable — wallet poll still runs */ }
-  }, []);
-
   useEffect(() => {
     if (!isPaymentReturn) return;
     const sp = new URLSearchParams(location.search);
@@ -328,12 +303,12 @@ function AppContent() {
     const next = sp.toString();
     navigate(location.pathname + (next ? `?${next}` : ''), { replace: true });
     setReturnScope(resolveReturnScope());
-    if (isAuthenticated) {
-      kickReturnVerification();
-      startReturnConfirm();
-    } else {
-      startGuestReturnConfirm();
-    }
+    // Return confirmation is server-verified: POST /payments/:id/refresh (or the
+    // guest variant) calls the provider and returns state + issued tickets. The
+    // Chapa callback reaches the backend through the public callback URL, so no
+    // client-side callback replay is needed.
+    if (isAuthenticated) startReturnConfirm();
+    else startGuestReturnConfirm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPaymentReturn, isAuthenticated]);
 
@@ -369,16 +344,6 @@ function AppContent() {
       try { sessionStorage.removeItem('digis:awaiting-confirm'); } catch { /* ignore */ }
     }
   }, [returnState.kind, guestReturnState.kind]);
-
-  // Re-kick verification while confirming: a first verify can land while
-  // Chapa still reports the attempt pending (or the kick raced the receipt),
-  // and nothing else re-triggers it — without this the overlay spins until
-  // timeout on payments that would verify seconds later.
-  useEffect(() => {
-    if (returnState.kind !== 'confirming') return;
-    const id = window.setInterval(kickReturnVerification, 20_000);
-    return () => window.clearInterval(id);
-  }, [returnState.kind, kickReturnVerification]);
 
   const confirmedTicket =
     returnState.kind === 'confirmed' ? returnState.ticket : null;
