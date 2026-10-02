@@ -1,0 +1,88 @@
+# Data integrity audit — seeds + e2e vs current backend (2026-10-02)
+
+Read-only audit of the dev seed chain and the e2e/mock data against the current
+backend (`feat/launch-hardening-telemetry` @ `f679e56`, after the Composable
+Admission Selection release + seller payouts).
+
+Dev seed chain: `db/seeds.rb` → always `db/seeds/base.rb`; `DIGIS_SEED_PROFILE=dev`
+→ `db/seeds/preview.rb` + `db/seeds/dev_extensions.rb` → `db/seeds_events.rb`
+(the frontend-owned mock-mirror) → `db/pazimo_seed.rb` + `db/pazimo/events_raw.json`.
+
+**Structural fragility (read this first):** all per-event behavior is keyed to the
+**pazimo array index** — `PAST_EVENT_INDICES`, `EVENT_TYPES`, `BOOKABLE_RSVP_INDICES`,
+`FORCE_SOLD_OUT_INDICES`, `AUDIENCE_OVERRIDES`, `TICKET_TYPE_CONFIGS`
+(`pazimo_seed.rb:40,175-231`) — and slugs are derived with `-2`/`-3` dedupe
+suffixes. A re-scrape that reorders/adds listings silently repoints every
+index-keyed slug, tier, audience, and both e2e and the frontend.
+
+## A. Backend seed drift (dev setup — `chore(dev)`)
+
+| Finding | Evidence | Impact |
+|---|---|---|
+| No seller payout account and no seller ledger balance seeded | no `Marketplace::SellerPayoutAccount`/`SellerLedgerEntry` writes in any seed; constraints `seller_payout_account.rb:28-37`, `seller_ledger_entry.rb:32-49` | **`/payouts` is empty out of the box**; `GET /marketplace/seller/balance` → `[]`, `POST …/payouts` → `seller_payout_account_required`. The new feature is undemonstrable from a clean seed. |
+| Dead `event_setting.config` vocabulary still written (`event_type`, `rsvp_*`, `access_mode`, `seat_map`, `lineup`, `access_codes`, …) | `seeds_events.rb:610-638`; public serializer slices to `%w[public_guest_limit]` | Misleading; the real gates are `ticket_type.audience`/`approval_mode`/`waitlist_enabled`. Some events are "rsvp" in dead config yet sell a public offer. |
+| Gated offers seeded with no `AccessCode`/`Invitation` rows | `pazimo_seed.rb:194-195,224` (audience set); no credential rows (only dead config `access_codes`) | Gated (`code_or_invitation`/`invitation`) selection can't be exercised end-to-end. |
+| `metadata.requires_ticket` never set; `public_guest_limit` never seeded | product serializer reads it (`catalog/public/event_product_serializer.rb:27-29`) | The `requires_ticket` gate is never exercised; public config always `{}`. |
+| `chapa-test-event` mixes a ticket + a non-ticket product (`type: "other"`) | tickets `preview.rb:988-1122`; non-ticket `preview.rb:957-981` | A mixed cart hits `product_unavailable` (`admission_selections/create.rb:196-197` = #63); the `"other"` product also can't fulfill (not in `add_ons/validate_product.rb:9`). |
+| `seeds_events.rb` **deletes** preview fixtures (`addis-music-fest-2026`, cancellation drills) | created `preview.rb:253-259,1259-1530`; deleted `seeds_events.rb:511-534` | Dev profile loses them after the mock-mirror runs. |
+| `IN ()` SQL error when `admin_event_ids` is empty | `seeds_events.rb:536-541` (unguarded interpolation; compare `in_list` at `:314-318`) | Standalone `bin/rails runner db/seeds_events.rb` crashes right after `base.rb`. |
+| Destructive + nondeterministic | purge `seeds_events.rb:307-421`; `rand`/`sample` `pazimo_seed.rb:57-66,139-162` | Every reseed wipes orders/tickets/registrations and churns product IDs / dates. |
+
+## B. E2E data drift (frontend)
+
+| Spec | Issue | Risk |
+|---|---|---|
+| `zz-live-payment.spec.ts:8-9` | buys `avenida-desperados-pregame-edition` + tier `Final Wave`; that slug is idx0 (**past**), and `Final Wave` is on the deduped `…-2` (idx25) | **High — wrong slug + tier + ended event** |
+| `zz-deathnote.spec.ts:31` | asserts tier `Convention Pass`; `death-note-anime-convention` (idx20) only has `Regular@350` (and is sold out) | **High — tier doesn't exist** |
+| `routing.spec.ts:4-5,73-74` | expects `+251900123456` to own a wallet ticket; the seed owns none for that user (only `+251911000003` on the preview event) | **High — needs a manual purchase drill** |
+| `checkout.spec.ts:111-118` | "holds fulfilled-but-still-active registrations" — false on a clean seed (registrations are purged) | Medium — comment/precondition stale |
+| `state-gating.spec.ts`, `zz-live-audience-gate.spec.ts`, `zz-live-guest-otp.spec.ts` | depend on index-keyed slugs/audiences (`friends`/$0 `Free Entry`, `unity-in-beats` ended, `psy-addis-saltland` `code_or_invitation`, `origins-2` invitation) | Medium-High — repointed by any re-scrape |
+
+Deterministic (wire-mocked, safe): `seller-payouts.spec.ts`, `payment-return.spec.ts`.
+Live + seed-dependent: `auth`, `checkout`, `event-detail`, `routing`, `state-gating`,
+`wallet-audit`, `mock-audit`, plus the `zz-*` drills.
+
+## C. Frontend mock drift
+
+| Finding | Evidence | Recommendation |
+|---|---|---|
+| `mock-audit.spec.ts` asserts nothing about provenance | `:19-38` only logs image counts | Add `expect(mockHostImgs).toHaveLength(0)`; cover wallet/resale |
+| Mock-host image fallback leaks into live paths | `eventImages.ts:8-9` `getEventImage` used by `tickets.ts:550`, `resale.ts:101,151,177`, `transfer.ts:72` | Render absent on missing backend cover (ADR-0002) |
+| Mock issuance pipeline still imported | `tickets.ts` `MOCK_USER_TICKETS` + `issueTicketsForOrder`; imported by router/payment-return/… | Delete + drop the `src/lib/mock/events.ts` import |
+| Mock-quote fallback can fabricate a 5% quote for a real event missing tier ids | `order.ts:28,300-312,366-368`; synthetic `ticket:` ids `useCheckoutFlow.ts:257` | Gate behind an explicit dev flag; error otherwise |
+| `UIPreviewPage` ships fake events/prices/organizers on a prod route | `router.tsx:873` | Gate behind a dev flag or remove from prod |
+| Dead files | `src/lib/mock/tickets.ts`, `src/lib/mock/current-user.ts` | Delete |
+
+## Practice (going forward)
+
+**After any backend sync/change that alters the contract, sweep the data too:**
+1. Does the change add a surface whose data must exist to be exercised (e.g. seller
+   payout balance)? Add a seed fixture.
+2. Does it remove/rename fields the seeds still write? Clean the seeds.
+3. Does it change slugs/tiers/accounts an e2e spec asserts? Update the spec.
+4. Are e2e specs depending on manual drill state? Make them self-seeding or seed it.
+
+Recorded in `AGENTS.md` → "Data integrity (seeds + e2e)".
+
+## Fix plan (prioritized)
+
+**P0 — actively broken / direct consequence of the latest change**
+1. Seed a seller payout account (verified, chapa, a valid rail) + a positive seller
+   ledger balance, so `/payouts` and a `succeeded`-path drill work from a clean seed.
+2. Fix `zz-live-payment.spec.ts` (slug → `…-2`, tier `Final Wave`) and
+   `zz-deathnote.spec.ts` (use an existing tier), or make them resolve data at runtime.
+3. `routing.spec.ts`: stop depending on a manual ticket; seed one for the buyer or
+   make the spec self-provision.
+
+**P1 — contract cleanup**
+4. Guard the `seeds_events.rb` `IN ()` path; reconcile `TEST_EVENT_SLUGS` so dev
+   doesn't delete preview's own fixtures.
+5. Remove dead `event_setting.config` keys; seed gated `AccessCode`/`Invitation`
+   rows; set `requires_ticket` on real add-ons and `public_guest_limit` where wanted.
+6. Resolve the `chapa-test-event` mixed ticket+`other` product (rename to a
+   fulfillable type or split) — see #63.
+
+**P2 — frontend mock hygiene**
+7. Make `mock-audit.spec.ts` assert; remove mock-host image fallbacks; delete the
+   mock issuance pipeline + dead mock files; gate `UIPreviewPage`; close the
+   mock-quote fallback.

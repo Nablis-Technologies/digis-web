@@ -225,6 +225,26 @@ the true ticket "from" price), #16 (Chapa API V2 — `api.chapa.global`,
 succeeds — Chapa V2 direct transfer; frontend rewired to the flat
 `bank_slug`/`account_number`/`holder_name` payload).
 
+## Data integrity (seeds + e2e) — update after changing things
+
+The dev seed chain (`digis_backend`: `db/seeds/base.rb` + `db/seeds/preview.rb`
++ `db/seeds_events.rb`) and the e2e fixtures are **downstream of the backend
+contract**. After ANY backend sync or change, sweep them before finishing:
+
+1. **New surface needs data to be exercisable?** Add a seed fixture — e.g. seller
+   payouts need a verified destination + a positive ledger balance; gated offers
+   need an `AccessCode`/`Invitation` row.
+2. **Removed/renamed a field the seeds still write?** Clean the seeds (the dead
+   `event_setting.config` `rsvp_*`/`event_type` keys are the current example).
+3. **Changed a slug/tier/account an e2e spec asserts?** Update the spec; prefer
+   resolving data at runtime over hardcoding index-dependent pazimo slugs.
+4. **Does the dev seed delete the very fixtures a drill/test needs?** Reconcile
+   `TEST_EVENT_SLUGS`.
+
+Full audit + prioritized fix list: `docs/handoffs/DATA_INTEGRITY_AUDIT.md`. The
+dev seed is destructive (purges orders/tickets/registrations) and slug/behavior is
+keyed to pazimo array indices — treat a re-scrape as a breaking change.
+
 ## Agent skills
 
 ### Issue tracker
