@@ -1,7 +1,7 @@
 # Invitation-token audience wiring (invite-only tiers)
 
-- **Status:** frontend BUILT 2026-10-01 — waiting only on the backend to emit the invitation link
-- **Blocked by:** backend — no invitation delivery/link format defined (see "Blocked on")
+- **Status:** frontend BUILT 2026-10-01; **reclassified 2026-10-02 — NOT a backend code gap.** The app owns the link; the backend already accepts `invitation_token`. Only the dev `invitation_delivery_sender` is unset (environment setup).
+- **Blocked by:** nothing backend-code; only a dev sender (setup) to exercise the flow end-to-end.
 - **Related:** `docs/BACKEND_GAPS.md` #20 (audience gating), #44 (event-level config inert; the real gates are per-offer)
 
 ## Built (2026-10-01)
@@ -18,9 +18,9 @@
 - Verified live: `origins-2?invitation=<token>` auto-unlocks; `psy-addis-saltland`
   unlocks with `DRILL-CODE`; a wrong code stays locked. Unit tests for
   `resolveProof` / `proveInvitation`.
-- Still frontend-unverifiable end-to-end: the **backend must email the link** so a
-  real buyer receives the token. The app accepts `?invitation=<token>` (and
-  `?invitation_token=`).
+- Still frontend-unverifiable end-to-end only for lack of a **dev sender** to
+  deliver the link; a real buyer receiving the token is a delivery/config concern.
+  The app accepts `?invitation=<token>` (and `?invitation_token=`).
 
 ## Problem
 
@@ -58,10 +58,15 @@ So an invitation-only tier can never be unlocked. The backend requires an `invit
 4. Mixed audience (design): gate **only** the non-public tiers and leave public tiers selectable.
    The backend gates per ticket type; today the **whole** selector is hidden when any tier is gated.
 
-## Blocked on (backend / dev setup)
+## Blocked on (dev setup only — NOT a backend gap)
 
-- The invitation **link format** the app must parse (URL + param name).
-- A dev `invitation_delivery_sender` so the flow can be exercised end-to-end.
+- ~~The invitation **link format** the app must parse (URL + param name).~~
+  **Settled 2026-10-02:** the app owns it — `/events/:slug?invitation=<token>`
+  (also accepts `?invitation_token=`); the backend already accepts
+  `invitation_token` as `audience_proof` (`PUBLIC_PROOF_FIELDS`). Nothing for the
+  backend to define.
+- A dev `invitation_delivery_sender` (e.g. log the composed link) so the flow can
+  be exercised end-to-end. Environment setup, not a code gap.
 
 ## Comments
 

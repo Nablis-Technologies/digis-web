@@ -92,6 +92,7 @@
 |---|---|
 | **open — blocking** | frontend feature cannot ship until fixed |
 | **open — degrading** | works but suboptimal; frontend has a mitigation |
+| **frontend-fixable** | **not a backend gap** — the frontend can satisfy this from an existing surface (reclassified 2026-10-02) |
 | **informational** | note for backend correctness; no frontend impact |
 | **deferred** | product decision, not a bug |
 | **resolved** | fixed; detail in the Resolved archive |
@@ -100,32 +101,32 @@
 
 | # | Status | Summary |
 |---|---|---|
-| 17 | open — blocking | `cbe` not a backend payment method (`PAYMENT_METHODS = %w[telebirr card bank]`) |
+| 17 | open — blocking | persisted enum `PAYMENT_METHODS = %w[telebirr card bank]` rejects `cbe`/`cbebirr` (the Chapa adapter already advertises `cbebirr`) |
 | 56 | open — blocking | signup can't take over an existing (shadow) phone → a guest who bought a ticket can never create an account ("Phone has already been taken") |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
-| 53 | open — blocking | public event payload drops `age_restriction` / `lineup` / `seat_map` / `featured` / `rating` (config now `%w[public_guest_limit]`) |
+| 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `featured` / `rating`; lineup → #36). The `rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
 | 54 | open — degrading | no discovery availability — `GET /public/events` has no `sold_out` / per-offer `available` (products are per-event) |
-| 55 | open — degrading | `EventDetailSerializer` has no `price_from_minor` (only the list serializer does) |
+| 55 | frontend-fixable | detail "from" price is derivable from `GET /public/events/:slug/products` `price_options` (or the list payload) — not a backend blocker |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
 | 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change/reset |
 | 49 | open — degrading | `GET /public/events` has no search/filter/sort/pagination; no events-by-organizer/artist/venue |
 | 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/registration/transfer history, unread-count/mark-all-read |
 | 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
-| 52 | open — degrading | `GET /venues/:id` and `/artists/:id` omit `is_following` (organizations has it) → follow state can't be read back |
+| 52 | frontend-fixable | venue/artist detail omit `is_following`; derivable from `GET /users/:id/following` (self-scoped) — a backend attribute would be cleaner but isn't required |
 | 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
-| 59 | open — blocking | no invitation link format and no dev sender → an `audience=invitation` offer is unbuyable end-to-end |
+| 59 | frontend-fixable | invitation link is frontend-constructible (backend already accepts `invitation_token`); the unset dev sender is **setup**, not a gap |
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
 | 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
 | 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
-| 36 | informational | public payload lacks lineup/participants + venue media/coords |
+| 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
 | 1 | resolved 2026-09-30 | public `event_setting.config` is now `%w[public_guest_limit]` — the old "widen to 17 keys" ask is moot; the fields it held are covered by #53/#44 |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
@@ -150,18 +151,26 @@ why it matters, and a concrete fix.
 
 ### #17. `cbe` is not a valid backend payment method
 
-Frontend `PaymentMethod = 'telebirr' | 'cbe' | 'card'`; backend
+Frontend `PaymentMethod = 'telebirr' | 'cbe' | 'card'`; the persisted enum
 `Commercial::FeeComponent::PAYMENT_METHODS = %w[telebirr card bank]`
-(`app/models/commercial/fee_component.rb:23`), and the Chapa payment adapter
-capabilities list `payment_methods: %w[telebirr card bank]`
-(`app/services/payments/providers/registration.rb`). Selecting CBE Birr →
+(`app/models/commercial/fee_component.rb:23`), inherited by `Orders::Payment`
+(`app/models/orders/payment.rb:13`, validated `:49`), rejects it at
+`app/services/orders/payment_attempt_support.rb:28`. Selecting CBE Birr →
 `422 invalid_payment_method`.
 
-**Fix:** add `"cbe"` to the model, the `chapa_adapter` capabilities, and any
-organizer-facing `payment_method` enums. The frontend's CBE button is currently
-disabled as a workaround.
+**Correction 2026-10-02:** the earlier claim that the Chapa adapter capabilities
+are `%w[telebirr card bank]` is **stale** — `app/services/payments/providers/registration.rb:33`
+now advertises `%w[telebirr cbebirr mpesa awashbirr ebirr enat_bank card bank]`
+(direct charge: `telebirr cbebirr mpesa awashbirr`). The only blocker is the
+persisted enum, which rejects **both** `cbe` and `cbebirr` even though the
+adapter supports `cbebirr`. So the fix is a one-line enum widening, not an
+adapter change.
 
-**Status: open — verified 2026-09-09.**
+**Fix:** add `"cbe"`/`"cbebirr"` to `PAYMENT_METHODS` (and any organizer-facing
+`payment_method` enum). The frontend's CBE button is currently disabled as a
+workaround.
+
+**Status: open — verified 2026-10-02 (enum confirmed; adapter evidence corrected).**
 
 ### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts — RESOLVED 2026-09-30
 
@@ -238,37 +247,38 @@ endpoints and pass them through as `audience_proof` to `Registrations::Submit`.
 
 ---
 
-### #53. Public event payload no longer exposes the detail fields (config gutted)
+### #53. Public event payload no longer exposes the non-admission detail fields
 
 `Events::Public::EventSettingSerializer` now whitelists **only**
-`%w[public_guest_limit]` (`app/serializers/events/public/event_setting_serializer.rb`),
-and `EventDetailSerializer` carries no replacement attributes. So the following
-previously-public fields have **no source anywhere in the public API** (grep of
-`app/` confirms the key strings are gone):
+`%w[public_guest_limit]` (`app/serializers/events/public/event_setting_serializer.rb:8`),
+and `EventDetailSerializer` carries no replacement attributes, so the
+previously-public config keys have no source in the public API (grep of `app/`
+confirms the strings are gone).
 
-`age_restriction`, `lineup`, `seat_map`, `featured`, `rating`,
-`answer_edit_window_hours`, `event_type`, `access_mode`, `invite_only_paid`,
-`on_guest_list`, `invite_waitlist_only`, `waitlist_ahead`, `rsvp_going`,
-`rsvp_capacity`, `allows_plus_one`, `max_guests`, `rsvp_requirements`,
-`price_foreign_from_minor`.
+**Re-scoped 2026-10-02 — split into two groups:**
 
-The **admission-related** keys are legitimately replaced by the offer model
-(`ticket_type.approval_mode` / `audience` / `waitlist_enabled`, `price_options`),
-but the **non-admission** ones have no substitute: the event-detail Age info card,
-Lineup section, SeatMap step, and the discovery Featured/rating surfaces all lose
-their data. `age_restriction` in particular is real organizer data the seed writes
-and the public payload used to serve.
+- **Superseded by the per-offer model (NOT a gap).** `event_type`, `access_mode`,
+  `invite_only_paid`, `on_guest_list`, `invite_waitlist_only`, `waitlist_ahead`,
+  `rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`,
+  `rsvp_requirements`. The real admission contract is per-offer
+  (`ticket_type.approval_mode` / `audience` / `waitlist_enabled` + `price_options`);
+  the frontend must source gating from the offer, not from event config (see #44).
+- **Genuinely lost non-admission data (real gap).** `age_restriction`, `seat_map`,
+  `featured`, `rating`, `answer_edit_window_hours`, `price_foreign_from_minor`.
+  No substitute exists: the event-detail Age info card, SeatMap step, and the
+  discovery Featured/rating surfaces lose their data. `lineup` is tracked under
+  #36 (needs a participants/artists surface, not just a config key).
 
 **Why it blocks:** those event-detail modules can only render absent. ADR-0002
 forbids fabricating them.
 
 **Fix:** expose the non-admission public-safe fields on the detail serializer —
-at minimum `age_restriction`, `seat_map`, and `lineup` (or a public lineup
-endpoint, see #36); decide explicitly whether `featured`/`rating` are part of the
-public contract.
+at minimum `age_restriction`, `seat_map` (and `lineup` via #36); decide explicitly
+whether `featured` / `rating` / `answer_edit_window_hours` /
+`price_foreign_from_minor` are part of the public contract.
 
-**Status: open — filed 2026-09-30 (verified against `326f6a3` by code read +
-live `GET /public/events/:slug` → `event_setting.config == {}`).**
+**Status: open (re-scoped 2026-10-02) — filed 2026-09-30 (verified against
+`326f6a3` by code read + live `GET /public/events/:slug` → `event_setting.config == {}`).**
 
 ### #56. Signup cannot take over an existing (shadow) phone
 
@@ -328,39 +338,43 @@ the claim flow, #56).
 
 **Status: open — filed 2026-09-30 (route grep).**
 
-### #59. No invitation link format or delivery → an `audience=invitation` offer is unbuyable end-to-end
+### #59. Invitation link — frontend contract done; the dev sender is SETUP, not a gap
 
-The backend creates invitations and can deliver them, but nothing defines the
-**link the buyer receives**:
+**Reclassified 2026-10-02 — this is NOT a backend code gap.**
 
-- `Ticketing::Invitations::Create` returns a one-time `token`; delivery happens in
-  `Ticketing::DeliverInvitationJob` through a configurable
-  `Rails.application.config.x.invitation_delivery_sender` (`deliver_invitation_job.rb:14`).
-- The job returns early when the sender is unset (no dev sender configured).
-- No public URL/param format exists for the token, so there is nothing for the app
-  to read.
+The app owns the deep-link contract and already implements it:
+`/events/:slug` reads `?invitation=<token>` (also `?invitation_token=`) and passes
+it as `invitation_token` to `POST /ticketing/audience_authorizations` and to
+`admission_selections` (`audience_proof.invitation_token`). The backend already
+**accepts** that token — `Orders::AdmissionSelectionEnvelope::PUBLIC_PROOF_FIELDS
+= %w[access_code invitation_token]` and the audience controller maps it
+(`Ticketing::Audience::Authorize#authorize_invitation`). Verified live:
+`origins-2?invitation=<token>` auto-unlocks.
 
-The frontend now consumes `?invitation=<token>` (also accepts `?invitation_token=`)
-on `/events/:slug` and passes it as `invitation_token` to
-`POST /ticketing/audience_authorizations` and to `admission_selections`
-(`audience_proof.invitation_token`). Until the backend emails that link, the
-token never reaches the buyer.
+What was previously filed as "no link format" is really two non-gaps:
+1. **Link format** — the app defines it (`<app>/events/<slug>?invitation=<token>`).
+   Nothing for the backend to invent; whoever composes the invitation message
+   (the configurable sender) just appends the token to that URL.
+2. **Delivery in dev** — `Ticketing::DeliverInvitationJob` calls
+   `config.x.invitation_delivery_sender`, which is unset in dev (an initializer
+   installs a no-op default, `config/initializers/ticketing_outbox_handlers.rb:5`,
+   so it does not literally "return early" — it calls a no-op). Setting a dev
+   sender is **environment setup**, which the gap rules explicitly exclude.
 
-**Why it blocks:** `audience=invitation` offers cannot be unlocked on any real
-path. Dev seed events `origins-2` and `event` (both `invitation`) are dead ends in
-the UI. Access-code offers work.
-
-**Fix:** have the invitation delivery build the event-URL link with the token —
-`<app>/events/<event_slug>?invitation=<token>` — and send it via the configured
-sender. Provide a dev `invitation_delivery_sender` (setup, not the gap) so the
-flow is exercisable. The link format is the contract; the sender is config.
+**Setup note (record in dev setup, NOT here):** a dev
+`invitation_delivery_sender` (e.g. log the composed link) makes the
+`audience=invitation` flow exercisable end-to-end. Production configures a real
+sender.
 
 **Evidence:** `app/services/ticketing/invitations/create.rb`;
-`app/jobs/ticketing/deliver_invitation_job.rb:14`; no `invitation_delivery_sender`
-in `config/environments/development.rb`. Frontend plan/built note:
+`app/jobs/ticketing/deliver_invitation_job.rb:14`;
+`config/initializers/ticketing_outbox_handlers.rb:5`; no `invitation_delivery_sender`
+in `config/environments/development.rb`. Frontend build note:
 `.scratch/invite-only-audience/issues/01-invitation-token-wiring.md`.
 
-**Status: open — filed 2026-10-01 (after wiring the frontend half).**
+**Status: frontend-fixable / setup — reclassified 2026-10-02 (filed 2026-10-01).**
+Removed from the open-gap count; the frontend half is built and the backend already
+accepts the token.
 
 ### #60. Chapa payment amount is sent 100× too large (minor units, not the provider's major unit)
 
@@ -422,16 +436,20 @@ availability batch.
 
 **Status: open — filed 2026-09-30 (verified against `326f6a3`).**
 
-### #55. `EventDetailSerializer` omits `price_from_minor`
+### #55. `EventDetailSerializer` omits `price_from_minor` — FRONTEND-FIXABLE (not a backend gap)
 
 `EventListSerializer` computes `price_from_minor` (over active ticket products)
 but `EventDetailSerializer` does not
-(`app/serializers/events/public/event_detail_serializer.rb`). The detail page must
-derive the "from" price from a second `GET .../products` call.
+(`app/serializers/events/public/event_detail_serializer.rb`). The detail page can
+already derive the "from" price from `GET /public/events/:slug/products`
+(`price_options[].amount_minor`, min) — a surface the detail page fetches anyway
+for the offers — or reuse the list payload's `price_from_minor`.
 
-**Fix:** mirror `price_from_minor` onto the detail serializer.
+**Fix (optional, convenience only):** mirror `price_from_minor` onto the detail
+serializer to save the second request. Not required.
 
-**Status: open — filed 2026-09-30 (verified against `326f6a3`).**
+**Status: frontend-fixable — reclassified 2026-10-02 (filed 2026-09-30).** This is
+a frontend derivation task, not a backend blocker; removed from the open-gap count.
 
 ### #41. A released order permanently burns its registration — RESOLVED 2026-09-30
 
@@ -790,21 +808,30 @@ What remains genuinely missing:
 
 **Fix:** events-by-followable (#49); venue media/coords (#36); decide gamification.
 
-### #52. Venue/artist detail omit `is_following`
+### #52. Venue/artist detail omit `is_following` — FRONTEND-FIXABLE (not a backend gap)
 
-`GET /venues/:id` (`app/serializers/events/public/venue_detail_serializer.rb`) and
+`GET /venues/:id` (`app/serializers/events/public/venue_detail_serializer.rb:5-8`) and
 `GET /artists/:id` expose the profile (description, socials, media, coords,
 `follower_count`) but **not `is_following`** — only
 `Organizations::Public::OrganizationDetailSerializer` has it
 (`organization_detail_serializer.rb:13,24-26`). The follow write-path works for
 all three (`POST|DELETE /:type/:id/follow`, type `venues|artists|organizations`,
-`config/routes.rb:68-73`) and returns `{ following, follower_count }`, so only the
-*initial* read is missing: a profile sheet cannot show whether the user already
-follows the entity.
+`config/routes.rb:68-73`) and returns `{ following, follower_count }`.
 
-**Fix:** add `attribute :is_following { object.followed_by?(instance_options[:current_user]) }`
-to the venue + artist detail serializers (mirroring the organization one) and to
-their policy `VISIBILITY[:show]` field lists.
+**Correction 2026-10-02:** this is **derivable from an existing surface** —
+`GET /users/:id/following` (`config/routes.rb:469`, `Core::FollowsController#following`,
+self-scoped) returns the current user's `Core::Follow` rows
+(`followable_type`/`followable_id`, `follow_serializer.rb`). The frontend can match
+the venue/artist id to read back follow state. Caveat: that list caps at 25 unless
+paginated (`follows_controller.rb:31`), so large follow sets need pagination.
+
+**Fix (optional, convenience only):** add
+`attribute :is_following { object.followed_by?(instance_options[:current_user]) }`
+to the venue + artist detail serializers (mirroring the organization one). Cleaner,
+but not required.
+
+**Status: frontend-fixable — reclassified 2026-10-02.** Removed from the open-gap
+count; the frontend can read follow state via `GET /users/:id/following`.
 
 ### #58. `active_checkout_exists` 409 carries no order id → the client can't resume or discard the open checkout
 
@@ -1047,8 +1074,18 @@ map falls back to a city-level default). **Seed side (frontend-owned):** the
 dev seeds do not yet populate `events_event_participants` / venue media — that
 is a seed task for when the backend exposes them, not a gap tracked here.
 
-**Fix (backend):** add `participants`/`artists` and venue `media`/`latitude`/
-`longitude` to the public serializers (or a public participants endpoint).
+**Correction 2026-10-02 — split:** the **venue media/coords half is
+frontend-fixable**: public `GET /venues/:id`
+(`app/controllers/events/venues_controller.rb:6-7`, `venue_detail_serializer.rb:5-8`)
+serves `latitude`/`longitude` and media, and `event_dates[].venue.id` is public,
+so the frontend can hydrate the venue. Only the **event participants/artists
+(lineup) half remains a backend gap** — there is no public event→artist link
+(`events_event_participants` is auth-gated, `routes.rb:94`; `Events::Event` has no
+`artists` association).
+
+**Fix (backend, lineup only):** add `participants`/`artists` to the public event
+serializers (or a public participants endpoint). Venue media/coords: no backend
+change needed.
 
 ### #37. No public waitlist-join or access-request endpoint
 

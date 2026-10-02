@@ -7,6 +7,43 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-02 — gap re-verification + frontend-fixable reclassifications
+
+**Backend source:** `digis_backend` @ `a5b9314` (upstream `ed6309a` + one
+`chore(dev)` reapply), clean tree. Read-only verification of every open gap
+against the code (serializers / controllers / routes / services).
+
+**Confirmed real backend gaps (backend dev must fix):** #60 (critical — Chapa
+amount 100×), #8, #9, #56, #57, #53 (non-admission fields only), #46, #47, #48,
+#49 (pagination), #50, #51 (endpoints), #58, #61, #62, #63 (guest path), #17
+(enum only — see correction), #36 (lineup only), #38, #11.
+
+**Reclassified `frontend-fixable` (NOT backend gaps — removed from the open count):**
+- **#59** — the app owns the link (`/events/:slug?invitation=<token>`); the
+  backend already accepts `invitation_token`. The unset dev sender is **setup**,
+  not a gap.
+- **#55** — detail "from" price derives from `GET .../products` `price_options`.
+- **#52** — `is_following` derives from `GET /users/:id/following` (self-scoped;
+  caps at 25 unless paginated).
+- **#54** — availability derives from `GET .../products` `available` (N+1 perf
+  ask only; not blocking).
+- **#36 (venue half)** — venue media/coords via public `GET /venues/:id`.
+- **#44** — source gating from the per-offer model, not the inert event config.
+- **#49 (search half)** — already client-side; only pagination needs the backend.
+- **#63 (partial)** — extras can be split into a separate `ExtrasOnlyCheckout`
+  order (auth-only).
+
+**Corrections applied to `BACKEND_GAPS.md`:**
+- **#17** — the "adapter capabilities = `%w[telebirr card bank]`" evidence was
+  stale; the adapter (`registration.rb:33`) already advertises `cbebirr`. The real
+  blocker is the persisted enum only (a one-line widening).
+- **#53** — re-scoped: the `rsvp_*`/`event_type`/`access_mode` keys are superseded
+  by the per-offer model (not a gap); the real gap is the lost non-admission
+  fields (`age_restriction`/`seat_map`/`featured`/`rating`/
+  `answer_edit_window_hours`/`price_foreign_from_minor`; lineup → #36).
+- **#59/#55/#52/#36-venue** — reclassified `frontend-fixable`; the status key
+  gained a `frontend-fixable` row.
+
 ## Session 2026-09-30 — backend pulled to `326f6a3`; Composable Admission Selection
 
 **Backend source:** `origin/feat/launch-hardening-telemetry` is now at `326f6a3`
