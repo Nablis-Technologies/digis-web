@@ -32,7 +32,7 @@ type Step = 'phone' | 'claim' | 'done';
 
 export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNavigateTickets }: ClaimTicketPageProps) {
   const { isDark } = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: transfer, isLoading, isError } = useQuery({
@@ -53,6 +53,10 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
   const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState('');
   const [accepted, setAccepted] = useState<AcceptedTransfer | null>(null);
+  // A signed-in recipient accepts with one tap (authenticated accept, no OTP);
+  // guests prove the phone with an OTP. "Not your account?" falls back to guest.
+  const [mode, setMode] = useState<'auth' | 'guest'>(isAuthenticated ? 'auth' : 'guest');
+  const [accepting, setAccepting] = useState(false);
 
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
@@ -101,6 +105,21 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
       setClaiming(false);
     }
   }, [transfer, challengeId, code, password, passwordConfirm, id, token, phone, queryClient]);
+
+  // Signed-in recipient: one-tap authenticated accept (no OTP, no password).
+  const handleAcceptAuthed = useCallback(async () => {
+    setAccepting(true);
+    setError('');
+    try {
+      await transferService.acceptAuthenticated(id, token);
+      queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+      onNavigateTickets();
+    } catch (err) {
+      setError(mapApiError(err));
+    } finally {
+      setAccepting(false);
+    }
+  }, [id, token, queryClient, onNavigateTickets]);
 
   const handleDownload = useCallback(async () => {
     if (!downloadRef.current) return;
@@ -265,6 +284,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
               <p className="mt-1 text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                 {transfer.ticket.product.name} · {transfer.ticket.status}
               </p>
+              {mode !== 'auth' && (
               <div className="relative mt-4 rounded-2xl overflow-hidden px-4 py-3 flex items-center gap-3" style={{ background: surfaceSoft }}>
                 <GlassReflection isDark={isDark} />
                 <Phone className="relative z-10 w-4 h-4 flex-shrink-0" style={{ color: textDim }} strokeWidth={1.8} />
@@ -272,8 +292,37 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   A code will be sent to <span style={{ color: text, fontWeight: 500 }}>{transfer.recipient.phone}</span>
                 </p>
               </div>
+              )}
 
-              {step === 'phone' ? (
+              {mode === 'auth' ? (
+                <>
+                  <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+                    You&apos;re signed in{user?.phone ? <> as <span style={{ color: text, fontWeight: 500 }}>{user.phone}</span></> : ''}. Accept this ticket to add it to your account.
+                  </p>
+                  <AppButton
+                    onClick={handleAcceptAuthed}
+                    disabled={accepting}
+                    className="mt-4 w-full py-3.5 rounded-full flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    style={{ background: ACCENT_HEX, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}
+                  >
+                    {accepting ? (
+                      <motion.div className="w-4 h-4 rounded-full" style={{ border: '2px solid rgba(0,0,0,0.25)', borderTopColor: '#0a0a0a' }} animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} />
+                    ) : (
+                      <>
+                        Accept ticket
+                        <Check className="w-4 h-4" strokeWidth={2.4} />
+                      </>
+                    )}
+                  </AppButton>
+                  <button
+                    onClick={() => { setMode('guest'); setError(''); }}
+                    className="mt-3 w-full text-center text-[11.5px] cursor-pointer"
+                    style={{ fontFamily: "'Inter', sans-serif", color: textDim }}
+                  >
+                    Not your account? Claim with the recipient&apos;s phone
+                  </button>
+                </>
+              ) : step === 'phone' ? (
                 <>
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                     Enter your full phone number to verify ownership and receive the code.

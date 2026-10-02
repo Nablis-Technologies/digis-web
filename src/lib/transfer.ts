@@ -181,4 +181,14 @@ export const transferService = {
       refreshToken: data.refresh_token,
     };
   },
+
+  /**
+   * POST /ticket_transfers/:id/accept (authenticated) — accepts a pending
+   * transfer as the signed-in recipient. No OTP or password: the bearer proves
+   * identity and the backend checks `to_user == current_user`. The accepted
+   * ticket then appears in GET /tickets.
+   */
+  async acceptAuthenticated(id: string, token: string): Promise<void> {
+    await apiFetch(`ticket_transfers/${id}/accept`, { method: 'POST', body: { token } });
+  },
 };

@@ -119,6 +119,15 @@ describe('transferService', () => {
     expect(result).toEqual({ verificationToken: 'proof-1' });
   });
 
+  it('acceptAuthenticated accepts as the signed-in recipient with the bearer, no OTP', async () => {
+    mockedApiFetch.mockResolvedValue({ data: { id: 'tr-1', status: 'accepted' } });
+    await transferService.acceptAuthenticated('tr-1', 's3cr3t');
+    expect(mockedApiFetch).toHaveBeenCalledWith('ticket_transfers/tr-1/accept', {
+      method: 'POST',
+      body: { token: 's3cr3t' },
+    });
+  });
+
   it('accept posts verification and maps the returned ticket into the wallet shape', async () => {
     mockedApiFetch.mockResolvedValue({
       data: {
