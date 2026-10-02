@@ -93,7 +93,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
     setStep('paying');
     setError(undefined);
     try {
-      const guest = !isAuthenticated ? { quoteToken: '', phone: guestPhone.trim() } : undefined;
+      const guest = !isAuthenticated ? { phone: guestPhone.trim() } : undefined;
       const quote = await orderModule.quote({
         eventId,
         items: selected.filter((a) => a.quantity > 0).map((a) => ({ eventProductId: a.productId, quantity: a.quantity })),

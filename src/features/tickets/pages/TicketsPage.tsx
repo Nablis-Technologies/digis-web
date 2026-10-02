@@ -105,9 +105,8 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
     onSuccess: () => { setAnswerSaveError(''); setEditingAnswersTicket(null); queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets }); },
     onError: (error: Error) => setAnswerSaveError(error.message),
   });
-  // Real extras-only checkout: opens the Chapa payment flow for just the extras
-  // (no ticket) instead of the mock purchaseTicketExtras (which only mutates the
-  // in-memory store and fails for live wallet tickets).
+  // Extras-only checkout: opens the Chapa payment flow for just the extras
+  // (no ticket) against a live wallet ticket.
   const [extrasCheckout, setExtrasCheckout] = useState<{ ticket: UserTicket; products: EventProduct[] } | null>(null);
   const [extrasProducts, setExtrasProducts] = useState<EventProduct[]>([]);
   const [extrasLoading, setExtrasLoading] = useState(false);

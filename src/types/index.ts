@@ -4,7 +4,7 @@ export type { AuthUser, AuthUserWire, AuthRole, AuthSession, AuthResult, SignInR
 export type { CustomQuestion, AnswerEditWindowHours } from './checkout';
 
 export type { UserTicket, TicketActionResult, ListForResaleResult } from './ticket';
-export type { PromoCode, PromoCreateInput, PromoDiscountType, AppliedPromo } from './promo';
+export type { AppliedPromo } from './promo';
 export type { CheckoutOrder, CheckoutStep, PaymentMethod, ContactDetails, CheckoutAnswers } from './checkout';
 export type { ResaleListing } from './resale';
 export type { PayoutMethod, PayoutMethodKind, PayoutBank, AddPayoutMethodInput } from './payout';
