@@ -703,6 +703,13 @@ and the two keys the public serializer *does* expose (`allow_waitlist`,
 `inviteOnly` / `ticketed`, nor show going/capacity/plus-one — the event-level
 config is decorative. (See also #1: the public serializer strips it entirely.)
 
+**Not frontend-fixable (corrected 2026-10-02):** the frontend *already* ignores
+this dead config — `backendEventToEvent` (`src/lib/events-adapter.ts:85-148`) maps
+no config keys, and `eventActionLabel()` is a constant (`src/lib/eventAction.ts`);
+admission is sourced per-offer from `GET /public/events/:slug/products`. So there
+is no frontend fix to make. Only the backend can resolve it: wire the keys
+(read + enforce + make organizer-writable) or delete them.
+
 **Fix:** decide whether the event-level type/access model is real. If yes, compute
 and expose it (extend `PUBLIC_CONFIG_KEYS`, read it in the RSVP/invite gates) and
 make it organizer-writable. If no, drop the inert keys so they stop implying a

@@ -28,10 +28,17 @@ amount 100×), #8, #9, #56, #57, #53 (non-admission fields only), #46, #47, #48,
 - **#54** — availability derives from `GET .../products` `available` (N+1 perf
   ask only; not blocking).
 - **#36 (venue half)** — venue media/coords via public `GET /venues/:id`.
-- **#44** — source gating from the per-offer model, not the inert event config.
 - **#49 (search half)** — already client-side; only pagination needs the backend.
 - **#63 (partial)** — extras can be split into a separate `ExtrasOnlyCheckout`
   order (auth-only).
+
+**Correction — #44 stays a backend-only gap (my earlier label was wrong).** The
+frontend *already* ignores the dead event-level config: `backendEventToEvent`
+(`events-adapter.ts:85-148`) maps **no** config keys, and `eventActionLabel()` is a
+constant (`'Tickets'`); gating is sourced per-offer (`ticket_type.audience`, etc.)
+from `GET /public/events/:slug/products`. So there is no frontend fix — only the
+backend can wire the keys (read/enforce/write) or delete them. The stale adapter
+docstring that claimed all 17 config keys are mapped was corrected.
 
 **Corrections applied to `BACKEND_GAPS.md`:**
 - **#17** — the "adapter capabilities = `%w[telebirr card bank]`" evidence was

@@ -10,19 +10,13 @@
  *                          event_media, event_organizations, event_setting, organization,
  *                          price_from_minor (computed over active ticket products
  *                          only — BACKEND_GAPS #13/#32 resolved).
- *   event_setting.config:  PUBLIC_CONFIG_KEYS projection (BACKEND_GAPS #1,
- *                          resolved + live since the 2026-09-10 serializer commit):
- *                          allow_waitlist, public_guest_limit, featured, rating,
- *                          sold_out, tickets_left, price_foreign_from_minor,
- *                          foreign_currency, event_type, seat_map,
- *                          answer_edit_window_hours, rsvp_going, rsvp_capacity,
- *                          allows_plus_one, max_guests, rsvp_requirements,
- *                          access_mode, invite_only_paid, on_guest_list,
- *                          age_restriction.
- *                          `access_codes`/`guest_name`/`invite_tickets`
- *                          stay private by design.
- *   All 17 config keys are mapped below; `foreign_currency` is intentionally
- *   dropped (currency is ETB-only).
+ *   event_setting.config:  after the 2026-09-30 composable-admission release the
+ *                          PUBLIC_CONFIG_KEYS projection carries only
+ *                          `public_guest_limit` (BACKEND_GAPS #53/#44). The
+ *                          event-level mode/rsvp/access keys are gone AND were
+ *                          never read by the backend, so this adapter maps none
+ *                          of them. Admission is sourced per-offer from
+ *                          `GET /public/events/:slug/products` (`products.ts`).
  *
  * Mock policy: the backend is the only source of truth. No mock event record
  * is merged in — absent backend data renders as absent.
