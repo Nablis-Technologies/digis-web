@@ -7,6 +7,39 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-02 (pm) — seller payouts wired (backend `f679e56`)
+
+**Backend pull:** `ed6309a → f679e56` (10 commits, **all marketplace seller
+payouts** — the auto build/mature jobs were deleted and a seller-initiated
+**withdrawal** API added; plus telemetry/Postman). Rebased the local `chore(dev)`
+commit on top (`80e5549`); no DB migration; `web` restarted. Plan:
+`docs/superpowers/plans/2026-10-02-seller-payouts-wiring.md`.
+
+**New surface (wired):**
+- `POST /marketplace/seller/payouts` — `{ payout: { currency, amount_minor?,
+  seller_payout_account_id? } }` + `Idempotency-Key` → 201 `SellerPayout`
+  (`pending`). Omit amount = full balance; omit account = default verified.
+- `GET /marketplace/seller/payouts` (paginated) · `GET …/:id`. Statuses
+  `pending → processing → succeeded | failed | cancelled`.
+
+**Frontend:**
+- `src/lib/seller-payouts.ts` + `src/types/seller-payouts.ts` — map + service +
+  query keys; stable `Idempotency-Key` per user intent (retry-safe). Unit-tested.
+- `errors.ts`: added the `seller_payout_*` codes (the upstream
+  `seller_payout_not_matured` / `_event_scope_invalid` were deleted).
+- New dedicated **`/payouts`** page (`src/features/payouts/`): balance + **Cash
+  out** sheet (partial or full; explicit verified destination) + inline payout
+  history with status chips and "Load more". Router wired as a proper `AppView`
+  (`pathToView`, route, TopBar title); guests get the `SignInGate`. Entry point:
+  a **Cash out** link on the Resale earnings card.
+
+**Verified:** `tsc` · `vitest` **145/145** · `build` · Playwright **28/28**
+(incl. new `e2e/seller-payouts.spec.ts`, wire-mocked — asserts the exact POST
+body + `Idempotency-Key`). **Live drill (level B) PASSED:** seeded a verified
+destination + an `adjustment` balance for the drill seller, real `POST` →
+`201 pending`, list served it, balance moved to reserved; then cancelled the
+drill payout to restore the dev balance.
+
 ## Session 2026-10-02 — gap re-verification + frontend-fixable reclassifications
 
 **Backend source:** `digis_backend` @ `a5b9314` (upstream `ed6309a` + one
