@@ -49,8 +49,14 @@ Upstream added organizer/admin surfaces + one gap fix. **Only #42 was fixed** �
 the wallet now serves `resale_price_cap_minor`; wired in `tickets.ts` /
 `SellTicketSheet` (`priceCapMinor`). Everything else re-verified still open:
 #17, #56, #57, #53, #8, #9, #44, #54, #55, #46–#52, #58, #59, #60, #11, #36,
-#38. No migrations in the range → syncing the local backend to `ed6309a` is a
-plain fast-forward-ish merge (dev setup), not a DB rebuild.
+**Synced 2026-10-01:** the local backend is now at upstream `ed6309a` plus a
+single `chore(dev)` reapply commit (1 ahead / 0 behind). Product + schema code
+matches upstream exactly (`git diff origin -- app db/migrate db/structure.sql` is
+empty); the old local product commit `648d21d` is gone from the branch; dev
+setup + seeds preserved. Backup: `backup/pre-ed6309a-sync-20261002`. No
+migrations in the range → no DB rebuild. `docker compose restart web` done; the
+full frontend e2e is green and #42 is verified live (wallet serves
+`resale_price_cap_minor`).
 - **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38.
 - **Frontend wire-now obligations:** retire `registrationModule.rsvpRequestOtp`/
   `rsvpSubmit` (dead routes); the #41 "Discard & start fresh" `release` workaround is
