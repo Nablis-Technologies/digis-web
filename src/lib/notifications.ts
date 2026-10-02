@@ -94,6 +94,15 @@ export const notificationsStore = {
     notifications = next;
     emit();
   },
+  /** Wipe the inbox and the persisted copy. Called when signed out, so a guest
+   *  (or the next user on this device) never sees the previous user's inbox. */
+  clear() {
+    notifications = [];
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
+    }
+    listeners.forEach((l) => l());
+  },
 };
 
 /** React hook for reading the live notification list. */
@@ -152,14 +161,22 @@ function bodyFor(type: string, data: Record<string, unknown>): string {
   const event = typeof data.event_title === 'string' ? data.event_title : undefined;
   const label = typeof data.ticket_label === 'string' ? data.ticket_label : undefined;
   const amount = typeof data.amount_minor === 'number' ? data.amount_minor : undefined;
-  if (type === 'ticket_issued' || type === 'credential_replaced') {
-    return [event, label].filter(Boolean).join(' · ');
-  }
-  if (type === 'payment_succeeded' && amount != null) {
-    return `${event ?? 'Payment'} · ${Money.fromMinor(amount, 'ETB').format()}`;
+  // The backend `data` is a minimal, recipient-safe projection; only some types
+  // carry `event_title`/`ticket_label`. Fall back to a concrete line so a card
+  // never renders a blank body.
+  const context = [event, label].filter(Boolean).join(' · ');
+  if (type === 'ticket_issued') return context || 'Your ticket is ready.';
+  if (type === 'credential_replaced') return context || 'Your ticket was updated.';
+  if (type === 'payment_succeeded') {
+    return amount != null ? `${event ?? 'Payment'} · ${Money.fromMinor(amount, 'ETB').format()}` : 'Your payment was successful.';
   }
   if (type === 'payment_failed') return event ?? 'Your payment could not be processed.';
+  if (type === 'refund_succeeded') return event ?? 'Your refund has been issued.';
+  if (type === 'refund_failed') return event ?? 'Your refund could not be processed.';
   if (type === 'transfer_received') return event ?? 'A ticket was transferred to you.';
+  if (type === 'waitlist_offer_created') return 'A spot opened — claim it before it expires.';
+  if (type === 'waitlist_offer_expired') return 'The waitlist offer has expired.';
+  if (type === 'registration_rejected') return event ?? 'Your registration was not approved.';
   if (type === 'schedule_changed') return event ?? 'The event time has changed.';
   if (type === 'consent_reminder') return 'Confirm your details before the event.';
   return event ?? '';

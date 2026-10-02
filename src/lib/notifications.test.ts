@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiFetch } from '@/lib/api';
 import {
-  mapNotification, channelPreferences, fetchNotificationPreferences, updateChannelPreference,
+  mapNotification, channelPreferences, fetchNotificationPreferences, updateChannelPreference, notificationsStore,
   type NotificationWire, type NotificationPreferenceWire,
 } from '@/lib/notifications';
 
@@ -56,6 +56,22 @@ describe('mapNotification (#7 live inbox)', () => {
     const n = mapNotification(wire({ notification_type: 'payment_succeeded', data: { amount_minor: 102500 } }));
     expect(n.body).toContain('1,025');
     expect(n.body).toContain('ETB');
+  });
+
+  it('never renders a blank body for a known type whose data lacks event context', () => {
+    expect(mapNotification(wire({ notification_type: 'credential_replaced', data: {} })).body).toBe('Your ticket was updated.');
+    expect(mapNotification(wire({ notification_type: 'refund_succeeded', data: {} })).body).toBe('Your refund has been issued.');
+    expect(mapNotification(wire({ notification_type: 'waitlist_offer_created', data: {} })).body).toContain('spot opened');
+    expect(mapNotification(wire({ notification_type: 'payment_succeeded', data: {} })).body).toBe('Your payment was successful.');
+  });
+});
+
+describe('notificationsStore.clear (no cross-session leak)', () => {
+  it('empties the inbox so a signed-out session reads nothing', () => {
+    notificationsStore.push({ type: 'ticket', title: 'x', body: 'y' });
+    expect(notificationsStore.getSnapshot().length).toBeGreaterThan(0);
+    notificationsStore.clear();
+    expect(notificationsStore.getSnapshot()).toEqual([]);
   });
 });
 

@@ -65,6 +65,12 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
     notificationsStore.replace(liveNotifications);
   }, [liveNotifications, isAuthenticated]);
 
+  // The inbox is recipient-owned: a signed-out session must never read the
+  // previous user's persisted notifications.
+  useEffect(() => {
+    if (!isAuthenticated) notificationsStore.clear();
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (openMenu === 'none') return;
     const handler = (e: MouseEvent) => {
