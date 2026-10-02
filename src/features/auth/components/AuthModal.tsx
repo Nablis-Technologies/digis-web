@@ -140,7 +140,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     // is attached to the field it concerns. Name is collected here and sent to
     // the backend, which does not persist it yet (BACKEND_GAPS.md #8).
     const next: Record<string, string> = {};
-    if (!trimmedName) next.name = 'Enter your full name.';
+    if (!trimmedName) next.name = 'Enter your name.';
     if (!/^\+[1-9]\d{6,14}$/.test(e164)) next.phone = 'Enter a valid mobile number for the selected country.';
     // Email is optional (`Core::User` validates it with `allow_blank`), so only
     // shape-check it when the user supplies one.
@@ -506,7 +506,7 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
-          noFocusRing aria-invalid={error ? true : undefined}
+          aria-invalid={error ? true : undefined}
           style={{ ...inputStyle(isDark), paddingLeft: '10px' }}
         />
       </div>
@@ -530,7 +530,7 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
       </div>
       <FieldError error={error} />
     </div>
@@ -552,7 +552,7 @@ function EmailField({ value, onChange, isDark, onEnter, error }: { value: string
         <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Email (optional)" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
       </div>
       <FieldError error={error} />
     </div>
@@ -574,7 +574,7 @@ function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }:
         <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
+          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
         <AppButton type="button" onClick={() => setShow((s) => !s)} className="cursor-pointer flex-shrink-0" style={{ color: textDim }}>
           {show ? <EyeOff className="w-4 h-4" strokeWidth={1.75} /> : <Eye className="w-4 h-4" strokeWidth={1.75} />}
         </AppButton>

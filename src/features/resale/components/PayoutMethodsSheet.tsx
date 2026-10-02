@@ -241,7 +241,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
   const valid = Boolean(selected) && holderName.trim().length > 1 && accountNumber.trim().length >= 4;
   // Explain the disabled button per field once the user leaves the field.
   const holderError = touched.holderName && holderName.trim().length <= 1
-    ? "Enter the account holder's full name."
+    ? "Enter the account holder's name."
     : undefined;
   const accountError = touched.accountNumber && accountNumber.trim().length < 4
     ? (isPhone ? 'Enter a valid phone number.' : 'Enter a valid account number.')
@@ -315,7 +315,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
         <label className="text-[10px] tracking-[1.5px] uppercase mb-2 block" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
           Account holder name
         </label>
-        <AppInput value={holderName} onChange={e => setHolderName(e.target.value)} placeholder="Full name"
+        <AppInput value={holderName} onChange={e => setHolderName(e.target.value)} placeholder="Name"
           onBlur={() => setTouched(t => ({ ...t, holderName: true }))} error={holderError} errorClassName={FIELD_ERROR_CLASS}
           className="w-full h-[52px] rounded-2xl px-4 text-[14px] outline-none" style={inputStyle} />
       </div>

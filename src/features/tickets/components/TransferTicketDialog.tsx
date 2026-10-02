@@ -291,7 +291,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   <AppInput
                     ref={nameRef}
                     type="text"
-                    placeholder="Recipient's full name"
+                    placeholder="Recipient's name"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
                     onBlur={() => setTouched((t) => ({ ...t, name: true }))}
