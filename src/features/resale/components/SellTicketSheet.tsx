@@ -15,15 +15,22 @@ import { glassEdge } from '@/lib/ui/glass';
 export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false, error = null }: { ticket: UserTicket; onClose: () => void; onConfirm: (price: number) => void; submitting?: boolean; error?: string | null }) {
   const { isDark } = useTheme();
   const [step, setStep] = useState<'price' | 'confirm'>('price');
-  const [price, setPrice] = useState(2000);
+  // Resale policy from the wallet ticket_type projection (#25/#42 resolved).
+  // The served `priceCapMinor` is the maximum allowed asking price; default the
+  // input to it — always valid, server-provided, and for the standard 100% policy
+  // it is exactly what the buyer paid. Fall back to the fixed cap for a backend
+  // that predates the field. Compare in major units; never divide minor in a
+  // component.
+  const policy = ticket.resalePolicy;
+  const capMinor = policy?.priceCapMinor
+    ?? (policy?.capType === 'fixed' ? policy.fixedCapMinor : null);
+  const capMajor = capMinor != null ? Money.fromMinor(capMinor, 'ETB').toMajor() : null;
+  const [price, setPrice] = useState<number>(capMajor ?? 2000);
   const [payoutOpen, setPayoutOpen] = useState(false);
 
   const { data: payoutMethods = [], isPending, isError, refetch } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
   const showLoading = useShowSkeleton(isPending);
 
-  // Resale policy from the wallet ticket_type projection (#25 resolved).
-  // Anything the backend doesn't serve is treated as closed, never assumed open.
-  const policy = ticket.resalePolicy;
   const policyBlocked = policy && !policy.enabled;
   const cutoffPassed = (() => {
     if (!policy || !policy.cutoffSecondsBeforeStart) return false;
@@ -31,13 +38,6 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
     if (!starts) return false;
     return Date.now() >= new Date(starts).getTime() - policy.cutoffSecondsBeforeStart * 1000;
   })();
-  // #42 resolved: the backend now serves the computed cap (`priceCapMinor`),
-  // which resolves a percentage cap to an amount. Fall back to the fixed cap for
-  // a backend that predates the field. Compare in major units (the price input is
-  // major); never divide minor in a component.
-  const capMinor = policy?.priceCapMinor
-    ?? (policy?.capType === 'fixed' ? policy.fixedCapMinor : null);
-  const capMajor = capMinor != null ? Money.fromMinor(capMinor, 'ETB').toMajor() : null;
   const overCap = capMajor != null && price > capMajor;
   const blockedReason = policyBlocked
     ? 'Resale is disabled for this ticket.'
