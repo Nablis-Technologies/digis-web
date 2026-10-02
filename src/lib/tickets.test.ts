@@ -80,12 +80,14 @@ describe('mapWalletTicket — resale policy projection (#25)', () => {
       resale_fixed_cap_minor: 500000,
       resale_fixed_cap_currency: 'ETB',
       resale_percentage_cap_bps: null,
+      resale_price_cap_minor: 500000,
       resale_cutoff_seconds_before_start: 7200,
       max_completed_resales: 1,
     }));
     expect(t.resalePolicy).toEqual({
       enabled: true,
       capType: 'fixed',
+      priceCapMinor: 500000,
       fixedCapMinor: 500000,
       fixedCapCurrency: 'ETB',
       percentageCapBps: null,
@@ -93,6 +95,23 @@ describe('mapWalletTicket — resale policy projection (#25)', () => {
       maxCompletedResales: 1,
     });
     expect(t.eventStartsAt).toBe('2026-09-20T18:00:00.000Z');
+  });
+
+  it('maps the server-computed cap for a percentage policy (#42 resolved)', () => {
+    const t = mapWalletTicket(wire({
+      id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr',
+      resale_enabled: true,
+      resale_price_cap_type: 'percentage',
+      resale_fixed_cap_minor: null,
+      resale_fixed_cap_currency: null,
+      resale_percentage_cap_bps: 10000,
+      resale_price_cap_minor: 600000,
+      resale_cutoff_seconds_before_start: 0,
+      max_completed_resales: 1,
+    }));
+    expect(t.resalePolicy?.capType).toBe('percentage');
+    expect(t.resalePolicy?.percentageCapBps).toBe(10000);
+    expect(t.resalePolicy?.priceCapMinor).toBe(600000);
   });
 
   it('renders resalePolicy absent when the backend omits it (never assumed open)', () => {
@@ -108,9 +127,11 @@ describe('mapWalletTicket — resale policy projection (#25)', () => {
       resale_fixed_cap_minor: null,
       resale_fixed_cap_currency: null,
       resale_percentage_cap_bps: null,
+      resale_price_cap_minor: null,
     }));
     expect(t.resalePolicy?.enabled).toBe(false);
     expect(t.resalePolicy?.capType).toBeNull();
+    expect(t.resalePolicy?.priceCapMinor).toBeNull();
     expect(t.resalePolicy?.fixedCapMinor).toBeNull();
     expect(t.resalePolicy?.percentageCapBps).toBeNull();
   });

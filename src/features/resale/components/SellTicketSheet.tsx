@@ -31,12 +31,14 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
     if (!starts) return false;
     return Date.now() >= new Date(starts).getTime() - policy.cutoffSecondsBeforeStart * 1000;
   })();
-  // Fixed cap is the only cap expressible without a face value on the wallet wire.
-  // Compare in major units (the price input is major); never divide minor in a component.
-  const fixedCapMajor = policy?.capType === 'fixed' && policy.fixedCapMinor != null
-    ? Money.fromMinor(policy.fixedCapMinor, 'ETB').toMajor()
-    : null;
-  const overCap = fixedCapMajor != null && price > fixedCapMajor;
+  // #42 resolved: the backend now serves the computed cap (`priceCapMinor`),
+  // which resolves a percentage cap to an amount. Fall back to the fixed cap for
+  // a backend that predates the field. Compare in major units (the price input is
+  // major); never divide minor in a component.
+  const capMinor = policy?.priceCapMinor
+    ?? (policy?.capType === 'fixed' ? policy.fixedCapMinor : null);
+  const capMajor = capMinor != null ? Money.fromMinor(capMinor, 'ETB').toMajor() : null;
+  const overCap = capMajor != null && price > capMajor;
   const blockedReason = policyBlocked
     ? 'Resale is disabled for this ticket.'
     : cutoffPassed
@@ -104,22 +106,21 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                       style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
                       {Money.fromMajor(price, 'ETB').format()}
                     </p>
-                    {overCap && fixedCapMajor != null && (
-                      <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
-                        Max {Money.fromMinor(policy!.fixedCapMinor!, 'ETB').format()} (resale cap)
+                    {capMinor != null && (
+                      <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: overCap ? '#e5484d' : (isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)') }}>
+                        Max {Money.fromMinor(capMinor, 'ETB').format()} (resale cap)
                       </p>
                     )}
-                    {/* The wallet carries the policy but not the value a
-                        percentage cap is computed from, so we can only state
-                        the rule — the backend enforces the ceiling. */}
-                    {!overCap && policy?.capType === 'percentage' && policy.percentageCapBps != null && (
+                    {/* Older backend without the computed cap: state the rule only
+                        — the backend enforces the ceiling. */}
+                    {capMinor == null && policy?.capType === 'percentage' && policy.percentageCapBps != null && (
                       <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }}>
                         Capped at {Math.round(policy.percentageCapBps / 100)}% of your purchase price
                       </p>
                     )}
                   </div>
                   <AppButton whileTap={{ scale: 0.9 }}
-                    onClick={() => setPrice(p => (fixedCapMajor != null ? Math.min(fixedCapMajor, p + 100) : p + 100))}
+                    onClick={() => setPrice(p => (capMajor != null ? Math.min(capMajor, p + 100) : p + 100))}
                     disabled={Boolean(blockedReason) || overCap}
                     className="relative w-12 h-12 rounded-full overflow-hidden flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
                     style={{

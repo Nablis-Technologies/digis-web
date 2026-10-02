@@ -400,6 +400,8 @@ export interface TicketWalletWire {
     resale_fixed_cap_minor?: number | null;
     resale_fixed_cap_currency?: string | null;
     resale_percentage_cap_bps?: number | null;
+    /** Server-computed cap in minor units (#42 resolved upstream 2026-09-30). */
+    resale_price_cap_minor?: number | null;
     resale_cutoff_seconds_before_start?: number;
     max_completed_resales?: number;
   } | null;
@@ -476,6 +478,7 @@ export function mapWalletTicket(w: TicketWalletWire): UserTicket {
           resalePolicy: {
             enabled: tt.resale_enabled,
             capType: (tt.resale_price_cap_type as 'none' | 'percentage' | 'fixed' | null) ?? null,
+            priceCapMinor: tt.resale_price_cap_minor ?? null,
             fixedCapMinor: tt.resale_fixed_cap_minor ?? null,
             fixedCapCurrency: tt.resale_fixed_cap_currency ?? null,
             percentageCapBps: tt.resale_percentage_cap_bps ?? null,

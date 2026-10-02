@@ -38,6 +38,9 @@ export interface UserTicket {
   resalePolicy?: {
     enabled: boolean;
     capType: 'none' | 'percentage' | 'fixed' | null;
+    /** Server-computed maximum asking price in minor units (#42 resolved
+     *  2026-09-30) — resolves a percentage cap to an amount. Null until served. */
+    priceCapMinor: number | null;
     fixedCapMinor: number | null;
     fixedCapCurrency: string | null;
     percentageCapBps: number | null;
