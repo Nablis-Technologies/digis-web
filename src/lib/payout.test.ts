@@ -57,7 +57,7 @@ describe('payoutService reads (live API, mocked HTTP)', () => {
       ],
     } as never);
     const banks = await payoutService.fetchBanks();
-    expect(mockedApiFetch).toHaveBeenCalledWith('marketplace/seller/payout_accounts/banks');
+    expect(mockedApiFetch).toHaveBeenCalledWith('marketplace/seller/payout_accounts/destinations');
     expect(banks[0]).toEqual({ bankSlug: 'link', bankName: 'Link', type: 'store_value', minAmount: 100, maxAmount: 5000000 });
     // Optional bounds are omitted, never defaulted.
     expect(banks[1]).toEqual({ bankSlug: 'cbe', bankName: 'Commercial Bank of Ethiopia', type: 'bank' });

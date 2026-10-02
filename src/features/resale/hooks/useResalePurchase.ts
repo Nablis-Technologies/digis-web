@@ -43,12 +43,6 @@ export function useResalePurchase(): UseResalePurchase {
         eventId: order.event_id,
       });
       if (payment && payment.status === 'processing' && payment.checkout_url) {
-        try {
-          sessionStorage.setItem(
-            `digis:payment-url:${order.id}`,
-            JSON.stringify({ url: payment.checkout_url, at: Date.now() }),
-          );
-        } catch { /* storage unavailable — resume link just won't exist */ }
         openHostedCheckout(order.id, payment.checkout_url);
         return;
       }

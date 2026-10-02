@@ -1,8 +1,8 @@
 /**
  * Seller payout destinations — mirrors digis_backend's seller payout
  * accounts (all mutations require Idempotency-Key, auto-injected):
- *   - GET  /marketplace/seller/payout_accounts        → own destinations
- *   - GET  /marketplace/seller/payout_accounts/banks  → provider-supported rails
+ *   - GET  /marketplace/seller/payout_accounts        → own registered accounts
+ *   - GET  /marketplace/seller/payout_accounts/destinations → provider rails
  *   - POST /marketplace/seller/payout_accounts        → verify + register one
  *
  * Backend contract notes the UI must respect:
@@ -84,13 +84,13 @@ export const payoutService = {
   },
 
   /**
-   * GET /marketplace/seller/payout_accounts/banks — the provider's supported
-   * destinations for this market. The add form renders exactly these; nothing
-   * is hardcoded, so test vs live rails follow the provider.
+   * GET /marketplace/seller/payout_accounts/destinations — the provider's
+   * supported rails for this market. The add form renders exactly these;
+   * nothing is hardcoded, so test vs live rails follow the provider.
    */
   async fetchBanks(): Promise<PayoutBank[]> {
     const { data } = await apiFetch<Array<{ bank_slug: string; bank_name: string; type: string; min_amount?: number; max_amount?: number }>>(
-      'marketplace/seller/payout_accounts/banks',
+      'marketplace/seller/payout_accounts/destinations',
     );
     return (Array.isArray(data) ? data : []).map((bank) => ({
       bankSlug: bank.bank_slug,
