@@ -9,3 +9,4 @@ export type { CheckoutOrder, CheckoutStep, PaymentMethod, ContactDetails, Checko
 export type { ResaleListing } from './resale';
 export type { PayoutMethod, PayoutMethodKind, PayoutBank, AddPayoutMethodInput } from './payout';
 export type { SellerBalance, SellerLedgerEntry } from './seller-reports';
+export type { SellerPayout, RequestPayoutInput } from './seller-payouts';

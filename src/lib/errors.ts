@@ -111,6 +111,17 @@ const CODE_MESSAGES: Record<string, string> = {
   payout_account_not_found: 'That payout account could not be found.',
   payout_account_conflict: 'This destination is already registered.',
   payout_account_invalid: 'This destination could not be saved — check the details and try again.',
+  // Seller payout withdrawals (Marketplace::SellerPayouts) — verified against the
+  // backend locale (f679e56). The `seller_payout_not_matured` /
+  // `seller_payout_event_scope_invalid` codes were removed upstream.
+  seller_payout_account_required: 'Add a verified payout destination before you can cash out.',
+  seller_payout_currency_invalid: 'That currency isn’t supported for payouts.',
+  seller_payout_amount_invalid: 'Enter a valid amount to cash out.',
+  seller_payout_seller_ineligible: 'Your account isn’t eligible for payouts.',
+  seller_payout_source_not_found: 'The balance for this payout could not be found.',
+  seller_payout_balance_not_positive: 'You have no available balance to cash out.',
+  seller_payout_replay_missing: 'Something went wrong completing this payout — please try again.',
+  seller_payout_not_dispatchable: 'This payout isn’t ready to be sent yet.',
   // Resale listings (Marketplace) — verified against the backend locale.
   resale_disabled: 'Resale is not enabled for this ticket type.',
   asking_amount_exceeds_cap: 'That price is above this event’s resale cap — lower your asking price and try again.',

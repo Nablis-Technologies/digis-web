@@ -37,6 +37,14 @@ describe('resale + payout error copy', () => {
       'payout_account_not_found',
       'payout_account_conflict',
       'payout_account_invalid',
+      'seller_payout_account_required',
+      'seller_payout_currency_invalid',
+      'seller_payout_amount_invalid',
+      'seller_payout_seller_ineligible',
+      'seller_payout_source_not_found',
+      'seller_payout_balance_not_positive',
+      'seller_payout_replay_missing',
+      'seller_payout_not_dispatchable',
     ];
     for (const code of codes) {
       const copy = messageForCode(code, 'FALLBACK');
