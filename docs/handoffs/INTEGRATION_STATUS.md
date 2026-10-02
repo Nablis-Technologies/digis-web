@@ -43,6 +43,14 @@ is gone; an event is a container of offers. Retired: `POST /public/events/:slug/
   #59 (no invitation link format/delivery → `audience=invitation` offers are
   unbuyable end-to-end), #60 (Chapa amount sent in minor units = 100× too large →
   large orders fail with Chapa's max-amount error).
+
+**Gap re-sweep 2026-10-01 (backend advanced `326f6a3 → ed6309a`, 9 commits).**
+Upstream added organizer/admin surfaces + one gap fix. **Only #42 was fixed** —
+the wallet now serves `resale_price_cap_minor`; wired in `tickets.ts` /
+`SellTicketSheet` (`priceCapMinor`). Everything else re-verified still open:
+#17, #56, #57, #53, #8, #9, #44, #54, #55, #46–#52, #58, #59, #60, #11, #36,
+#38. No migrations in the range → syncing the local backend to `ed6309a` is a
+plain fast-forward-ish merge (dev setup), not a DB rebuild.
 - **Still open:** #17, #8, #9, #42, #44, #46–#52, #11, #36, #38.
 - **Frontend wire-now obligations:** retire `registrationModule.rsvpRequestOtp`/
   `rsvpSubmit` (dead routes); the #41 "Discard & start fresh" `release` workaround is

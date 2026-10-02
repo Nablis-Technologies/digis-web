@@ -95,7 +95,7 @@
 | 53 | open — blocking | public event payload drops `age_restriction` / `lineup` / `seat_map` / `featured` / `rating` (config now `%w[public_guest_limit]`) |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
-| 42 | open — degrading | wallet resale policy omits the percentage-cap basis → the seller can't know the max asking price |
+| 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
 | 54 | open — degrading | no discovery availability — `GET /public/events` has no `sold_out` / per-offer `available` (products are per-event) |
 | 55 | open — degrading | `EventDetailSerializer` has no `price_from_minor` (only the list serializer does) |
@@ -440,7 +440,7 @@ released order no longer burns the registration for a retry. **Frontend done
 was retired** (the direct `register`/`guestRegister` methods went with the
 `admission_selections` migration too).
 
-### #42. Wallet resale policy omits the value a percentage cap is computed from
+### #42. Wallet resale policy omits the value a percentage cap is computed from — RESOLVED 2026-10-01
 
 `Ticketing::TicketWalletSerializer` projects the resale policy
 (`resale_enabled`, `resale_price_cap_type`, `resale_fixed_cap_minor`,
@@ -464,7 +464,13 @@ resolved `resale_price_cap_minor`. A resolved cap keeps the money math
 server-side (the Marketplace-owned `CalculatePriceCap`), which the module
 dependency rules require, since Ticketing must not depend on Marketplace.
 
-**Status: open — verified 2026-09-18 (live 422/201 pair + serializer read).**
+**Status: resolved 2026-10-01** — `Ticketing::TicketWalletSerializer` now serves
+`resale_price_cap_minor`, the cap resolved server-side through
+`Marketplace::CalculatePriceCap` (`d7aa4ff`, upstream `ed6309a`; gated to active
+paid tickets in the event currency). **Frontend wired:** `tickets.ts` maps it to
+`resalePolicy.priceCapMinor`; `SellTicketSheet` now enforces/displays the resolved
+amount for both fixed and percentage caps (falling back to the old percent-rule
+text only when the field is absent).
 
 ### #39. No public endpoint exposing payout `bank_slug`s
 
