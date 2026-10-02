@@ -946,7 +946,10 @@ defaults `SellTicketSheet`'s price to it.
 (`cap × 10000 / bps`), not for a `fixed` cap, and that would be frontend money
 math — so a served field is the right fix.
 
-**Status: open — filed 2026-10-01 (frontend wiring audit).**
+**Status: open — filed 2026-10-01 (frontend wiring audit). Frontend mitigation
+(2026-10-01): `SellTicketSheet` now defaults the asking price to
+`resale_price_cap_minor` — exact for the standard 100% policy, the max otherwise.
+The served acquisition price is still wanted for non-100% caps.**
 
 ### #49 addendum — no city aggregation
 
