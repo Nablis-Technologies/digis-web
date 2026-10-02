@@ -28,7 +28,7 @@ test('gmail buyer buys convention pass and hits chapa', async ({ page }) => {
   await loginThroughUi(page);
   await page.goto('/events/death-note-anime-convention');
   await expect(page.getByRole('heading', { name: 'Select Your Ticket' })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('heading', { name: 'Convention Pass' }).first().click({ force: true });
+  await page.getByRole('heading', { name: 'Regular' }).first().click({ force: true });
   await page.getByRole('button', { name: /Buy Now/i }).click();
   await expect(page.getByText('Review', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
 

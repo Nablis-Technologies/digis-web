@@ -2,10 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 
 const BUYER = '+251900123456';
 const PASS = 'password123';
-// Seed-drift note (2026-09-07): the second avenida event is gone — one remains,
-// titled with a colon — and its only ticket tier is now 'Final Wave'. Verified
-// against GET /public/events before running; update these if the seed changes.
-const EVENT_SLUG = 'avenida-desperados-pregame-edition';
+// Seed-drift note (2026-10-02): there are TWO avenida events now. The first
+// (`avenida-desperados-pregame-edition`) is a past event selling only `Early
+// Bird`; the sellable one is the deduped `-2` with tier `Final Wave`. Verified
+// against GET /public/events + products before running; update if the seed changes.
+const EVENT_SLUG = 'avenida-desperados-pregame-edition-2';
 const TIER = 'Final Wave';
 
 async function login(page: Page) {

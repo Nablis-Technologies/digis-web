@@ -1,8 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const API = 'http://localhost:3000';
-// Seeded verified attendee with active paid tickets in the wallet.
-const BUYER = '+251900123456';
+// The `attendee` fixture (db/seeds/preview.rb) is seeded with an active paid
+// ticket on the preserved `chapa-test-event` — unlike the plain buyer, who has
+// no seeded ticket (the mock-mirror purges registrations/tickets on reseed).
+const BUYER = '+251911000003';
 const BUYER_PASSWORD = 'password123';
 
 async function loginThroughUi(page: Page, identifier: string) {
