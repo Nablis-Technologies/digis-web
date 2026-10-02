@@ -125,6 +125,7 @@
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
 | 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
 | 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
+| 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -413,6 +414,46 @@ minor before changing it. Add a request-shaping test asserting the initialize
 payload amount for a known `amount_minor`.
 
 **Status: open — filed 2026-10-01 (live repro on the Chapa hosted page).**
+
+### #65. Seller payout dispatch is rejected by the provider (`invalid_format`) — no payout ever succeeds
+
+The seller payout **API** works end-to-end (create → `pending`, list/show), but the
+**dispatch** (`Marketplace::DispatchSellerPayoutJob` → `Marketplace::DispatchSellerPayout`
+→ `Marketplace::PayoutProviders::ChapaAdapter#payout`) always ends in provider
+rejection. The payout reaches a terminal `failed` with `failure_code` from Chapa.
+
+**Live drill 2026-10-02 (real backend `f679e56`, `CHAPA_ENABLED=true` +
+`CHAPA_PAYOUT_ENABLED=true`, `CHAPA_MODE=test`):** a seller with a verified
+destination (`bank_slug: "test"`, "Test Bank" — the only rail the test provider
+`GET …/payout_accounts/destinations` returns) and a positive balance:
+`POST /marketplace/seller/payouts` → `pending` → (worker) `processing` → **`failed`,
+`failure_code: "invalid_format"`**, `provider_reference: null`. Reproduced twice
+(after correcting the rail from `cbe` → `test`, the code moved `invalid_value` →
+`invalid_format`). **No payout has ever reached `succeeded`.**
+
+**Evidence:**
+- Payload the client sends (`app/services/finance/payout_providers/chapa_payout_client.rb:21-38`):
+  `amount: integer_amount(request.fetch(:amount_minor))` — the **raw minor integer**,
+  unchanged (`:161-165`) — plus a nested `account: { account_number, account_name,
+  bank_slug }`.
+- `failure_code_for` (`:126-134`) passes the provider's `data.reason` / `error.code`
+  through, so `invalid_format` is **Chapa's own error code**.
+- Balance is correctly released on failure (the reservation is dropped).
+
+**Hypothesis (needs backend/provider confirmation):** the same minor-vs-major family
+as **#60** (the amount is posted 100× / in the wrong unit), and/or the payout payload
+field names don't match Chapa's V2 payouts contract. It may also be a test-mode
+capability/funding limitation — the existing tracker note (G-26) already says
+test-mode payout *transfer* evidence was still outstanding.
+
+**Why it blocks:** the payout feature can create and track a payout but the money can
+never move; the frontend can only render the resulting `failed` state.
+
+**Fix:** align the Chapa V2 payout request with the provider contract (amount unit +
+field names) and obtain a `succeeded` test-mode payout as evidence; add a
+request-shaping test asserting the `/v2/payouts` payload.
+
+**Status: open — filed 2026-10-02 (live drill; provider returns `invalid_format`).**
 
 ## Open — degrading
 

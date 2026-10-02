@@ -37,8 +37,15 @@ commit on top (`80e5549`); no DB migration; `web` restarted. Plan:
 (incl. new `e2e/seller-payouts.spec.ts`, wire-mocked — asserts the exact POST
 body + `Idempotency-Key`). **Live drill (level B) PASSED:** seeded a verified
 destination + an `adjustment` balance for the drill seller, real `POST` →
-`201 pending`, list served it, balance moved to reserved; then cancelled the
-drill payout to restore the dev balance.
+`201 pending`, list served it, balance moved to reserved.
+
+**Live drill (level C) — ran, ends at a provider rejection → filed #65.** With
+the worker + `CHAPA_ENABLED`/`CHAPA_PAYOUT_ENABLED=true`, the payout went
+`pending → processing → failed` (`failure_code: invalid_format` from Chapa;
+`provider_reference: null`); the balance was released. The only test rail
+(`bank_slug: "test"`) still fails, so **no payout reaches `succeeded`** — a
+backend/provider gap (likely the amount unit, the same family as #60, and/or the
+payout payload field names). The frontend correctly renders the `failed` state.
 
 ## Session 2026-10-02 — gap re-verification + frontend-fixable reclassifications
 
