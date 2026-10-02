@@ -121,6 +121,7 @@
 | 59 | open — blocking | no invitation link format and no dev sender → an `audience=invitation` offer is unbuyable end-to-end |
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
+| 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -871,6 +872,27 @@ ticket" in the app. Today they see nothing.
    even when SMS/email isn't configured.
 
 **Status: open — filed 2026-10-01 (dev-DB audit).**
+
+### #62. A pending (unaccepted) outgoing transfer is invisible on the sender's wallet ticket
+
+`Ticketing::Transfers::Initiate` deliberately keeps the ticket owned and
+`active` until the recipient accepts ("Pending transfers do not change ownership
+or credentials; only authenticated recipient acceptance does"). So for the whole
+7-day window the sender's wallet still shows the ticket — but **nothing marks it
+as "transfer pending"**: `Ticketing::TicketWalletSerializer` projects no transfer
+state (no `pending_transfer`), and the ticket status stays `active`.
+
+**Why it degrades:** the sender sees a normal-looking, still-usable ticket and
+can't tell a transfer is outstanding. They may resell/scan it (resale is blocked
+server-side with `pending_transfer`, but the QR/use path and the UI give no
+hint), and once the recipient accepts the credential is replaced under them.
+
+**Fix:** expose the pending-transfer state on the wallet ticket — e.g.
+`pending_transfer: { id, to_user_id, expires_at }` (null when none) — so the UI
+can render "Transfer pending" and gate transfer/resale/QR for that ticket. The
+data already exists (`ticket.ticket_transfers.pending`); it just isn't projected.
+
+**Status: open — filed 2026-10-01 (reported by the user; code read).**
 
 ### #49 addendum — no city aggregation
 
