@@ -123,7 +123,7 @@
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
 | 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
-| 64 | open — degrading | wallet ticket omits the acquisition (sold) price → the resale sheet can't default the asking price to what the buyer paid |
+| 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -925,7 +925,7 @@ can't carry add-ons, so "ticket + parking" is un-buyable in one order.
 
 **Status: open — filed 2026-10-01 (frontend wiring audit).**
 
-### #64. Wallet ticket omits the acquisition (sold) price → the resale default can't be "what you paid"
+### #64. Wallet ticket omits the acquisition (sold) price — RESOLVED 2026-10-01 (no longer needed)
 
 `Ticketing::TicketWalletSerializer#resale_policy` computes the cap from
 `object.current_acquisition_product_value_minor` (`calculate_resale_price_cap_minor`,
@@ -946,10 +946,12 @@ defaults `SellTicketSheet`'s price to it.
 (`cap × 10000 / bps`), not for a `fixed` cap, and that would be frontend money
 math — so a served field is the right fix.
 
-**Status: open — filed 2026-10-01 (frontend wiring audit). Frontend mitigation
-(2026-10-01): `SellTicketSheet` now defaults the asking price to
-`resale_price_cap_minor` — exact for the standard 100% policy, the max otherwise.
-The served acquisition price is still wanted for non-100% caps.**
+**Status: resolved 2026-10-01 — no backend change needed.** The frontend no longer
+needs the acquisition field: `SellTicketSheet` defaults the asking price to the
+served `resale_price_cap_minor` (the maximum allowed price), which is a valid,
+server-provided default and equals the paid price under the standard 100% policy.
+For non-100% caps the default is the cap (the max) rather than the exact paid
+price — acceptable, and not worth a backend field.
 
 ### #49 addendum — no city aggregation
 

@@ -46,8 +46,8 @@ is gone; an event is a container of offers. Retired: `POST /public/events/:slug/
   is invisible in-app — no notification on initiation, no incoming-transfers list),
   #62 (a pending outgoing transfer is invisible on the sender's wallet ticket —
   it still looks active), #63 (`admission_selections` is ticket-only → a ticket +
-  extra cart fails at Pay), #64 (wallet omits the acquisition price → resale
-  sheet can't default to it).
+  extra cart fails at Pay). (#64 was filed then **resolved** the same day: the
+  resale default now uses the served `resale_price_cap_minor`.)
 
 **Gap re-sweep 2026-10-01 (backend advanced `326f6a3 → ed6309a`, 9 commits).**
 Upstream added organizer/admin surfaces + one gap fix. **Only #42 was fixed** —
