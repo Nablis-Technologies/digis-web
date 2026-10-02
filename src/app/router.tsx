@@ -15,6 +15,7 @@ import { EventDetail } from '@/features/event-detail/pages/EventDetailPage';
 import { UserProfile } from '@/features/profile/pages/ProfilePage';
 import { SettingsView } from '@/features/profile/pages/SettingsPage';
 import { ResaleMarketplace } from '@/features/resale/pages/ResalePage';
+import { PayoutsView } from '@/features/payouts/pages/PayoutsPage';
 import { resaleModule } from '@/lib/resale';
 import { ClaimTicketPage } from '@/features/tickets/pages/ClaimTicketPage';
 import { UIPreviewPage } from '@/features/ui-preview/pages/UIPreviewPage';
@@ -29,7 +30,7 @@ import { usePageTitle } from '@/lib/usePageTitle';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 import { AppButton } from '@/components/primitives/AppButton';
 
-export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings';
+export type AppView = 'discover' | 'tickets' | 'profile' | 'create' | 'resale' | 'settings' | 'payouts';
 
 export const VIEW_PATHS: Record<AppView, string> = {
   discover: '/',
@@ -38,6 +39,7 @@ export const VIEW_PATHS: Record<AppView, string> = {
   create: '/create',
   resale: '/resale',
   settings: '/settings',
+  payouts: '/payouts',
 };
 
 export function eventPath(event: Event): string {
@@ -59,6 +61,7 @@ export function pathToView(pathname: string): AppView {
   if (pathname === '/create') return 'create';
   if (pathname === '/resale' || pathname.startsWith('/resale/')) return 'resale';
   if (pathname === '/settings') return 'settings';
+  if (pathname === '/payouts') return 'payouts';
   return 'discover';
 }
 
@@ -147,6 +150,7 @@ function AppContent() {
       currentView === 'resale' ? (resaleEventSlug ? 'Resale listing' : 'Resale') :
       currentView === 'profile' ? 'Profile' :
       currentView === 'settings' ? 'Settings' :
+      currentView === 'payouts' ? 'Payouts' :
       'Discover events';
     return `${name} · Digis`;
   }, [selectedEvent, currentView, ticketId, resaleEventSlug]));
@@ -571,12 +575,19 @@ function AppContent() {
                   selectedEventSlug={resaleEventSlug}
                   onOpenEvent={(slug) => navigate(`/resale/events/${encodeURIComponent(slug)}`)}
                   onCloseEvent={() => navigate('/resale')}
+                  onOpenPayouts={() => navigate('/payouts')}
                 />
               ) : currentView === 'settings' ? (
                 <SettingsView
                   onBack={() => navigateToView('profile')}
                   onRequestAuth={requestAuth}
                 />
+              ) : currentView === 'payouts' ? (
+                isAuthenticated ? (
+                  <PayoutsView onBack={() => navigateToView('profile')} />
+                ) : (
+                  <SignInGate isDark={isDark} onSignIn={requestAuth} />
+                )
               ) : null}
             </motion.div>
           )}
@@ -855,6 +866,7 @@ export function AppRouterProvider() {
       { path: '/resale/listings/:listingId', Component: ResaleListingRedirect },
       { path: '/create', Component: CreateRedirect },
       { path: '/settings', Component: AppContent },
+      { path: '/payouts', Component: AppContent },
       { path: '/login', Component: AuthLoginRoute },
       { path: '/signup', Component: AuthSignupRoute },
       { path: '/claim/:id', Component: ClaimRoute },

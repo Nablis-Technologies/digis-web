@@ -43,12 +43,14 @@ interface ResaleMarketplaceProps {
   selectedEventSlug?: string | null;
   onOpenEvent?: (slug: string) => void;
   onCloseEvent?: () => void;
+  /** Opens the dedicated payouts/cash-out page (`/payouts`). */
+  onOpenPayouts?: () => void;
 }
 
 /* ═══════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════ */
-export function ResaleMarketplace({ userTickets, initialListTicket, selectedEventSlug = null, onOpenEvent, onCloseEvent }: ResaleMarketplaceProps) {
+export function ResaleMarketplace({ userTickets, initialListTicket, selectedEventSlug = null, onOpenEvent, onCloseEvent, onOpenPayouts }: ResaleMarketplaceProps) {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -943,6 +945,16 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       )}
                     </div>
                   </div>
+
+                  {onOpenPayouts && sellerBalance.some((b) => b.availableMinor > 0) && (
+                    <AppButton whileTap={{ scale: 0.98 }} onClick={onOpenPayouts}
+                      className="relative z-10 w-full h-[44px] mt-3 rounded-xl flex items-center justify-center cursor-pointer"
+                      style={{ background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(109,40,217,0.06)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.28)' : 'rgba(109,40,217,0.22)'}` }}>
+                      <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#6d28d9' }}>
+                        Cash out
+                      </span>
+                    </AppButton>
+                  )}
 
                   {sellerHistory.length > 0 ? (
                     <div className="relative z-10 mt-3 pt-3 space-y-2.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
