@@ -120,6 +120,7 @@
 | 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
 | 59 | open — blocking | no invitation link format and no dev sender → an `audience=invitation` offer is unbuyable end-to-end |
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
+| 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -835,6 +836,41 @@ hosted page) or **Restart**.
 `config/routes.rb` (orders member-only).
 
 **Status: open — filed 2026-09-30 (frontend does not change backend code).**
+
+### #61. A pending ticket transfer is invisible to the recipient in-app
+
+When a sender initiates a transfer, the recipient is identified (`transfer.to_user`)
+and the ticket is held `pending`, but there is **no in-app signal and no way to
+list it**:
+
+- The only notification is `transfer_received`, produced by the messaging handler
+  for `ticketing.ticket_transfer.accepted` — i.e. **only after the recipient
+  accepts**. `ticketing.ticket_transfer.initiated` is not in
+  `Messaging::OutboxHandlers::PublishTransactionalNotification::EVENT_TYPES`.
+- The initiation signal is the claim link sent by `Ticketing::TicketTransferDeliveryJob`
+  through the SMS/email adapters — in dev the messaging provider registry holds
+  **only `in_app`**, so no link is sent.
+- There is **no endpoint to list incoming transfers**: `config/routes.rb` exposes
+  `resources :transfers, only: :create` plus member `accept`/`decline`/`cancel`
+  and the public token routes — no index scoped to `to_user`.
+
+**Evidence (dev DB 2026-10-01):** one transfer `pending` to `+251900123456`
+(verified account, has password, token present), yet zero `transfer_received`
+notifications exist. A logged-in, verified recipient has no way to discover or
+accept the transfer without the (undelivered) link.
+
+**Why it degrades:** the recipient reasonably expects to see "someone sent you a
+ticket" in the app. Today they see nothing.
+
+**Fix (pick one/and):**
+1. Add `GET /tickets/transfers?status=pending` scoped to `to_user` so the wallet
+   can show incoming transfers (the recipient is already the resolved owner, so
+   this needs no secret token).
+2. Emit an in-app notification on `ticketing.ticket_transfer.initiated`
+   (recipient = `to_user`) with an accept action, so the recipient is notified
+   even when SMS/email isn't configured.
+
+**Status: open — filed 2026-10-01 (dev-DB audit).**
 
 ### #49 addendum — no city aggregation
 

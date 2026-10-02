@@ -42,7 +42,8 @@ is gone; an event is a container of offers. Retired: `POST /public/events/:slug/
 - **Filed later 2026-10-01:** #58 (`active_checkout_exists` 409 has no order id),
   #59 (no invitation link format/delivery → `audience=invitation` offers are
   unbuyable end-to-end), #60 (Chapa amount sent in minor units = 100× too large →
-  large orders fail with Chapa's max-amount error).
+  large orders fail with Chapa's max-amount error), #61 (a pending ticket transfer
+  is invisible in-app — no notification on initiation, no incoming-transfers list).
 
 **Gap re-sweep 2026-10-01 (backend advanced `326f6a3 → ed6309a`, 9 commits).**
 Upstream added organizer/admin surfaces + one gap fix. **Only #42 was fixed** —
