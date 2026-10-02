@@ -274,21 +274,17 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
         <div className="flex items-center justify-between gap-2 mt-1.5">
           <div className="flex items-center gap-1.5 text-[10.5px] min-w-0"
             style={{ fontFamily: "'Inter', sans-serif", color: isDark ? `rgba(${accentRgb}, 0.6)` : mutedInk }}>
-            {!soldOut && (
-              <span className="flex-shrink-0">{type.available} left</span>
-            )}
-            {admitsMultiple && (
-              <>
-                {!soldOut && <span style={{ opacity: 0.4 }}>·</span>}
-                <span className="flex-shrink-0">Admits {admissionsPerUnit}</span>
-              </>
-            )}
-            {type.features?.length > 0 && (
-              <>
-                {!soldOut && <span style={{ opacity: 0.4 }}>·</span>}
-                <span className="truncate min-w-0">{type.features[0].text}</span>
-              </>
-            )}
+            {/* No remaining count is fabricated: the backend serves only an
+                `available` boolean (#54), so a tier never prints a fake "N left". */}
+            {[
+              admitsMultiple ? `Admits ${admissionsPerUnit}` : null,
+              type.features?.[0]?.text ?? null,
+            ].filter((text): text is string => !!text).map((text, i) => (
+              <React.Fragment key={text}>
+                {i > 0 && <span style={{ opacity: 0.4 }}>·</span>}
+                <span className="truncate min-w-0">{text}</span>
+              </React.Fragment>
+            ))}
           </div>
           {type.features?.length > 1 && (
             <AppButton

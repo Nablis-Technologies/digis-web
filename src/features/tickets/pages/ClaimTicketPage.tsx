@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -57,6 +57,12 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
   // guests prove the phone with an OTP. "Not your account?" falls back to guest.
   const [mode, setMode] = useState<'auth' | 'guest'>(isAuthenticated ? 'auth' : 'guest');
   const [accepting, setAccepting] = useState(false);
+  // Signing in on this page switches to the one-tap accept — unless the visitor
+  // deliberately chose to claim with a different (recipient) phone.
+  const choseGuestRef = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && !choseGuestRef.current) setMode('auth');
+  }, [isAuthenticated]);
 
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
@@ -315,7 +321,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                     )}
                   </AppButton>
                   <button
-                    onClick={() => { setMode('guest'); setError(''); }}
+                    onClick={() => { choseGuestRef.current = true; setMode('guest'); setError(''); }}
                     className="mt-3 w-full text-center text-[11.5px] cursor-pointer"
                     style={{ fontFamily: "'Inter', sans-serif", color: textDim }}
                   >
@@ -324,6 +330,21 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                 </>
               ) : step === 'phone' ? (
                 <>
+                  {!isAuthenticated && (
+                    <>
+                      <AppButton
+                        onClick={onRequestAuth}
+                        className="mt-4 w-full py-3.5 rounded-full flex items-center justify-center gap-2 cursor-pointer"
+                        style={{ background: ACCENT_HEX, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}
+                      >
+                        <LogIn className="w-4 h-4" strokeWidth={2.2} />
+                        Sign in to accept
+                      </AppButton>
+                      <p className="mt-3 text-[11px] text-center" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>
+                        Or verify the recipient phone to claim as a guest.
+                      </p>
+                    </>
+                  )}
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                     Enter your full phone number to verify ownership and receive the code.
                   </p>

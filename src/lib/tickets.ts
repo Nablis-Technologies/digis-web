@@ -651,29 +651,6 @@ export const ticketsService = {
     return ticket;
   },
 
-  /** Buy additional extras against an already-purchased ticket. */
-  async purchaseTicketExtras(
-    ticketId: string,
-    items: import("@/types/event").SelectedEventProduct[],
-  ): Promise<UserTicket> {
-    await wait(1400);
-    const ticket = userTickets.find(
-      (item) => item.id === ticketId,
-    );
-    if (!ticket) throw new Error("Ticket not found.");
-    const merged = (ticket.addOns ?? []).map((a) => ({ ...a }));
-    items.forEach((item) => {
-      if (item.quantity <= 0) return;
-      const existing = merged.find(
-        (a) => a.productId === item.productId,
-      );
-      if (existing) existing.quantity += item.quantity;
-      else merged.push({ ...item });
-    });
-    ticket.addOns = merged;
-    return ticket;
-  },
-
   async updateTicketAnswers(
     ticketId: string,
     answers: CheckoutAnswers,
@@ -697,12 +674,6 @@ export const ticketsService = {
     return ticket;
   },
 
-  async transferTicket(
-    _ticketId: UserTicket["id"],
-    _recipient: string,
-  ): Promise<TicketActionResult> {
-    return { ok: true };
-  },
   async listForResale(
     ticketId: UserTicket["id"],
     price: number,
