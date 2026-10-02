@@ -47,7 +47,7 @@ test.describe('routing', () => {
   test('direct deep link to /signup renders the signup form', async ({ page }) => {
     await page.goto('/signup');
     await expect(page.getByRole('heading', { name: 'Create an account' }).first()).toBeVisible();
-    await expect(page.getByPlaceholder('Full name', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder('Name', { exact: true })).toBeVisible();
   });
 
   test('discovery search is written to ?q= and survives reload', async ({ page }) => {

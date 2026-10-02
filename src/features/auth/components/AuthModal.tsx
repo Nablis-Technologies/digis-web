@@ -515,7 +515,7 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
   );
 }
 
-/* ─── Full name field (signup only) ──────────────────────── */
+/* ─── Name field (signup only) ──────────────────────── */
 function NameField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
@@ -528,7 +528,7 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
         }}>
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="Full name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
+          placeholder="Name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} noFocusRing />
       </div>

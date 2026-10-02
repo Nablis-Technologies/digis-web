@@ -199,7 +199,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             <div className="mb-3">
               <AppInput
                 type="text"
-                placeholder="Full name (optional)"
+                placeholder="Name (optional)"
                 value={guestName}
                 onChange={(e) => { setGuestName(e.target.value); clearField('name'); }}
                 error={fieldErrors.name} errorClassName={FIELD_ERROR_CLASS}
