@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { NAV_ITEMS } from '@/components/Navigation';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useNotifications, notificationsStore, fetchNotifications, markNotificationRead } from '@/lib/notifications';
+import { toastError } from '@/lib/feedback';
 import type { NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -32,6 +33,8 @@ const NOTIF_ICON: Record<NotificationType, typeof Ticket> = {
 
 export function TopBar({ currentView, onNavigate, hidden = false, showSearchButton = false, onSearchClick, onRequestAuth }: TopBarProps = {}) {
   const [openMenu, setOpenMenu] = useState<'none' | 'notif' | 'profile'>('none');
+  const [markingAll, setMarkingAll] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const notifications = useNotifications();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -80,19 +83,24 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   const accentSoft = isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)';
 
   const markRead = (id: string) => {
+    // Optimistic: clear the dot now; the refetch below restores it if the write failed.
     notificationsStore.markRead(id);
     if (!isAuthenticated) return;
-    // Persist so a refetch doesn't resurrect the unread state.
     void markNotificationRead(id)
-      .catch(() => undefined)
+      .catch(() => toastError('Couldn’t mark that notification as read.'))
       .finally(() => queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] }));
   };
   const markAllRead = () => {
     const unreadIds = notifications.filter((n) => n.unread).map((n) => n.id);
     notificationsStore.markAllRead();
     if (!isAuthenticated || unreadIds.length === 0) return;
-    void Promise.allSettled(unreadIds.map((id) => markNotificationRead(id)))
-      .finally(() => queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] }));
+    setMarkingAll(true);
+    void Promise.all(unreadIds.map((id) => markNotificationRead(id)))
+      .catch(() => toastError('Couldn’t mark all notifications as read.'))
+      .finally(() => {
+        setMarkingAll(false);
+        queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] });
+      });
   };
 
   const panelStyle = {
@@ -214,10 +222,11 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
               {unreadCount > 0 && (
                 <AppButton
                   onClick={markAllRead}
-                  className="text-[11px] tracking-[0.5px] transition-opacity hover:opacity-70"
+                  disabled={markingAll}
+                  className="text-[11px] tracking-[0.5px] transition-opacity hover:opacity-70 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ fontFamily: "'Inter', sans-serif", color: accentFg }}
                 >
-                  Mark all read
+                  {markingAll ? 'Marking…' : 'Mark all read'}
                 </AppButton>
               )}
             </div>
@@ -441,12 +450,18 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                 <>
                   <div className="my-1.5 h-px mx-2" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }} />
                   <AppButton
-                    onClick={() => { signOut(); setOpenMenu('none'); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-red-500/[0.06]"
+                    onClick={() => {
+                      if (signingOut) return;
+                      setSigningOut(true);
+                      setOpenMenu('none');
+                      void signOut().finally(() => setSigningOut(false));
+                    }}
+                    disabled={signingOut}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-red-500/[0.06] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <LogOut className="w-4 h-4" strokeWidth={1.5} style={{ color: 'rgba(239,68,68,0.6)' }} />
                     <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(239,68,68,0.7)' }}>
-                      Log out
+                      {signingOut ? 'Logging out…' : 'Log out'}
                     </span>
                   </AppButton>
                 </>

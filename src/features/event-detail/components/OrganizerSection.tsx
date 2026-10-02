@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, BadgeCheck, Calendar, Check, ChevronRight, Clock, MapPin, Share2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Calendar, Check, ChevronRight, Clock, Loader2, MapPin, Share2, UserPlus, Users, X } from 'lucide-react';
 import { flatAvatarColor } from '@/lib/utils/avatarColor';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
@@ -144,6 +144,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
             <OrganizerListSheet
               organizers={organizers}
               followingMap={followingMap}
+              pendingFollow={pendingFollow}
               onToggleFollow={toggleFollow}
               onOpenProfile={(o) => { setListOpen(false); setProfileTarget(o); }}
               onClose={() => setListOpen(false)}
@@ -152,6 +153,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
           )}
           {profileTarget && (
             <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.id] || false}
+              pending={pendingFollow === profileTarget.id}
               onToggleFollow={() => toggleFollow(profileTarget.id)}
               onClose={() => setProfileTarget(null)} isDark={isDark} />
           )}
@@ -236,6 +238,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
       <AnimatePresence>
         {profileTarget && (
           <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.id] || false}
+            pending={pendingFollow === profileTarget.id}
             onToggleFollow={() => toggleFollow(profileTarget.id)}
             onClose={() => setProfileTarget(null)} isDark={isDark} />
         )}
@@ -385,8 +388,8 @@ function OrganizerStat({ label, value, isDark }: { label: string; value: string;
   );
 }
 
-function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenProfile, onClose, isDark }: {
-  organizers: any[]; followingMap: Record<string, boolean>; onToggleFollow: (handle: string) => void;
+function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleFollow, onOpenProfile, onClose, isDark }: {
+  organizers: any[]; followingMap: Record<string, boolean>; pendingFollow: string | null; onToggleFollow: (handle: string) => void;
   onOpenProfile: (o: any) => void; onClose: () => void; isDark: boolean;
 }) {
   const accent = isDark ? '#d6f905' : '#d6f905';
@@ -468,7 +471,8 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
                 </AppButton>
                 <AppButton whileTap={{ scale: 0.95 }}
                   onClick={() => onToggleFollow(o.id)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer"
+                  disabled={pendingFollow === o.id}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     background: following
                       ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
@@ -477,9 +481,11 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
                       ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
                       : (isDark ? 'rgba(214,249,5,0.22)' : 'transparent')}`,
                   }}>
-                  {following
-                    ? <Check className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
-                    : <UserPlus className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />}
+                  {pendingFollow === o.id
+                    ? <Loader2 className="w-3 h-3 animate-spin" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
+                    : following
+                      ? <Check className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
+                      : <UserPlus className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />}
                   <span className="text-[11px]"
                     style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: following ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : (isDark ? accent : '#0a0a0a') }}>
                     {following ? 'Following' : 'Follow'}
@@ -498,8 +504,8 @@ function OrganizerListSheet({ organizers, followingMap, onToggleFollow, onOpenPr
   return typeof document !== 'undefined' ? createPortal(sheet, document.body) : sheet;
 }
 
-function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, isDark }: {
-  organizer: any; following: boolean; onToggleFollow: () => void; onClose: () => void; isDark: boolean;
+function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, onClose, isDark }: {
+  organizer: any; following: boolean; pending: boolean; onToggleFollow: () => void; onClose: () => void; isDark: boolean;
 }) {
   const initials = organizer.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
   const accent = isDark ? '#d6f905' : '#d6f905';
@@ -657,7 +663,8 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
             <AppButton
               whileTap={{ scale: 0.97 }}
               onClick={onToggleFollow}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl cursor-pointer"
+              disabled={pending}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 background: following
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
@@ -667,9 +674,11 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                   : 'transparent'}`,
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
               }}>
-              {following
-                ? <Check className="w-4 h-4" strokeWidth={2.5} />
-                : <UserPlus className="w-4 h-4" strokeWidth={2} />}
+              {pending
+                ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
+                : following
+                  ? <Check className="w-4 h-4" strokeWidth={2.5} />
+                  : <UserPlus className="w-4 h-4" strokeWidth={2} />}
               <span className="text-[12.5px] tracking-[0.3px]"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                 {following ? 'Following' : 'Follow Organizer'}
@@ -816,8 +825,8 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <AppButton whileTap={{ scale: 0.98 }} onClick={onToggleFollow}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer"
+            <AppButton whileTap={{ scale: 0.98 }} onClick={onToggleFollow} disabled={pending}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 background: following
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
@@ -825,7 +834,9 @@ function OrganizerProfileSheet({ organizer, following, onToggleFollow, onClose, 
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : (isDark ? '#0a0a0a' : '#fff'),
                 border: following ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none',
               }}>
-              {following ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <UserPlus className="w-4 h-4" strokeWidth={2} />}
+              {pending
+                ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
+                : following ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <UserPlus className="w-4 h-4" strokeWidth={2} />}
               <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                 {following ? 'Following' : 'Follow'}
               </span>

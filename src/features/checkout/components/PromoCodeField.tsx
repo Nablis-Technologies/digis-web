@@ -12,7 +12,7 @@ interface PromoCodeFieldProps { promoApplied: AppliedPromo | null; promoCodeInpu
 
 export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, discountAmount, isDark }: PromoCodeFieldProps) {
   return (
-        <>{promoApplied ? (
+        <>{promoApplied && !promoLoading ? (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}

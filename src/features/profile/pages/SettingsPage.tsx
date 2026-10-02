@@ -35,6 +35,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const [prefsLoading, setPrefsLoading] = useState(false);
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const [savingChannel, setSavingChannel] = useState<NotificationChannel | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const loadPreferences = useCallback(async () => {
     if (!isAuthenticated) { setChannelPrefs(null); return; }
@@ -217,8 +218,13 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
       {isAuthenticated && (
         <AppButton
           whileTap={{ scale: 0.98 }}
-          onClick={signOut}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl cursor-pointer mb-6"
+          onClick={() => {
+            if (signingOut) return;
+            setSigningOut(true);
+            void signOut().finally(() => setSigningOut(false));
+          }}
+          disabled={signingOut}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl cursor-pointer mb-6 disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             background: isDark ? 'rgba(239,68,68,0.10)' : 'rgba(239,68,68,0.08)',
             border: `1px solid ${isDark ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.2)'}`,
@@ -226,7 +232,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
           }}
         >
           <LogOut className="w-4 h-4" strokeWidth={2} />
-          Sign out
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </AppButton>
       )}
 

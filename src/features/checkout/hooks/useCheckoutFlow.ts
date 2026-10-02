@@ -276,6 +276,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
       setQuote(null);
       setQuoteLoading(false);
       setQuoteError(undefined);
+      setPromoLoading(false);
       return;
     }
     let alive = true;
@@ -284,14 +285,18 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     orderModule.quote(quoteInput).then((q) => {
       if (!alive) return;
       setQuote(q);
-      // A stored promo code the server doesn't know is surfaced on the promo
-      // field; the totals shown are the server's (without the discount).
-      if (promoCode) setPromoError('');
       setQuoteLoading(false);
+      // The server accepted the quote — a pending promo code is now applied.
+      if (promoCode) {
+        setPromoError('');
+        setPromoLoading(false);
+        setPromoExpanded(false);
+      }
     }).catch((e) => {
       if (!alive) return;
       setQuote(null);
       setQuoteLoading(false);
+      setPromoLoading(false);
       // A live TICKET quote without a registration is rejected by design
       // (registration_required) — not an error. Until registration at Pay,
       // the tier price is the display estimate; the authoritative quote
@@ -304,8 +309,11 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         isLiveTicket && promoCode && e instanceof ApiError &&
         (e.code === 'invalid_promotion_code' || e.code === 'promotion_unavailable')
       ) {
-        // Bad promo code: keep the totals area clean, explain on the field.
+        // Bad promo code: keep the totals area clean, revert the optimistic
+        // apply so the field reopens, and explain on the field.
         setQuoteError(undefined);
+        setPromoApplied(null);
+        setPromoExpanded(true);
         setPromoError(messageForCode(e.code, e.message));
       } else {
         setQuoteError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Could not load pricing. Check your connection and try again.');
@@ -350,15 +358,19 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     const code = promoCodeInput.trim().toUpperCase();
     if (!code) return;
     removePromoErrorOnly();
+    // Optimistically queue the code (it drives the quote request); the field
+    // stays open with a spinner until the server confirms (see PromoCodeField),
+    // then collapses to the applied pill — or reverts with the error on reject.
     setPromoApplied({ code, discount: 0, type: 'fixed', label: code });
-    setPromoExpanded(false);
+    setPromoLoading(true);
+    setPromoExpanded(true);
   };
-  const removePromo = () => { setPromoApplied(null); setPromoCodeInput(''); setPromoError(''); };
+  const removePromo = () => { setPromoApplied(null); setPromoCodeInput(''); setPromoError(''); setPromoLoading(false); };
   const removePromoErrorOnly = () => { setPromoError(''); };
 
   const validateDetails = () => {
     const e: typeof errors = {};
-    if (!contactDetails.name.trim() || contactDetails.name.trim().length < 2) e.name = 'Please enter your full name';
+    if (!contactDetails.name.trim() || contactDetails.name.trim().length < 2) e.name = 'Please enter your name';
     if (contactDetails.contactMethod === 'email') {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactDetails.email)) e.email = 'Enter a valid email';
     } else if (!/^(\+251|0)?9\d{8}$/.test(contactDetails.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid Ethiopian phone';
