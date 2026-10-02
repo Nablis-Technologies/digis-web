@@ -97,6 +97,12 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
     .map((t) => t.ticketTypeId)
     .filter((id): id is string => !!id);
   const hasGatedTiers = gatedTicketTypeIds.length > 0;
+  // Whether any gated offer accepts a code. Invitation-only events have no code
+  // that could work, so the gate shows the invitation-link path instead of a
+  // code box that can never succeed.
+  const acceptsCode = displayTicketTypes.some(
+    (t) => t.audience === 'access_code' || t.audience === 'code_or_invitation',
+  );
   // The backend gates per ticket type, so on a mixed event the public tiers stay
   // selectable while the gated ones wait behind the unlock panel.
   const publicTicketTypes = displayTicketTypes.filter((t) => !t.audience || t.audience === 'public');
@@ -230,6 +236,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
             unlocked={!hasGatedTiers || gatedUnlocked}
             invitationToken={invitationToken}
             hasPublicTiers={hasPublicTiers}
+            acceptsCode={acceptsCode}
             onUnlocked={(proof) => { setGatedUnlocked(true); setAudienceProof(proof); }}
           >
           <TicketSelector
@@ -268,7 +275,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
               <Lock className="relative z-10 w-3.5 h-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }} strokeWidth={2} />
               <span className="relative z-10 text-[12px] tracking-[0.3px]"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.7)' }}>
-                Unlock tickets with your access code
+                  {acceptsCode ? 'Unlock tickets with your access code' : 'Invite-only — open your invitation'}
               </span>
               <ArrowRight className="relative z-10 w-3.5 h-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }} strokeWidth={2} />
             </AppButton>

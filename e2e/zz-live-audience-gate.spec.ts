@@ -120,10 +120,11 @@ test('invitation link auto-unlocks an invitation-only offer', async ({ page, req
   }
 });
 
-test('an access code cannot unlock an invitation-only offer', async ({ page }) => {
+test('invitation-only event shows the invite path, not a code box', async ({ page }) => {
   await page.goto(`/events/${INVITE_ONLY}`);
-  await page.getByPlaceholder('Enter your code').fill('NOT-A-CODE');
-  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
-  await expect(page.getByText(/not valid/i).first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Invite-only event', { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/invitation link/i).first()).toBeVisible();
+  // No code input: an access code can never open an invitation-only offer.
+  await expect(page.getByPlaceholder('Enter your code')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Select Your Ticket' })).toHaveCount(0);
 });

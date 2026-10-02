@@ -19,6 +19,11 @@ interface GatedTierGateProps {
   /** When some tiers are public, keep them visible while the rest stay locked
    *  (the backend gates per ticket type, not per event). */
   hasPublicTiers?: boolean;
+  /** True when at least one gated offer accepts an access code
+   *  (`access_code`/`code_or_invitation`). When false the offers are
+   *  `invitation`-only, so a code input could never succeed — show the
+   *  invitation-link path instead. */
+  acceptsCode?: boolean;
   /** Called with the accepted proof so checkout can carry it as audience_proof. */
   onUnlocked: (proof: AudienceProof) => void;
   children: React.ReactNode;
@@ -36,6 +41,7 @@ export function GatedTierGate({
   unlocked,
   invitationToken,
   hasPublicTiers = false,
+  acceptsCode = true,
   onUnlocked,
   children,
 }: GatedTierGateProps) {
@@ -84,6 +90,7 @@ export function GatedTierGate({
 
   if (unlocked) return <>{children}</>;
 
+  const invitationOnly = !acceptsCode;
   const panel = (
     <div className="rounded-3xl overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.025)' : '#fff' }}>
       <GlassReflection isDark={isDark} />
@@ -94,46 +101,57 @@ export function GatedTierGate({
         </div>
         <h3 className="text-[18px] mb-1.5"
           style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
-          {hasPublicTiers ? 'Unlock more tickets' : 'This event requires access'}
+          {hasPublicTiers ? 'Unlock more tickets' : invitationOnly ? 'Invite-only event' : 'This event requires access'}
         </h3>
         <p className="text-[12px] leading-relaxed mb-5"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
-          Enter the access code or open the invitation link you received to unlock these tickets.
+          {invitationOnly
+            ? 'This event is invitation-only. Open the invitation link you received to unlock tickets.'
+            : 'Enter the access code or open the invitation link you received to unlock these tickets.'}
         </p>
 
-        <motion.div
-          animate={error ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-2 rounded-2xl p-1.5"
-          style={{
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-            border: `1px solid ${error ? 'rgba(239,68,68,0.5)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')}`,
-          }}>
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
-            style={{ background: `rgba(${accentRgb},0.1)` }}>
-            <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
-          </div>
-          <AppInput
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
-            placeholder="Enter your code"
-            className="flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
-            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
-          <AppButton whileTap={{ scale: 0.95 }}
-            onClick={tryCode}
-            disabled={!code.trim() || checking}
-            className="flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-xl disabled:cursor-not-allowed"
-            style={
-              code.trim() && !checking
-                ? { background: isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a', color: isDark ? '#0a0a0a' : '#fff' }
-                : disabledSurface(isDark)
-            }>
-            <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-              {checking ? 'Checking…' : 'Unlock'}
-            </span>
-          </AppButton>
-        </motion.div>
+        {acceptsCode && (
+          <motion.div
+            animate={error ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex items-center gap-2 rounded-2xl p-1.5"
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              border: `1px solid ${error ? 'rgba(239,68,68,0.5)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')}`,
+            }}>
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+              style={{ background: `rgba(${accentRgb},0.1)` }}>
+              <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
+            </div>
+            <AppInput
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
+              placeholder="Enter your code"
+              className="flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
+            <AppButton whileTap={{ scale: 0.95 }}
+              onClick={tryCode}
+              disabled={!code.trim() || checking}
+              className="flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-xl disabled:cursor-not-allowed"
+              style={
+                code.trim() && !checking
+                  ? { background: isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a', color: isDark ? '#0a0a0a' : '#fff' }
+                  : disabledSurface(isDark)
+              }>
+              <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                {checking ? 'Checking…' : 'Unlock'}
+              </span>
+            </AppButton>
+          </motion.div>
+        )}
+
+        {invitationOnly && checking && !error && (
+          <p className="text-[11px] mt-2"
+            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
+            Checking your invitation…
+          </p>
+        )}
 
         <AnimatePresence>
           {error && (
@@ -150,7 +168,7 @@ export function GatedTierGate({
           <ShieldCheck className="w-3 h-3" style={{ color: accentText }} strokeWidth={2} />
           <span className="text-[10px] tracking-[1.5px] uppercase"
             style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-            Access required
+            {invitationOnly ? 'Invitation required' : 'Access required'}
           </span>
         </div>
       </div>
