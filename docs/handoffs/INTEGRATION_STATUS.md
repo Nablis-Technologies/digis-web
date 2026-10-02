@@ -45,7 +45,8 @@ is gone; an event is a container of offers. Retired: `POST /public/events/:slug/
   large orders fail with Chapa's max-amount error), #61 (a pending ticket transfer
   is invisible in-app — no notification on initiation, no incoming-transfers list),
   #62 (a pending outgoing transfer is invisible on the sender's wallet ticket —
-  it still looks active).
+  it still looks active), #63 (`admission_selections` is ticket-only → a ticket +
+  extra cart fails at Pay).
 
 **Gap re-sweep 2026-10-01 (backend advanced `326f6a3 → ed6309a`, 9 commits).**
 Upstream added organizer/admin surfaces + one gap fix. **Only #42 was fixed** —

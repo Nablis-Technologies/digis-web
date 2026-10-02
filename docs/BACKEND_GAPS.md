@@ -122,6 +122,7 @@
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
+| 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks lineup/participants + venue media/coords |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -893,6 +894,35 @@ can render "Transfer pending" and gate transfer/resale/QR for that ticket. The
 data already exists (`ticket.ticket_transfers.pending`); it just isn't projected.
 
 **Status: open — filed 2026-10-01 (reported by the user; code read).**
+
+### #63. `admission_selections` is ticket-only → a ticket + extra cart is rejected
+
+`Orders::AdmissionSelections::Create#validate_selection!`
+(`app/services/orders/admission_selections/create.rb:195-197`) aborts with
+`product_unavailable` unless **every** item's product is a ticket
+(`product.ticket? && product.ticket_type.present?`). But the main checkout folds
+selected extras (parking/merch/food) into the same selection:
+`useCheckoutFlow.buildSelectionInput` builds `items: [ticketItem, ...addOnItems]`
+(`src/features/checkout/hooks/useCheckoutFlow.ts:416-420`). So on an event that
+serves extras (`chapa-test-event` in the dev seed), selecting a ticket + an extra
+and paying fails `product_unavailable` — the extras step can never complete.
+
+**Why it degrades:** the composable selection is the one checkout path, but it
+can't carry add-ons, so "ticket + parking" is un-buyable in one order.
+
+**Fix (pick one):**
+1. Let `admission_selections` accept non-ticket add-on items (validate them as
+   purchasable add-ons instead of tickets) so one selection → one order, matching
+   the composable model; or
+2. Confirm add-ons are always separate orders — then the frontend removes the
+   main-checkout extras step and buys extras via the extras-only flow
+   (`ExtrasOnlyCheckout`, which uses the legacy quote→order endpoints) after the
+   ticket.
+
+**Evidence:** code read 2026-10-01; live products probe shows only
+`chapa-test-event` currently has available extras.
+
+**Status: open — filed 2026-10-01 (frontend wiring audit).**
 
 ### #49 addendum — no city aggregation
 
