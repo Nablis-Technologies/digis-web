@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Share2, Download, ChevronRight, Sparkles, Send, Tag, Check, X, ArrowUpRight, FilePenLine, Plus, Car, Coffee, Gift, Heart, Package, Smartphone, ShoppingBag, Armchair, UserCheck } from 'lucide-react';
+import { Calendar, MapPin, Clock, Share2, Download, ChevronRight, Sparkles, Send, Tag, Check, X, ArrowUpRight, FilePenLine, Plus, Car, Coffee, Gift, Heart, Package, Smartphone, ShoppingBag, Armchair, UserCheck, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useImageColor } from '@/lib/hooks/useImageColor';
@@ -10,6 +10,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { copyText } from '@/lib/utils/clipboard';
 import { toastError } from '@/lib/feedback';
+import { ticketStatusMeta } from '@/lib/tickets';
 
 const extraIconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
 
@@ -122,6 +123,9 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
   const tt = tierTheme(ticket.ticketType, ticket.ticketLevel);
   const isVIP = tt.premium;
   const tier = { rgb: tt.rgb, color: isDark ? tt.bright : tt.ink, label: ticket.ticketType || 'Standard' };
+  // A non-active ticket (refunded/void/suspended) is not usable: show a banner
+  // and hide the QR + every action.
+  const { inactive, label: statusLabel } = ticketStatusMeta(ticket.status);
 
   // Countdown
   const countdown = (() => {
@@ -242,7 +246,29 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
           )}
         </div>
 
+        {/* Non-active (refunded/void/suspended) — a banner replaces the QR */}
+        {inactive && (
+          <div className="relative px-5 sm:px-7 pt-5">
+            <div className="rounded-2xl p-4 flex items-start gap-3"
+              style={{
+                background: isDark ? 'rgba(248,113,113,0.1)' : 'rgba(190,18,60,0.08)',
+                border: `1px solid ${isDark ? 'rgba(248,113,113,0.28)' : 'rgba(190,18,60,0.22)'}`,
+              }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#fca5a5' : '#b91c1c' }} strokeWidth={2} />
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fca5a5' : '#b91c1c' }}>
+                  This ticket is {statusLabel?.toLowerCase()}
+                </p>
+                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }}>
+                  It can no longer be used at the gate.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* QR — always light so it stays scannable */}
+        {!inactive && (
         <div className="relative px-5 sm:px-7 pt-5">
           <AppButton
             whileTap={{ scale: 0.99 }}
@@ -269,6 +295,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
             </div>
           </AppButton>
         </div>
+        )}
 
         {/* Divider between the QR and the trip details */}
         <div className="relative mx-5 sm:mx-7 mt-5 h-px" style={{ background: t.panelBorder }} />
@@ -406,8 +433,8 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
           </section>
         ) : null}
 
-        {/* Primary action: Download */}
-        {onDownload && (
+        {/* Primary action: Download (hidden for a non-active ticket) */}
+        {!inactive && onDownload && (
         <div className="relative px-5 sm:px-7 pt-5">
           <AppButton
             whileTap={{ scale: downloading ? 1 : 0.98 }}
@@ -451,8 +478,8 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         </div>
         )}
 
-        {/* Secondary actions — roomy stacked tiles */}
-        {secondaryActions.length > 0 && (
+        {/* Secondary actions — roomy stacked tiles (hidden for a non-active ticket) */}
+        {!inactive && secondaryActions.length > 0 && (
           <div className="relative px-5 sm:px-7 pt-3 grid gap-3"
             style={{ gridTemplateColumns: `repeat(${secondaryActions.length}, minmax(0, 1fr))` }}>
             {secondaryActions.map(({ Icon, label, action }) => (

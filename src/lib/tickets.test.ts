@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mapWalletTicket, ticketsService, type TicketWalletWire } from '@/lib/tickets';
+import { mapWalletTicket, ticketsService, ticketStatusMeta, type TicketWalletWire } from '@/lib/tickets';
 import { apiFetch } from '@/lib/api';
 import { getEventImage } from '@/lib/utils/eventImages';
 
@@ -134,6 +134,17 @@ describe('mapWalletTicket — resale policy projection (#25)', () => {
     expect(t.resalePolicy?.priceCapMinor).toBeNull();
     expect(t.resalePolicy?.fixedCapMinor).toBeNull();
     expect(t.resalePolicy?.percentageCapBps).toBeNull();
+  });
+});
+
+describe('ticketStatusMeta — invalid tickets must not look valid', () => {
+  it('flags non-active statuses with a badge label; active/absent stay normal', () => {
+    expect(ticketStatusMeta('active')).toEqual({ inactive: false, label: null });
+    expect(ticketStatusMeta(undefined)).toEqual({ inactive: false, label: null });
+    expect(ticketStatusMeta('refunded')).toEqual({ inactive: true, label: 'Refunded' });
+    expect(ticketStatusMeta('void')).toEqual({ inactive: true, label: 'Void' });
+    expect(ticketStatusMeta('suspended')).toEqual({ inactive: true, label: 'Suspended' });
+    expect(ticketStatusMeta('SUSPENDED')).toEqual({ inactive: true, label: 'Suspended' });
   });
 });
 

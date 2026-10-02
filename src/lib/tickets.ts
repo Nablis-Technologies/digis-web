@@ -490,6 +490,22 @@ export function mapWalletTicket(w: TicketWalletWire): UserTicket {
   };
 }
 
+/**
+ * Non-active ticket statuses (`suspended`/`refunded`/`void`) are not usable —
+ * the QR is blank and transfer/resale are refused. Map them to a badge label so
+ * the UI never presents an invalid ticket as valid. `active`/absent → not inactive.
+ */
+const TICKET_STATUS_LABEL: Record<string, string> = {
+  suspended: 'Suspended',
+  refunded: 'Refunded',
+  void: 'Void',
+};
+export function ticketStatusMeta(status?: string): { inactive: boolean; label: string | null } {
+  const key = status?.toLowerCase();
+  const label = key ? TICKET_STATUS_LABEL[key] ?? null : null;
+  return { inactive: !!label, label };
+}
+
 export const ticketsService = {
   /**
    * Reset the store to its seed state — mirrors the backend's wipable,
