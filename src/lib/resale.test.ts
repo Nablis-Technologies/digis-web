@@ -72,6 +72,9 @@ function walletWire() {
 }
 
 beforeEach(() => {
+  // No usable localStorage under the node test env — the module falls back to
+  // an in-memory store; prune([]) clears it between cases.
+  resaleModule.pruneListingTickets([]);
   mockedApiFetch.mockReset();
   mockedApiFetch.mockImplementation((async (path: string, opts?: { method?: string }) => {
     if (path === 'resale_listings') return { data: [browseWire(), browseWire({ id: 'rl-2', event: { id: 'e-9', slug: 'ghost-event', title: 'Ghost Event', timezone: 'Africa/Addis_Ababa', currency: 'ETB' } })] };
@@ -230,7 +233,7 @@ describe('resaleModule.createListing (live API, mocked HTTP)', () => {
     expect(listing.fee_terms.rate_bps).toBe(800);
   });
 
-  it('createListing enriches via the detail endpoint, no local id bookkeeping', async () => {
+  it('createListing enriches via the detail endpoint and remembers the ticket pair', async () => {
     mockedApiFetch.mockImplementation((async (path: string, opts?: { method?: string }) => {
       if (path === 'tickets/tk-1/resale' && opts?.method === 'POST') return { data: sellerWire({ id: 'rl-1' }) };
       if (path === 'resale_listings/rl-1') return { data: { ...browseWire({ id: 'rl-1' }), seller_acquisition_product_value_minor: 200000 } };
@@ -238,9 +241,10 @@ describe('resaleModule.createListing (live API, mocked HTTP)', () => {
     }) as typeof apiFetch);
     const listing = await resaleModule.createListing(ticket, 250000);
     expect(listing.id).toBe('rl-1');
-    // Ownership is the backend's answer (GET /mine), not a local session set —
-    // the module no longer writes any per-user storage on create.
-    expect(mockedApiFetch).not.toHaveBeenCalledWith('tickets', expect.anything());
+    // Ownership is the backend's answer (GET /mine); the create response is the
+    // only place the listing→ticket link exists, so it's cached for the picker
+    // (BACKEND_GAPS #66).
+    expect(resaleModule.listedTicketIds(['rl-1']).has('tk-1')).toBe(true);
   });
 
   it('rejects inactive tickets without a request', async () => {
@@ -334,3 +338,41 @@ describe('resaleModule.purchaseListing (live API, mocked HTTP)', () => {
     expect(order.total_minor).toBe(420000);
   });
 });
+
+describe('resaleModule listing→ticket cache (BACKEND_GAPS #66)', () => {
+  it('hides a ticket only while its listing is active', () => {
+    resaleModule.rememberListingTicket('rl-1', 'tk-1');
+    resaleModule.rememberListingTicket('rl-2', 'tk-2');
+    expect(resaleModule.listedTicketIds(['rl-1', 'rl-2'])).toEqual(new Set(['tk-1', 'tk-2']));
+    // A listing that is no longer active stops hiding its ticket.
+    expect(resaleModule.listedTicketIds(['rl-1'])).toEqual(new Set(['tk-1']));
+    expect(resaleModule.listedTicketIds([])).toEqual(new Set());
+  });
+
+  it('forgetListingTicket drops the pair on cancel', async () => {
+    resaleModule.rememberListingTicket('rl-1', 'tk-1');
+    mockedApiFetch.mockImplementation((async (path: string, opts?: { method?: string }) => {
+      if (path === 'resale_listings/rl-1/cancel' && opts?.method === 'POST') {
+        return { data: sellerWire({ id: 'rl-1', status: 'cancelled' }) };
+      }
+      return { data: null };
+    }) as typeof apiFetch);
+    await resaleModule.cancelListing('rl-1');
+    expect(resaleModule.listedTicketIds(['rl-1'])).toEqual(new Set());
+  });
+
+  it('fetchMyListings prunes pairs whose listing is no longer active', async () => {
+    resaleModule.rememberListingTicket('rl-1', 'tk-1');
+    resaleModule.rememberListingTicket('rl-stale', 'tk-stale');
+    mockedApiFetch.mockImplementation((async (path: string) => {
+      if (path === 'resale_listings/mine') return { data: [sellerWire({ id: 'rl-1' })] };
+      if (path === 'resale_listings') return { data: [browseWire({ id: 'rl-1' })] };
+      return { data: null };
+    }) as typeof apiFetch);
+    await resaleModule.fetchMyListings();
+    // The stale pair is removed from storage, not just from this read.
+    expect(resaleModule.listedTicketIds(['rl-stale'])).toEqual(new Set());
+    expect(resaleModule.listedTicketIds(['rl-1'])).toEqual(new Set(['tk-1']));
+  });
+});
+

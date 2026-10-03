@@ -31,6 +31,48 @@ import type { ResaleListing, PublicResaleListingWire, SellerResaleListingWire } 
 import type { UserTicket } from "@/types/ticket";
 import { Money } from "@/lib/money";
 
+/**
+ * Client-side correlation of an active listing to the wallet ticket it was
+ * created from. The backend's seller listing wire omits `ticket_id`
+ * (BACKEND_GAPS #66), so this is the only way to keep an already-listed ticket
+ * out of the "list a ticket" picker across reloads. It is a cache, never a
+ * source of truth: it is reconciled against the server's active
+ * `resale_listings/mine` ids, so a listing that sold or was delisted — here or
+ * on another device — stops hiding its ticket. Scoped to this browser; #66 is
+ * the real fix.
+ */
+const LISTING_TICKET_KEY = 'digis.resale.listingTicketMap';
+
+/** localStorage when available, else an in-memory store (SSR / node test / private mode). */
+const listingTicketStore: { get(k: string): string | null; set(k: string, v: string): void } = (() => {
+  try {
+    const ls = globalThis.localStorage;
+    if (ls) return { get: (k) => ls.getItem(k), set: (k, v) => ls.setItem(k, v) };
+  } catch {
+    // Accessing localStorage can throw (e.g. node without --localstorage-file).
+  }
+  const mem = new Map<string, string>();
+  return { get: (k) => mem.get(k) ?? null, set: (k, v) => { mem.set(k, v); } };
+})();
+
+function readListingTicketMap(): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(listingTicketStore.get(LISTING_TICKET_KEY) ?? '{}');
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeListingTicketMap(map: Record<string, string>): void {
+  try {
+    listingTicketStore.set(LISTING_TICKET_KEY, JSON.stringify(map));
+  } catch {
+    // Storage unavailable — dedup degrades to the #66 behaviour (the backend
+    // still rejects a second listing).
+  }
+}
+
 /** Map the buyer-visible wire shape to display fields. No invention. */
 export function mapPublicListing(wire: PublicResaleListingWire, image: string): ResaleListing {
   const firstDate = wire.event_dates?.[0];
@@ -138,6 +180,47 @@ export const resaleModule = {
     detail: (id: string) => ['resale', 'listings', id] as const,
   },
 
+  /** Pair a created listing with its wallet ticket (see the #66 cache note). */
+  rememberListingTicket(listingId: string, ticketId: string): void {
+    const map = readListingTicketMap();
+    map[listingId] = ticketId;
+    writeListingTicketMap(map);
+  },
+
+  /** Drop a listing→ticket pair once the listing is cancelled. */
+  forgetListingTicket(listingId: string): void {
+    const map = readListingTicketMap();
+    if (listingId in map) {
+      delete map[listingId];
+      writeListingTicketMap(map);
+    }
+  },
+
+  /** Keep only pairs whose listing is still active (server-authoritative ids). */
+  pruneListingTickets(activeListingIds: string[]): void {
+    const active = new Set(activeListingIds);
+    const map = readListingTicketMap();
+    const kept: Record<string, string> = {};
+    for (const listingId of Object.keys(map)) {
+      if (active.has(listingId)) kept[listingId] = map[listingId];
+    }
+    if (Object.keys(kept).length !== Object.keys(map).length) writeListingTicketMap(kept);
+  },
+
+  /**
+   * Wallet ticket ids that currently have an active listing, scoped to the
+   * server's active listing ids. Pure read — pruning happens in the data layer.
+   */
+  listedTicketIds(activeListingIds: string[]): Set<string> {
+    const active = new Set(activeListingIds);
+    const map = readListingTicketMap();
+    const ids = new Set<string>();
+    for (const [listingId, ticketId] of Object.entries(map)) {
+      if (active.has(listingId)) ids.add(ticketId);
+    }
+    return ids;
+  },
+
   /**
    * Mirror GET /resale_listings (active, buyer-visible fields). The backend
    * scopes to active; no client-side status filtering.
@@ -159,6 +242,9 @@ export const resaleModule = {
   async fetchMyListings(): Promise<ResaleListing[]> {
     const { data } = await apiFetch<SellerResaleListingWire[]>("resale_listings/mine");
     const mineWires = Array.isArray(data) ? data : [];
+    // Reconcile the listing→ticket cache against the server's active ids so it
+    // never hides a ticket whose listing has closed (see the #66 cache note).
+    resaleModule.pruneListingTickets(mineWires.map((w) => w.id));
     if (mineWires.length === 0) return [];
     const mineIds = new Set(mineWires.map((w) => w.id));
     const all = await resaleModule.fetchListings();
@@ -207,6 +293,9 @@ export const resaleModule = {
       method: 'POST',
       body: { resale_listing: { asking_amount_minor: askingAmountMinor } },
     });
+    // Remember which ticket this listing came from — the wire won't tell us
+    // later (BACKEND_GAPS #66), so the picker uses this cache to hide it.
+    resaleModule.rememberListingTicket(data.id, ticket.id);
     // Enrichment is cosmetic — the listing exists either way. A failed detail
     // or browse read must NOT fail the create (the seller would be left on a
     // stuck sheet for a listing that was actually created).
@@ -229,6 +318,7 @@ export const resaleModule = {
       method: 'POST',
       body: { resale_listing: { reason } },
     });
+    resaleModule.forgetListingTicket(listingId);
     return sellerWireToListing(data);
   },
 
