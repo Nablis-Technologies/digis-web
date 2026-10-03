@@ -70,10 +70,6 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const [methodsOpen, setMethodsOpen] = useState(false);
   // Payout destinations (for the inline cash-out + "manage methods").
   const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
-  // Tickets that can be listed for resale — active only, not already listed.
-  const listableTickets = userTickets.filter(
-    (t) => t.status === 'active' && !myListings.some((l) => l.ticket?.id === t.id),
-  );
   // Browse + my-listings read through the Resale module (live backend: browse
   // serves active listings; my-listings are the active rows created in this
   // session — the backend exposes no owner identifier on browse).
@@ -98,6 +94,15 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   // Skeletons only appear if loading persists.
   const showBrowseLoading = useShowSkeleton(browsePending);
   const showMyLoading = useShowSkeleton(myPending);
+  // Wallet card derived values (computed at the top level, not inside JSX).
+  const payableBalances = sellerBalance.filter((b) => b.availableMinor > 0);
+  const hasVerifiedMethod = payoutMethods.some((m) => m.status === 'verified');
+  const showWalletCard = !balanceError && sellerBalance.length > 0 && sellerHistory.length > 0;
+  // Tickets that can be listed for resale — active only, not already listed.
+  // Declared after `myListings` (above) to avoid a temporal-dead-zone crash.
+  const listableTickets = userTickets.filter(
+    (t) => t.status === 'active' && !myListings.some((l) => l.ticket?.id === t.id),
+  );
   const [showFilters, setShowFilters] = useState(false);
   // The selected-event rail is a separate view — it keeps its own open state so
   // toggling one panel never opens the other.
@@ -838,14 +843,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                 </div>
               </div>
             )}
-            {/* Only when the seller actually has earnings history — an empty
-                wallet should not occupy the top of the tab. */}
             {/* ── Wallet — one card: balance, cash out, history, methods. Only
                 when the seller has earnings history. ── */}
-            {!balanceError && sellerBalance.length > 0 && sellerHistory.length > 0 && (() => {
-              const payable = sellerBalance.filter((b) => b.availableMinor > 0);
-              const verifiedMethod = payoutMethods.some((m) => m.status === 'verified');
-              return (
+            {showWalletCard && (
                 <div className="px-5 pt-5">
                   <div className="relative w-full rounded-2xl overflow-hidden p-4"
                     style={{ background: isDark ? 'rgba(255,255,255,0.04)' : '#fff', ...glassEdge(isDark) }}>
@@ -861,8 +861,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                           Available to pay out
                         </p>
                         <p className="text-[20px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#fff' : '#1a1a1a' }}>
-                          {payable.length > 0
-                            ? payable.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')
+                          {payableBalances.length > 0
+                            ? payableBalances.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')
                             : Money.fromMinor(0, sellerBalance[0].currency).format()}
                         </p>
                         {sellerBalance.some((b) => b.reservedMinor > 0) && (
@@ -877,12 +877,12 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
 
                     {/* Cash out (inline) */}
                     <div className="relative z-10 mt-4">
-                      {payable.length === 0 ? (
+                      {payableBalances.length === 0 ? (
                         <AppButton disabled className="w-full h-[48px] rounded-xl flex items-center justify-center cursor-not-allowed"
                           style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
                           <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>No balance to cash out</span>
                         </AppButton>
-                      ) : !verifiedMethod ? (
+                      ) : !hasVerifiedMethod ? (
                         <AppButton whileTap={{ scale: 0.98 }} onClick={() => setMethodsOpen(true)}
                           className="w-full h-[48px] rounded-xl flex items-center justify-center cursor-pointer"
                           style={{ background: '#d6f905', ...glassEdge(isDark) }}>
@@ -932,8 +932,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+            )}
 
             {/* ── Active Listings ── */}
             {myError ? (
