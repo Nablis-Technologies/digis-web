@@ -44,15 +44,13 @@ export function RemoveListingSheet({
         <div
           className="relative rounded-[28px] overflow-hidden px-6 pt-8 pb-6"
           style={{
-            background: isDark
-              ? 'linear-gradient(160deg, rgba(40,18,18,0.92) 0%, rgba(20,8,8,0.97) 100%)'
-              : 'linear-gradient(160deg, #fff 0%, #fdf6f6 100%)',
-            border: `1px solid rgba(239,68,68,${isDark ? 0.25 : 0.2})`,
+            background: isDark ? '#101115' : '#fff',
+            border: 'none',
             backdropFilter: 'blur(32px)',
             WebkitBackdropFilter: 'blur(32px)',
-            ...glassEdge(isDark),
           }}
         >
+          <GlassReflection isDark={isDark} />
           {/* Pull handle */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full"
             style={{ background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }} />
