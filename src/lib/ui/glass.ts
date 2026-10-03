@@ -112,7 +112,7 @@ export function glassEdgeReflection(
   const mask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
 
   return {
-    padding: "1px",
+    padding: "0.5px",
     background: `conic-gradient(from ${config.hairlineAngle}deg at 50% 50%, rgba(255,255,255,${opacity * 0.24}) 0deg, rgba(255,255,255,${opacity}) 50deg, rgba(255,255,255,${opacity * 0.34}) 132deg, rgba(255,255,255,${opacity * 0.08}) 230deg, rgba(255,255,255,${opacity * 0.24}) 360deg)`,
     borderRadius: "inherit",
     WebkitMask: mask,
@@ -165,10 +165,11 @@ export function glassInputSurface(isDark: boolean): CSSProperties {
 
 /**
  * Field/input surface + state. The same `glassInputSurface()` as the search
- * bar at rest. Focus is a clear, unmistakable shift: a lime hairline + a
- * brighter lime ring (not the faint 10% halo) + a lime-warmed fill. Error swaps
- * lime for red (the message under the field still carries the failure). The
- * reflected hairline comes from a `GlassReflection` overlay on the wrapper.
+ * bar at rest. Focus is a clear, unmistakable shift but the edge stays a
+ * *hairline*: a lime ring (no added border-width) + a lime-warmed fill + a lime
+ * glow. Error swaps lime for red (the message under the field still carries the
+ * failure). The reflected hairline comes from a `GlassReflection` overlay on
+ * the wrapper.
  */
 export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
   const out = glassInputSurface(isDark);
@@ -176,14 +177,12 @@ export function glassField(isDark: boolean, opts: { error?: boolean; focused?: b
     out.background = isDark
       ? "linear-gradient(rgba(50,24,26,0.5), rgba(50,24,26,0.5)), rgba(30,30,34,0.4)"
       : "rgba(255,244,245,0.72)";
-    out.border = `1px solid ${isDark ? "rgba(248,113,113,0.85)" : "rgba(190,18,60,0.7)"}`;
-    out.boxShadow = `${out.boxShadow}, 0 0 0 3px ${isDark ? "rgba(248,113,113,0.22)" : "rgba(190,18,60,0.16)"}`;
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(248,113,113,0.7)" : "rgba(190,18,60,0.55)"}, 0 0 0 3px ${isDark ? "rgba(248,113,113,0.22)" : "rgba(190,18,60,0.16)"}`;
   } else if (opts.focused) {
     out.background = isDark
       ? "linear-gradient(rgba(46,49,18,0.5), rgba(46,49,18,0.5)), rgba(30,30,34,0.4)"
       : "rgba(252,255,220,0.78)";
-    out.border = `1px solid ${isDark ? "#d6f905" : "#7c9a00"}`;
-    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.5)" : "rgba(124,154,0,0.4)"}, 0 0 0 3px ${isDark ? "rgba(214,249,5,0.28)" : "rgba(124,154,0,0.2)"}`;
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.6)" : "rgba(124,154,0,0.5)"}, 0 0 0 3px ${isDark ? "rgba(214,249,5,0.28)" : "rgba(124,154,0,0.2)"}`;
   }
   return out;
 }
