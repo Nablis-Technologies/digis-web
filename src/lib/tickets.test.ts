@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mapWalletTicket, ticketsService, ticketStatusMeta, type TicketWalletWire } from '@/lib/tickets';
 import { apiFetch } from '@/lib/api';
-import { getEventImage } from '@/lib/utils/eventImages';
 
 vi.mock('@/lib/api', () => ({ apiFetch: vi.fn() }));
-vi.mock('@/lib/utils/eventImages', () => ({ getEventImage: vi.fn(() => '') }));
 
 const mockedApiFetch = vi.mocked(apiFetch);
 

@@ -114,8 +114,9 @@ test('seller cashes out the full balance → POST carries amount + account + key
   await expect(amount).toHaveValue('5000');
   await page.getByRole('button', { name: 'Confirm cash out' }).click();
 
-  // The new payout renders as pending (never "paid out").
-  await expect(page.getByText('Pending')).toBeVisible({ timeout: 10_000 });
+  // The new payout renders as pending (never "paid out"). Exact match so the
+  // transient success toast ("… it's pending.") can't satisfy the assertion.
+  await expect(page.getByText('Pending', { exact: true })).toBeVisible({ timeout: 10_000 });
   expect(postBody).toEqual({
     payout: { currency: 'ETB', amount_minor: 500000, seller_payout_account_id: 'pa-1' },
   });

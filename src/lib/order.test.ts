@@ -73,10 +73,9 @@ describe('findGuestReturnCreds correlation (BACKEND_GAPS #14 return flow)', () =
   });
 });
 
-describe('orderModule.quote', () => {
+describe('orderModule.quote (mock cart — no backend event)', () => {
   it('computes subtotal as unit cents × quantity', async () => {
     const q = await orderModule.quote({
-      eventId: 'evt-1',
       items: [{ eventProductId: 'ticket:VIP', quantity: 2, unitPriceMinor: 150000 }],
       chargeCurrency: 'ETB',
     });
@@ -87,7 +86,6 @@ describe('orderModule.quote', () => {
 
   it('adds the buyer fee on top (5% mock, integer cents)', async () => {
     const q = await orderModule.quote({
-      eventId: 'evt-1',
       items: [{ eventProductId: 'ticket:VIP', quantity: 1, unitPriceMinor: 100000 }],
       chargeCurrency: 'ETB',
     });
@@ -97,7 +95,6 @@ describe('orderModule.quote', () => {
 
   it('totals multiple lines', async () => {
     const q = await orderModule.quote({
-      eventId: 'evt-1',
       items: [
         { eventProductId: 'ticket:GA', quantity: 2, unitPriceMinor: 60000 },
         { eventProductId: 'av-parking', quantity: 1, unitPriceMinor: 25000 },
@@ -109,7 +106,6 @@ describe('orderModule.quote', () => {
 
   it('returns a quote_token and expiry', async () => {
     const q = await orderModule.quote({
-      eventId: 'evt-1',
       items: [{ eventProductId: 'ticket:GA', quantity: 1, unitPriceMinor: 10000 }],
       chargeCurrency: 'ETB',
     });

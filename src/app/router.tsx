@@ -870,7 +870,8 @@ export function AppRouterProvider() {
       { path: '/login', Component: AuthLoginRoute },
       { path: '/signup', Component: AuthSignupRoute },
       { path: '/claim/:id', Component: ClaimRoute },
-      { path: '/ui-preview', Component: UIPreviewPage },
+      // UI preview is a dev-only design sandbox; it is not registered in prod.
+      ...(import.meta.env.DEV ? [{ path: '/ui-preview', Component: UIPreviewPage }] : []),
     ])
   );
   return <RouterProvider router={router} />;

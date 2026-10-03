@@ -122,9 +122,9 @@ describe('resaleModule reads (live API, mocked HTTP)', () => {
     expect(l.listedAgo).not.toBe('');
   });
 
-  it('fetchListings falls back to an empty image when no cover resolves', async () => {
+  it('fetchListings leaves the image absent when no cover resolves', async () => {
     const listings = await resaleModule.fetchListings();
-    expect(listings[1].image).toBe('');
+    expect(listings[1].image).toBeUndefined();
   });
 
   it('mapper tolerates missing event dates and venue', () => {

@@ -1,6 +1,5 @@
 import { apiFetch } from '@/lib/api';
 import { mapWalletTicket, type TicketWalletWire } from '@/lib/tickets';
-import { getEventImage } from '@/lib/utils/eventImages';
 import type { UserTicket } from '@/types/ticket';
 
 export type TransferStatus = 'pending' | 'accepted' | 'expired' | 'declined' | 'cancelled';
@@ -59,17 +58,16 @@ export function buildClaimLink(transferId: string, token: string): string {
   return `/claim/${transferId}?${params.toString()}`;
 }
 
-async function resolveTransferImage(slug: string | undefined, title: string): Promise<string | undefined> {
-  if (slug) {
-    try {
-      const { eventsModule } = await import('@/lib/events');
-      const event = await eventsModule.fetchById(slug);
-      if (event?.image) return event.image;
-    } catch {
-      /* fall through to the local name-matched cover */
-    }
+async function resolveTransferImage(slug: string | undefined): Promise<string | undefined> {
+  if (!slug) return undefined;
+  try {
+    const { eventsModule } = await import('@/lib/events');
+    const event = await eventsModule.fetchById(slug);
+    return event?.image || undefined;
+  } catch {
+    // A failed cover read renders absent — never a fabricated local image.
+    return undefined;
   }
-  return getEventImage(title) || undefined;
 }
 
 export const transferService = {
@@ -114,7 +112,7 @@ export const transferService = {
       },
       recipient: { phone: data.recipient.phone, emailPresent: data.recipient.email_present },
     };
-    mapped.image = await resolveTransferImage(data.event.slug, data.event.title);
+    mapped.image = await resolveTransferImage(data.event.slug);
     return mapped;
   },
 

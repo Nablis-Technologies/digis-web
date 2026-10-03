@@ -34,7 +34,7 @@ async function walkGuestToPayment(page: Page) {
   for (let i = 0; i < 6; i++) {
     const payNow = page.getByRole('button', { name: /^Pay .*/ });
     if (await payNow.count() > 0) break;
-    const nameField = page.getByPlaceholder('Abebe Bekele');
+    const nameField = page.getByPlaceholder('Abebe');
     if (await nameField.isVisible().catch(() => false)) {
       await nameField.fill('Free Guest');
       const emailField = page.getByPlaceholder('you@example.com');

@@ -363,9 +363,11 @@ export const orderModule = {
    * — the frontend never invents money or posts fabricated quote tokens.
    */
   async quote(input: QuoteInput): Promise<OrderQuote> {
-    const isMockCart =
-      !input.eventId || input.items.some((i) => i.eventProductId.includes(":"));
-    if (isMockCart) return mockQuote(input);
+    // A cart that carries a real backend event is priced ONLY by the backend —
+    // a live event whose tier has no backend product id must surface an error,
+    // never a fabricated client-side quote (ADR-0002). The local mock calculator
+    // covers only carts with no backend event (design sandbox / preview data).
+    if (!input.eventId) return mockQuote(input);
 
     const baseBody = {
       charge_currency: input.chargeCurrency,

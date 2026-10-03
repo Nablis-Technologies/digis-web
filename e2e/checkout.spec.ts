@@ -139,9 +139,9 @@ test('guest is asked to log in before payment', async ({ page }) => {
     const payNow = page.getByRole('button', { name: /^Pay .*/ });
     if (await payNow.count() > 0) break;
     // Details step: fill it once, it validates and blocks otherwise.
-    // Fields are placeholder-addressed (AppInput): "Abebe Bekele" (name),
+    // Fields are placeholder-addressed (AppInput): "Abebe" (name),
     // "you@example.com" (email), "+251 9 XX XXX XXX" (phone).
-    const nameField = page.getByPlaceholder('Abebe Bekele');
+    const nameField = page.getByPlaceholder('Abebe');
     if (await nameField.isVisible().catch(() => false)) {
       await nameField.fill('Test Guest');
       const emailField = page.getByPlaceholder('you@example.com');

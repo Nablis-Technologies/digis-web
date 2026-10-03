@@ -29,7 +29,6 @@ import { isoToDisplayDate, isoToDisplayTime, formatRelativeTime } from "@/lib/ma
 import type { CheckoutOrder } from "@/lib/order";
 import type { ResaleListing, PublicResaleListingWire, SellerResaleListingWire } from "@/types/resale";
 import type { UserTicket } from "@/types/ticket";
-import { getEventImage } from "@/lib/utils/eventImages";
 import { Money } from "@/lib/money";
 
 /** Map the buyer-visible wire shape to display fields. No invention. */
@@ -91,14 +90,13 @@ function sellerWireToListing(wire: SellerResaleListingWire): ResaleListing {
   };
 }
 
-/** Resolve a backend event cover per distinct slug; failures fall back locally. */
+/** Resolve a backend event cover per distinct slug; a failure renders absent. */
 async function resolveImages(wires: PublicResaleListingWire[]): Promise<Map<string, string>> {
   const slugs = Array.from(new Set(wires.map((w) => w.event.slug).filter(Boolean)));
   const entries = await Promise.all(
     slugs.map(async (slug) => {
       const event = await eventsModule.fetchById(slug).catch(() => null);
-      const wire = wires.find((w) => w.event.slug === slug)!;
-      return [slug, event?.image || getEventImage(wire.event.title)] as const;
+      return [slug, event?.image ?? ""] as const;
     }),
   );
   return new Map(entries);
@@ -148,7 +146,7 @@ export const resaleModule = {
     const { data } = await apiFetch<PublicResaleListingWire[]>("resale_listings");
     const wires = Array.isArray(data) ? data : [];
     const images = await resolveImages(wires);
-    return wires.map((w) => mapPublicListing(w, images.get(w.event.slug) ?? getEventImage(w.event.title)));
+    return wires.map((w) => mapPublicListing(w, images.get(w.event.slug) || undefined));
   },
 
   /**
@@ -174,7 +172,7 @@ export const resaleModule = {
   async fetchListingDetail(id: string): Promise<ResaleListing> {
     const { data } = await apiFetch<PublicResaleListingWire | SellerResaleListingWire>(`resale_listings/${id}`);
     if (isPublicListingWire(data)) {
-      const image = (await resolveImages([data])).get(data.event.slug) ?? getEventImage(data.event.title);
+      const image = (await resolveImages([data])).get(data.event.slug) || undefined;
       return mapPublicListing(data, image);
     }
     // Seller view is flat — enrich display from the browse row when the listing

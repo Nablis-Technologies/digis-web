@@ -25,6 +25,8 @@ test('runtime provenance audit - discovery + detail', async ({ page }) => {
   const mockImgs = cardImgs.filter((s) => MOCK_HOSTS.some((h) => s.includes(h)));
   console.log(`DISCOVERY images: ${cardImgs.length} total | backend: ${backendImgs.length} | mock-host: ${mockImgs.length}`);
   mockImgs.slice(0, 4).forEach((s) => console.log('  mock img:', s.slice(0, 90)));
+  // Provenance assertion: no mock-host artwork may render on a live surface.
+  expect(mockImgs, `mock-host images leaked: ${JSON.stringify(mockImgs.slice(0, 4))}`).toHaveLength(0);
 
   // ── Detail (deep link, forces fetchById) ──
   apiCalls.length = 0;
@@ -35,5 +37,7 @@ test('runtime provenance audit - discovery + detail', async ({ page }) => {
   const detailImgs = await page.evaluate(() =>
     Array.from(document.querySelectorAll('img')).map((i) => i.src).filter((s) => s && !s.startsWith('data:'))
   );
-  console.log(`DETAIL images: ${detailImgs.length} total | backend: ${detailImgs.filter((s) => s.includes('localhost:3000')).length} | mock-host: ${detailImgs.filter((s) => MOCK_HOSTS.some((h) => s.includes(h))).length}`);
+  const detailMockHost = detailImgs.filter((s) => MOCK_HOSTS.some((h) => s.includes(h)));
+  console.log(`DETAIL images: ${detailImgs.length} total | backend: ${detailImgs.filter((s) => s.includes('localhost:3000')).length} | mock-host: ${detailMockHost.length}`);
+  expect(detailMockHost, `mock-host images leaked: ${JSON.stringify(detailMockHost.slice(0, 4))}`).toHaveLength(0);
 });

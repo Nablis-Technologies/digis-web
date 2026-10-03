@@ -8,7 +8,6 @@ import { DetailedTicket } from '@/features/tickets/components/DetailedTicket';
 import { DownloadableTicketCard } from '@/features/tickets/components/DownloadableTicketCard';
 import { GlassTicketCard } from '@/features/tickets/components/GlassTicketCard';
 import { TicketsEmptyState } from '@/features/tickets/components/TicketsEmptyState';
-import { EditTicketAnswersDialog } from '@/features/tickets/components/EditTicketAnswersDialog';
 import { AddExtrasDialog } from '@/features/tickets/components/AddExtrasDialog';
 import { ExtrasOnlyCheckout } from '@/features/checkout/components/ExtrasOnlyCheckout';
 import { useTicketGroups } from '@/features/tickets/hooks/useTicketGroups';
@@ -51,8 +50,6 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   const [showQR, setShowQR] = useState(false);
   const [transferringTicket, setTransferringTicket] = useState<UserTicket | null>(null);
   const [sharingTicket, setSharingTicket] = useState<UserTicket | null>(null);
-  const [editingAnswersTicket, setEditingAnswersTicket] = useState<UserTicket | null>(null);
-  const [answerSaveError, setAnswerSaveError] = useState('');
   const [claimingTicket, setClaimingTicket] = useState<UserTicket | null>(null);
   const [addingExtrasTicket, setAddingExtrasTicket] = useState<UserTicket | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -99,12 +96,6 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
       if (onCloseTicket) onCloseTicket();
     }
   };
-  const updateAnswersMutation = useMutation({
-    mutationKey: ['tickets', 'answers'],
-    mutationFn: ({ ticketId, answers }: { ticketId: string; answers: Record<string, unknown> }) => ticketsService.updateTicketAnswers(ticketId, answers),
-    onSuccess: () => { setAnswerSaveError(''); setEditingAnswersTicket(null); queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets }); },
-    onError: (error: Error) => setAnswerSaveError(error.message),
-  });
   // Extras-only checkout: opens the Chapa payment flow for just the extras
   // (no ticket) against a live wallet ticket.
   const [extrasCheckout, setExtrasCheckout] = useState<{ ticket: UserTicket; products: EventProduct[] } | null>(null);
@@ -324,7 +315,6 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
                 onTransfer={() => { setTransferringTicket(selectedTicket); setSelectedTicket(null); }}
                 onShare={() => { setSharingTicket(selectedTicket); setSelectedTicket(null); }}
                 onResell={selectedTicket.status === 'active' && onListForResale ? () => { onListForResale(selectedTicket); setSelectedTicket(null); } : undefined}
-                onEditAnswers={selectedTicket.customQuestions?.length && selectedTicket.answersEditableUntil && Date.parse(selectedTicket.answersEditableUntil) > Date.now() ? () => { setAnswerSaveError(''); setEditingAnswersTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onAddExtras={selectedTicket.eventSlug ? () => { setAddingExtrasTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onClaim={!isAuthenticated && selectedTicket.registrationId && selectedTicket.ticketViewToken ? () => { setClaimingTicket(selectedTicket); setSelectedTicket(null); } : undefined}
                 onDownload={handleDownload}
@@ -364,18 +354,6 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
             products={extrasCheckout.products}
             onClose={() => setExtrasCheckout(null)}
             onComplete={() => { setExtrasCheckout(null); queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets }); }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {editingAnswersTicket && (
-          <EditTicketAnswersDialog
-            ticket={editingAnswersTicket}
-            isSaving={updateAnswersMutation.isPending}
-            saveError={answerSaveError}
-            onClose={() => { if (!updateAnswersMutation.isPending) setEditingAnswersTicket(null); }}
-            onSave={(answers) => updateAnswersMutation.mutate({ ticketId: editingAnswersTicket.id, answers })}
           />
         )}
       </AnimatePresence>

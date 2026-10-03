@@ -1,14 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiFetch } from '@/lib/api';
 import { transferService, buildClaimLink } from '@/lib/transfer';
-import { getEventImage } from '@/lib/utils/eventImages';
 import type { TicketWalletWire } from '@/lib/tickets';
 
 vi.mock('@/lib/api', () => ({ apiFetch: vi.fn() }));
-vi.mock('@/lib/utils/eventImages', () => ({ getEventImage: vi.fn(() => 'local-cover') }));
 
 const mockedApiFetch = vi.mocked(apiFetch);
-const mockedGetEventImage = vi.mocked(getEventImage);
 
 const transferWire = {
   id: 'tr-1',
@@ -38,7 +35,6 @@ const walletWire: TicketWalletWire = {
 describe('transferService', () => {
   beforeEach(() => {
     mockedApiFetch.mockReset();
-    mockedGetEventImage.mockReset();
   });
 
   it('builds a claim link with the transfer id + secret token', () => {
@@ -87,14 +83,13 @@ describe('transferService', () => {
     });
   });
 
-  it('fetchPublic falls back to the local cover when the detail fetch fails', async () => {
+  it('fetchPublic renders no cover when the detail fetch fails', async () => {
     mockedApiFetch.mockImplementation(async (path: string) => {
       if (path.startsWith('public/ticket_transfers/')) return { data: transferWire };
       throw new Error('boom');
     });
     const result = await transferService.fetchPublic('tr-1', 's3cr3t');
-    expect(result.image).toBe('local-cover');
-    expect(mockedGetEventImage).toHaveBeenCalledWith('On & On');
+    expect(result.image).toBeUndefined();
   });
 
   it('requestOtp posts the phone and secret token', async () => {

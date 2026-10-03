@@ -30,7 +30,7 @@ export function DetailsStep({
       </div>
 
       <Field
-        icon={<User className="w-4 h-4" />} label="Name" placeholder="Abebe Bekele"
+        icon={<User className="w-4 h-4" />} label="Name" placeholder="Abebe"
         value={name} onChange={(v: string) => { setName(v); setErrors((e: any) => ({ ...e, name: undefined })); }}
         error={errors.name} isDark={isDark}
       />

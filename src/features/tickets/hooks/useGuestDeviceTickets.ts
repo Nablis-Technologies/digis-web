@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { mapWalletTicket } from '@/lib/tickets';
 import { guestWallet } from '@/lib/guest-wallet';
-import { getEventImage } from '@/lib/utils/eventImages';
 import type { UserTicket } from '@/types';
 
 export interface GuestDeviceTicket extends UserTicket {
@@ -47,8 +46,8 @@ export function useGuestDeviceTickets(): {
           }
         }
         // Enrich covers like the authenticated wallet does: the wire carries no
-        // artwork, so resolve each distinct event's cover (public detail) with
-        // a local name-matched fallback — never a blank card.
+        // artwork, so resolve each distinct event's cover from the public
+        // detail; a miss renders absent, never a fabricated local image.
         const slugs = [...new Set(eventRecords.map((r) => r.wire.event.slug).filter(Boolean))];
         if (slugs.length > 0) {
           const { eventsModule } = await import('@/lib/events');
@@ -60,7 +59,7 @@ export function useGuestDeviceTickets(): {
             if (res.status === 'fulfilled' && res.value.event?.image) bySlug.set(res.value.slug, res.value.event.image);
           });
           mapped.forEach((t) => {
-            const cover = (t.eventSlug && bySlug.get(t.eventSlug)) || getEventImage(t.eventName) || undefined;
+            const cover = t.eventSlug ? bySlug.get(t.eventSlug) : undefined;
             if (cover) t.image = cover;
           });
         }

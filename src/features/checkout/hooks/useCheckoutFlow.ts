@@ -1,7 +1,6 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { orderModule, type OrderQuote } from '@/lib/order';
-import { ticketsService } from '@/lib/tickets';
 import { clearCheckoutResumeKeys } from '@/lib/payment-return';
 import { openHostedCheckout as openHostedCheckoutTab } from '@/lib/checkout-popup';
 import { registrationModule, type ConsentDocument } from '@/lib/registration';
@@ -201,28 +200,12 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     },
   });
 
-  const finalizeSuccess = (order: { id: string }) => {
+  const finalizeSuccess = () => {
     // Terminal outcome — drop per-checkout resume keys so the NEXT purchase
     // of the same tier starts fresh instead of replaying this registration.
+    // Tickets are always issued server-side after payment
+    // (Ticketing::Packages::Issue) and read from GET /tickets.
     clearCheckoutResumeKeys();
-    // Live orders: the backend issues tickets server-side after payment
-    // (Ticketing::Packages::Issue) and the wallet reads them from
-    // GET /tickets. Mock-issue ONLY for mock carts — faking wallet rows for a
-    // live order would mask the real async issuance (ADR-0003).
-    if (!isLiveTicket) {
-      ticketsService.issueTicketsForOrder({
-        id: order.id,
-        eventId,
-        ticketType,
-        quantity,
-        seats: hasSeats ? selectedSeats : undefined,
-        addOns,
-        answers,
-        customQuestions: questions,
-        answerEditWindowHours,
-        completedAt: new Date().toISOString(),
-      });
-    }
     setStep('success');
   };
 
@@ -519,7 +502,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
 
       // Free / fully-discounted admission — the backend confirms + issues.
       if (nextAction.type === 'confirmed' || nextAction.type === 'issuing') {
-        finalizeSuccess(order ?? { id: nextAction.orderId ?? '' });
+        finalizeSuccess();
         return;
       }
       if (nextAction.type === 'awaiting_approval') {
@@ -540,7 +523,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
           eventId,
           ...(guest ? { guest } : {}),
         });
-        if (!payment || payment.status === 'succeeded') { finalizeSuccess(order); return; }
+        if (!payment || payment.status === 'succeeded') { finalizeSuccess(); return; }
         if (payment.status === 'processing' && payment.checkout_url) {
           openHostedCheckout(order.id, payment.checkout_url);
           return;
