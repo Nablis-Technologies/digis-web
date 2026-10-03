@@ -20,6 +20,7 @@ import { FilterPanel } from '@/features/resale/components/FilterPanel';
 
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
 import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSheet';
+import { BuyListingSheet } from '@/features/resale/components/BuyListingSheet';
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
 import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
 import { PayoutMethodsSheet } from '@/features/resale/components/PayoutMethodsSheet';
@@ -228,6 +229,18 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
 
   // Resale purchase — the shared command used by every resale buy surface.
   const resalePurchase = useResalePurchase();
+  // The listing awaiting purchase confirmation (the review sheet). Buy never
+  // fires directly from the row — the buyer reviews price, face value, and the
+  // Digis guarantee first.
+  const [confirmBuy, setConfirmBuy] = useState<ResaleListing | null>(null);
+  // On a successful buy the hook either opens the hosted checkout (new tab) or
+  // sets a pendingOrder. Close the review sheet once the attempt settles without
+  // an error, so the row flow continues underneath.
+  useEffect(() => {
+    if (confirmBuy && !resalePurchase.purchasing && !resalePurchase.error) {
+      setConfirmBuy(null);
+    }
+  }, [confirmBuy, resalePurchase.purchasing, resalePurchase.error, resalePurchase.pendingOrder]);
   // The event behind the selected group, for the ticket-detail elements the
   // event page shows (about / lineup / organizer). Absent data renders nothing.
   const selectedEventQuery = useQuery({
@@ -693,10 +706,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                               </span>
                             ) : (
                               <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                onClick={() => void resalePurchase.buy(listing)}
-                                disabled={resalePurchase.purchasing}
+                                onClick={() => { resalePurchase.reset(); setConfirmBuy(listing); }}
                                 className="relative z-10 flex-shrink-0 px-4 py-2.5 rounded-xl cursor-pointer disabled:cursor-not-allowed"
-                                style={{ background: 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)', color: '#0a0a0a' }}>
+                                style={{ background: '#d6f905', color: '#0a0a0a', ...glassEdge(isDark) }}>
                                 <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Buy</span>
                               </AppButton>
                             )}
@@ -1051,6 +1063,19 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
             listingId={successListing.id}
             isDark={isDark}
             onClose={() => { setShowListingSuccess(false); setActiveTab('myListings'); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Buy confirmation sheet — review before purchasing a listing */}
+      <AnimatePresence>
+        {confirmBuy && (
+          <BuyListingSheet
+            listing={confirmBuy}
+            submitting={resalePurchase.purchasing}
+            error={resalePurchase.error}
+            onConfirm={() => void resalePurchase.buy(confirmBuy)}
+            onClose={() => { if (!resalePurchase.purchasing) { resalePurchase.reset(); setConfirmBuy(null); } }}
           />
         )}
       </AnimatePresence>
