@@ -239,12 +239,15 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const [confirmBuy, setConfirmBuy] = useState<ResaleListing | null>(null);
   // On a successful buy the hook either opens the hosted checkout (new tab) or
   // sets a pendingOrder. Close the review sheet once the attempt settles without
-  // an error, so the row flow continues underneath.
+  // an error. `buyAttempted` guards against closing on the initial render (when
+  // the sheet just opened with purchasing=false and no error).
+  const [buyAttempted, setBuyAttempted] = useState(false);
   useEffect(() => {
-    if (confirmBuy && !resalePurchase.purchasing && !resalePurchase.error) {
+    if (buyAttempted && confirmBuy && !resalePurchase.purchasing && !resalePurchase.error) {
       setConfirmBuy(null);
+      setBuyAttempted(false);
     }
-  }, [confirmBuy, resalePurchase.purchasing, resalePurchase.error, resalePurchase.pendingOrder]);
+  }, [buyAttempted, confirmBuy, resalePurchase.purchasing, resalePurchase.error, resalePurchase.pendingOrder]);
   // The event behind the selected group, for the ticket-detail elements the
   // event page shows (about / lineup / organizer). Absent data renders nothing.
   const selectedEventQuery = useQuery({
@@ -739,7 +742,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                               </span>
                             ) : (
                               <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                onClick={() => { resalePurchase.reset(); setConfirmBuy(listing); }}
+                                onClick={() => { resalePurchase.reset(); setBuyAttempted(false); setConfirmBuy(listing); }}
                                 disabled={resalePurchase.purchasing}
                                 className="relative z-10 flex-shrink-0 px-4 py-2.5 rounded-xl cursor-pointer disabled:cursor-not-allowed"
                                 style={{
@@ -1113,8 +1116,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
             listing={confirmBuy}
             submitting={resalePurchase.purchasing}
             error={resalePurchase.error}
-            onConfirm={() => void resalePurchase.buy(confirmBuy)}
-            onClose={() => { if (!resalePurchase.purchasing) { resalePurchase.reset(); setConfirmBuy(null); } }}
+            onConfirm={() => { setBuyAttempted(true); void resalePurchase.buy(confirmBuy); }}
+            onClose={() => { if (!resalePurchase.purchasing) { resalePurchase.reset(); setBuyAttempted(false); setConfirmBuy(null); } }}
           />
         )}
       </AnimatePresence>
