@@ -109,3 +109,10 @@ Playwright **28/28** (one transient parallel-login flake, green on re-run).
 
 Verified: tsc · vitest **145/145** · build · Playwright **28/28**; no
 `mock/events`/`eventImages` references remain in `src`.
+
+**Follow-ups done 2026-10-02:**
+- **De-flake:** seller-payout specs now log in as a dedicated account
+  `+251911000007` (seeded in `dev_demo.rb` with a verified destination + balance),
+  not the shared buyer — no more parallel-login race with `checkout.spec`.
+- **Live drill:** `e2e/zz-live-seller-payout.spec.ts` (run `RUN_ZZ=1`) drives the
+  real `/payouts` UI → real `pending` payout + balance drop.
