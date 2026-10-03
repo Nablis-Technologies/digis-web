@@ -1,9 +1,10 @@
 /**
  * Seller payout destinations — mirrors digis_backend's seller payout
  * accounts (all mutations require Idempotency-Key, auto-injected):
- *   - GET  /marketplace/seller/payout_accounts        → own registered accounts
+ *   - GET  /marketplace/seller/payout_accounts            → own registered accounts
  *   - GET  /marketplace/seller/payout_accounts/destinations → provider rails
- *   - POST /marketplace/seller/payout_accounts        → verify + register one
+ *   - POST /marketplace/seller/payout_accounts            → verify + register one
+ *   - POST /marketplace/seller/payout_accounts/:id/set_default → choose the default
  *
  * Backend contract notes the UI must respect:
  * - Rails are DISCOVERED, never hardcoded. The provider (and its mode) decides
@@ -119,6 +120,20 @@ export const payoutService = {
         },
       },
     });
+    return mapPayoutAccount(data);
+  },
+
+  /**
+   * POST /marketplace/seller/payout_accounts/:id/set_default — make a verified
+   * destination the default (used when a cash-out omits the destination). The
+   * backend only allows VERIFIED accounts; the returned row carries the new
+   * `is_default`.
+   */
+  async setDefault(id: string): Promise<PayoutMethod> {
+    const { data } = await apiFetch<SellerPayoutAccountWire>(
+      `marketplace/seller/payout_accounts/${encodeURIComponent(id)}/set_default`,
+      { method: 'POST' },
+    );
     return mapPayoutAccount(data);
   },
 };

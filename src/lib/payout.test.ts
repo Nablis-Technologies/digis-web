@@ -129,3 +129,12 @@ describe('payoutService.addMethod (live API, mocked HTTP)', () => {
     expect(mockedApiFetch).not.toHaveBeenCalled();
   });
 });
+
+describe('payoutService.setDefault (live API, mocked HTTP)', () => {
+  it('POSTs to the set_default member route and maps the returned default', async () => {
+    mockedApiFetch.mockResolvedValue({ data: accountWire({ is_default: true }) } as never);
+    const method = await payoutService.setDefault('pa/1');
+    expect(mockedApiFetch).toHaveBeenCalledWith('marketplace/seller/payout_accounts/pa%2F1/set_default', { method: 'POST' });
+    expect(method.isDefault).toBe(true);
+  });
+});

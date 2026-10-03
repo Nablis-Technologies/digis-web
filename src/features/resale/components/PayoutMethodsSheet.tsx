@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
-import { X, Plus, Check, ArrowLeft, Wallet, Landmark, AlertTriangle } from 'lucide-react';
+import { X, Plus, Check, ArrowLeft, Wallet, Landmark, AlertTriangle, Loader2 } from 'lucide-react';
 import { payoutService, payoutKeys, statusLabel } from '@/lib/payout';
 import { mapApiError } from '@/lib/errors';
 import { toastSuccess } from '@/lib/feedback';
@@ -36,10 +36,18 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
     },
   });
 
-  // No default flag and no removal endpoint exist server-side, so selection
-  // is notification-only (the sheet's caller closes / continues).
+  // Picking a verified destination makes it the default server-side (used by a
+  // cash-out that omits the destination). There is no removal endpoint.
+  const defaultMutation = useMutation({
+    mutationFn: (id: string) => payoutService.setDefault(id),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: payoutKeys.all }); },
+  });
+
   const selectMethod = (method: PayoutMethod) => {
     onMethodSelected?.(method);
+    if (method.status === 'verified' && !method.isDefault && !defaultMutation.isPending) {
+      defaultMutation.mutate(method.id);
+    }
   };
 
   const text = isDark ? '#fff' : '#1a1a1a';
@@ -135,6 +143,7 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
                     {methods.map(m => (
                       <PayoutRow key={m.id} method={m} isDark={isDark} text={text} muted={muted}
                         cardBg={cardBg} cardBorder={cardBorder}
+                        saving={defaultMutation.isPending && defaultMutation.variables === m.id}
                         onSelect={() => selectMethod(m)} />
                     ))}
                   </div>
@@ -162,11 +171,12 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
   return typeof document !== 'undefined' ? createPortal(sheet, document.body) : sheet;
 }
 
-function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect }: {
+function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, saving, onSelect }: {
   method: PayoutMethod; isDark: boolean; text: string; muted: string; cardBg: string; cardBorder: string;
-  onSelect: () => void;
+  saving: boolean; onSelect: () => void;
 }) {
   const verified = method.status === 'verified';
+  const accent = isDark ? '#d6f905' : '#6d28d9';
   return (
     <div className="relative rounded-2xl overflow-hidden p-1.5 flex items-center gap-1.5" style={{ background: cardBg }}>
       <GlassReflection isDark={isDark} />
@@ -194,8 +204,21 @@ function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, onSelect }
               }}>
               {statusLabel(method.status)}
             </span>
+            {method.isDefault && (
+              <span className="text-[9px] tracking-[0.5px] uppercase px-1.5 py-0.5 rounded-md"
+                style={{ fontFamily: "'Inter', sans-serif", color: accent, background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(109,40,217,0.06)' }}>
+                Default
+              </span>
+            )}
           </div>
         </div>
+        {saving ? (
+          <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" style={{ color: accent }} strokeWidth={2} />
+        ) : method.isDefault ? (
+          <Check className="w-4 h-4 flex-shrink-0" style={{ color: accent }} strokeWidth={2.4} />
+        ) : verified ? (
+          <span className="text-[11px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>Set default</span>
+        ) : null}
       </AppButton>
     </div>
   );
