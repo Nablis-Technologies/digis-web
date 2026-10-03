@@ -98,14 +98,12 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const hasVerifiedMethod = payoutMethods.some((m) => m.status === 'verified');
   const showWalletCard = !balanceError && sellerBalance.length > 0 && sellerHistory.length > 0;
   // Tickets that can be listed for resale — active only, and not already listed.
-  // The seller wire omits `ticket_id` (BACKEND_GAPS #66), so a listing can't be
-  // matched back to its wallet ticket across sessions. Within a session we pair
-  // each created listing with its ticket (the create response carries it) and
-  // drop the pair on a successful delist; a full fix waits on #66.
-  const [sessionListings, setSessionListings] = useState<Array<{ listingId: string; ticketId: string }>>([]);
-  const sessionListedTicketIds = new Set(sessionListings.map((s) => s.ticketId));
+  // The seller wire omits `ticket_id` (BACKEND_GAPS #66), so `resaleModule`
+  // caches each listing→ticket pair and reconciles it against the active
+  // `myListings` ids; a full cross-device fix waits on #66.
+  const listedTicketIds = resaleModule.listedTicketIds(myListings.map((l) => l.id));
   const listableTickets = userTickets.filter(
-    (t) => t.status === 'active' && !sessionListedTicketIds.has(t.id),
+    (t) => t.status === 'active' && !listedTicketIds.has(t.id),
   );
   const [showFilters, setShowFilters] = useState(false);
   // The selected-event rail is a separate view — it keeps its own open state so
@@ -298,13 +296,6 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
           setSuccessListing(listing);
           setListingTicket(null);
           setShowListingSuccess(true);
-          if (listing.ticket) {
-            setSessionListings((prev) => (
-              prev.some((s) => s.listingId === listing.id)
-                ? prev
-                : [...prev, { listingId: listing.id, ticketId: listing.ticket!.id }]
-            ));
-          }
           // Keep the confirmation open so the seller can share their listing before continuing.
         },
       },
@@ -324,7 +315,6 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
     // that is still in flight or that may fail.
     removeListingMutation.mutate(id, {
       onSuccess: () => {
-        setSessionListings((prev) => prev.filter((s) => s.listingId !== id));
         setPendingRemoveId(null);
         setRemovedFlashId(id);
         setTimeout(() => setRemovedFlashId(null), 600);
@@ -987,18 +977,18 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleRemoveListing(listing.id)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer ml-3"
+                        className="relative overflow-hidden flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer ml-3"
                         style={{
                           background: 'rgba(239,68,68,0.08)',
-                          border: '1px solid rgba(239,68,68,0.18)',
                           color: '#ef4444',
                           fontFamily: "'Inter', sans-serif",
                           fontSize: '11px',
                           fontWeight: 600,
                         }}
                       >
-                        <X className="w-3 h-3" strokeWidth={2.5} />
-                        Delist
+                        <GlassReflection isDark={isDark} />
+                        <X className="relative z-10 w-3 h-3" strokeWidth={2.5} />
+                        <span className="relative z-10">Delist</span>
                       </AppButton>
                     </motion.div>
                     );
@@ -1075,18 +1065,18 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleListTicket(ticket)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer ml-3"
+                        className="relative overflow-hidden flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer ml-3"
                         style={{
                           background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(214,249,5,0.16)',
-                          border: '1px solid rgba(214,249,5,0.3)',
                           color: isDark ? '#d6f905' : '#5a6b00',
                           fontFamily: "'Inter', sans-serif",
                           fontSize: '11px',
                           fontWeight: 600,
                         }}
                       >
-                        <Tag className="w-3 h-3" strokeWidth={2.2} />
-                        List
+                        <GlassReflection isDark={isDark} />
+                        <Tag className="relative z-10 w-3 h-3" strokeWidth={2.2} />
+                        <span className="relative z-10">List</span>
                       </AppButton>
                     </motion.div>
                   ))}
