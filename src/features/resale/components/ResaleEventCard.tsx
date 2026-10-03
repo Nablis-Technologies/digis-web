@@ -74,7 +74,7 @@ export function ResaleEventCard({ group, onClick }: { group: ResaleGroupCardData
         </div>
       </div>
       <div className="absolute inset-0 rounded-[24px] pointer-events-none"
-        style={{ boxShadow: `inset 0 0 0 1px rgba(${rgb},0.12)` }} />
+        style={{ boxShadow: `inset 0 0 0 1px ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }} />
     </div>
   );
 }

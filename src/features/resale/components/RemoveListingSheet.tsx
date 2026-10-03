@@ -6,6 +6,7 @@ import type { ResaleListing } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function RemoveListingSheet({
   listing,
@@ -49,7 +50,7 @@ export function RemoveListingSheet({
             border: `1px solid rgba(239,68,68,${isDark ? 0.25 : 0.2})`,
             backdropFilter: 'blur(32px)',
             WebkitBackdropFilter: 'blur(32px)',
-            boxShadow: isDark ? '0 -24px 60px -16px rgba(239,68,68,0.2)' : '0 -16px 48px -16px rgba(239,68,68,0.12)',
+            ...glassEdge(isDark),
           }}
         >
           {/* Pull handle */}
@@ -133,7 +134,7 @@ export function RemoveListingSheet({
                 fontWeight: 600,
                 background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                 color: '#fff',
-                boxShadow: '0 8px 24px -8px rgba(239,68,68,0.5)',
+                ...glassEdge(isDark),
               }}
             >
               Yes, delist
