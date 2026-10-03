@@ -575,7 +575,6 @@ function AppContent() {
                   selectedEventSlug={resaleEventSlug}
                   onOpenEvent={(slug) => navigate(`/resale/events/${encodeURIComponent(slug)}`)}
                   onCloseEvent={() => navigate('/resale')}
-                  onOpenPayouts={() => navigate('/payouts')}
                 />
               ) : currentView === 'settings' ? (
                 <SettingsView

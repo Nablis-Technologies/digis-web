@@ -20,12 +20,15 @@ import { FilterPanel } from '@/features/resale/components/FilterPanel';
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
 import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSheet';
 import { BuyListingSheet } from '@/features/resale/components/BuyListingSheet';
-import { ListTicketPickerSheet } from '@/features/resale/components/ListTicketPickerSheet';
+import { GlassTicketCard } from '@/features/tickets/components/GlassTicketCard';
+import { WithdrawPayoutSheet } from '@/features/payouts/components/WithdrawPayoutSheet';
+import { payoutService, payoutKeys } from '@/lib/payout';
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
 import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
 import { PayoutMethodsSheet } from '@/features/resale/components/PayoutMethodsSheet';
 import { ticketKeys } from '@/lib/tickets';
 import { sellerReportsService, sellerReportsKeys } from '@/lib/seller-reports';
+import { isoToDisplayDate } from '@/lib/mappers';
 import { toastError } from '@/lib/feedback';
 import { mapApiError } from '@/lib/errors';
 import { useQuery } from '@tanstack/react-query';
@@ -43,14 +46,12 @@ interface ResaleMarketplaceProps {
   selectedEventSlug?: string | null;
   onOpenEvent?: (slug: string) => void;
   onCloseEvent?: () => void;
-  /** Opens the dedicated payouts/cash-out page (`/payouts`). */
-  onOpenPayouts?: () => void;
 }
 
 /* ═══════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════ */
-export function ResaleMarketplace({ userTickets, initialListTicket, selectedEventSlug = null, onOpenEvent, onCloseEvent, onOpenPayouts }: ResaleMarketplaceProps) {
+export function ResaleMarketplace({ userTickets, initialListTicket, selectedEventSlug = null, onOpenEvent, onCloseEvent }: ResaleMarketplaceProps) {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -65,8 +66,14 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const [successListing, setSuccessListing] = useState<ResaleListing | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [removedFlashId, setRemovedFlashId] = useState<string | null>(null);
-  const [showPayoutSheet, setShowPayoutSheet] = useState(false);
-  const [showListPicker, setShowListPicker] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [methodsOpen, setMethodsOpen] = useState(false);
+  // Payout destinations (for the inline cash-out + "manage methods").
+  const { data: payoutMethods = [] } = useQuery({ queryKey: payoutKeys.all, queryFn: payoutService.fetchMethods });
+  // Tickets that can be listed for resale — active only, not already listed.
+  const listableTickets = userTickets.filter(
+    (t) => t.status === 'active' && !myListings.some((l) => l.ticket?.id === t.id),
+  );
   // Browse + my-listings read through the Resale module (live backend: browse
   // serves active listings; my-listings are the active rows created in this
   // session — the backend exposes no owner identifier on browse).
@@ -87,6 +94,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   // History is used only to decide whether the wallet card shows (has earnings
   // history). The full ledger lives on the /payouts page.
   const { data: sellerHistory = [] } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
+  const [showAllWalletHistory, setShowAllWalletHistory] = useState(false);
   // Skeletons only appear if loading persists.
   const showBrowseLoading = useShowSkeleton(browsePending);
   const showMyLoading = useShowSkeleton(myPending);
@@ -138,13 +146,13 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
 
   // Lock body scroll when a bottom sheet is open
   useEffect(() => {
-    if (showListSheet || showPayoutSheet) {
+    if (showListSheet || withdrawOpen || methodsOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
-  }, [showListSheet, showPayoutSheet]);
+  }, [showListSheet, withdrawOpen, methodsOpen]);
 
   // Group browse listings by event (mirrors the browse view's "Events with Resale").
   const eventGroups = (() => {
@@ -832,49 +840,100 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
             )}
             {/* Only when the seller actually has earnings history — an empty
                 wallet should not occupy the top of the tab. */}
-            {!balanceError && sellerBalance.length > 0 && sellerHistory.length > 0 && (
-              <div className="px-5 pt-5">
-                <AppButton whileTap={{ scale: 0.99 }}
-                  onClick={onOpenPayouts}
-                  disabled={!onOpenPayouts}
-                  className="relative w-full text-left rounded-2xl overflow-hidden p-4 cursor-pointer disabled:cursor-default"
-                  style={{ background: isDark ? 'rgba(255,255,255,0.04)' : '#fff', ...glassEdge(isDark) }}>
-                  <GlassReflection isDark={isDark} />
-                  <div className="relative z-10 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
-                      <Wallet className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                        Available to pay out
-                      </p>
-                      <p className="text-[18px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#fff' : '#1a1a1a' }}>
-                        {sellerBalance.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')}
-                      </p>
-                    </div>
-                    {onOpenPayouts && (
-                      <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} strokeWidth={1.5} />
-                    )}
-                  </div>
-                  <div className="relative z-10 flex items-center justify-between gap-3 mt-3 pt-3"
-                    style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
-                    <div className="min-w-0">
-                      <p className="text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
-                        {sellerBalance.some((b) => b.reservedMinor > 0)
-                          ? sellerBalance.filter((b) => b.reservedMinor > 0)
+            {/* ── Wallet — one card: balance, cash out, history, methods. Only
+                when the seller has earnings history. ── */}
+            {!balanceError && sellerBalance.length > 0 && sellerHistory.length > 0 && (() => {
+              const payable = sellerBalance.filter((b) => b.availableMinor > 0);
+              const verifiedMethod = payoutMethods.some((m) => m.status === 'verified');
+              return (
+                <div className="px-5 pt-5">
+                  <div className="relative w-full rounded-2xl overflow-hidden p-4"
+                    style={{ background: isDark ? 'rgba(255,255,255,0.04)' : '#fff', ...glassEdge(isDark) }}>
+                    <GlassReflection isDark={isDark} />
+                    {/* Balance */}
+                    <div className="relative z-10 flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
+                        <Wallet className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                          Available to pay out
+                        </p>
+                        <p className="text-[20px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#fff' : '#1a1a1a' }}>
+                          {payable.length > 0
+                            ? payable.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')
+                            : Money.fromMinor(0, sellerBalance[0].currency).format()}
+                        </p>
+                        {sellerBalance.some((b) => b.reservedMinor > 0) && (
+                          <p className="text-[11px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                            {sellerBalance.filter((b) => b.reservedMinor > 0)
                               .map((b) => `${Money.fromMinor(b.reservedMinor, b.currency).format()} on hold`)
-                              .join(' · ')
-                          : 'Payout methods · History'}
-                      </p>
+                              .join(' · ')}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[11px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
-                      Cash out & history
-                    </span>
+
+                    {/* Cash out (inline) */}
+                    <div className="relative z-10 mt-4">
+                      {payable.length === 0 ? (
+                        <AppButton disabled className="w-full h-[48px] rounded-xl flex items-center justify-center cursor-not-allowed"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                          <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>No balance to cash out</span>
+                        </AppButton>
+                      ) : !verifiedMethod ? (
+                        <AppButton whileTap={{ scale: 0.98 }} onClick={() => setMethodsOpen(true)}
+                          className="w-full h-[48px] rounded-xl flex items-center justify-center cursor-pointer"
+                          style={{ background: '#d6f905', ...glassEdge(isDark) }}>
+                          <span className="text-[13px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: '#0a0a0a' }}>Add payout method</span>
+                        </AppButton>
+                      ) : (
+                        <AppButton whileTap={{ scale: 0.98 }} onClick={() => setWithdrawOpen(true)}
+                          className="w-full h-[48px] rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                          style={{ background: '#d6f905', ...glassEdge(isDark) }}>
+                          <span className="text-[13px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: '#0a0a0a' }}>Cash out</span>
+                        </AppButton>
+                      )}
+                    </div>
+
+                    {/* History (inline, unified) */}
+                    <div className="relative z-10 mt-4 pt-3" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <span className="text-[10px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                          Activity
+                        </span>
+                        <AppButton onClick={() => setMethodsOpen(true)} className="cursor-pointer text-[11px]"
+                          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
+                          Manage methods
+                        </AppButton>
+                      </div>
+                      {(showAllWalletHistory ? sellerHistory : sellerHistory.slice(0, 3)).map((entry) => (
+                        <div key={entry.id} className="flex items-center justify-between gap-3 py-1.5">
+                          <div className="min-w-0">
+                            <p className="text-[12.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                              {entry.description || entry.eventName || entry.type}
+                            </p>
+                            <p className="text-[10.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                              {entry.eventName ? `${entry.eventName} · ` : ''}Available {isoToDisplayDate(entry.availableAt)}
+                            </p>
+                          </div>
+                          <p className="text-[12.5px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: entry.amountMinor < 0 ? (isDark ? '#ff6b70' : '#c0392b') : (isDark ? '#34d399' : '#059669') }}>
+                            {entry.amountMinor < 0 ? '' : '+'}{Money.fromMinor(entry.amountMinor, entry.currency).format()}
+                          </p>
+                        </div>
+                      ))}
+                      {sellerHistory.length > 3 && (
+                        <AppButton onClick={() => setShowAllWalletHistory((v) => !v)} className="cursor-pointer mt-1 text-[11.5px] font-semibold"
+                          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
+                          {showAllWalletHistory ? 'Show less' : `Show all ${sellerHistory.length}`}
+                        </AppButton>
+                      )}
+                    </div>
                   </div>
-                </AppButton>
-              </div>
-            )}
+                </div>
+              );
+            })()}
 
             {/* ── Active Listings ── */}
             {myError ? (
@@ -979,26 +1038,37 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
               </div>
             )}
 
-            {/* ── List a ticket — a distinct action card, not a content row ── */}
+            {/* ── List a ticket — your collectible tickets, same card as the
+                wallet. Tapping one opens the sell flow. ── */}
             <div className="px-5 pt-6">
-              <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-                onClick={() => setShowListPicker(true)}
-                className="relative w-full flex items-center gap-3 p-4 rounded-2xl cursor-pointer text-left overflow-hidden"
-                style={{ background: '#d6f905', ...glassEdge(isDark) }}>
-                <div className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(10,10,10,0.1)' }}>
-                  <Tag className="w-5 h-5" style={{ color: '#0a0a0a' }} strokeWidth={1.75} />
+              <div className="flex items-center gap-3 mb-3 px-1">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: isDark ? 'rgba(214,249,5,0.09)' : 'rgba(214,249,5,0.14)' }}>
+                  <Tag className="w-[18px] h-[18px]" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.6} />
                 </div>
-                <div className="relative z-10 min-w-0 flex-1">
-                  <p className="text-[14px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: '#0a0a0a' }}>
-                    List a ticket for sale
-                  </p>
-                  <p className="text-[11.5px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(10,10,10,0.6)' }}>
-                    Pick a ticket from your collection
+                <div>
+                  <h3 className="text-[15px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                    List a Ticket for Sale
+                  </h3>
+                  <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                    Choose a ticket from your collection
                   </p>
                 </div>
-                <ArrowRight className="relative z-10 w-5 h-5 flex-shrink-0" style={{ color: '#0a0a0a' }} strokeWidth={2} />
-              </AppButton>
+              </div>
+              {listableTickets.length === 0 ? (
+                <div className="relative rounded-2xl p-5 overflow-hidden text-center" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
+                  <GlassReflection isDark={isDark} />
+                  <p className="relative z-10 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                    You have no active tickets to list right now.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {listableTickets.map((ticket) => (
+                    <GlassTicketCard key={ticket.id} ticket={ticket} onClick={() => handleListTicket(ticket)} />
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -1027,14 +1097,20 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
         )}
       </AnimatePresence>
 
-      {/* Ticket picker — opened by the "List a ticket" action card */}
+      {/* Inline wallet: cash-out + manage methods */}
       <AnimatePresence>
-        {showListPicker && (
-          <ListTicketPickerSheet
-            tickets={userTickets.filter((t) => t.status === 'active')}
-            onPick={(ticket) => { setShowListPicker(false); handleListTicket(ticket); }}
-            onClose={() => setShowListPicker(false)}
+        {withdrawOpen && (
+          <WithdrawPayoutSheet
+            balances={sellerBalance}
+            destinations={payoutMethods}
+            onClose={() => setWithdrawOpen(false)}
+            onSubmitted={() => void refetchBalance()}
           />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {methodsOpen && (
+          <PayoutMethodsSheet onClose={() => setMethodsOpen(false)} />
         )}
       </AnimatePresence>
 
@@ -1081,12 +1157,6 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
         )}
       </AnimatePresence>
 
-      {/* Payout methods manager */}
-      <AnimatePresence>
-        {showPayoutSheet && (
-          <PayoutMethodsSheet onClose={() => setShowPayoutSheet(false)} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
