@@ -165,17 +165,25 @@ export function glassInputSurface(isDark: boolean): CSSProperties {
 
 /**
  * Field/input surface + state. The same `glassInputSurface()` as the search
- * bar, plus focus/error state: focus adds a lime ring, error a red ring (the
- * red message under the field still carries the failure). The reflected
- * hairline comes from a `GlassReflection` overlay rendered on the wrapper.
+ * bar at rest. Focus is a clear, unmistakable shift: a lime hairline + a
+ * brighter lime ring (not the faint 10% halo) + a lime-warmed fill. Error swaps
+ * lime for red (the message under the field still carries the failure). The
+ * reflected hairline comes from a `GlassReflection` overlay on the wrapper.
  */
 export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
   const out = glassInputSurface(isDark);
-  const ring = opts.error
-    ? (isDark ? "0 0 0 3px rgba(248,113,113,0.14)" : "0 0 0 3px rgba(190,18,60,0.1)")
-    : opts.focused
-      ? (isDark ? "0 0 0 4px rgba(217,255,0,0.12)" : "0 0 0 4px rgba(214,249,5,0.14)")
-      : null;
-  if (ring) out.boxShadow = `${out.boxShadow}, ${ring}`;
+  if (opts.error) {
+    out.background = isDark
+      ? "linear-gradient(rgba(50,24,26,0.5), rgba(50,24,26,0.5)), rgba(30,30,34,0.4)"
+      : "rgba(255,244,245,0.72)";
+    out.border = `1px solid ${isDark ? "rgba(248,113,113,0.85)" : "rgba(190,18,60,0.7)"}`;
+    out.boxShadow = `${out.boxShadow}, 0 0 0 3px ${isDark ? "rgba(248,113,113,0.22)" : "rgba(190,18,60,0.16)"}`;
+  } else if (opts.focused) {
+    out.background = isDark
+      ? "linear-gradient(rgba(46,49,18,0.5), rgba(46,49,18,0.5)), rgba(30,30,34,0.4)"
+      : "rgba(252,255,220,0.78)";
+    out.border = `1px solid ${isDark ? "#d6f905" : "#7c9a00"}`;
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.5)" : "rgba(124,154,0,0.4)"}, 0 0 0 3px ${isDark ? "rgba(214,249,5,0.28)" : "rgba(124,154,0,0.2)"}`;
+  }
   return out;
 }
