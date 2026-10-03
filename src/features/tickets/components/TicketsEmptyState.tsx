@@ -1,9 +1,6 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Share2, Download, ChevronDown, ChevronRight, Sparkles, Send, Tag, Check, Ticket as TicketIcon, ArrowRight, Compass, X, ArrowUpRight } from 'lucide-react';
-import { forwardRef, useState } from 'react';
+import { motion } from 'motion/react';
+import { Sparkles, ArrowRight, Compass } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { useImageColor } from '@/lib/hooks/useImageColor';
-import type { UserTicket } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
@@ -214,31 +211,6 @@ export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming'
               transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
             />
           </AppButton>
-
-          {isUpcoming && (
-            <div className="flex items-center justify-center gap-5 mt-7 pt-6 border-t"
-              style={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)' }}
-            >
-              {[
-                { icon: <TicketIcon className="w-3.5 h-3.5" />, label: 'Live events' },
-                { icon: <Send className="w-3.5 h-3.5" />, label: 'Transferable' },
-                { icon: <Sparkles className="w-3.5 h-3.5" />, label: 'VIP access' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-1.5"
-                  style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '10px',
-                    letterSpacing: '1px',
-                    textTransform: 'uppercase',
-                    color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)',
-                  }}
-                >
-                  <span style={{ color: isDark ? '#d6f905' : '#0a0a0a' }}>{item.icon}</span>
-                  {item.label}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </motion.div>
