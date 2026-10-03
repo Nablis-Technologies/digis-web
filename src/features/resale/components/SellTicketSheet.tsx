@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '@/app/components/ThemeContext';
-import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket, Wallet } from 'lucide-react';
+import { ArrowRight, X, AlertTriangle, Check, ChevronRight, Filter, Minus, Plus, Ticket, Wallet } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
 import { payoutService, payoutKeys } from '@/lib/payout';
 import { Money } from '@/lib/money';

@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 import type { ResaleListing } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
