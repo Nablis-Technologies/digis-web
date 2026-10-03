@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { Check, Copy, Shield, Sparkles } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import type { ResaleListing, UserTicket } from '@/types';
 import { Money } from '@/lib/money';
 import { copyText } from '@/lib/utils/clipboard';
@@ -122,31 +122,6 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
         >
           {ticket.eventName} · {Money.fromMinor(price, 'ETB').format()} is now visible to buyers. We'll notify you the moment it sells.
         </motion.p>
-
-        {/* Trust badges */}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.62, duration: 0.4 }}
-          className="relative z-10 flex items-center gap-4"
-        >
-          {[
-            { Icon: Shield, label: 'Verified' },
-            { Icon: Check, label: 'Price locked' },
-            { Icon: Sparkles, label: 'Instant notify' },
-          ].map(({ Icon: Ic, label }) => (
-            <div key={label} className="flex flex-col items-center gap-1">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.2)', border: `1px solid ${isDark ? 'rgba(217,255,0,0.2)' : 'rgba(180,210,0,0.4)'}` }}>
-                <Ic className="w-3.5 h-3.5" strokeWidth={2} style={{ color: isDark ? brand : '#5a6b00' }} />
-              </div>
-              <span className="text-[9px] tracking-[0.5px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.45)' }}>
-                {label}
-              </span>
-            </div>
-          ))}
-        </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72, duration: 0.4 }} className="relative z-10 mt-8 w-full flex gap-2.5">
           <AppButton onClick={copyListingLink} className="flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)', ...glassEdge(isDark) }}>
