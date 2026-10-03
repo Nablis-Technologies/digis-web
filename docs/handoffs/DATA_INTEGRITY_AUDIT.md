@@ -96,7 +96,16 @@ destination, attendee 1 ticket, buyer 0; Playwright suite **28/28**.
 Verified: clean dev reseed; both credentials authorize (`authorized: true`);
 Playwright **28/28** (one transient parallel-login flake, green on re-run).
 
-**P2 — frontend mock hygiene**
-7. Make `mock-audit.spec.ts` assert; remove mock-host image fallbacks; delete the
-   mock issuance pipeline + dead mock files; gate `UIPreviewPage`; close the
-   mock-quote fallback.
+**P2 — DONE 2026-10-02** (commit `7e5b209`)
+7. ✅ `mock-audit.spec.ts` now asserts `mock-host images === 0` (discovery + detail).
+   Removed the mock-host image fallback (`eventImages.ts`) from wallet/resale/
+   transfer/guest-wallet — a missing cover now renders absent (ADR-0002). Deleted
+   the mock issuance pipeline (`MOCK_USER_TICKETS`/`issueTicketsForOrder`/
+   `resetToSeed`/`addReceivedTicket`/`updateTicketAnswers`) + `mock/tickets.ts` +
+   `mock/current-user.ts` + the unreachable `EditTicketAnswersDialog`. Closed the
+   `order.ts` mock-quote fallback for real events. `/ui-preview` is now registered
+   in dev only. (Also fixed two stale e2e name selectors — placeholder is
+   `Abebe`, not `Abebe Bekele`.)
+
+Verified: tsc · vitest **145/145** · build · Playwright **28/28**; no
+`mock/events`/`eventImages` references remain in `src`.
