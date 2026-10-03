@@ -123,7 +123,7 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
                       Couldn't load payout methods.
                     </p>
                     <AppButton onClick={() => void refetch()} className="cursor-pointer"
-                      style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                      style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
                       Retry
                     </AppButton>
                     </div>
@@ -176,7 +176,7 @@ function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, saving, on
   saving: boolean; onSelect: () => void;
 }) {
   const verified = method.status === 'verified';
-  const accent = isDark ? '#d6f905' : '#6d28d9';
+  const accent = isDark ? '#d6f905' : '#0a0a0a';
   return (
     <div className="relative rounded-2xl overflow-hidden p-1.5 flex items-center gap-1.5" style={{ background: cardBg }}>
       <GlassReflection isDark={isDark} />
@@ -206,7 +206,7 @@ function PayoutRow({ method, isDark, text, muted, cardBg, cardBorder, saving, on
             </span>
             {method.isDefault && (
               <span className="text-[9px] tracking-[0.5px] uppercase px-1.5 py-0.5 rounded-md"
-                style={{ fontFamily: "'Inter', sans-serif", color: accent, background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(109,40,217,0.06)' }}>
+                style={{ fontFamily: "'Inter', sans-serif", color: accent, background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(10,10,10,0.06)' }}>
                 Default
               </span>
             )}
@@ -292,7 +292,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
             Couldn't load payout destinations.
           </p>
           <AppButton onClick={() => void refetch()} className="cursor-pointer"
-            style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+            style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
             Retry
           </AppButton>
         </div>
@@ -310,8 +310,8 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
               <AppButton key={bank.bankSlug} whileTap={{ scale: 0.98 }} onClick={() => setBankSlug(bank.bankSlug)}
                 className="rounded-xl p-3 flex items-center gap-3 cursor-pointer text-left"
                 style={{
-                  background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
-                  border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.5)' : 'rgba(109,40,217,0.4)') : cardBorder}`,
+                  background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(10,10,10,0.05)') : cardBg,
+                  border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.5)' : 'rgba(10,10,10,0.4)') : cardBorder}`,
                 }}>
                 <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
@@ -327,7 +327,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
                     {bank.type === 'mobile_money' ? 'Mobile money' : bank.type === 'bank' ? 'Bank transfer' : 'Wallet'}
                   </p>
                 </div>
-                {active && <Check className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={2.4} />}
+                {active && <Check className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2.4} />}
               </AppButton>
             );
           })}
@@ -370,7 +370,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
         className="w-full h-[56px] rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
         style={{
           background: valid
-            ? (isDark ? 'linear-gradient(135deg, rgba(214,249,5,0.2), rgba(217,255,0,0.1))' : 'linear-gradient(135deg, rgba(214,249,5,0.9), rgba(109,40,217,0.85))')
+            ? (isDark ? 'linear-gradient(135deg, rgba(214,249,5,0.2), rgba(217,255,0,0.1))' : 'linear-gradient(135deg, rgba(214,249,5,0.9), rgba(10,10,10,0.85))')
             : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
           opacity: valid ? 1 : 0.5,
           ...glassEdge(isDark),

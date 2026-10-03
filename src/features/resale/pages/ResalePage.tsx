@@ -924,7 +924,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                     Couldn't load your earnings.
                   </p>
                   <AppButton onClick={() => void refetchBalance()} className="relative z-10 cursor-pointer"
-                    style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                    style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
                     Retry
                   </AppButton>
                 </div>
@@ -961,8 +961,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                   {onOpenPayouts && sellerBalance.some((b) => b.availableMinor > 0) && (
                     <AppButton whileTap={{ scale: 0.98 }} onClick={onOpenPayouts}
                       className="relative z-10 w-full h-[44px] mt-3 rounded-xl flex items-center justify-center cursor-pointer"
-                      style={{ background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(109,40,217,0.06)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.28)' : 'rgba(109,40,217,0.22)'}` }}>
-                      <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#6d28d9' }}>
+                      style={{ background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(10,10,10,0.06)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.28)' : 'rgba(10,10,10,0.22)'}` }}>
+                      <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
                         Cash out
                       </span>
                     </AppButton>
@@ -987,7 +987,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       ))}
                       {sellerHistory.length > 3 && (
                         <AppButton onClick={() => setShowAllHistory((v) => !v)} className="cursor-pointer"
-                          style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                          style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
                           {showAllHistory ? 'Show less' : `Show all ${sellerHistory.length}`}
                         </AppButton>
                       )}
@@ -1000,7 +1000,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         Couldn’t load your activity.
                       </span>
                       <AppButton onClick={() => void refetchHistory()} className="cursor-pointer flex-shrink-0"
-                        style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#6d28d9' }}>
+                        style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
                         Retry
                       </AppButton>
                     </div>
@@ -1018,7 +1018,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                 }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                  <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={1.5} />
+                  <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.5} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>

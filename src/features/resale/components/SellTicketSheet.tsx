@@ -176,7 +176,7 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                   style={{
                     background: isDark
                       ? 'linear-gradient(135deg, rgba(214,249,5,0.2), rgba(217,255,0,0.1))'
-                      : 'linear-gradient(135deg, rgba(214,249,5,0.9), rgba(109,40,217,0.85))',
+                      : 'linear-gradient(135deg, rgba(214,249,5,0.9), rgba(10,10,10,0.85))',
                     opacity: blockedReason || overCap ? 0.5 : 1,
                     ...glassEdge(isDark),
                   }}>
@@ -268,7 +268,7 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                   }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                    <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#6d28d9' }} strokeWidth={1.5} />
+                    <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.5} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] tracking-[1px] uppercase mb-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
@@ -323,13 +323,12 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                     disabled={submitting || showLoading}
                     className="flex-1 h-[56px] rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                     style={{
-                      background: isDark
-                        ? 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(16,185,129,0.08))'
-                        : 'linear-gradient(135deg, rgba(5,150,105,0.9), rgba(4,120,87,0.85))',
+                      background: '#d6f905',
+                      color: '#0a0a0a',
                       ...glassEdge(isDark),
                     }}>
-                    <Check className="w-4 h-4" style={{ color: isDark ? '#34d399' : '#fff' }} strokeWidth={2} />
-                    <span className="text-[14px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#34d399' : '#fff' }}>
+                    <Check className="w-4 h-4" style={{ color: '#0a0a0a' }} strokeWidth={2} />
+                    <span className="text-[14px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: '#0a0a0a' }}>
                       List Ticket
                     </span>
                   </AppButton>
