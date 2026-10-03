@@ -16,7 +16,12 @@ import { openHostedCheckout } from '@/lib/checkout-popup';
 import type { ResaleListing } from '@/types';
 
 export interface UseResalePurchase {
+  /** True while ANY listing purchase is in flight (drives global guards). */
   purchasing: boolean;
+  /** The id of the listing currently being purchased (per-row spinner/disable). */
+  purchasingId: string | null;
+  /** The id of the listing whose purchase failed (row-attached error). */
+  errorId: string | null;
   /** Mapped, user-readable failure — render inline on the surface. */
   error: string | null;
   /** Set when the payment was accepted without a hosted redirect. */
@@ -26,12 +31,15 @@ export interface UseResalePurchase {
 }
 
 export function useResalePurchase(): UseResalePurchase {
-  const [purchasing, setPurchasing] = useState(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingOrder, setPendingOrder] = useState<CheckoutOrder | null>(null);
+  const purchasing = purchasingId !== null;
 
   const buy = async (listing: ResaleListing) => {
-    setPurchasing(true);
+    setPurchasingId(listing.id);
+    setErrorId(null);
     setError(null);
     setPendingOrder(null);
     try {
@@ -52,16 +60,19 @@ export function useResalePurchase(): UseResalePurchase {
       setPendingOrder(order);
     } catch (e) {
       setError(mapApiError(e, 'Purchase failed. Please try again.'));
+      setErrorId(listing.id);
     } finally {
-      setPurchasing(false);
+      setPurchasingId(null);
     }
   };
 
   return {
     purchasing,
+    purchasingId,
+    errorId,
     error,
     pendingOrder,
     buy,
-    reset: () => { setError(null); setPendingOrder(null); },
+    reset: () => { setError(null); setErrorId(null); setPendingOrder(null); },
   };
 }

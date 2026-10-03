@@ -589,8 +589,10 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       </div>
                     )}
 
-                    {/* Purchase failures stay on the page next to the rows. */}
-                    {resalePurchase.error && (
+                    {/* Purchase failures render in the buy confirmation sheet
+                        (attached to the listing). A failure that dismissed the
+                        sheet surfaces here next to the rows. */}
+                    {resalePurchase.error && !confirmBuy && (
                       <p className="text-[11px] mb-3 leading-[1.5]"
                         style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
                         {resalePurchase.error}
@@ -707,9 +709,15 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                             ) : (
                               <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                                 onClick={() => { resalePurchase.reset(); setConfirmBuy(listing); }}
+                                disabled={resalePurchase.purchasing}
                                 className="relative z-10 flex-shrink-0 px-4 py-2.5 rounded-xl cursor-pointer disabled:cursor-not-allowed"
-                                style={{ background: '#d6f905', color: '#0a0a0a', ...glassEdge(isDark) }}>
-                                <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>Buy</span>
+                                style={{
+                                  background: '#d6f905', color: '#0a0a0a', ...glassEdge(isDark),
+                                  opacity: resalePurchase.purchasing && resalePurchase.purchasingId !== listing.id ? 0.5 : 1,
+                                }}>
+                                <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>
+                                  {resalePurchase.purchasingId === listing.id ? '…' : 'Buy'}
+                                </span>
                               </AppButton>
                             )}
                           </motion.div>
