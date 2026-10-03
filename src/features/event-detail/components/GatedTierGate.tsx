@@ -115,12 +115,10 @@ export function GatedTierGate({
           <motion.div
             animate={error ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
             transition={{ duration: 0.4 }}
-            className="flex items-center gap-2 rounded-2xl p-1.5"
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              ...glassField(isDark, { error: !!error }),
-            }}>
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+            className="relative overflow-hidden flex items-center gap-2 rounded-2xl p-1.5"
+            style={glassField(isDark, { error: !!error })}>
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
               style={{ background: `rgba(${accentRgb},0.1)` }}>
               <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
             </div>
@@ -129,7 +127,7 @@ export function GatedTierGate({
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
               placeholder="Enter your code"
-              className="flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
+              className="relative z-10 flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
             <AppButton whileTap={{ scale: 0.95 }}
               onClick={tryCode}

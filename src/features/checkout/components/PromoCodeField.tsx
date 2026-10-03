@@ -63,20 +63,21 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                   transition={{ duration: 0.25 }}
                   className="overflow-hidden">
                   <div className="flex gap-2 mt-3">
-                    <AppInput
-                      type="text"
-                      value={promoCodeInput}
-                      onChange={(e) => { setPromoCodeInput(e.target.value.toUpperCase()); setPromoError(''); }}
-                      onKeyDown={(e) => e.key === 'Enter' && validatePromo()}
-                      placeholder="Enter code"
-                      className="flex-1 px-4 py-2.5 rounded-xl text-[13px] tracking-[1px] uppercase outline-none placeholder:normal-case placeholder:tracking-normal"
-                      style={{
-                        fontFamily: "'Inter', sans-serif",
-                        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                        ...glassField(isDark),
-                        color: isDark ? '#fff' : '#1a1a1a',
-                      }}
-                    />
+                    <div className="relative flex-1 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!promoError })}>
+                      <GlassReflection isDark={isDark} />
+                      <AppInput
+                        type="text"
+                        value={promoCodeInput}
+                        onChange={(e) => { setPromoCodeInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onKeyDown={(e) => e.key === 'Enter' && validatePromo()}
+                        placeholder="Enter code"
+                        className="relative z-10 w-full px-4 py-2.5 text-[13px] tracking-[1px] uppercase outline-none placeholder:normal-case placeholder:tracking-normal"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          color: isDark ? '#fff' : '#1a1a1a',
+                        }}
+                      />
+                    </div>
                     <AppButton
                       whileTap={{ scale: 0.97 }}
                       onClick={validatePromo}

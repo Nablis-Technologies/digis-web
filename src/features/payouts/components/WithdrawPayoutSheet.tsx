@@ -94,9 +94,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
   const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
   const accent = isDark ? '#d6f905' : '#6d28d9';
-  const inputStyle = {
-    fontFamily: "'Inter', sans-serif", color: text, background: cardBg, ...glassField(isDark),
-  } as const;
+  const inputStyle = glassField(isDark);
 
   const sheet = (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -175,12 +173,13 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                       Withdraw all
                     </AppButton>
                   </div>
-                  <div className="relative">
+                  <div className="relative rounded-2xl overflow-hidden" style={inputStyle}>
+                    <GlassReflection isDark={isDark} />
                     <AppInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal"
                       onBlur={() => setTouched(true)} error={amountError} errorClassName={FIELD_ERROR_CLASS}
-                      className="w-full h-[52px] rounded-2xl px-4 text-[15px] outline-none"
-                      style={{ ...inputStyle, paddingRight: 64 }} />
-                    <span className="absolute right-4 top-[26px] -translate-y-1/2 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
+                      className="relative z-10 w-full h-[52px] px-4 text-[15px] outline-none"
+                      style={{ fontFamily: "'Inter', sans-serif", color: text, paddingRight: 64 }} />
+                    <span className="absolute z-10 right-4 top-1/2 -translate-y-1/2 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
                       {currency}
                     </span>
                   </div>

@@ -11,6 +11,7 @@ import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { glassField } from '@/lib/ui/glass';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -185,37 +186,40 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             <p className="text-[10px] tracking-[1.6px] uppercase mb-4" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
               Contact details
             </p>
-            <div className="mb-3">
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.phone })}>
+              <GlassReflection isDark={isDark} />
               <AppInput
                 type="tel"
                 placeholder="Phone number"
                 value={guestPhone}
                 onChange={(e) => { setGuestPhone(e.target.value); clearField('phone'); }}
                 error={fieldErrors.phone} errorClassName={FIELD_ERROR_CLASS}
-                className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
-                style={{ ...glassField(isDark, { error: !!fieldErrors.phone }), color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+                className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
+                style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-            <div className="mb-3">
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.name })}>
+              <GlassReflection isDark={isDark} />
               <AppInput
                 type="text"
                 placeholder="Name (optional)"
                 value={guestName}
                 onChange={(e) => { setGuestName(e.target.value); clearField('name'); }}
                 error={fieldErrors.name} errorClassName={FIELD_ERROR_CLASS}
-                className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
-                style={{ ...glassField(isDark, { error: !!fieldErrors.name }), color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+                className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
+                style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-            <div className="mb-3">
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.email })}>
+              <GlassReflection isDark={isDark} />
               <AppInput
                 type="email"
                 placeholder="Email (optional)"
                 value={guestEmail}
                 onChange={(e) => { setGuestEmail(e.target.value); clearField('email'); }}
                 error={fieldErrors.email} errorClassName={FIELD_ERROR_CLASS}
-                className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
-                style={{ ...glassField(isDark, { error: !!fieldErrors.email }), color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+                className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
+                style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
           </div>

@@ -147,40 +147,35 @@ export function glassControl(isDark: boolean, tint?: GlassTint): CSSProperties {
 }
 
 /**
- * The canonical input chrome — the FULL discovery-search setup, not just the
- * fill: translucent surface + 40px backdrop blur + a thin reflected hairline
- * (the same one-pixel conic edge `glassEdgeReflection()` paints) + the quiet
- * float shadow. Rendered on the host itself as a border-box gradient, so a
- * plain `AppInput` gets the whole look without an overlay child. State
- * (focus/error) recolours the hairline and adds a halo.
- *
- * The search bar keeps its separate `<GlassReflection>` overlay (it animates a
- * bloom too); this mirrors that chrome so every field matches it.
+ * Exact styles copied from the discovery search bar (`SearchBar.tsx`): the
+ * canonical input surface. Translucent fill + 40px backdrop blur + a quiet
+ * float shadow. Every field uses this, so a field and the search bar are the
+ * same surface. The hairline is the separate `GlassReflection` overlay pair.
+ */
+export function glassInputSurface(isDark: boolean): CSSProperties {
+  return {
+    background: isDark ? "rgba(30,30,34,0.40)" : "rgba(255,255,255,0.68)",
+    backdropFilter: "blur(40px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.5)",
+    boxShadow: isDark
+      ? "0 12px 36px -16px rgba(0,0,0,0.48)"
+      : "0 12px 36px -18px rgba(20,18,40,0.18)",
+  };
+}
+
+/**
+ * Field/input surface + state. The same `glassInputSurface()` as the search
+ * bar, plus focus/error state: focus adds a lime ring, error a red ring (the
+ * red message under the field still carries the failure). The reflected
+ * hairline comes from a `GlassReflection` overlay rendered on the wrapper.
  */
 export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
-  const edge = glassEdgeReflection(isDark).background;
-  const line = opts.error
-    ? (isDark ? "rgba(248,113,113,0.75)" : "rgba(190,18,60,0.6)")
-    : opts.focused
-      ? (isDark ? "rgba(217,255,0,0.8)" : "rgba(124,154,0,0.9)")
-      : null;
-  const shadow = opts.error
+  const out = glassInputSurface(isDark);
+  const ring = opts.error
     ? (isDark ? "0 0 0 3px rgba(248,113,113,0.14)" : "0 0 0 3px rgba(190,18,60,0.1)")
     : opts.focused
       ? (isDark ? "0 0 0 4px rgba(217,255,0,0.12)" : "0 0 0 4px rgba(214,249,5,0.14)")
       : null;
-  return {
-    background: isDark
-      ? `linear-gradient(rgba(30,30,34,0.40), rgba(30,30,34,0.40)) padding-box, ${edge} border-box`
-      : `linear-gradient(rgba(255,255,255,0.68), rgba(255,255,255,0.68)) padding-box, ${edge} border-box`,
-    backgroundClip: "padding-box, border-box",
-    border: "1px solid transparent",
-    backdropFilter: "blur(40px) saturate(1.5)",
-    WebkitBackdropFilter: "blur(40px) saturate(1.5)",
-    boxShadow: [
-      ...(shadow ? [shadow] : []),
-      isDark ? "0 12px 36px -16px rgba(0,0,0,0.48)" : "0 12px 36px -18px rgba(20,18,40,0.18)",
-    ].join(", "),
-    ...(line ? { borderColor: line } : {}),
-  };
+  if (ring) out.boxShadow = `${out.boxShadow}, ${ring}`;
+  return out;
 }

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'motion/react';
+﻿import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
   X, Phone, Lock, Mail, User, ArrowRight, Eye, EyeOff,
@@ -15,35 +15,35 @@ import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import type { CSSProperties } from 'react';
 
-/* ─── Country data ─────────────────────────────────────────── */
+/* â”€â”€â”€ Country data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface Country { code: string; name: string; dial: string; flag: string; }
 
 const COUNTRIES: Country[] = [
-  { code: 'ET', name: 'Ethiopia',       dial: '251', flag: '🇪🇹' },
-  { code: 'KE', name: 'Kenya',          dial: '254', flag: '🇰🇪' },
-  { code: 'NG', name: 'Nigeria',        dial: '234', flag: '🇳🇬' },
-  { code: 'GH', name: 'Ghana',          dial: '233', flag: '🇬🇭' },
-  { code: 'TZ', name: 'Tanzania',       dial: '255', flag: '🇹🇿' },
-  { code: 'UG', name: 'Uganda',         dial: '256', flag: '🇺🇬' },
-  { code: 'RW', name: 'Rwanda',         dial: '250', flag: '🇷🇼' },
-  { code: 'ER', name: 'Eritrea',        dial: '291', flag: '🇪🇷' },
-  { code: 'SO', name: 'Somalia',        dial: '252', flag: '🇸🇴' },
-  { code: 'DJ', name: 'Djibouti',       dial: '253', flag: '🇩🇯' },
-  { code: 'SS', name: 'South Sudan',    dial: '211', flag: '🇸🇸' },
-  { code: 'SD', name: 'Sudan',          dial: '249', flag: '🇸🇩' },
-  { code: 'ZA', name: 'South Africa',   dial: '27',  flag: '🇿🇦' },
-  { code: 'EG', name: 'Egypt',          dial: '20',  flag: '🇪🇬' },
-  { code: 'MA', name: 'Morocco',        dial: '212', flag: '🇲🇦' },
-  { code: 'AE', name: 'UAE',            dial: '971', flag: '🇦🇪' },
-  { code: 'SA', name: 'Saudi Arabia',   dial: '966', flag: '🇸🇦' },
-  { code: 'US', name: 'United States',  dial: '1',   flag: '🇺🇸' },
-  { code: 'CA', name: 'Canada',         dial: '1',   flag: '🇨🇦' },
-  { code: 'GB', name: 'United Kingdom', dial: '44',  flag: '🇬🇧' },
-  { code: 'DE', name: 'Germany',        dial: '49',  flag: '🇩🇪' },
-  { code: 'FR', name: 'France',         dial: '33',  flag: '🇫🇷' },
-  { code: 'IN', name: 'India',          dial: '91',  flag: '🇮🇳' },
-  { code: 'CN', name: 'China',          dial: '86',  flag: '🇨🇳' },
-  { code: 'AU', name: 'Australia',      dial: '61',  flag: '🇦🇺' },
+  { code: 'ET', name: 'Ethiopia',       dial: '251', flag: 'ðŸ‡ªðŸ‡¹' },
+  { code: 'KE', name: 'Kenya',          dial: '254', flag: 'ðŸ‡°ðŸ‡ª' },
+  { code: 'NG', name: 'Nigeria',        dial: '234', flag: 'ðŸ‡³ðŸ‡¬' },
+  { code: 'GH', name: 'Ghana',          dial: '233', flag: 'ðŸ‡¬ðŸ‡­' },
+  { code: 'TZ', name: 'Tanzania',       dial: '255', flag: 'ðŸ‡¹ðŸ‡¿' },
+  { code: 'UG', name: 'Uganda',         dial: '256', flag: 'ðŸ‡ºðŸ‡¬' },
+  { code: 'RW', name: 'Rwanda',         dial: '250', flag: 'ðŸ‡·ðŸ‡¼' },
+  { code: 'ER', name: 'Eritrea',        dial: '291', flag: 'ðŸ‡ªðŸ‡·' },
+  { code: 'SO', name: 'Somalia',        dial: '252', flag: 'ðŸ‡¸ðŸ‡´' },
+  { code: 'DJ', name: 'Djibouti',       dial: '253', flag: 'ðŸ‡©ðŸ‡¯' },
+  { code: 'SS', name: 'South Sudan',    dial: '211', flag: 'ðŸ‡¸ðŸ‡¸' },
+  { code: 'SD', name: 'Sudan',          dial: '249', flag: 'ðŸ‡¸ðŸ‡©' },
+  { code: 'ZA', name: 'South Africa',   dial: '27',  flag: 'ðŸ‡¿ðŸ‡¦' },
+  { code: 'EG', name: 'Egypt',          dial: '20',  flag: 'ðŸ‡ªðŸ‡¬' },
+  { code: 'MA', name: 'Morocco',        dial: '212', flag: 'ðŸ‡²ðŸ‡¦' },
+  { code: 'AE', name: 'UAE',            dial: '971', flag: 'ðŸ‡¦ðŸ‡ª' },
+  { code: 'SA', name: 'Saudi Arabia',   dial: '966', flag: 'ðŸ‡¸ðŸ‡¦' },
+  { code: 'US', name: 'United States',  dial: '1',   flag: 'ðŸ‡ºðŸ‡¸' },
+  { code: 'CA', name: 'Canada',         dial: '1',   flag: 'ðŸ‡¨ðŸ‡¦' },
+  { code: 'GB', name: 'United Kingdom', dial: '44',  flag: 'ðŸ‡¬ðŸ‡§' },
+  { code: 'DE', name: 'Germany',        dial: '49',  flag: 'ðŸ‡©ðŸ‡ª' },
+  { code: 'FR', name: 'France',         dial: '33',  flag: 'ðŸ‡«ðŸ‡·' },
+  { code: 'IN', name: 'India',          dial: '91',  flag: 'ðŸ‡®ðŸ‡³' },
+  { code: 'CN', name: 'China',          dial: '86',  flag: 'ðŸ‡¨ðŸ‡³' },
+  { code: 'AU', name: 'Australia',      dial: '61',  flag: 'ðŸ‡¦ðŸ‡º' },
 ];
 const DEFAULT_COUNTRY = COUNTRIES[0]; // Ethiopia
 
@@ -57,7 +57,7 @@ function buildPhone(value: string, dial: string): string {
 interface AuthModalProps {
   onClose: () => void;
   onAuthed?: () => void;
-  /** Mode to open in — the route (`/login` | `/signup`) seeds it. */
+  /** Mode to open in â€” the route (`/login` | `/signup`) seeds it. */
   initialMode?: 'signin' | 'signup';
   /** Notified on a user mode switch so the route can stay in sync. */
   onModeChange?: (mode: 'signin' | 'signup') => void;
@@ -65,7 +65,7 @@ interface AuthModalProps {
 
 /**
  * Phone-first auth, matching digis_backend's identifier+password surface.
- * No OTP / Google / password-reset (the backend has none — see BACKEND_GAPS.md #8).
+ * No OTP / Google / password-reset (the backend has none â€” see BACKEND_GAPS.md #8).
  *
  * Mode is local state seeded from the route: switching flips the UI immediately
  * and the parent mirrors it into the URL. It must not depend on the route round
@@ -81,7 +81,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   };
   const [loading, setLoading] = useState(false);
   // Per-field messages (keyed by field) plus a form-level line for anything
-  // that names no field — so a failure points at the exact input, not the form.
+  // that names no field â€” so a failure points at the exact input, not the form.
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -90,7 +90,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   const [identifier, setIdentifier] = useState(''); // unified entry (phone or email)
   const [fullName, setFullName] = useState(''); // signup only
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState(''); // signup only — optional server-side
+  const [email, setEmail] = useState(''); // signup only â€” optional server-side
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
@@ -135,7 +135,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     const trimmedName = fullName.trim();
     const e164 = buildPhone(phone, country.dial);
     const trimmedEmail = email.trim();
-    // Client-side policy — the backend currently enforces none of these
+    // Client-side policy â€” the backend currently enforces none of these
     // (BACKEND_GAPS.md #10), so the signup form is the only gate. Each message
     // is attached to the field it concerns. Name is collected here and sent to
     // the backend, which does not persist it yet (BACKEND_GAPS.md #8).
@@ -167,7 +167,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     for (const key of ['name', 'phone', 'email', 'password', 'passwordConfirmation']) {
       if (fields[key]) mapped[key] = fields[key];
     }
-    // The phone already owns an account — either a real one, or the shadow user
+    // The phone already owns an account â€” either a real one, or the shadow user
     // a guest checkout created. The backend has no claim-on-signup yet
     // (BACKEND_GAPS #56), so a guest who bought a ticket cannot create an
     // account with that phone. Replace the raw "has already been taken" line
@@ -177,7 +177,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     if (phoneTaken) {
       setErrors({ ...mapped, phone: 'This phone already has a Digis account.' });
       setFormError(
-        'Log in with your password — or, if you bought a ticket as a guest, open it under Tickets and set a password there.',
+        'Log in with your password â€” or, if you bought a ticket as a guest, open it under Tickets and set a password there.',
       );
       return;
     }
@@ -187,7 +187,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
   const titles = {
     signin: { kicker: 'Welcome back', title: 'Log in', sub: 'Enter your phone number or email and password to continue.' },
-    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required — email is optional.' },
+    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required â€” email is optional.' },
   };
   const t = titles[mode];
 
@@ -324,7 +324,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                     <ErrorLine error={formError} />
                     <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!fullName.trim() || !phone.trim() || !password || !confirmPassword} />
                     <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                      By continuing you agree to Digis’ Terms & Privacy Policy.
+                      By continuing you agree to Digisâ€™ Terms & Privacy Policy.
                     </p>
                   </>
                 )}
@@ -349,7 +349,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   );
 }
 
-/* ─── helpers / subcomponents ───────────────────────────── */
+/* â”€â”€â”€ helpers / subcomponents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function DigisMark({ className, color }: { className?: string; color: string }) {
   return (
     <svg viewBox="0 0 1000 1000" className={className} fill={color}>
@@ -369,7 +369,7 @@ function inputStyle(isDark: boolean): CSSProperties {
   };
 }
 
-/* ─── CountrySelector ──────────────────────────────────────── */
+/* â”€â”€â”€ CountrySelector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function CountrySelector({ country, onChange, isDark }: {
   country: Country; onChange: (c: Country) => void; isDark: boolean;
 }) {
@@ -435,7 +435,7 @@ function CountrySelector({ country, onChange, isDark }: {
                 <Search className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} style={{ color: textDim }} />
                 <AppInput
                   type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search country…" autoFocus
+                  placeholder="Search countryâ€¦" autoFocus
                   style={{
                     background: 'transparent', border: 'none', outline: 'none',
                     fontFamily: "'Inter', sans-serif", fontSize: '12px', color: textPrimary, width: '100%',
@@ -473,7 +473,7 @@ function CountrySelector({ country, onChange, isDark }: {
   );
 }
 
-/* ─── PhoneField (with dial selector) ─────────────────────── */
+/* â”€â”€â”€ PhoneField (with dial selector) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function PhoneField({ country, onCountryChange, placeholder, value, onChange, isDark, onEnter, error }: {
   country: Country; onCountryChange: (c: Country) => void;
   placeholder?: string; value: string; onChange: (v: string) => void;
@@ -482,11 +482,9 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
   const [focused, setFocused] = useState(false);
   return (
     <div>
-      <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all"
-        style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          ...glassField(isDark, { error: !!error, focused }),
-        }}>
+      <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
+        style={glassField(isDark, { error: !!error, focused })}>
+        <GlassReflection isDark={isDark} />
         <CountrySelector country={country} onChange={onCountryChange} isDark={isDark} />
         <AppInput
           type="tel" value={value} placeholder={placeholder || 'Phone number'}
@@ -502,17 +500,15 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
   );
 }
 
-/* ─── Name field (signup only) ──────────────────────── */
+/* â”€â”€â”€ Name field (signup only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function NameField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
     <div>
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
-        style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          ...glassField(isDark, { error: !!error, focused }),
-        }}>
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
+        style={glassField(isDark, { error: !!error, focused })}>
+        <GlassReflection isDark={isDark} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
@@ -524,17 +520,15 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
   );
 }
 
-/* ─── Email field (signup only — optional server-side) ────── */
+/* â”€â”€â”€ Email field (signup only â€” optional server-side) â”€â”€â”€â”€â”€â”€ */
 function EmailField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
     <div>
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
-        style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          ...glassField(isDark, { error: !!error, focused }),
-        }}>
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
+        style={glassField(isDark, { error: !!error, focused })}>
+        <GlassReflection isDark={isDark} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
         <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Email (optional)" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
@@ -552,11 +546,9 @@ function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }:
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
     <div>
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
-        style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          ...glassField(isDark, { error: !!error, focused }),
-        }}>
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
+        style={glassField(isDark, { error: !!error, focused })}>
+        <GlassReflection isDark={isDark} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Lock className="w-4 h-4" /></span>
         <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}

@@ -52,12 +52,8 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   const surface = isDark ? '#101115' : '#fff';
   const accent = '#d6f905';
 
-  const inputStyle = (invalid = false): React.CSSProperties => ({
-    background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-    ...glassField(isDark, { error: invalid }),
-    color: text,
-    fontFamily: "'Inter', sans-serif",
-  });
+  const inputSurface = (invalid = false): React.CSSProperties => glassField(isDark, { error: invalid });
+  const inputStyle: React.CSSProperties = { color: text, fontFamily: "'Inter', sans-serif" };
 
   const clearAll = () => { setErrors({}); setFormError(''); };
   const clearField = (field: string) => setErrors((prev) => {
@@ -174,14 +170,15 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
           <div className="space-y-3">
             <div>
               <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Phone</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
+              <div className="relative rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.phone))}>
+                <GlassReflection isDark={isDark} />
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
                 <AppInput
                   type="tel" value={phone} disabled={otpStage === 'sent' || otpStage === 'submitting'}
                   onChange={(e) => { setPhone(e.target.value); clearField('phone'); }}
                   placeholder="The phone you checked out with"
-                  className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px]"
-                  style={inputStyle(Boolean(errors.phone))} aria-invalid={errors.phone ? true : undefined}
+                  className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px]"
+                  style={inputStyle} aria-invalid={errors.phone ? true : undefined}
                 />
               </div>
               <FieldError error={errors.phone} />
@@ -191,14 +188,15 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
               <>
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Verification code</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><ShieldCheck className="w-4 h-4" /></span>
+                  <div className="relative rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.otp))}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><ShieldCheck className="w-4 h-4" /></span>
                     <AppInput
                       type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otpCode}
                       onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); clearField('otp'); }}
                       placeholder="6-digit code"
-                      className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px] tracking-[0.3em]"
-                      style={inputStyle(Boolean(errors.otp))} aria-invalid={errors.otp ? true : undefined}
+                      className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px] tracking-[0.3em]"
+                      style={inputStyle} aria-invalid={errors.otp ? true : undefined}
                     />
                   </div>
                   <FieldError error={errors.otp} />
@@ -210,25 +208,27 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
 
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Create a password</label>
-                  <div className="relative mb-2">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><Lock className="w-4 h-4" /></span>
+                  <div className="relative mb-2 rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.password))}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Lock className="w-4 h-4" /></span>
                     <AppInput
                       type="password" autoComplete="new-password" value={password}
                       onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
                       placeholder="At least 8 characters"
-                      className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px]"
-                      style={inputStyle(Boolean(errors.password))} aria-invalid={errors.password ? true : undefined}
+                      className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px]"
+                      style={inputStyle} aria-invalid={errors.password ? true : undefined}
                     />
                   </div>
                   <FieldError error={errors.password} />
-                  <div className="relative mt-2">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: muted }}><KeyRound className="w-4 h-4" /></span>
+                  <div className="relative mt-2 rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.passwordConfirm))}>
+                    <GlassReflection isDark={isDark} />
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><KeyRound className="w-4 h-4" /></span>
                     <AppInput
                       type="password" autoComplete="new-password" value={passwordConfirm}
                       onChange={(e) => { setPasswordConfirm(e.target.value); clearField('passwordConfirm'); }}
                       placeholder="Repeat password"
-                      className="w-full h-12 rounded-xl pl-10 pr-3.5 outline-none text-[13px]"
-                      style={inputStyle(Boolean(errors.passwordConfirm))} aria-invalid={errors.passwordConfirm ? true : undefined}
+                      className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px]"
+                      style={inputStyle} aria-invalid={errors.passwordConfirm ? true : undefined}
                     />
                   </div>
                   <FieldError error={errors.passwordConfirm} />

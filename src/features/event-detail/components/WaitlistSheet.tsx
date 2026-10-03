@@ -159,24 +159,30 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
                 </p>
 
                 {phase === 'code' ? (
-                  <AppInput
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="6-digit code"
-                    inputMode="numeric"
-                    className="w-full h-12 rounded-2xl px-4 text-[16px] tracking-[6px] text-center outline-none"
-                    style={{ ...glassField(isDark), color: isDark ? '#fff' : '#111' }}
-                  />
+                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                    <GlassReflection isDark={isDark} />
+                    <AppInput
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="6-digit code"
+                      inputMode="numeric"
+                      className="relative z-10 w-full h-12 px-4 text-[16px] tracking-[6px] text-center outline-none"
+                      style={{ color: isDark ? '#fff' : '#111' }}
+                    />
+                  </div>
                 ) : (
-                  <AppInput
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+251 9.."
-                    inputMode="tel"
-                    disabled={isAuthenticated}
-                    className="w-full h-12 rounded-2xl px-4 text-[14px] outline-none"
-                    style={{ ...glassField(isDark), color: isDark ? '#fff' : '#111' }}
-                  />
+                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                    <GlassReflection isDark={isDark} />
+                    <AppInput
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+251 9.."
+                      inputMode="tel"
+                      disabled={isAuthenticated}
+                      className="relative z-10 w-full h-12 px-4 text-[14px] outline-none"
+                      style={{ color: isDark ? '#fff' : '#111' }}
+                    />
+                  </div>
                 )}
 
                 {error && <p className="text-[12px] mt-2.5" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>{error}</p>}

@@ -140,18 +140,16 @@ export function EditField({ icon, type = 'text', placeholder, value, onChange, i
   const [focused, setFocused] = useState(false);
   const dim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
   return (
-    <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all"
-      style={{
-        background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.85)',
-        ...glassField(isDark, { focused }),
-      }}
+    <div className="relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all overflow-hidden"
+      style={glassField(isDark, { focused })}
     >
-      <span style={{ color: focused ? (isDark ? '#d6f905' : '#5a6b00') : dim }}>{icon}</span>
+      <GlassReflection isDark={isDark} />
+      <span className="relative z-10" style={{ color: focused ? (isDark ? '#d6f905' : '#5a6b00') : dim }}>{icon}</span>
       <AppInput
         type={type} value={value} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        className="flex-1 bg-transparent outline-none text-[14px]"
+        className="relative z-10 flex-1 bg-transparent outline-none text-[14px]"
         style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}
       />
     </div>

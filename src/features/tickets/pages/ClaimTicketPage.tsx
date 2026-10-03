@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -57,7 +57,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
   // guests prove the phone with an OTP. "Not your account?" falls back to guest.
   const [mode, setMode] = useState<'auth' | 'guest'>(isAuthenticated ? 'auth' : 'guest');
   const [accepting, setAccepting] = useState(false);
-  // Signing in on this page switches to the one-tap accept — unless the visitor
+  // Signing in on this page switches to the one-tap accept â€” unless the visitor
   // deliberately chose to claim with a different (recipient) phone.
   const choseGuestRef = useRef(false);
   useEffect(() => {
@@ -141,7 +141,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
       setDownloadDone(true);
       setTimeout(() => setDownloadDone(false), 2500);
     } catch (err) {
-      toastError(err, 'Couldn’t save your ticket image. Please try again.');
+      toastError(err, 'Couldnâ€™t save your ticket image. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -177,7 +177,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
           <GlassReflection isDark={isDark} />
           <div className="relative z-10 flex flex-col items-center gap-3">
             <motion.div className="w-8 h-8 rounded-full" style={{ border: '2px solid rgba(214,249,5,0.2)', borderTopColor: ACCENT_HEX }} animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} />
-            <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Opening your ticket…</p>
+            <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Opening your ticketâ€¦</p>
           </div>
         </motion.div>
       </div>
@@ -236,7 +236,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
     );
   }
 
-  // Success — show the claimed ticket.
+  // Success â€” show the claimed ticket.
   if (step === 'done' && accepted) {
     const footer = isAuthenticated ? (
       <AppButton onClick={onNavigateTickets} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 cursor-pointer" style={{ background: ACCENT_HEX, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}>
@@ -250,7 +250,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
           Sign in with your phone
         </AppButton>
         <p className="text-[11px] text-center" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>
-          Your account is created — sign in to keep this ticket on all your devices.
+          Your account is created â€” sign in to keep this ticket on all your devices.
         </p>
       </div>
     );
@@ -268,7 +268,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
     );
   }
 
-  // Pending — phone + OTP claim.
+  // Pending â€” phone + OTP claim.
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-5 py-16">
       {backButton}
@@ -288,7 +288,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                 {transfer.event.title}
               </h1>
               <p className="mt-1 text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                {transfer.ticket.product.name} · {transfer.ticket.status}
+                {transfer.ticket.product.name} Â· {transfer.ticket.status}
               </p>
               {mode !== 'auth' && (
               <div className="relative mt-4 rounded-2xl overflow-hidden px-4 py-3 flex items-center gap-3" style={{ background: surfaceSoft }}>
@@ -348,14 +348,17 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                     Enter your full phone number to verify ownership and receive the code.
                   </p>
-                  <AppInput
-                    type="tel"
-                    placeholder="+251 9·· ·· ·· ··"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
-                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
-                  />
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                    <GlassReflection isDark={isDark} />
+                    <AppInput
+                      type="tel"
+                      placeholder="+251 9·· ·· ·· ··"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
+                      style={{ color: text, fontFamily: "'Inter', sans-serif" }}
+                    />
+                  </div>
                   <AppButton
                     onClick={handleSendCode}
                     disabled={!phone.trim() || sending}
@@ -377,34 +380,43 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                     Enter the code we texted you and create your account.
                   </p>
-                  <AppInput
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="Code ••••••"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                    className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-center text-[20px] tracking-[8px]"
-                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
-                  />
-                  <AppInput
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Password (at least 8 characters)"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
-                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
-                  />
-                  <AppInput
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Confirm password"
-                    value={passwordConfirm}
-                    onChange={(e) => setPasswordConfirm(e.target.value)}
-                    className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
-                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
-                  />
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                    <GlassReflection isDark={isDark} />
+                    <AppInput
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Code ••••••"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                      className="relative z-10 w-full px-4 py-3.5 outline-none text-center text-[20px] tracking-[8px]"
+                      style={{ color: text, fontFamily: "'Inter', sans-serif" }}
+                    />
+                  </div>
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                    <GlassReflection isDark={isDark} />
+                    <AppInput
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Password (at least 8 characters)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
+                      style={{ color: text, fontFamily: "'Inter', sans-serif" }}
+                    />
+                  </div>
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                    <GlassReflection isDark={isDark} />
+                    <AppInput
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Confirm password"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
+                      style={{ color: text, fontFamily: "'Inter', sans-serif" }}
+                    />
+                  </div>
                   <AppButton
                     onClick={handleClaim}
                     disabled={code.trim().length !== 6 || password.length < 8 || password !== passwordConfirm || claiming}

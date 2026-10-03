@@ -19,7 +19,6 @@ function CustomDropdown({
 
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
-  const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)';
   const accent = isDark ? '#d6f905' : '#0a0a0a';
   const menuBg = isDark ? 'rgba(20,20,20,0.92)' : 'rgba(255,255,255,0.96)';
 
@@ -42,25 +41,27 @@ function CustomDropdown({
 
   return (
     <div className="relative" ref={ref}>
-      <AppButton
-        type="button"
-        onClick={() => setOpenState(!open)}
-        className="w-full pl-4 pr-10 py-3 rounded-xl outline-none transition-all text-left cursor-pointer flex items-center"
-        style={{
-          fontFamily: "'Inter', sans-serif", fontSize: '14px',
-          background: inputBg, color: value ? textPrimary : textDim,
-          ...glassField(isDark, { error: hasError, focused: open }),
-        }}
-      >
-        {value || placeholder}
-      </AppButton>
-      <motion.div
-        className="absolute right-4 top-[22px] -translate-y-1/2 pointer-events-none"
-        animate={{ rotate: open ? 180 : 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        <ChevronDown className="w-4 h-4" style={{ color: open ? accent : textDim }} strokeWidth={2} />
-      </motion.div>
+      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused: open })}>
+        <GlassReflection isDark={isDark} />
+        <AppButton
+          type="button"
+          onClick={() => setOpenState(!open)}
+          className="relative z-10 w-full pl-4 pr-10 py-3 outline-none transition-all text-left cursor-pointer flex items-center"
+          style={{
+            fontFamily: "'Inter', sans-serif", fontSize: '14px',
+            color: value ? textPrimary : textDim,
+          }}
+        >
+          {value || placeholder}
+        </AppButton>
+        <motion.div
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none"
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="w-4 h-4" style={{ color: open ? accent : textDim }} strokeWidth={2} />
+        </motion.div>
+      </div>
 
       <AnimatePresence>
         {open && (
@@ -129,7 +130,6 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
-  const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)';
   const accent = isDark ? '#d6f905' : '#0a0a0a';
   const hasError = !!error;
   const [focused, setFocused] = useState(false);
@@ -155,34 +155,38 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
       {labelBlock}
 
       {question.type === 'text' && (
-        <AppInput
-          type="text" value={value || ''} maxLength={question.maxLength}
-          placeholder={question.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          className="w-full px-4 py-3 rounded-xl outline-none transition-all"
-          style={{
-            fontFamily: "'Inter', sans-serif", fontSize: '14px',
-            background: inputBg, color: textPrimary,
-            ...glassField(isDark, { error: hasError, focused }),
-          }}
-        />
+        <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+          <GlassReflection isDark={isDark} />
+          <AppInput
+            type="text" value={value || ''} maxLength={question.maxLength}
+            placeholder={question.placeholder}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            className="relative z-10 w-full px-4 py-3 outline-none transition-all"
+            style={{
+              fontFamily: "'Inter', sans-serif", fontSize: '14px',
+              color: textPrimary,
+            }}
+          />
+        </div>
       )}
 
       {question.type === 'textarea' && (
-        <AppTextArea
-          value={value || ''} maxLength={question.maxLength}
-          placeholder={question.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          rows={3}
-          className="w-full px-4 py-3 rounded-xl outline-none transition-all resize-none"
-          style={{
-            fontFamily: "'Inter', sans-serif", fontSize: '14px',
-            background: inputBg, color: textPrimary,
-            ...glassField(isDark, { error: hasError, focused }),
-          }}
-        />
+        <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+          <GlassReflection isDark={isDark} />
+          <AppTextArea
+            value={value || ''} maxLength={question.maxLength}
+            placeholder={question.placeholder}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            rows={3}
+            className="relative z-10 w-full px-4 py-3 outline-none transition-all resize-none"
+            style={{
+              fontFamily: "'Inter', sans-serif", fontSize: '14px',
+              color: textPrimary,
+            }}
+          />
+        </div>
       )}
 
       {(question.type === 'select' || question.type === 'radio') && (
@@ -210,7 +214,7 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
                 style={{
                   background: active
                     ? (isDark ? 'rgba(217,255,0,0.08)' : 'rgba(214,249,5,0.08)')
-                    : inputBg,
+                    : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)'),
                   ...glassEdge(isDark),
                 }}>
                 <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"

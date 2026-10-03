@@ -193,8 +193,9 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
           {label}
         </label>
       )}
-      <div className="relative">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2"
+      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+        <GlassReflection isDark={isDark} />
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
           style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim, transition: 'color 0.2s' }}>
           {icon}
         </div>
@@ -205,12 +206,10 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3.5 rounded-xl outline-none transition-all"
+          className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
           style={{
             fontFamily: "'Inter', sans-serif",
             fontSize: '14px',
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-            ...glassField(isDark, { error: hasError, focused }),
             color: textPrimary,
           }}
         />

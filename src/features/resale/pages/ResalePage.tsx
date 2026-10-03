@@ -403,18 +403,16 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                   {/* Search + Filter */}
                   <div className="px-5 pt-5">
                     <div className="flex gap-2">
-                      <div className="flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl"
-                        style={{
-                          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                          ...glassField(isDark),
-                        }}>
-                        <Search className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }} strokeWidth={1.5} />
+                      <div className="relative flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl overflow-hidden"
+                        style={glassField(isDark)}>
+                        <GlassReflection isDark={isDark} />
+                        <Search className="relative z-10 w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }} strokeWidth={1.5} />
                         <AppInput
                           type="text"
                           placeholder="Search events..."
                           value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)}
-                          className="flex-1 bg-transparent outline-none text-[13px]"
+                          className="relative z-10 flex-1 bg-transparent outline-none text-[13px]"
                           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}
                         />
                       </div>

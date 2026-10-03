@@ -61,15 +61,18 @@ export function PhoneOtpStep({
         </div>
       </div>
 
-      <AppInput
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        placeholder="6-digit code"
-        inputMode="numeric"
-        aria-label="Verification code"
-        className="w-full h-14 rounded-2xl px-4 text-[18px] tracking-[8px] text-center outline-none"
-        style={{ ...glassField(isDark, { error: !!error }), color: isDark ? '#fff' : '#111' }}
-      />
+      <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error })}>
+        <GlassReflection isDark={isDark} />
+        <AppInput
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="6-digit code"
+          inputMode="numeric"
+          aria-label="Verification code"
+          className="relative z-10 w-full h-14 px-4 text-[18px] tracking-[8px] text-center outline-none"
+          style={{ color: isDark ? '#fff' : '#111' }}
+        />
+      </div>
 
       {error && (
         <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: '#f87171' }}>{error}</p>
