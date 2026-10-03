@@ -40,7 +40,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
                 background: isDark
                   ? 'linear-gradient(160deg, rgba(214,249,5,0.16) 0%, rgba(214,249,5,0.04) 100%)'
                   : 'linear-gradient(160deg, rgba(214,249,5,0.4) 0%, rgba(214,249,5,0.14) 100%)',
-                border: `1px solid ${isDark ? 'rgba(214,249,5,0.28)' : 'rgba(150,180,0,0.45)'}`,
+                ...glassEdge(isDark),
               }}
               animate={reduceMotion ? { rotate: -8 } : { rotate: -8, y: [0, -3, 0] }}
               transition={{ y: { duration: 4.5, repeat: Infinity, ease: 'easeInOut' } }}
@@ -70,8 +70,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
               className="absolute rounded-[16px] overflow-hidden"
               style={{
                 left: 'calc(50%)', width: '96px', height: '120px',
-                ...glass(isDark),
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
+                ...glass(isDark), ...glassEdge(isDark),
               }}
               animate={reduceMotion ? { rotate: 8 } : { rotate: 8, y: [0, -3, 0] }}
               transition={{ y: { duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.3 } }}
@@ -101,7 +100,6 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
               className="relative z-20 w-14 h-14 rounded-full flex items-center justify-center"
               style={{
                 background: isDark ? 'rgba(16,17,21,0.92)' : '#fff',
-                border: `1px solid ${isDark ? 'rgba(214,249,5,0.35)' : 'rgba(180,210,0,0.5)'}`,
                 ...glassEdge(isDark),
               }}
               animate={reduceMotion ? undefined : { y: [0, -4, 0] }}

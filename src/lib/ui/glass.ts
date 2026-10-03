@@ -145,3 +145,19 @@ export function glassEdge(isDark: boolean): CSSProperties {
 export function glassControl(isDark: boolean, tint?: GlassTint): CSSProperties {
   return { ...glass(isDark, tint), ...glassEdge(isDark) };
 }
+
+/**
+ * Field/input boundary: the inset glass edge replaces the rest border, the
+ * focus halo is the state, and an error tints the fill danger (red icon + copy
+ * still carry the message). Keeps the caller's own background for the neutral
+ * and focused cases so translucent field fills survive.
+ */
+export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
+  const edge = glassEdge(isDark).boxShadow;
+  const halo = opts.focused && !opts.error
+    ? isDark ? "0 0 0 4px rgba(217,255,0,0.1)" : "0 0 0 4px rgba(214,249,5,0.08)"
+    : null;
+  const out: CSSProperties = { boxShadow: halo ? `${halo}, ${edge}` : edge };
+  if (opts.error) out.background = glass(isDark, "danger").background;
+  return out;
+}

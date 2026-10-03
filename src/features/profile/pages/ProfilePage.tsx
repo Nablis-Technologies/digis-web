@@ -85,7 +85,7 @@ export function UserProfile({ tickets, onOpenSettings, loading = false }: UserPr
         >
           <div className="relative flex-shrink-0">
             <div className="relative rounded-full"
-              style={{ border: `3px solid ${isDark ? '#0a0a0a' : '#f8f7fc'}` }}>
+              style={{ boxShadow: `0 0 0 3px ${isDark ? '#0a0a0a' : '#f8f7fc'}` }}>
               <UserAvatar
                 user={authUser}
                 size={80}

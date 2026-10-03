@@ -47,7 +47,7 @@ export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming'
                 marginLeft: `${card.x}px`,
                 rotate: card.rot,
                 background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}`,
+                ...glassEdge(isDark),
               }}
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: card.dur, repeat: Infinity, ease: 'easeInOut', delay: card.delay }}
@@ -56,7 +56,7 @@ export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming'
           {/* Front — the standard glass surface */}
           <motion.div
             className="relative rounded-[16px] w-[108px] h-[134px] overflow-hidden"
-            style={{ rotate: -2, ...glass(isDark), border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}` }}
+            style={{ rotate: -2, ...glass(isDark), ...glassEdge(isDark) }}
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
           >

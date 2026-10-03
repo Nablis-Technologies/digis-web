@@ -5,6 +5,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassControl } from '@/lib/ui/glass';
 import { waitlistModule } from '@/lib/waitlist';
 import { registrationModule } from '@/lib/registration';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -122,7 +123,7 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
         <div className="relative z-10">
           <div className="flex items-start justify-between mb-4">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
-              style={{ background: `rgba(214,249,5,0.12)`, border: `1px solid rgba(214,249,5,0.3)` }}>
+              style={glassControl(isDark, 'accent')}>
               <Hourglass className="w-5 h-5" style={{ color: accent }} strokeWidth={2} />
             </div>
             <AppButton onClick={onClose} ariaLabel="Close" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"

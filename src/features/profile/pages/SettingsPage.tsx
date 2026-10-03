@@ -17,6 +17,7 @@ import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, 
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 
 interface SettingsViewProps {
   onBack: () => void;
@@ -226,8 +227,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
           disabled={signingOut}
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl cursor-pointer mb-6 disabled:cursor-not-allowed disabled:opacity-60"
           style={{
-            background: isDark ? 'rgba(239,68,68,0.10)' : 'rgba(239,68,68,0.08)',
-            border: `1px solid ${isDark ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.2)'}`,
+            ...glassControl(isDark, 'danger'),
             color: '#ef4444', fontFamily: "'Inter', sans-serif", fontSize: '13px', fontWeight: 600, letterSpacing: '0.3px',
           }}
         >
@@ -306,7 +306,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
               <SettingsSheet key="2fa" title="Two-factor authentication" onClose={closeSheet} isDark={isDark} brand={brand} cardBorder={cardBorder}>
                 <div className="flex flex-col items-center text-center gap-4 py-2">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                    style={{ background: twoFaEnabled ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${twoFaEnabled ? 'rgba(52,211,153,0.3)' : cardBorder}` }}>
+                    style={{ background: twoFaEnabled ? 'rgba(52,211,153,0.12)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'), ...glassEdge(isDark) }}>
                     <ShieldCheck className="w-7 h-7" strokeWidth={1.75} style={{ color: twoFaEnabled ? '#10b981' : (isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)') }} />
                   </div>
                   <div>
@@ -325,9 +325,10 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
                     className="w-full py-3 rounded-2xl cursor-pointer text-[13px]"
                     style={{
                       fontFamily: "'Inter', sans-serif", fontWeight: 600,
-                      background: twoFaEnabled ? 'rgba(239,68,68,0.1)' : (isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a'),
+                      ...(twoFaEnabled
+                        ? glassControl(isDark, 'danger')
+                        : { background: isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a' }),
                       color: twoFaEnabled ? '#ef4444' : (isDark ? '#000' : '#fff'),
-                      border: twoFaEnabled ? '1px solid rgba(239,68,68,0.25)' : 'none',
                     }}
                   >
                     {twoFaEnabled ? 'Disable 2FA' : 'Enable 2FA'}

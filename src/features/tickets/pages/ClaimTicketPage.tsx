@@ -15,7 +15,7 @@ import type { AcceptedTransfer } from '@/lib/transfer';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 import { toastError } from '@/lib/feedback';
 
 const ACCENT_HEX = '#d6f905';
@@ -191,7 +191,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative w-full max-w-md rounded-[28px] overflow-hidden p-8 text-center" style={{ background: isDark ? '#0f0f10' : '#ffffff' }}>
           <GlassReflection isDark={isDark} />
           <div className="relative z-10">
-            <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5" style={glassControl(isDark, 'danger')}>
               <AlertTriangle className="w-6 h-6" style={{ color: '#ef4444' }} strokeWidth={1.8} />
             </div>
             <h1 className="text-[22px] font-light tracking-[-0.3px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: text }}>
@@ -217,7 +217,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative w-full max-w-md rounded-[28px] overflow-hidden p-8 text-center" style={{ background: isDark ? '#0f0f10' : '#ffffff' }}>
           <GlassReflection isDark={isDark} />
           <div className="relative z-10">
-            <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5" style={{ background: 'rgba(214,249,5,0.12)', border: '1px solid rgba(214,249,5,0.3)' }}>
+            <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5" style={glassControl(isDark, 'accent')}>
               <ShieldCheck className="w-6 h-6" style={{ color: isDark ? ACCENT_HEX : '#0a0a0a' }} strokeWidth={1.8} />
             </div>
             <h1 className="text-[22px] font-light tracking-[-0.3px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: text }}>

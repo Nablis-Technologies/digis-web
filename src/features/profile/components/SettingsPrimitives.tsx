@@ -3,7 +3,7 @@ import { Check, ChevronRight, Loader2, Moon, Sun, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { Switch } from '@/components/ui/switch';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
@@ -35,14 +35,9 @@ export function OtpInput({ value, onChange, isDark }: { value: string; onChange:
             fontWeight: 600,
             color: isDark ? '#fff' : '#0a0a0a',
             background: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.9)',
-            border: `1.5px solid ${
-              d
-                ? isDark ? 'rgba(217,255,0,0.55)' : 'rgba(180,210,0,0.7)'
-                : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'
-            }`,
             boxShadow: d
-              ? `0 0 0 3px ${isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.15)'}`
-              : 'none',
+              ? `0 0 0 1.5px ${isDark ? 'rgba(217,255,0,0.55)' : 'rgba(180,210,0,0.7)'}, 0 0 0 3px ${isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.15)'}`
+              : `0 0 0 1.5px ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
           }}
         >
           {d || <span style={{ opacity: 0.2 }}>·</span>}
@@ -148,7 +143,7 @@ export function EditField({ icon, type = 'text', placeholder, value, onChange, i
     <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all"
       style={{
         background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.85)',
-        border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(180,210,0,0.7)') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')}`,
+        ...glassField(isDark, { focused }),
       }}
     >
       <span style={{ color: focused ? (isDark ? '#d6f905' : '#5a6b00') : dim }}>{icon}</span>
@@ -264,7 +259,7 @@ export function PickerList({ options, selected, onSelect, isDark }: {
             className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl cursor-pointer text-left"
             style={{
               background: active ? (isDark ? 'rgba(214,249,5,0.1)' : 'rgba(214,249,5,0.14)') : 'transparent',
-              border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.3)' : 'rgba(180,210,0,0.5)') : 'transparent'}`,
+              ...(active ? glassEdge(isDark) : {}),
             }}
           >
             <span className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: active ? 600 : 400, color: heading }}>{opt}</span>

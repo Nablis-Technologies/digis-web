@@ -25,7 +25,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { mapApiError } from '@/lib/errors';
 
 interface TransferTicketProps {
@@ -337,7 +337,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   <p className="relative z-10 text-[12px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add a short personal note if you’d like. It will travel with the secure claim link.</p>
                 </div>
                 <div className="relative">
-                  <AppTextArea placeholder="Write something thoughtful…" value={note} onChange={(e) => setNote(e.target.value.slice(0, 140))} rows={2} className={`w-full px-4 py-3 rounded-2xl text-[13.5px] outline-none resize-none ${placeholderClass}`} style={{ background: surfaceSoft, border: `1px solid ${note ? accentBorder : borderSoft}`, color: text, fontFamily: "'Inter', sans-serif" }} />
+                  <AppTextArea placeholder="Write something thoughtful…" value={note} onChange={(e) => setNote(e.target.value.slice(0, 140))} rows={2} className={`w-full px-4 py-3 rounded-2xl text-[13.5px] outline-none resize-none ${placeholderClass}`} style={{ background: surfaceSoft, ...glassField(isDark, { focused: !!note }), color: text, fontFamily: "'Inter', sans-serif" }} />
                   <span className="absolute bottom-2.5 right-3 text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>{note.length}/140</span>
                 </div>
                 {isGift && giftExtras.length > 0 && (

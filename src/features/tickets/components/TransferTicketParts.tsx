@@ -1,6 +1,7 @@
 import { Calendar, Ticket as TicketIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassField } from '@/lib/ui/glass';
 
 const ACCENT = '214,249,5';
 const ACCENT_HEX = '#d6f905';
@@ -21,15 +22,14 @@ export function Field({
   error?: boolean;
 }) {
   const surfaceSoft = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
-  const borderSoft = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
   const iconColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
   return (
     <div
       className="relative flex items-center gap-3 px-4 py-3.5 rounded-2xl"
       style={{
         background: surfaceSoft,
-        border: `1px solid ${error ? 'rgba(239,68,68,0.6)' : active ? `rgba(${ACCENT},0.3)` : borderSoft}`,
-        transition: 'border-color 0.25s',
+        ...(active ? glassField(isDark, { error, focused: true }) : glassField(isDark, { error })),
+        transition: 'box-shadow 0.25s',
       }}
     >
       <span style={{ color: iconColor }}>{icon}</span>

@@ -11,6 +11,7 @@ import { registrationModule } from '@/lib/registration';
 import { guestWallet } from '@/lib/guest-wallet';
 import { ApiError, mapApiError, mapFieldErrors } from '@/lib/errors';
 import { FieldError } from '@/components/primitives/FieldError';
+import { glassField } from '@/lib/ui/glass';
 
 /**
  * Guest ticket → account claim (#31 resolved). A guest whose ticket carries a
@@ -53,7 +54,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
 
   const inputStyle = (invalid = false): React.CSSProperties => ({
     background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-    border: `1px solid ${invalid ? 'rgba(248,113,113,0.75)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`,
+    ...glassField(isDark, { error: invalid }),
     color: text,
     fontFamily: "'Inter', sans-serif",
   });

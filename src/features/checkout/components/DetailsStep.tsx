@@ -5,6 +5,7 @@ import type { ContactDetails } from '@/features/checkout/hooks/useCheckoutFlow';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { glassField } from '@/lib/ui/glass';
 
 export function DetailsStep({
   name, setName, email, setEmail, phone, setPhone,
@@ -120,15 +121,8 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
             fontFamily: "'Inter', sans-serif",
             fontSize: '14px',
             background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-            border: `1px solid ${hasError
-              ? '#ef4444'
-              : focused
-                ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.4)')
-                : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
+            ...glassField(isDark, { error: hasError, focused }),
             color: textPrimary,
-            boxShadow: focused && !hasError
-              ? `0 0 0 4px ${isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.08)'}`
-              : 'none',
           }}
         />
       </div>

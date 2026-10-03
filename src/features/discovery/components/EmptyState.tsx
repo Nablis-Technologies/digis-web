@@ -120,7 +120,7 @@ export function EmptyState({
               style={{
                 marginLeft: -59 - 48, marginTop: -73, rotate: -14,
                 background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}`,
+                ...glassEdge(isDark),
               }}
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
@@ -131,7 +131,7 @@ export function EmptyState({
               style={{
                 marginLeft: -59 + 48, marginTop: -73, rotate: 14,
                 background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}`,
+                ...glassEdge(isDark),
               }}
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
@@ -139,7 +139,7 @@ export function EmptyState({
             {/* front — the standard glass surface */}
             <motion.div
               className="absolute left-1/2 top-1/2 w-[118px] h-[146px] rounded-[18px] overflow-hidden"
-              style={{ marginLeft: -59, marginTop: -73, ...glass(isDark), border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}` }}
+              style={{ marginLeft: -59, marginTop: -73, ...glass(isDark), ...glassEdge(isDark) }}
               animate={{ y: [0, -5, 0] }}
               transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
             >

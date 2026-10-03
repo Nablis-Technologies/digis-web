@@ -9,7 +9,7 @@ import { ProviderLogo } from '@/components/ProviderLogo';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 
 export function PaymentStep({
   method, setMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, total, subtotal, discountTotal, promoCode, serviceFee, isDark,
@@ -130,10 +130,7 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
         background: selected
           ? (isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.06)')
           : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(26,26,46,0.03)'),
-        border: `1.5px solid ${selected
-          ? (isDark ? 'rgba(217,255,0,0.4)' : 'rgba(214,249,5,0.35)')
-          : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)')}`,
-        boxShadow: 'none',
+        ...(selected ? glassEdge(isDark) : {}),
         transition: 'all 0.2s',
       }}
     >
@@ -164,7 +161,7 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
       <motion.div
         className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
         style={{
-          border: selected ? 'none' : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(26,26,46,0.2)'}`,
+          boxShadow: selected ? 'none' : `0 0 0 1.5px ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(26,26,46,0.2)'}`,
           background: selected ? '#d6f905' : 'transparent',
         }}
         animate={{ scale: selected ? [1, 1.15, 1] : 1 }}
@@ -213,15 +210,8 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
             fontFamily: "'Inter', sans-serif",
             fontSize: '14px',
             background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-            border: `1px solid ${hasError
-              ? '#ef4444'
-              : focused
-                ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.4)')
-                : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
+            ...glassField(isDark, { error: hasError, focused }),
             color: textPrimary,
-            boxShadow: focused && !hasError
-              ? `0 0 0 4px ${isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.08)'}`
-              : 'none',
           }}
         />
       </div>

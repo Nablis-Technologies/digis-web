@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Tag, X } from 'lucide-react';
 import type { AppliedPromo } from '@/features/checkout/hooks/useCheckoutFlow';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -73,7 +73,7 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                       style={{
                         fontFamily: "'Inter', sans-serif",
                         background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                        ...glassField(isDark),
                         color: isDark ? '#fff' : '#1a1a1a',
                       }}
                     />

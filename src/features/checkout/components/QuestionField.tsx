@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import type { CustomQuestion } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 
 function CustomDropdown({
   value, options, placeholder, onChange, onOpenChange, hasError, isDark,
@@ -19,8 +20,6 @@ function CustomDropdown({
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)';
-  const focusedBorder = isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)';
-  const restBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
   const accent = isDark ? '#d6f905' : '#0a0a0a';
   const menuBg = isDark ? 'rgba(20,20,20,0.92)' : 'rgba(255,255,255,0.96)';
 
@@ -41,11 +40,6 @@ function CustomDropdown({
     };
   }, [open]);
 
-  const borderColor = hasError ? '#ef4444' : open ? focusedBorder : restBorder;
-  const focusShadow = open && !hasError
-    ? `0 0 0 4px ${isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.08)'}`
-    : 'none';
-
   return (
     <div className="relative" ref={ref}>
       <AppButton
@@ -55,7 +49,7 @@ function CustomDropdown({
         style={{
           fontFamily: "'Inter', sans-serif", fontSize: '14px',
           background: inputBg, color: value ? textPrimary : textDim,
-          border: `1px solid ${borderColor}`, boxShadow: focusShadow,
+          ...glassField(isDark, { error: hasError, focused: open }),
         }}
       >
         {value || placeholder}
@@ -136,16 +130,9 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
   const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)';
-  const focusedBorder = isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)';
-  const restBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
   const accent = isDark ? '#d6f905' : '#0a0a0a';
   const hasError = !!error;
   const [focused, setFocused] = useState(false);
-
-  const borderColor = hasError ? '#ef4444' : focused ? focusedBorder : restBorder;
-  const focusShadow = focused && !hasError
-    ? `0 0 0 4px ${isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.08)'}`
-    : 'none';
 
   const labelBlock = (
     <div className="flex items-baseline justify-between mb-2 ml-1 gap-2">
@@ -177,7 +164,7 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
           style={{
             fontFamily: "'Inter', sans-serif", fontSize: '14px',
             background: inputBg, color: textPrimary,
-            border: `1px solid ${borderColor}`, boxShadow: focusShadow,
+            ...glassField(isDark, { error: hasError, focused }),
           }}
         />
       )}
@@ -193,7 +180,7 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
           style={{
             fontFamily: "'Inter', sans-serif", fontSize: '14px',
             background: inputBg, color: textPrimary,
-            border: `1px solid ${borderColor}`, boxShadow: focusShadow,
+            ...glassField(isDark, { error: hasError, focused }),
           }}
         />
       )}
@@ -224,11 +211,11 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
                   background: active
                     ? (isDark ? 'rgba(217,255,0,0.08)' : 'rgba(214,249,5,0.08)')
                     : inputBg,
-                  border: `1px solid ${active ? (isDark ? 'rgba(217,255,0,0.45)' : 'rgba(214,249,5,0.45)') : restBorder}`,
+                  ...glassEdge(isDark),
                 }}>
                 <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{
-                    border: `1.5px solid ${active ? accent : textDim}`,
+                    boxShadow: `0 0 0 1.5px ${active ? accent : textDim}`,
                     background: active ? accent : 'transparent',
                   }}>
                   {active && <Check className="w-3 h-3" strokeWidth={3} style={{ color: '#0a0a0a' }} />}
@@ -268,3 +255,4 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
     </div>
   );
 }
+

@@ -592,7 +592,7 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
             <div className="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0"
               style={{
                 background: flatAvatarColor(organizer.name),
-                border: `3px solid ${isDark ? '#101010' : '#fff'}`,
+                boxShadow: `0 0 0 3px ${isDark ? '#101010' : '#fff'}`,
               }}>
               <span className="text-[22px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
                 {initials}

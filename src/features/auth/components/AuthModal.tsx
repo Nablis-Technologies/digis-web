@@ -8,7 +8,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { mapFieldErrors } from '@/lib/errors';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
@@ -219,7 +219,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
         </div>
 
         {/* Header */}
-        <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${borderSoft}` }}>
+        <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ boxShadow: `inset 0 -1px 0 ${borderSoft}` }}>
           <div className="w-9 h-9" />
           <p className="text-[9px] tracking-[3px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
             {t.kicker}
@@ -409,7 +409,7 @@ function CountrySelector({ country, onChange, isDark }: {
         type="button"
         onClick={() => { setOpen(o => !o); setSearch(''); }}
         className="flex items-center gap-1.5 pr-3 cursor-pointer select-none"
-        style={{ borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,26,46,0.1)'}` }}
+        style={{ boxShadow: `inset -1px 0 0 ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,26,46,0.1)'}` }}
       >
         <span className="text-[17px] leading-none">{country.flag}</span>
         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: textMuted }}>+{country.dial}</span>
@@ -435,7 +435,7 @@ function CountrySelector({ country, onChange, isDark }: {
           >
             <GlassReflection isDark={isDark} />
             {/* Search */}
-            <div className="relative z-10 p-2.5" style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)'}` }}>
+            <div className="relative z-10 p-2.5" style={{ boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)'}` }}>
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
                 style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(26,26,46,0.04)' }}>
                 <Search className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} style={{ color: textDim }} />
@@ -479,13 +479,6 @@ function CountrySelector({ country, onChange, isDark }: {
   );
 }
 
-/** Red border when the field has an error, else the focus/neutral border. */
-function fieldBorder(error: string | undefined, focused: boolean, isDark: boolean): string {
-  if (error) return 'rgba(248,113,113,0.7)';
-  if (focused) return isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.6)';
-  return isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)';
-}
-
 /* ─── PhoneField (with dial selector) ─────────────────────── */
 function PhoneField({ country, onCountryChange, placeholder, value, onChange, isDark, onEnter, error }: {
   country: Country; onCountryChange: (c: Country) => void;
@@ -498,7 +491,7 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
       <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all"
         style={{
           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+          ...glassField(isDark, { error: !!error, focused }),
         }}>
         <CountrySelector country={country} onChange={onCountryChange} isDark={isDark} />
         <AppInput
@@ -524,7 +517,7 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
         style={{
           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+          ...glassField(isDark, { error: !!error, focused }),
         }}>
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
@@ -546,7 +539,7 @@ function EmailField({ value, onChange, isDark, onEnter, error }: { value: string
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
         style={{
           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+          ...glassField(isDark, { error: !!error, focused }),
         }}>
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
         <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
@@ -568,7 +561,7 @@ function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }:
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
         style={{
           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-          border: `1px solid ${fieldBorder(error, focused, isDark)}`,
+          ...glassField(isDark, { error: !!error, focused }),
         }}>
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Lock className="w-4 h-4" /></span>
         <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}

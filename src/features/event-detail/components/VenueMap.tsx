@@ -243,7 +243,7 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
               <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{
                   background: venueName ? flatAvatarColor(venueName) : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                  border: `3px solid ${isDark ? '#101010' : '#fff'}`,
+                  boxShadow: `0 0 0 3px ${isDark ? '#101010' : '#fff'}`,
                 }}>
                 <span className="text-[26px] uppercase"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: '#fff' }}>

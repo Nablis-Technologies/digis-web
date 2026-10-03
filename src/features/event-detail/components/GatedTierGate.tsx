@@ -6,6 +6,7 @@ import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { audienceModule, type AudienceProof } from '@/lib/audience';
 
 interface GatedTierGateProps {
@@ -96,7 +97,7 @@ export function GatedTierGate({
       <GlassReflection isDark={isDark} />
       <div className="relative z-10 px-6 py-8 text-center">
         <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-4"
-          style={{ background: isDark ? 'rgba(10,10,10,0.85)' : '#fff', border: `1.5px solid rgba(${accentRgb},0.35)` }}>
+          style={{ background: isDark ? 'rgba(10,10,10,0.85)' : '#fff', boxShadow: `0 0 0 1.5px rgba(${accentRgb},0.35), ${glassEdge(isDark).boxShadow}` }}>
           <Lock className="w-5 h-5" style={{ color: accentText }} strokeWidth={2} />
         </div>
         <h3 className="text-[18px] mb-1.5"
@@ -117,7 +118,7 @@ export function GatedTierGate({
             className="flex items-center gap-2 rounded-2xl p-1.5"
             style={{
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${error ? 'rgba(239,68,68,0.5)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')}`,
+              ...glassField(isDark, { error: !!error }),
             }}>
             <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
               style={{ background: `rgba(${accentRgb},0.1)` }}>

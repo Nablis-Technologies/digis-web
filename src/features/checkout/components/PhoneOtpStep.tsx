@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glass, glassControl } from '@/lib/ui/glass';
 
 /**
  * Guest free-admission phone proof, shown inline as its own checkout step.
@@ -33,20 +34,19 @@ export function PhoneOtpStep({
   const [code, setCode] = useState('');
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
-  const borderSoft = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)';
   const canSubmit = !loading && code.trim().length >= 4;
 
   return (
     <div className="space-y-4">
       <div
         className="relative overflow-hidden rounded-2xl px-4 py-4"
-        style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)', border: `1px solid ${borderSoft}` }}
+        style={glass(isDark)}
       >
         <GlassReflection isDark={isDark} />
         <div className="relative z-10 flex items-start gap-3">
           <div
             className="w-9 h-9 rounded-xl grid place-items-center shrink-0"
-            style={{ background: 'rgba(214,249,5,0.12)', border: '1px solid rgba(214,249,5,0.3)' }}
+            style={glassControl(isDark, 'accent')}
           >
             <ShieldCheck className="w-4 h-4" style={{ color: '#d6f905' }} strokeWidth={2} />
           </div>

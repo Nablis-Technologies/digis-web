@@ -10,6 +10,7 @@ import { orderModule } from '@/lib/order';
 import type { Event, UserTicket } from '@/types';
 import { EventDiscovery } from '@/features/discovery/pages/DiscoveryPage';
 import { EventDetailSkeleton } from '@/components/loading';
+import { glass, glassControl } from '@/lib/ui/glass';
 import { TicketView } from '@/features/tickets/pages/TicketsPage';
 import { EventDetail } from '@/features/event-detail/pages/EventDetailPage';
 import { UserProfile } from '@/features/profile/pages/ProfilePage';
@@ -475,14 +476,11 @@ function AppContent() {
             >
               <div
                 className="relative w-full max-w-md rounded-[28px] p-8 text-center"
-                style={{
-                  background: isDark ? '#0f0f10' : '#ffffff',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-                }}
+                style={glass(isDark)}
               >
                 <div
                   className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5"
-                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}
+                  style={glassControl(isDark, 'danger')}
                 >
                   <AlertTriangle className="w-6 h-6" style={{ color: '#ef4444' }} strokeWidth={1.8} />
                 </div>

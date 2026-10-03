@@ -1,7 +1,7 @@
 import type { Event, TicketTier } from '@/types';
 import { TicketTypeCard } from './TicketTypeCard';
 import { Spinner, LoadErrorCard } from '@/components/loading';
-import type { GlassReflectionSettings } from '@/lib/ui/glass';
+import { glassControl, type GlassReflectionSettings } from '@/lib/ui/glass';
 
 export function TicketSelector({
   event,
@@ -67,7 +67,7 @@ export function TicketSelector({
       {blocked ? (
         <div className="flex items-center justify-center gap-2 mb-7">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{ background: isDark ? 'rgba(255,59,48,0.12)' : 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)' }}>
+            style={glassControl(isDark, 'danger')}>
             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#ff3b30' }} />
             <span className="text-[10px] tracking-[1.5px] uppercase"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,100,90,0.9)' : 'rgba(200,40,30,0.85)', fontWeight: 600 }}>

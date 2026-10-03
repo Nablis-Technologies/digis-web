@@ -6,7 +6,7 @@ import type { ResaleListing } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 
 export function RemoveListingSheet({
   listing,
@@ -58,7 +58,7 @@ export function RemoveListingSheet({
           {/* Warning icon */}
           <div className="flex justify-center mb-5">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              style={glassControl(isDark, 'danger')}>
               <AlertTriangle className="w-6 h-6 text-red-400" strokeWidth={2} />
             </div>
           </div>
