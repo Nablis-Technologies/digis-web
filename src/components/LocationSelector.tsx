@@ -84,7 +84,7 @@ export function LocationSelector() {
               style={{
                 fontFamily: "'Inter', sans-serif",
                 color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
-                borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(81,72,101,0.075)'}`,
+                boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(81,72,101,0.075)'}`,
               }}
             >
               Choose your city

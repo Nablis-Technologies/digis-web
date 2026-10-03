@@ -49,7 +49,7 @@ export function AddExtrasDialog({ ticket, products, isSaving = false, done = fal
         style={{ background: bgPanel }}>
         <GlassReflection isDark={isDark} />
         <div className="relative z-10 contents">
-        <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${borderSoft}` }}>
+        <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ boxShadow: `inset 0 -1px 0 ${borderSoft}` }}>
           <div>
             <p className="text-[9px] tracking-[3px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add extras</p>
             <p className="text-[13px] mt-0.5 truncate max-w-[240px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary, fontWeight: 300 }}>{ticket.eventName}</p>
@@ -80,7 +80,7 @@ export function AddExtrasDialog({ ticket, products, isSaving = false, done = fal
         </div>
 
         {products.length > 0 && (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
             <div className="flex items-center justify-between mb-3.5">
               <div>
                 <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>

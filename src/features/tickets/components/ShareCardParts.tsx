@@ -113,7 +113,7 @@ export function TierBadge({ ticketType, isVIP, tier }: { ticketType?: string; is
   if (!ticketType) return null;
   return (
     <span className="inline-flex items-center gap-1 text-[9.5px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
-      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `rgba(${tier.rgb},0.18)`, border: `1px solid rgba(${tier.rgb},0.55)`, color: tier.color }}>
+      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `rgba(${tier.rgb},0.18)`, boxShadow: `0 0 0 1px rgba(${tier.rgb},0.55)`, color: tier.color }}>
       {isVIP && <Crown className="w-3 h-3" strokeWidth={2} />}
       {ticketType}
     </span>
@@ -126,7 +126,7 @@ export function StatusChip({ accentText, label = 'Ticket Secured' }: { accentTex
     <span className="inline-flex items-center gap-1.5 text-[10px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
       style={{
         fontFamily: "'Inter', sans-serif", fontWeight: 700,
-        background: `rgba(${accentText},0.16)`, border: `1px solid rgba(${accentText},0.45)`, color: `rgb(${accentText})`,
+        background: `rgba(${accentText},0.16)`, boxShadow: `0 0 0 1px rgba(${accentText},0.45)`, color: `rgb(${accentText})`,
       }}>
       {label}
     </span>
@@ -204,7 +204,7 @@ export function BrandCTA({ accentText }: { accentText: string }) {
 
 export function MetaFooter({ event, accentText, borderColor }: { event: ShareCardEvent; accentText: string; borderColor: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${borderColor}` }}>
+    <div className="flex items-center justify-between gap-3 pt-4" style={{ boxShadow: `inset 0 1px 0 ${borderColor}` }}>
       <div className="min-w-0">
         <div className="text-[13px] tracking-[0.8px] uppercase truncate" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: '#fff' }}>
           {shortDate(event.date)}{event.time ? ` · ${event.time}` : ''}
@@ -274,7 +274,7 @@ export function BoldCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
             style={{ background: `linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.22) 47%, transparent 60%)` }} />
           {event.category && (
             <span className="absolute top-3 left-3 text-[9px] tracking-[2px] uppercase px-2.5 py-1 rounded-full"
-              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`, border: `1px solid rgba(${categoryTokens.rgb},${categoryTokens.border})`, color: `rgb(${categoryTokens.rgb})` }}>
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`, boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`, color: `rgb(${categoryTokens.rgb})` }}>
               {event.category}
             </span>
           )}
@@ -330,7 +330,7 @@ export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentT
 
         {/* Verified status row */}
         <div className="relative mt-4 inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-full"
-          style={{ background: `rgba(${accentText},0.14)`, border: `1px solid rgba(${accentText},0.5)` }}>
+          style={{ background: `rgba(${accentText},0.14)`, boxShadow: `0 0 0 1px rgba(${accentText},0.5)` }}>
           <Check className="w-3.5 h-3.5" strokeWidth={3} style={{ color: `rgb(${accentText})` }} />
           <span className="text-[11px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: `rgb(${accentText})` }}>
             {purchased ? 'Ticket Secured' : 'Get Tickets'}

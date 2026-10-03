@@ -142,7 +142,7 @@ export function ShareCard({ event, ticketType, ticketLevel, purchased = false, o
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: active ? 700 : 500,
                   background: active ? BRAND : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${active ? BRAND : 'rgba(255,255,255,0.12)'}`,
+                  boxShadow: `0 0 0 1px ${active ? BRAND : 'rgba(255,255,255,0.12)'}`,
                   color: active ? INK : 'rgba(255,255,255,0.6)',
                 }}
               >

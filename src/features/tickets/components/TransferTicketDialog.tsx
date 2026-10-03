@@ -210,7 +210,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
               <div className="flex items-center gap-2">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}
+                  style={{ background: accentSoft, boxShadow: `0 0 0 1px ${accentBorder}` }}
                 >
                   <FlowIcon className="w-3.5 h-3.5" style={{ color: accentText }} strokeWidth={2} />
                 </div>

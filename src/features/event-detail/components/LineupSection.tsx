@@ -346,9 +346,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                 background: following
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                   : accent,
-                border: `1px solid ${following
-                  ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
-                  : 'transparent'}`,
+                ...(following ? glassEdge(isDark) : {}),
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
               }}>
               {following
@@ -515,7 +513,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
                   : (isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a'),
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : (isDark ? '#0a0a0a' : '#fff'),
-                border: following ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none',
+                ...(following ? glassEdge(isDark) : {}),
               }}>
               {following ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <UserPlus className="w-4 h-4" strokeWidth={2} />}
               <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>

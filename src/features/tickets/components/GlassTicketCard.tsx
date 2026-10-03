@@ -158,7 +158,7 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
                     fontWeight: 600,
                     background: isDark ? 'rgba(248,113,113,0.14)' : 'rgba(190,18,60,0.1)',
                     color: isDark ? '#fca5a5' : '#b91c1c',
-                    border: `1px solid ${isDark ? 'rgba(248,113,113,0.3)' : 'rgba(190,18,60,0.25)'}`,
+                    boxShadow: `0 0 0 1px ${isDark ? 'rgba(248,113,113,0.3)' : 'rgba(190,18,60,0.25)'}`,
                   }}
                 >
                   <GlassReflection isDark={isDark} />

@@ -11,6 +11,7 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { copyText } from '@/lib/utils/clipboard';
 import { toastError } from '@/lib/feedback';
 import { ticketStatusMeta } from '@/lib/tickets';
+import { glassControl } from '@/lib/ui/glass';
 
 const extraIconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
 
@@ -250,10 +251,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         {inactive && (
           <div className="relative px-5 sm:px-7 pt-5">
             <div className="rounded-2xl p-4 flex items-start gap-3"
-              style={{
-                background: isDark ? 'rgba(248,113,113,0.1)' : 'rgba(190,18,60,0.08)',
-                border: `1px solid ${isDark ? 'rgba(248,113,113,0.28)' : 'rgba(190,18,60,0.22)'}`,
-              }}>
+              style={{ ...glassControl(isDark, 'danger') }}>
               <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#fca5a5' : '#b91c1c' }} strokeWidth={2} />
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fca5a5' : '#b91c1c' }}>
@@ -449,7 +447,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               background: downloadDone
                 ? (isDark ? 'rgba(52,211,153,0.14)' : 'rgba(15,155,108,0.12)')
                 : 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
-              border: downloadDone ? `1px solid ${isDark ? 'rgba(52,211,153,0.3)' : 'rgba(15,155,108,0.35)'}` : 'none',
+              boxShadow: downloadDone ? `0 0 0 1px ${isDark ? 'rgba(52,211,153,0.3)' : 'rgba(15,155,108,0.35)'}` : 'none',
               color: downloadDone ? (isDark ? '#34d399' : '#0b7c56') : '#0a0a0a',
             }}
           >

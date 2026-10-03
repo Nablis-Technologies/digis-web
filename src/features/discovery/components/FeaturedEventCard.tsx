@@ -78,7 +78,7 @@ export function FeaturedEventCard({
                 fontFamily: "'Inter', sans-serif",
                 color: `rgb(${hued})`,
                 background: `rgba(${hued},0.16)`,
-                border: `1px solid rgba(${hued},0.4)`,
+                boxShadow: `0 0 0 1px rgba(${hued},0.4)`,
                 backdropFilter: "blur(12px)",
                 fontWeight: 600,
               }}

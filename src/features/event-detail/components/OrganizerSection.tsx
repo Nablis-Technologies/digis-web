@@ -183,7 +183,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
           <div key={o.id ?? o.name}
             className="relative z-10 flex items-center gap-3 px-4 py-2.5"
             style={{
-              borderTop: idx === 0 ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(81,72,101,0.075)'}`,
+              boxShadow: idx === 0 ? 'none' : `inset 0 1px 0 ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(81,72,101,0.075)'}`,
             }}>
             <AppButton onClick={() => setProfileTarget(o)} className="relative flex-shrink-0 cursor-pointer">
               {o.avatar ? (
@@ -221,9 +221,7 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
                 background: (followingMap[o.id] || false)
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                   : (isDark ? 'rgba(214,249,5,0.1)' : accent),
-                border: `1px solid ${(followingMap[o.id] || false)
-                  ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
-                  : (isDark ? 'rgba(214,249,5,0.22)' : 'transparent')}`,
+                ...((followingMap[o.id] || false) ? glassEdge(isDark) : {}),
               }}>
               {(followingMap[o.id] || false) ? (
                 <Check className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
@@ -412,7 +410,7 @@ function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleF
         }}>
         <GlassReflection isDark={isDark} />
         <div className="relative z-10 flex items-center justify-between px-6 pt-5 pb-4"
-          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
+          style={{ boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
           <div>
             <p className="text-[9px] tracking-[3px] uppercase"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
@@ -477,9 +475,7 @@ function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleF
                     background: following
                       ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                       : (isDark ? 'rgba(214,249,5,0.1)' : accent),
-                    border: `1px solid ${following
-                      ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
-                      : (isDark ? 'rgba(214,249,5,0.22)' : 'transparent')}`,
+                    ...(following ? glassEdge(isDark) : {}),
                   }}>
                   {pendingFollow === o.id
                     ? <Loader2 className="w-3 h-3 animate-spin" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
@@ -669,9 +665,7 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
                 background: following
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                   : accent,
-                border: `1px solid ${following
-                  ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
-                  : 'transparent'}`,
+                ...(following ? glassEdge(isDark) : {}),
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
               }}>
               {pending
@@ -832,7 +826,7 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
                   : (isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a'),
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : (isDark ? '#0a0a0a' : '#fff'),
-                border: following ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none',
+                ...(following ? glassEdge(isDark) : {}),
               }}>
               {pending
                 ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />

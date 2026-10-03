@@ -22,7 +22,7 @@ export function OrderSummary({ subtotal, discountTotal, promoCode, serviceFee, t
       <SummaryLine label="Subtotal" value={Money.fromMinor(subtotal, "ETB").format()} isDark={isDark} />
       {discountTotal > 0 && <SummaryLine label={`Promo ${promoCode ? `· ${promoCode}` : ''}`} value={`− ${Money.fromMinor(discountTotal, "ETB").format()}`} color="#34d399" isDark={isDark} />}
       <SummaryLine label="Service fee" value={Money.fromMinor(serviceFee, "ETB").format()} isDark={isDark} />
-      <div className="flex items-baseline justify-between pt-2.5 mt-1" style={{ borderTop: `1px solid ${divider}` }}>
+      <div className="flex items-baseline justify-between pt-2.5 mt-1" style={{ boxShadow: `inset 0 1px 0 ${divider}` }}>
         <span className="text-[11px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>Total</span>
         <span className="text-[20px] font-light leading-none" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>{Money.fromMinor(total, "ETB").format()}</span>
       </div>

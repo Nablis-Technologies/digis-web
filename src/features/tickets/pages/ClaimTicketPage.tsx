@@ -15,7 +15,7 @@ import type { AcceptedTransfer } from '@/lib/transfer';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassControl, glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
 import { toastError } from '@/lib/feedback';
 
 const ACCENT_HEX = '#d6f905';
@@ -148,7 +148,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
   }, [accepted]);
 
   const surfaceSoft = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
-  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+
   const text = isDark ? '#ffffff' : '#0a0a0a';
   const textDim = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)';
   const textFaint = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)';
@@ -354,7 +354,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
-                    style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
                   />
                   <AppButton
                     onClick={handleSendCode}
@@ -385,7 +385,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                     className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-center text-[20px] tracking-[8px]"
-                    style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
                   />
                   <AppInput
                     type="password"
@@ -394,7 +394,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
-                    style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
                   />
                   <AppInput
                     type="password"
@@ -403,7 +403,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                     value={passwordConfirm}
                     onChange={(e) => setPasswordConfirm(e.target.value)}
                     className="mt-3 w-full px-4 py-3.5 rounded-2xl outline-none text-[14px]"
-                    style={{ background: surfaceSoft, border: `1px solid ${border}`, color: text, fontFamily: "'Inter', sans-serif" }}
+                    style={{ background: surfaceSoft, ...glassField(isDark), color: text, fontFamily: "'Inter', sans-serif" }}
                   />
                   <AppButton
                     onClick={handleClaim}
@@ -436,7 +436,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
               )}
 
               {error && (
-                <div className="mt-4 flex items-start gap-2 rounded-2xl px-3.5 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <div className="mt-4 flex items-start gap-2 rounded-2xl px-3.5 py-3" style={{ ...glassControl(isDark, 'danger') }}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} strokeWidth={2} />
                   <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
                     {error}

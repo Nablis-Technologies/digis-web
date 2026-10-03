@@ -104,11 +104,9 @@ export function FeaturedMagazine({
         <GlassReflection isDark={isDark} />
         {/* Ticker strip across top */}
         <div
-          className="relative overflow-hidden border-b"
+          className="relative overflow-hidden"
           style={{
-            borderColor: isDark
-              ? "rgba(255,255,255,0.06)"
-              : "rgba(0,0,0,0.06)",
+            boxShadow: `inset 0 -1px 0 ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
             background: isDark
               ? "rgba(0,0,0,0.4)"
               : "rgba(0,0,0,0.02)",
@@ -171,7 +169,7 @@ export function FeaturedMagazine({
                 style={{
                   width: 100,
                   height: 100,
-                  border: `1.5px solid rgba(${dateRgb},0.75)`,
+                  boxShadow: `0 0 0 1.5px rgba(${dateRgb},0.75)`,
                   background: isDark
                     ? `rgba(${rgb},0.1)`
                     : `rgba(${rgb},0.08)`,
@@ -358,11 +356,9 @@ export function FeaturedMagazine({
 
         {/* Bottom navigator strip — Headliners label + equal-width thumbnails */}
         <div
-          className="relative border-t px-4 py-3 flex items-center gap-3"
+          className="relative px-4 py-3 flex items-center gap-3"
           style={{
-            borderColor: isDark
-              ? "rgba(255,255,255,0.06)"
-              : "rgba(0,0,0,0.06)",
+            boxShadow: `inset 0 1px 0 ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
             background: isDark
               ? "rgba(0,0,0,0.3)"
               : "rgba(0,0,0,0.015)",

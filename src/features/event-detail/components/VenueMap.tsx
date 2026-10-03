@@ -72,7 +72,7 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
 
       {/* Footer */}
       <div className="relative z-10 flex items-center justify-between px-4 py-3 gap-3"
-        style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(81,72,101,0.075)'}` }}>
+        style={{ boxShadow: `inset 0 1px 0 ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(81,72,101,0.075)'}` }}>
         <AppButton
           onClick={onOpenProfile}
           disabled={!onOpenProfile}
@@ -331,9 +331,7 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
                   background: following
                     ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                     : accent,
-                  border: `1px solid ${following
-                    ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
-                    : 'transparent'}`,
+                  ...(following ? glassEdge(isDark) : {}),
                   color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
                 }}>
                 {following

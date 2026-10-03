@@ -218,7 +218,7 @@ export function PayoutsView({ onBack }: { onBack: () => void }) {
           {payoutsQuery.hasNextPage && (
             <AppButton onClick={() => void payoutsQuery.fetchNextPage()} disabled={payoutsQuery.isFetchingNextPage}
               className="w-full h-[46px] rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              style={{ background: rowBg, border: `1px solid ${border}` }}>
+              style={{ background: rowBg, boxShadow: `inset 0 0 0 1px ${border}` }}>
               <Plus className="w-3.5 h-3.5" style={{ color: text }} strokeWidth={2} />
               <span className="text-[12.5px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
                 {payoutsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}

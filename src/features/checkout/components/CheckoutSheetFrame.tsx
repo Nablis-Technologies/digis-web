@@ -50,7 +50,7 @@ export function CheckoutSheetFrame({
         <GlassReflection isDark={isDark} />
         <div className="relative z-10 contents">
         {/* Header */}
-        <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${borderSoft}` }}>
+        <div className="relative px-6 pt-5 pb-4 flex items-center justify-between" style={{ boxShadow: `inset 0 -1px 0 ${borderSoft}` }}>
           <button
             onClick={onBack}
             aria-label="Back"

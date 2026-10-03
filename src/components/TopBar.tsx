@@ -202,7 +202,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             <GlassReflection isDark={isDark} />
             <div
               className="relative z-10 px-4 py-3 flex items-center justify-between"
-              style={{ borderBottom: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
+              style={{ boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
             >
               <div className="flex items-center gap-2">
                 <span
@@ -342,7 +342,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             <GlassReflection isDark={isDark} />
             <div
               className="relative z-10 p-4 pb-3 flex items-center gap-3"
-              style={{ borderBottom: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
+              style={{ boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
             >
               <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
                 style={{ background: !isAuthenticated ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : 'transparent' }}>

@@ -52,7 +52,7 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
                 textTransform: 'uppercase' as const,
                 color: '#d6f905',
                 background: 'rgba(214,249,5,0.12)',
-                border: '1px solid rgba(214,249,5,0.25)',
+                boxShadow: '0 0 0 1px rgba(214,249,5,0.25)',
                 padding: '3px 10px',
                 borderRadius: '20px',
                 marginBottom: '8px',
@@ -84,7 +84,7 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
               textTransform: 'uppercase' as const,
               color: '#d6f905',
               background: 'rgba(214,249,5,0.12)',
-              border: '1px solid rgba(214,249,5,0.25)',
+              boxShadow: '0 0 0 1px rgba(214,249,5,0.25)',
               padding: '3px 10px',
               borderRadius: '20px',
               marginBottom: '8px',
@@ -117,7 +117,7 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '8px 0',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.06)',
           }}>
             <span style={{ fontSize: '10px', letterSpacing: '1.5px', color: 'rgba(255,255,255,0.35)' }}>
               {item.label}
@@ -188,7 +188,7 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
       {/* Footer branding */}
       <div style={{
         padding: '14px 24px 18px',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',

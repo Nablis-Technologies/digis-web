@@ -55,7 +55,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
       {/* Stage / screen orientation bar */}
       <div className="flex flex-col items-center mb-5">
         <div className="w-3/4 h-8 rounded-b-[40px] flex items-center justify-center"
-          style={{ background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.12)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(214,249,5,0.25)'}`, borderTop: 'none' }}>
+          style={{ background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.12)', boxShadow: `0 0 0 1px ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(214,249,5,0.25)'}` }}>
           <span className="text-[10px] tracking-[4px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#5a6b00' }}>
             {stageLabel}
           </span>

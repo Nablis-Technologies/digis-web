@@ -46,7 +46,7 @@ export function InfoStrip({ items, rgb, reflectionSettings }: {
         {items.map((item) => (
           <div key={item.label}
             className="flex flex-col gap-2 px-4 py-4 min-w-0 lg:px-5"
-            style={{ borderLeft: `1px solid ${dividerColor}`, borderTop: `1px solid ${dividerColor}` }}>
+            style={{ boxShadow: `inset 1px 0 0 ${dividerColor}, inset 0 1px 0 ${dividerColor}` }}>
             <div className="flex items-center gap-1.5" style={{ color: iconColor }}>
               {item.icon}
               <span className="text-[9px] tracking-[1.2px] uppercase"

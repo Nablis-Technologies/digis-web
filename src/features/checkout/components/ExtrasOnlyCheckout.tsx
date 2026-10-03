@@ -147,7 +147,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
       onClose={onClose}
       hideSteps
       footer={
-        <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+        <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
           <div className="flex items-center justify-between mb-3.5">
             <div>
               <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>

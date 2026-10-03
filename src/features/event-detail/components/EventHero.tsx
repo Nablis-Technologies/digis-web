@@ -163,7 +163,7 @@ export function EventHero({
                     background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`,
                     backdropFilter: "blur(20px)",
                     color: `rgb(${categoryTokens.rgb})`,
-                    border: `1px solid rgba(${categoryTokens.rgb},${categoryTokens.border})`,
+                    boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`,
                     fontWeight: 600,
                   }}
                 >
@@ -335,13 +335,13 @@ export function EventHero({
             transition={{ delay: 0.2, duration: 0.5 }}
           >
             <div
-              className="inline-block px-3 py-1.5 rounded-full text-[10px] tracking-[1.5px] uppercase mb-4 border"
+              className="inline-block px-3 py-1.5 rounded-full text-[10px] tracking-[1.5px] uppercase mb-4"
               style={{
                 background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`,
                 backdropFilter: "blur(20px)",
                 fontFamily: "'Inter', sans-serif",
                 color: `rgb(${categoryTokens.rgb})`,
-                borderColor: `rgba(${categoryTokens.rgb},${categoryTokens.border})`,
+                boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`,
               }}
             >
               {event.category}

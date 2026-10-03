@@ -627,10 +627,7 @@ function AppContent() {
           >
             <div
               className="w-full max-w-sm rounded-[28px] px-7 py-12 flex flex-col items-center"
-              style={{
-                background: isDark ? '#0a0a0a' : '#ffffff',
-                border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.12)'}`,
-              }}
+              style={glass(isDark)}
             >
               <h3
                 className="text-[20px] font-light mb-2 text-center"
@@ -714,10 +711,7 @@ function SignInGate({ isDark, onSignIn }: { isDark: boolean; onSignIn: () => voi
     <div className="px-6 pt-24 pb-20 flex flex-col items-center text-center">
       <div
         className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
-        style={{
-          background: isDark ? 'rgba(217,255,0,0.08)' : 'rgba(214,249,5,0.1)',
-          border: `1px solid ${isDark ? 'rgba(217,255,0,0.2)' : 'rgba(214,249,5,0.25)'}`,
-        }}
+        style={glassControl(isDark, 'accent')}
       >
         <UserCircle className="w-8 h-8" strokeWidth={1.5} style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
       </div>

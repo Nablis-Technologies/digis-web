@@ -329,7 +329,7 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
               transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="overflow-hidden">
               <div className="pt-3 mt-3 space-y-2"
-                style={{ borderTop: `1px solid rgba(${accentRgb}, 0.12)` }}>
+                style={{ boxShadow: `inset 0 1px 0 rgba(${accentRgb}, 0.12)` }}>
                 {type.features.map((feature: TicketTierFeature, idx: number) => (
                   <div key={idx} className="flex items-center gap-2.5">
                     <div style={{ color: isDark ? `rgba(${accentRgb}, 0.7)` : accentInk }}>

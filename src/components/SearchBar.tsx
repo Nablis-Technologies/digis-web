@@ -138,7 +138,7 @@ export function SearchBar({
                 color: isDark ? '#d6f905' : '#0a0a0a',
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 700,
-                border: `2px solid ${isDark ? '#d6f905' : '#fff'}`,
+                boxShadow: `0 0 0 2px ${isDark ? '#d6f905' : '#fff'}`,
               }}
             >
               {activeFilterCount}
