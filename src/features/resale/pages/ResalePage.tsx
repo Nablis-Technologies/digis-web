@@ -60,6 +60,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const [listingTicket, setListingTicket] = useState<UserTicket | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'priceAsc' | 'priceDesc'>('recent');
+  const [sortOpen, setSortOpen] = useState(false);
   const [selectedEventName, setSelectedEventName] = useState<string | null>(null);
   const [showListingSuccess, setShowListingSuccess] = useState(false);
   const [successListing, setSuccessListing] = useState<ResaleListing | null>(null);
@@ -89,6 +90,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const showBrowseLoading = useShowSkeleton(browsePending);
   const showMyLoading = useShowSkeleton(myPending);
   const [showFilters, setShowFilters] = useState(false);
+  // The selected-event rail is a separate view — it keeps its own open state so
+  // toggling one panel never opens the other.
+  const [showEventFilters, setShowEventFilters] = useState(false);
   // Ticket-type options come from the live data (backend type names are
   // arbitrary — no hardcoded VIP/Regular). Verified and face-value filters
   // are cut: the backend serves neither seller metadata nor buyer face value.
@@ -536,26 +540,53 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         {eventListings.length} of {selectedGroup.count} {selectedGroup.count === 1 ? 'Ticket' : 'Tickets'}
                       </p>
                       <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <AppButton whileTap={{ scale: 0.95 }}
+                            onClick={() => setSortOpen(v => !v)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer"
+                            style={{
+                              background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                              ...glassEdge(isDark),
+                            }}>
+                            <ArrowUpDown className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
+                            <span className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
+                              {sortBy === 'recent' ? 'Recent' : sortBy === 'priceAsc' ? 'Low → High' : 'High → Low'}
+                            </span>
+                            <ChevronDown className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
+                          </AppButton>
+                          <AnimatePresence>
+                            {sortOpen && (
+                              <>
+                                {/* Click-away target */}
+                                <div className="fixed inset-0 z-40" onClick={() => setSortOpen(false)} />
+                                <motion.div
+                                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                                  className="absolute right-0 top-full mt-1 z-50 w-[150px] rounded-2xl overflow-hidden p-1"
+                                  style={{ background: isDark ? '#101115' : '#fff', ...glassEdge(isDark) }}>
+                                  <GlassReflection isDark={isDark} />
+                                  {([['recent', 'Recent'], ['priceAsc', 'Price: Low → High'], ['priceDesc', 'Price: High → Low']] as const).map(([value, label]) => (
+                                    <AppButton key={value}
+                                      onClick={() => { setSortBy(value); setSortOpen(false); }}
+                                      className="relative z-10 w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl cursor-pointer text-left">
+                                      <span className="text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                                        {label}
+                                      </span>
+                                      {sortBy === value && <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2.4} />}
+                                    </AppButton>
+                                  ))}
+                                </motion.div>
+                              </>
+                            )}
+                          </AnimatePresence>
+                        </div>
                         <AppButton whileTap={{ scale: 0.95 }}
-                          onClick={() => setSortBy(s => s === 'recent' ? 'priceAsc' : s === 'priceAsc' ? 'priceDesc' : 'recent')}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer"
-                          style={{
-                            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                            ...glassEdge(isDark),
-                          }}>
-                          <ArrowUpDown className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.5} />
-                          <span className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
-                            {sortBy === 'recent' ? 'Recent' : sortBy === 'priceAsc' ? 'Low → High' : 'High → Low'}
-                          </span>
-                        </AppButton>
-                        <AppButton whileTap={{ scale: 0.95 }}
-                          onClick={() => setShowFilters(v => !v)}
+                          onClick={() => setShowEventFilters(v => !v)}
                           className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer"
                           style={{
-                            background: showFilters || activeFilterCount > 0
+                            background: showEventFilters || activeFilterCount > 0
                               ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)')
                               : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                            border: `1px solid ${showFilters || activeFilterCount > 0
+                            border: `1px solid ${showEventFilters || activeFilterCount > 0
                               ? (isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.2)')
                               : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')}`,
                           }}>
@@ -570,7 +601,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       </div>
                     </div>
                     <FilterPanel
-                      open={showFilters}
+                      open={showEventFilters}
                       isDark={isDark}
                       typeOptions={typeOptions}
                       typeFilter={typeFilter} setTypeFilter={setTypeFilter}
