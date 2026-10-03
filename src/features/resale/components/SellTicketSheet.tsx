@@ -224,6 +224,17 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                       ETB {price.toLocaleString()}
                     </span>
                   </div>
+                  {/* The exact resale fee is resolved server-side at listing time
+                      and is not on the wallet. We state the deduction plainly
+                      rather than invent a take-home figure. */}
+                  <div className="flex items-start justify-between gap-3 mt-2">
+                    <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                      You’ll receive
+                    </span>
+                    <span className="text-[11px] text-right leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
+                      Your asking price minus the resale fee — the exact amount appears on your live listing.
+                    </span>
+                  </div>
                   </div>
                 </div>
 
