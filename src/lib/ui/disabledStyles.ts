@@ -14,7 +14,6 @@ export function disabledSurface(isDark: boolean) {
   return {
     background: isDark ? 'rgba(255,255,255,0.085)' : 'rgba(20,18,40,0.08)',
     color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(20,18,40,0.42)',
-    boxShadow: `inset 0 0 0 1px ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(20,18,40,0.1)'}`,
   };
 }
 

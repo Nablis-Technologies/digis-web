@@ -12,9 +12,16 @@ that fought it. Removing the stroke leaves one depth language:
   plus the `GlassReflection` overlay pair (`glassReflection()` bloom +
   `glassEdgeReflection()` masked conic edge) on a `relative overflow-hidden`
   host. The edge becomes travelling light, not a painted line.
-- **Compact controls** (inputs, icon squares, small buttons, pills): `glass()`
-  fill + `glassEdge(isDark)` (inset top light + quiet shadow). No room for an
-  overlay, so the inset highlight is the whole edge.
+- **Compact controls** (icon squares, small buttons, pills):
+  `glassControl(isDark, tint?)` = `glass()` fill + `glassEdge()` (inset top
+  light + quiet shadow). No room for an overlay, so the inset highlight is the
+  whole edge.
+- **Inputs / fields** are the one exception that keeps a thin hairline:
+  `glassField(isDark, { error, focused })` draws a 1px line, a recessed inset
+  shadow, and a lime focus hairline + halo. A field's edge is an affordance —
+  it is what separates an editable well from a button, which carries no border.
+  This was added after the first pass: with no line at all, inputs and buttons
+  collapsed into the same raised glass and focus was invisible.
 - **State** is carried by the tint, never a stroke: selected/active =
   `glass(isDark, 'accent')`; error/destructive = `glass(isDark, 'danger')` with
   red icon + copy. A failure still cannot look like success — danger keeps its
@@ -24,6 +31,7 @@ that fought it. Removing the stroke leaves one depth language:
 
 Exempt — `border` stays where it is the mechanism, not decoration:
 
+- Inputs/fields — a thin hairline is the affordance (`glassField`).
 - Rotation/progress rings (`border-top-color` spinner math).
 - Ticket perforation (dashed) and punched notches — the Stub Geometry Rule.
 - Seat-map state dots and legend swatches — border encodes seat data.

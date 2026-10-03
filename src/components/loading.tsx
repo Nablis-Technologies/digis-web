@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
+import { glassControl } from '@/lib/ui/glass';
 
 /**
  * Shared loading primitives. Every skeleton mirrors its data layout
@@ -452,10 +453,7 @@ export function LoadErrorCard({ message, onRetry }: { message?: string; onRetry:
     >
       <div
         className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-        style={{
-          background: isDark ? 'rgba(229,72,77,0.1)' : 'rgba(229,72,77,0.08)',
-          border: '1px solid rgba(229,72,77,0.25)',
-        }}
+        style={glassControl(isDark, 'danger')}
       >
         <AlertTriangle className="w-5 h-5" style={{ color: '#e5484d' }} strokeWidth={2} />
       </div>

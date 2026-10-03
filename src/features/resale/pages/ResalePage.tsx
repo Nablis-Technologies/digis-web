@@ -851,7 +851,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                     {/* Balance */}
                     <div className="relative z-10 flex items-center gap-3">
                       <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
+                        style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)', ...glassEdge(isDark) }}>
                         <Wallet className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
                       </div>
                       <div className="min-w-0 flex-1">

@@ -147,17 +147,28 @@ export function glassControl(isDark: boolean, tint?: GlassTint): CSSProperties {
 }
 
 /**
- * Field/input boundary: the inset glass edge replaces the rest border, the
- * focus halo is the state, and an error tints the fill danger (red icon + copy
- * still carry the message). Keeps the caller's own background for the neutral
- * and focused cases so translucent field fills survive.
+ * Field/input boundary. Inputs keep one thin hairline — a field's edge is an
+ * affordance, not decoration (ADR-0007 exception): it is what separates an
+ * editable field from a button, which carries no border. The field is recessed
+ * (inset shadow) so it reads as a well, never as a raised control, and focus
+ * lifts it with a lime hairline + halo. An error tints the fill danger (red
+ * icon + copy still carry the message). Keeps the caller's own background for
+ * the neutral/focused cases so translucent field fills survive.
  */
 export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
-  const edge = glassEdge(isDark).boxShadow;
+  const line = opts.error
+    ? (isDark ? "rgba(248,113,113,0.7)" : "rgba(190,18,60,0.55)")
+    : opts.focused
+      ? (isDark ? "rgba(217,255,0,0.75)" : "rgba(124,154,0,0.9)")
+      : (isDark ? "rgba(255,255,255,0.14)" : "rgba(20,18,40,0.14)");
   const halo = opts.focused && !opts.error
-    ? isDark ? "0 0 0 4px rgba(217,255,0,0.1)" : "0 0 0 4px rgba(214,249,5,0.08)"
+    ? (isDark ? "0 0 0 4px rgba(217,255,0,0.12)" : "0 0 0 4px rgba(214,249,5,0.14)")
     : null;
-  const out: CSSProperties = { boxShadow: halo ? `${halo}, ${edge}` : edge };
+  const recess = `inset 0 1px 2px ${isDark ? "rgba(0,0,0,0.35)" : "rgba(20,18,40,0.05)"}`;
+  const out: CSSProperties = {
+    border: `1px solid ${line}`,
+    boxShadow: halo ? `${recess}, ${halo}` : recess,
+  };
   if (opts.error) out.background = glass(isDark, "danger").background;
   return out;
 }

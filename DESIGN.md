@@ -171,9 +171,11 @@ event-detail modules, not guessed.
 **No Painted Borders (ADR-0007).** The reflected edge *is* the boundary; a CSS
 `border` is never decoration. Surfaces carry the overlay pair, compact controls
 carry `glassEdge()` (inset top light), and state is told through the glass tint
-— never a stroke. `border` survives only where it is the mechanism: spinner
-rings, ticket perforation dashes, seat-map data dots, skeleton shells. Compact
-controls compose `glassControl(isDark, tint?)` = `glass()` fill + `glassEdge()`.
+— never a stroke. `border` survives only where it is the mechanism: **input
+fields (a thin hairline is the affordance that separates a well from a
+button)**, spinner rings, ticket perforation dashes, seat-map data dots,
+skeleton shells. Buttons compose `glassControl(isDark, tint?)`; fields compose
+`glassField(isDark, { error, focused })`.
 **The Quiet Shadow Rule.** Primary CTAs carry no shadow at all. Shadows answer only to state — hover lift, open sheets, floating chrome.
 
 ## Shapes
@@ -203,9 +205,9 @@ Tactile and confident: chunky, lime, begging to be pressed.
 - **Internal Padding:** 12–16px; card footers breathe with 14px top padding.
 
 ### Inputs / Fields
-- **Style:** 12–14px radius, `glassControl()` — glass fill (white 4% dark / indigo-ink 3% light) with an inset top light edge, no painted border; 14px Inter values, tracked-out 10px uppercase labels.
-- **Focus:** The inset edge and leading icon warm to lime on dark (ink on light) with a soft 4px halo.
-- **Error / Disabled:** Error takes the danger glass tint (`glass(isDark,'danger')`) with a red icon and message (never a stroke); OTP uses six discrete boxes with lime fill rings; there is no backend OTP — codes shown are display-only patterns.
+- **Style:** 12–14px radius, `glassField()` — a recessed glass well (translucent fill + inset shadow) with one thin hairline so a field never reads as a button; 14px Inter values, tracked-out 10px uppercase labels.
+- **Focus:** The hairline and leading icon warm to lime (ink-adjacent on light) with a soft 4px halo; the recess stays, so a focused field is unmistakable.
+- **Error / Disabled:** Error takes the danger glass tint + red hairline (`glassField(isDark, { error })`) with a red icon and message; disabled fields use the flat translucent disabled surface (no ring). OTP uses six discrete boxes with lime fill rings; there is no backend OTP — codes shown are display-only patterns.
 
 ### Navigation
 - **Style:** Mobile bottom tab bar (glass, a soft lime light edge, safe-area padded) vs desktop fixed top bar (72px, centered pill group, blur 48px). Active mobile item gets a shared-layout lime pip; active desktop pill fills lime-tinted glass.
