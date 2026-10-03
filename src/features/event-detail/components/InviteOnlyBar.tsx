@@ -25,8 +25,8 @@ export function InviteOnlyBar({ event, inviteUnlock, inviteRsvpConfirmed, isDark
           ? `rgba(${isDark ? '214,249,5' : '214,249,5'},0.25)`
           : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`,
       }}>
-      <div className="flex items-center gap-2.5 min-w-0 flex-shrink-0">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+      <div className="flex items-center gap-2.5 min-w-0 flex-shrink">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{
             background: inviteUnlock.unlocked
               ? (inviteUnlock.method === 'waitlist'
@@ -46,7 +46,7 @@ export function InviteOnlyBar({ event, inviteUnlock, inviteRsvpConfirmed, isDark
           )}
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-[9px] tracking-[1.8px] uppercase leading-none mb-1"
+          <span className="text-[9px] tracking-[1.8px] uppercase leading-none mb-1 truncate"
             style={{ fontFamily: "'Inter', sans-serif",
               color: inviteUnlock.unlocked && inviteUnlock.method !== 'waitlist'
                 ? (isDark ? '#d6f905' : '#0a0a0a')
@@ -55,7 +55,7 @@ export function InviteOnlyBar({ event, inviteUnlock, inviteRsvpConfirmed, isDark
               ? 'Waitlisted'
               : inviteUnlock.unlocked ? 'Access Granted' : (event.inviteWaitlistOnly ? 'At Capacity' : 'Locked')}
           </span>
-          <span className="text-[13px] leading-none"
+          <span className="text-[13px] leading-none truncate"
             style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
             {inviteUnlock.method === 'waitlist'
               ? 'Holding spot'
@@ -80,7 +80,7 @@ export function InviteOnlyBar({ event, inviteUnlock, inviteRsvpConfirmed, isDark
           }
         }}
         disabled={!inviteUnlock.unlocked || inviteUnlock.method === 'waitlist'}
-        className="relative flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer disabled:cursor-not-allowed"
+        className="relative flex flex-1 shrink-0 basis-[44%] items-center justify-center gap-2 whitespace-nowrap rounded-xl py-3 cursor-pointer disabled:cursor-not-allowed"
         style={{
           background: !inviteUnlock.unlocked || inviteUnlock.method === 'waitlist'
             ? disabledSurface(isDark).background

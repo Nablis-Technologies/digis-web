@@ -248,13 +248,15 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
         {/* Ticket Selection / RSVP */}
         <motion.div ref={ticketsSectionRef} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mb-6 lg:mb-32 scroll-mt-6">
           {isInvite ? (
-            <InviteOnlySection
-              event={event}
-              unlock={inviteUnlock}
-              onUnlockChange={setInviteUnlock}
-              rsvpConfirmed={inviteRsvpConfirmed}
-              onConfirmRsvp={() => setInviteRsvpConfirmed(true)}
-            />
+            <div className="mx-auto w-full max-w-md">
+              <InviteOnlySection
+                event={event}
+                unlock={inviteUnlock}
+                onUnlockChange={setInviteUnlock}
+                rsvpConfirmed={inviteRsvpConfirmed}
+                onConfirmRsvp={() => setInviteRsvpConfirmed(true)}
+              />
+            </div>
           ) : isRsvp ? (
             <RsvpSection
               event={event}
@@ -284,7 +286,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate, onRequestAu
       {/* Purchase / RSVP Bar */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
         className="fixed bottom-0 left-0 right-0 z-[25]">
-        <div className="relative px-5 lg:px-8 pb-8 lg:pb-6 pt-3 max-w-5xl lg:max-w-2xl mx-auto">
+        <div className={`relative px-5 lg:px-8 pb-8 lg:pb-6 pt-3 mx-auto ${isInvite ? 'max-w-md' : 'max-w-5xl lg:max-w-2xl'}`}>
           {isInvite ? (
             <InviteOnlyBar
               event={event}

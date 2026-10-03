@@ -259,26 +259,28 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                   <motion.div
                     animate={codeError ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
                     transition={{ duration: 0.4 }}
-                    className="flex items-center gap-2 rounded-2xl p-1.5"
-                    style={{
-                      background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${codeError ? 'rgba(239,68,68,0.5)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')}`,
-                    }}>
-                    <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
-                      style={{ background: `rgba(${accentRgb},0.1)` }}>
-                      <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
+                    className="flex flex-col gap-2">
+                    <div className="relative flex items-center rounded-2xl"
+                      style={{
+                        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                        border: `1px solid ${codeError ? 'rgba(239,68,68,0.5)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')}`,
+                      }}>
+                      <div className="pointer-events-none absolute left-1.5 flex items-center justify-center w-9 h-9 rounded-xl"
+                        style={{ background: `rgba(${accentRgb},0.1)` }}>
+                        <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
+                      </div>
+                      <AppInput
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
+                        placeholder="Enter your code"
+                        className="block w-full bg-transparent outline-none text-[14px] tracking-[2px] uppercase py-3 pl-[52px] pr-3"
+                        style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
                     </div>
-                    <AppInput
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
-                      placeholder="Enter your code"
-                      className="flex-1 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
-                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
-                    <AppButton whileTap={{ scale: 0.95 }}
+                    <AppButton whileTap={{ scale: 0.98 }}
                       onClick={tryCode}
                       disabled={!code.trim()}
-                      className="flex-shrink-0 px-4 py-2 rounded-xl disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center px-4 py-3 rounded-2xl disabled:cursor-not-allowed"
                       style={
                         code.trim()
                           ? {
@@ -287,7 +289,7 @@ export function InviteOnlySection({ event, unlock, onUnlockChange, rsvpConfirmed
                             }
                           : disabledSurface(isDark)
                       }>
-                      <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                      <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                         Unlock
                       </span>
                     </AppButton>

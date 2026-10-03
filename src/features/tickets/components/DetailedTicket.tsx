@@ -70,15 +70,15 @@ function ExtraCard({ item, index, isDark }: { item: import('@/types').SelectedEv
 function DetailRow({ icon, label, value, isDark, href }: { icon: React.ReactNode; label: string; value: string; isDark: boolean; href?: string }) {
   const t = ticketTokens(isDark);
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex items-center gap-2.5" style={{ color: t.textMuted }}>
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4">
+      <div className="flex shrink-0 items-center gap-2.5" style={{ color: t.textMuted }}>
         {icon}
         <span className="text-[10px] tracking-[1.5px] uppercase"
           style={{ fontFamily: "'Inter', sans-serif" }}>
           {label}
         </span>
       </div>
-      {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-[13px] text-right truncate hover:underline" style={{ fontFamily: "'Inter', sans-serif", color: t.text }}>{value}</a> : <span className="text-[13px] text-right truncate" style={{ fontFamily: "'Inter', sans-serif", color: t.text }}>{value}</span>}
+      {href ? <a href={href} target="_blank" rel="noopener noreferrer" title={value} className="block h-5 min-w-0 truncate text-right text-[13px] leading-5 hover:underline" style={{ fontFamily: "'Inter', sans-serif", color: t.text }}>{value}</a> : <span title={value} className="block h-5 min-w-0 truncate text-right text-[13px] leading-5" style={{ fontFamily: "'Inter', sans-serif", color: t.text }}>{value}</span>}
     </div>
   );
 }
