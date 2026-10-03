@@ -1,13 +1,35 @@
 import { motion } from 'motion/react';
 import { Check, Crown, MapPin, Share2 } from 'lucide-react';
 import { formatETB } from '@/lib/utils/format';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { getCategoryColor } from '@/lib/categoryColors';
 import { glassEdge } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
+import { proxiedImageUrl, isProxied } from '@/lib/utils/imageProxy';
 
 const BRAND = '#d6f905';
+
+/**
+ * Event covers come from non-CORS hosts (i.ibb.co, …) — a raw `<img crossorigin>`
+ * fails to load and `html-to-image` can't inline it, so the exported card shows a
+ * blank frame. Render through the CORS proxy (already used for colour extraction)
+ * so the image loads and is inlinable, with a plain fallback if the proxy is down.
+ */
+function ShareImage({ src, className, style }: { src: string; className: string; style?: React.CSSProperties }) {
+  const [failed, setFailed] = useState(false);
+  const proxied = isProxied(src) ? src : proxiedImageUrl(src, 1080);
+  return (
+    <img
+      src={failed ? src : proxied}
+      alt=""
+      crossOrigin="anonymous"
+      className={className}
+      style={style}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export type ShareCardEvent = { name: string; date: string; time?: string; venue: string; image: string; category?: string; price?: number; };
 
@@ -268,7 +290,7 @@ export function BoldCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
       <div className="relative px-6 mt-5 flex-1 min-h-0">
         <div className="relative w-full h-full rounded-[20px] overflow-hidden"
           style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.25), 0 12px 32px rgba(0,0,0,0.45)' }}>
-          <img src={event.image} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
+          <ShareImage src={event.image} className="w-full h-full object-cover" />
           {/* foil shimmer sweep */}
           <div className="absolute inset-0 pointer-events-none"
             style={{ background: `linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.22) 47%, transparent 60%)` }} />
@@ -302,7 +324,7 @@ export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentT
     <div className="relative w-full rounded-[28px] overflow-hidden flex flex-col" style={{ aspectRatio: '9/16', background: '#08080a' }}>
       {/* Full-bleed cinematic image */}
       <div className="relative w-full" style={{ height: '60%' }}>
-        <img src={event.image} alt="" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
+        <ShareImage src={event.image} className="absolute inset-0 w-full h-full object-cover" />
         {/* cinematic fade to black */}
         <div className="absolute inset-0 pointer-events-none"
           style={{ background: 'linear-gradient(180deg, rgba(8,8,10,0.30) 0%, transparent 30%, rgba(8,8,10,0.55) 72%, #08080a 100%)' }} />
@@ -383,7 +405,7 @@ export function StubCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
               <Wordmark shadow />
               <TierBadge ticketType={ticketType} isVIP={isVIP} tier={tier} />
             </div>
-            <img src={event.image} alt="" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
+        <ShareImage src={event.image} className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 pointer-events-none"
               style={{ background: 'linear-gradient(180deg, rgba(10,10,12,0.25) 0%, transparent 38%, rgba(14,14,17,0.55) 70%, rgba(14,14,17,0.97) 100%)' }} />
             <div className="absolute bottom-0 left-0 right-0 p-4">

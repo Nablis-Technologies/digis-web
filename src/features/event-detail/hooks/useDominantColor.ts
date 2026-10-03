@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
+import { proxiedImageUrl } from '@/lib/utils/imageProxy';
 
-function proxiedColorUrl(url: string): string {
-  const stripped = url.replace(/^https:\/\//, 'ssl:').replace(/^http:\/\//, '');
-  return `https://images.weserv.nl/?url=${encodeURIComponent(stripped)}&w=160`;
-}
+const proxiedColorUrl = (url: string) => proxiedImageUrl(url, 160);
 
 export function useDominantColor(src?: string): [number, number, number] | null {
   const [rgb, setRgb] = useState<[number, number, number] | null>(null);
