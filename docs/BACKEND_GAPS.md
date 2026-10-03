@@ -126,6 +126,7 @@
 | 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
 | 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
+| 66 | open — degrading | seller listing wire (`GET /resale_listings/mine`) omits `ticket_id` → the wallet can't tell which tickets already have an open listing, so they stay in the "list a ticket" picker |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -458,6 +459,33 @@ request-shaping test asserting the `/v2/payouts` payload.
 ## Open — degrading
 
 Work but suboptimal; the frontend mitigates. Fixing these improves correctness.
+
+### #66. Seller listing wire omits `ticket_id` — the wallet can't tell which tickets are already listed
+
+`Marketplace::ResaleListingSerializer`
+(`app/serializers/marketplace/resale_listing_serializer.rb:10-16`) exposes `id,
+event_id, ticket_type_id, seller_user_id, status, …` but **no `ticket_id`**, and the
+public serializer (`app/serializers/marketplace/public/resale_listing_serializer.rb`)
+carries only event / product / ticket-type context. The association exists on the
+model (`ResaleListing#ticket_id`, used by `ActivateListing#build_listing` and
+`#lock_related_rows`) — it is simply not serialized. The wallet serializer
+(`app/serializers/ticketing/ticket_wallet_serializer.rb`) carries no
+active-listing reference either, so there is no other client-visible source.
+
+**Why it matters:** the My Listings tab's "List a Ticket for Sale" picker should
+hide tickets that already have an open listing (the backend rejects a second one
+with `listing_already_open`, `activate_listing.rb:114`). It can only map a listing
+→ wallet ticket by id, which the wire omits, so already-listed tickets still render
+as listable and the seller only discovers the conflict after opening the sell
+sheet and submitting.
+
+**Fix:** add `ticket_id` to `Marketplace::ResaleListingSerializer` (or expose an
+`active_resale_listing_id` / `resale_listing_status` on
+`Ticketing::TicketWalletSerializer`). The seller scope already owns the ticket, so
+this exposes nothing to buyers.
+
+**Status: open — filed 2026-10-03 (code read: seller + wallet + public
+serializers; `ticket_id` present on the model, absent from every wire).**
 
 ### #54. Discovery availability has no backend source
 

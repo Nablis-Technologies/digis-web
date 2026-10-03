@@ -7,6 +7,38 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-03 — resale My Listings polish (frontend only)
+
+**Backend:** read-only review of `digis_backend` @
+`feat/launch-hardening-telemetry` (no backend changes). One new gap filed.
+
+**#66 filed (open — degrading).** `Marketplace::ResaleListingSerializer` and the
+public serializer expose no `ticket_id`, and `TicketWalletSerializer` carries no
+active-listing reference, so the My Listings "List a Ticket" picker cannot exclude
+tickets that already have an open listing (the backend rejects a second with
+`listing_already_open`). Fix: add `ticket_id` to the seller serializer (or an
+`active_resale_listing_id` on the wallet serializer). The frontend mitigation is
+session-scoped (below) — cross-session dedup waits on #66.
+
+**Frontend fixes (resale only):**
+- **Wallet action-row copy:** middle tile "Payout methods" → **"Methods"**
+  (`Cash out · Methods · History`); commit `364f426`.
+- **`listableTickets`:** removed the dead `myListings.some(l => l.ticket?.id …)`
+  clause (the query rows never carry `.ticket`). Replaced with a session pairing —
+  each created listing is paired with its wallet ticket (from the create response)
+  and the pair is dropped on a successful delist, so a just-listed ticket leaves
+  the picker within the session.
+- **Event grouping key:** browse event selection moved from `eventName` to
+  `event_id` (`selectedEventName` → `selectedEventId`; React key `group.eventId`)
+  so two events sharing a title no longer collide/merge.
+
+**Verified:** `tsc` · `vitest` **146/146** · `build` · Playwright chromium
+**28/28**.
+
+**Open follow-up (copy, not fixed):** `ListingSuccessOverlay`'s "View listing"
+button only closes the overlay and switches to My Listings — it does not open the
+listing; the label may warrant renaming.
+
 ## Session 2026-10-02 (pm) — seller payouts wired (backend `f679e56`)
 
 **Backend pull:** `ed6309a → f679e56` (10 commits, **all marketplace seller
