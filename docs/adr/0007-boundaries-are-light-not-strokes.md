@@ -17,13 +17,14 @@ that fought it. Removing the stroke leaves one depth language:
   light + quiet shadow). No room for an overlay, so the inset highlight is the
   whole edge.
 - **Inputs / fields** are the one exception that keeps a thin hairline:
-  `glassField(isDark, { error, focused })`. Every field shares one canonical
-  surface — `glassInputSurface()` (translucent fill + 40px backdrop blur + float
-  shadow), byte-for-byte the discovery search bar — so fields are consistent
-  everywhere. The hairline appears only on focus (lime) / error (red), because a
-  field's edge is an affordance: it separates an editable well from a button,
-  which carries none. Added after the first pass, when inputs and buttons
-  collapsed into the same raised glass and focus was invisible.
+  `glassField(isDark, { error, focused })` reproduces the full discovery-search
+  chrome on every field — translucent surface + 40px backdrop blur + the
+  reflected hairline (a border-box conic gradient, the same edge the search's
+  `GlassReflection` paints) + float shadow. The hairline is rest-quiet and turns
+  lime on focus / red on error, because a field's edge is an affordance: it
+  separates an editable well from a borderless button. Added after the first
+  pass, when inputs and buttons collapsed into the same raised glass and focus
+  was invisible.
 - **State** is carried by the tint, never a stroke: selected/active =
   `glass(isDark, 'accent')`; error/destructive = `glass(isDark, 'danger')` with
   red icon + copy. A failure still cannot look like success — danger keeps its
