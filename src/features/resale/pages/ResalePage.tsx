@@ -20,7 +20,6 @@ import { FilterPanel } from '@/features/resale/components/FilterPanel';
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
 import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSheet';
 import { BuyListingSheet } from '@/features/resale/components/BuyListingSheet';
-import { GlassTicketCard } from '@/features/tickets/components/GlassTicketCard';
 import { WithdrawPayoutSheet } from '@/features/payouts/components/WithdrawPayoutSheet';
 import { payoutService, payoutKeys } from '@/lib/payout';
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
@@ -1032,7 +1031,51 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
               ) : (
                 <div className="space-y-3">
                   {listableTickets.map((ticket) => (
-                    <GlassTicketCard key={ticket.id} ticket={ticket} onClick={() => handleListTicket(ticket)} />
+                    <motion.div key={ticket.id}
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      className="relative flex items-center justify-between p-4 rounded-2xl overflow-hidden"
+                      style={{
+                        background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
+                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                      }}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        {ticket.image ? (
+                          <img src={ticket.image} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                        ) : (
+                          <span className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
+                            <Ticket className="w-5 h-5" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }} strokeWidth={1.6} />
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[13px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
+                            {ticket.eventName}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[12px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}>
+                              {ticket.ticketType} · {ticket.eventDate}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <AppButton
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleListTicket(ticket)}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer ml-3"
+                        style={{
+                          background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(214,249,5,0.16)',
+                          border: '1px solid rgba(214,249,5,0.3)',
+                          color: isDark ? '#d6f905' : '#5a6b00',
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: '11px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Tag className="w-3 h-3" strokeWidth={2.2} />
+                        List
+                      </AppButton>
+                    </motion.div>
                   ))}
                 </div>
               )}

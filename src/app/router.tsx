@@ -155,6 +155,13 @@ function AppContent() {
     return `${name} · Digis`;
   }, [selectedEvent, currentView, ticketId, resaleEventSlug]));
   const navigateToView = useCallback((view: AppView) => navigate(VIEW_PATHS[view]), [navigate]);
+  // Return to the previous in-app surface when there is one; otherwise fall back
+  // to a logical parent. Use for a detail/settings page reached from more than
+  // one place, so "Back" never dumps the user on an unrelated view.
+  const goBackOr = useCallback((fallback: string) => {
+    if (typeof window !== 'undefined' && window.history.length > 1) navigate(-1);
+    else navigate(fallback);
+  }, [navigate]);
   const [resaleTicket, setResaleTicket] = useState<UserTicket | null>(null);
   // Search lives in the URL (?q=) so it is shareable, refresh-safe, and
   // back/forward-able. `searchMode` stays UI state (is the search UI active).
@@ -579,12 +586,12 @@ function AppContent() {
                 />
               ) : currentView === 'settings' ? (
                 <SettingsView
-                  onBack={() => navigateToView('profile')}
+                  onBack={() => goBackOr('/profile')}
                   onRequestAuth={requestAuth}
                 />
               ) : currentView === 'payouts' ? (
                 isAuthenticated ? (
-                  <PayoutsView onBack={() => navigateToView('profile')} />
+                  <PayoutsView onBack={() => goBackOr('/resale')} />
                 ) : (
                   <SignInGate isDark={isDark} onSignIn={requestAuth} />
                 )
