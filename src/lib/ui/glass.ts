@@ -147,28 +147,42 @@ export function glassControl(isDark: boolean, tint?: GlassTint): CSSProperties {
 }
 
 /**
- * Field/input boundary. Inputs keep one thin hairline — a field's edge is an
- * affordance, not decoration (ADR-0007 exception): it is what separates an
- * editable field from a button, which carries no border. The field is recessed
- * (inset shadow) so it reads as a well, never as a raised control, and focus
- * lifts it with a lime hairline + halo. An error tints the fill danger (red
- * icon + copy still carry the message). Keeps the caller's own background for
- * the neutral/focused cases so translucent field fills survive.
+ * The canonical input glass — one source of truth shared by every field and by
+ * the discovery search bar (which is the reference surface). Translucent fill +
+ * heavy backdrop blur + a quiet float shadow: the same setup everywhere, so
+ * fields are consistent and distinct from the raised `glassControl()` buttons.
+ */
+export function glassInputSurface(isDark: boolean): CSSProperties {
+  return {
+    background: isDark ? "rgba(30,30,34,0.40)" : "rgba(255,255,255,0.68)",
+    backdropFilter: "blur(40px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.5)",
+    boxShadow: isDark
+      ? "0 12px 36px -16px rgba(0,0,0,0.48)"
+      : "0 12px 36px -18px rgba(20,18,40,0.18)",
+  };
+}
+
+/**
+ * Field/input state on top of the canonical input glass. Rest is the plain
+ * search glass; focus adds a lime hairline + halo; error adds a red hairline +
+ * halo (the red message under the field still carries the failure). A field's
+ * thin hairline is the one ADR-0007 exception — it is what says "editable well",
+ * never decoration.
  */
 export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
+  const out = glassInputSurface(isDark);
   const line = opts.error
-    ? (isDark ? "rgba(248,113,113,0.7)" : "rgba(190,18,60,0.55)")
+    ? (isDark ? "rgba(248,113,113,0.75)" : "rgba(190,18,60,0.6)")
     : opts.focused
-      ? (isDark ? "rgba(217,255,0,0.75)" : "rgba(124,154,0,0.9)")
-      : (isDark ? "rgba(255,255,255,0.14)" : "rgba(20,18,40,0.14)");
-  const halo = opts.focused && !opts.error
-    ? (isDark ? "0 0 0 4px rgba(217,255,0,0.12)" : "0 0 0 4px rgba(214,249,5,0.14)")
-    : null;
-  const recess = `inset 0 1px 2px ${isDark ? "rgba(0,0,0,0.35)" : "rgba(20,18,40,0.05)"}`;
-  const out: CSSProperties = {
-    border: `1px solid ${line}`,
-    boxShadow: halo ? `${recess}, ${halo}` : recess,
-  };
-  if (opts.error) out.background = glass(isDark, "danger").background;
+      ? (isDark ? "rgba(217,255,0,0.8)" : "rgba(124,154,0,0.9)")
+      : null;
+  if (line) out.border = `1px solid ${line}`;
+  if (opts.focused && !opts.error) {
+    out.boxShadow = `${out.boxShadow}, 0 0 0 4px ${isDark ? "rgba(217,255,0,0.12)" : "rgba(214,249,5,0.14)"}`;
+  }
+  if (opts.error) {
+    out.boxShadow = `${out.boxShadow}, 0 0 0 3px ${isDark ? "rgba(248,113,113,0.14)" : "rgba(190,18,60,0.1)"}`;
+  }
   return out;
 }

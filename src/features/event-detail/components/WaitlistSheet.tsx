@@ -5,7 +5,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassControl } from '@/lib/ui/glass';
+import { glassControl, glassField } from '@/lib/ui/glass';
 import { waitlistModule } from '@/lib/waitlist';
 import { registrationModule } from '@/lib/registration';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -165,7 +165,7 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
                     placeholder="6-digit code"
                     inputMode="numeric"
                     className="w-full h-12 rounded-2xl px-4 text-[16px] tracking-[6px] text-center outline-none"
-                    style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', color: isDark ? '#fff' : '#111' }}
+                    style={{ ...glassField(isDark), color: isDark ? '#fff' : '#111' }}
                   />
                 ) : (
                   <AppInput
@@ -175,7 +175,7 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
                     inputMode="tel"
                     disabled={isAuthenticated}
                     className="w-full h-12 rounded-2xl px-4 text-[14px] outline-none"
-                    style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', color: isDark ? '#fff' : '#111' }}
+                    style={{ ...glassField(isDark), color: isDark ? '#fff' : '#111' }}
                   />
                 )}
 

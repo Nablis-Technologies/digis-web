@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Lock, ArrowRight } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -12,6 +12,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
+import { glassField } from '@/lib/ui/glass';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { EventProduct, SelectedEventProduct } from '@/types';
 
@@ -20,7 +21,7 @@ const FIELD_ERROR_CLASS = 'flex items-center gap-1.5 mt-1.5 text-[11px] text-red
 
 interface ExtrasOnlyCheckoutProps {
   event: { name: string; date: string; time: string; venue: string; image?: string };
-  /** Backend event id — the extras-only order is created against it. */
+  /** Backend event id â€” the extras-only order is created against it. */
   eventId: string;
   /** The event's purchasable extras (parking, merch, food, ...). */
   products: EventProduct[];
@@ -34,8 +35,8 @@ interface ExtrasOnlyCheckoutProps {
 /**
  * Extras-only checkout: buy more event extras (parking, merch, food) against an
  * already-purchased ticket without re-entering the full ticket flow. Creates a
- * fresh backend order for JUST the extras (quote → order → payment), the same
- * chain the main checkout uses. No registration/consents/seats — those belong
+ * fresh backend order for JUST the extras (quote â†’ order â†’ payment), the same
+ * chain the main checkout uses. No registration/consents/seats â€” those belong
  * to ticket lines, and extras-only orders are accepted without them.
  */
 export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], onClose, onComplete }: ExtrasOnlyCheckoutProps) {
@@ -69,7 +70,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
   const startPayment = async () => {
     if (count <= 0 || payingRef.current) return;
     // Guests need to confirm their phone before checkout can start (BACKEND_GAPS
-    // #14 — the guest quote/order/payment endpoints are phone-bound).
+    // #14 â€” the guest quote/order/payment endpoints are phone-bound).
     if (!isAuthenticated) {
       setStep('details');
       return;
@@ -162,7 +163,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             className="w-full py-4 rounded-2xl flex items-center justify-center gap-2.5"
             style={{ ...primaryButtonSurface(Boolean(count) && step !== 'paying', isDark), fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', fontWeight: 500 }}>
             {step === 'paying' ? (
-              <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="w-4 h-4 border-2 rounded-full" style={{ borderColor: 'currentColor', borderTopColor: 'transparent', opacity: 0.8 }} />Starting payment…</>
+              <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="w-4 h-4 border-2 rounded-full" style={{ borderColor: 'currentColor', borderTopColor: 'transparent', opacity: 0.8 }} />Starting paymentâ€¦</>
             ) : step === 'details' ? (
               <><span>Continue</span><ArrowRight className="w-4 h-4" strokeWidth={2.5} /></>
             ) : (
@@ -193,7 +194,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
                 onChange={(e) => { setGuestPhone(e.target.value); clearField('phone'); }}
                 error={fieldErrors.phone} errorClassName={FIELD_ERROR_CLASS}
                 className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
-                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+                style={{ ...glassField(isDark, { error: !!fieldErrors.phone }), color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
             <div className="mb-3">
@@ -204,7 +205,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
                 onChange={(e) => { setGuestName(e.target.value); clearField('name'); }}
                 error={fieldErrors.name} errorClassName={FIELD_ERROR_CLASS}
                 className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
-                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+                style={{ ...glassField(isDark, { error: !!fieldErrors.name }), color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
             <div className="mb-3">
@@ -215,7 +216,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
                 onChange={(e) => { setGuestEmail(e.target.value); clearField('email'); }}
                 error={fieldErrors.email} errorClassName={FIELD_ERROR_CLASS}
                 className="w-full px-4 py-3 rounded-xl text-[14px] outline-none"
-                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#f3f3f3', color: textPrimary, fontFamily: "'Inter', sans-serif" }}
+                style={{ ...glassField(isDark, { error: !!fieldErrors.email }), color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
           </div>

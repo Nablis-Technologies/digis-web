@@ -17,10 +17,12 @@ that fought it. Removing the stroke leaves one depth language:
   light + quiet shadow). No room for an overlay, so the inset highlight is the
   whole edge.
 - **Inputs / fields** are the one exception that keeps a thin hairline:
-  `glassField(isDark, { error, focused })` draws a 1px line, a recessed inset
-  shadow, and a lime focus hairline + halo. A field's edge is an affordance —
-  it is what separates an editable well from a button, which carries no border.
-  This was added after the first pass: with no line at all, inputs and buttons
+  `glassField(isDark, { error, focused })`. Every field shares one canonical
+  surface — `glassInputSurface()` (translucent fill + 40px backdrop blur + float
+  shadow), byte-for-byte the discovery search bar — so fields are consistent
+  everywhere. The hairline appears only on focus (lime) / error (red), because a
+  field's edge is an affordance: it separates an editable well from a button,
+  which carries none. Added after the first pass, when inputs and buttons
   collapsed into the same raised glass and focus was invisible.
 - **State** is carried by the tint, never a stroke: selected/active =
   `glass(isDark, 'accent')`; error/destructive = `glass(isDark, 'danger')` with

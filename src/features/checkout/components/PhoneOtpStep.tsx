@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glass, glassControl } from '@/lib/ui/glass';
+import { glass, glassControl, glassField } from '@/lib/ui/glass';
 
 /**
  * Guest free-admission phone proof, shown inline as its own checkout step.
@@ -68,7 +68,7 @@ export function PhoneOtpStep({
         inputMode="numeric"
         aria-label="Verification code"
         className="w-full h-14 rounded-2xl px-4 text-[18px] tracking-[8px] text-center outline-none"
-        style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', color: isDark ? '#fff' : '#111' }}
+        style={{ ...glassField(isDark, { error: !!error }), color: isDark ? '#fff' : '#111' }}
       />
 
       {error && (

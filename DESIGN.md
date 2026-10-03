@@ -205,8 +205,8 @@ Tactile and confident: chunky, lime, begging to be pressed.
 - **Internal Padding:** 12–16px; card footers breathe with 14px top padding.
 
 ### Inputs / Fields
-- **Style:** 12–14px radius, `glassField()` — a recessed glass well (translucent fill + inset shadow) with one thin hairline so a field never reads as a button; 14px Inter values, tracked-out 10px uppercase labels.
-- **Focus:** The hairline and leading icon warm to lime (ink-adjacent on light) with a soft 4px halo; the recess stays, so a focused field is unmistakable.
+- **Style:** 12–14px radius, `glassField()` — the canonical input glass, byte-for-byte the discovery search surface (`glassInputSurface()`: translucent fill + 40px backdrop blur + quiet float shadow), so every field matches the search bar. One thin hairline appears only on focus/error to say "editable well" without making a resting field look like a button; 14px Inter values, tracked-out 10px uppercase labels.
+- **Focus:** The hairline turns lime (ink-adjacent on light) with a soft 4px halo; the fill stays the shared glass, so an active field is unmistakable.
 - **Error / Disabled:** Error takes the danger glass tint + red hairline (`glassField(isDark, { error })`) with a red icon and message; disabled fields use the flat translucent disabled surface (no ring). OTP uses six discrete boxes with lime fill rings; there is no backend OTP — codes shown are display-only patterns.
 
 ### Navigation
