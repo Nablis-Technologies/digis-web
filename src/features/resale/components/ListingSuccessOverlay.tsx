@@ -89,7 +89,7 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
             <span className="text-[12px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: copied ? brand : (isDark ? '#fff' : '#1a1a1a') }}>{copied ? 'Link copied' : 'Copy link'}</span>
           </AppButton>
           <AppButton onClick={onClose} className="flex-1 h-12 rounded-2xl flex items-center justify-center cursor-pointer" style={{ background: brand, color: '#152006' }}>
-            <span className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif" }}>View listing</span>
+            <span className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif" }}>Done</span>
           </AppButton>
         </motion.div>
       </motion.div>

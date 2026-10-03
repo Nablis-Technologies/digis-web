@@ -35,9 +35,9 @@ session-scoped (below) — cross-session dedup waits on #66.
 **Verified:** `tsc` · `vitest` **146/146** · `build` · Playwright chromium
 **28/28**.
 
-**Open follow-up (copy, not fixed):** `ListingSuccessOverlay`'s "View listing"
-button only closes the overlay and switches to My Listings — it does not open the
-listing; the label may warrant renaming.
+**Copy follow-up (resolved):** `ListingSuccessOverlay`'s action button was
+relabelled **"Done"** — it closes the overlay and switches to My Listings (where
+the listing now appears); "View listing" overpromised opening the listing.
 
 ## Session 2026-10-02 (pm) — seller payouts wired (backend `f679e56`)
 
