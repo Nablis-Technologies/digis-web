@@ -106,8 +106,8 @@ One accent on near-black (or paper), with data hues kept strictly in their lane.
 - **Tier Emerald** (#34d399), **Tier Blue** (#60a5fa), **Tier Violet** (#c4b5fd), **Tier Gold** (#fac83c), **Tier Rose** (#fb7185): Price-rank accents for ticket tiers (cheapest emerald → priciest gold) and countdown/state tints. Data only — never chrome, never CTAs. Each ships a deeper ink shade for light mode (emerald #047857, blue #1d4ed8, violet #6d28d9, gold #9a6a00, rose #be123c).
 
 ### Neutral
-- **Night** (#08090b bg / #101115 card / #f4f4f0 text / #aaa9ae muted / #3b3b3b line): The default world. Cards sit on near-black with hairline borders and inset highlights.
-- **Paper** (#f3f1f7 bg / #f8f7fa card / #17161c text / #6d6976 muted): The light inversion. Same hairlines, same radii, deeper drop shadows to compensate for lost contrast.
+- **Night** (#08090b bg / #101115 card / #f4f4f0 text / #aaa9ae muted / #3b3b3b line): The default world. Cards sit on near-black as translucent glass, bounded by reflected light — never a painted hairline (ADR-0007).
+- **Paper** (#f3f1f7 bg / #f8f7fa card / #17161c text / #6d6976 muted): The light inversion. Same glass boundary, same radii, deeper drop shadows to compensate for lost contrast.
 - **Ink** (#0a0a0a): CTA text on lime, light-mode primary surfaces, the brand mark on light.
 - **Danger** (#c7344f): Errors, destructive actions, live-now badges (dark destructive deepens to #7f2638).
 
@@ -144,7 +144,7 @@ Spacing rhythm is Tailwind's 4px base with 12/16/24px doing the structural work:
 
 ## Elevation & Depth
 
-Depth is blur plus translucency, not shadow. Navigation bars, search fields, menus, and dropdowns float on backdrop glass (20–60px blur, saturate 1.5–1.8×) over tinted scrims; hairline borders and inset top-highlights separate the layers. Drop shadows exist but stay quiet and purposeful.
+Depth is blur plus translucency, not shadow. Navigation bars, search fields, menus, and dropdowns float on backdrop glass (20–60px blur, saturate 1.5–1.8×) over tinted scrims; reflected-light edges and inset top-highlights separate the layers. Drop shadows exist but stay quiet and purposeful.
 
 ### Shadow Vocabulary (if applicable)
 - **Card rest** (`0 16px 40px -20px rgba(0,0,0,0.7)` dark / `0 12px 32px -18px rgba(0,0,0,0.2)` light, each with an inset top hairline): Event and ticket cards at rest.
@@ -168,6 +168,12 @@ get only the restrained inset hairline (`glassEdge()`). Overlays accept three
 tints — none (white light), accent lime, danger — and the `/ui-preview`
 calibration page exists so new surfaces are tuned against the real
 event-detail modules, not guessed.
+**No Painted Borders (ADR-0007).** The reflected edge *is* the boundary; a CSS
+`border` is never decoration. Surfaces carry the overlay pair, compact controls
+carry `glassEdge()` (inset top light), and state is told through the glass tint
+— never a stroke. `border` survives only where it is the mechanism: spinner
+rings, ticket perforation dashes, seat-map data dots, skeleton shells. Compact
+controls compose `glassControl(isDark, tint?)` = `glass()` fill + `glassEdge()`.
 **The Quiet Shadow Rule.** Primary CTAs carry no shadow at all. Shadows answer only to state — hover lift, open sheets, floating chrome.
 
 ## Shapes
@@ -183,26 +189,26 @@ Tactile and confident: chunky, lime, begging to be pressed.
 - **Shape:** Fully 16px radius (rounded-2xl), full-width, 16px vertical padding.
 - **Primary:** Digis Lime gradient (`135deg, #d9ff00 → #d6f905`), ink text, 14px/500–600 with 0.5px tracking. No shadow. Taps scale 1.01/0.98; auth primary adds a slow diagonal shimmer.
 - **Hover / Focus:** Subtle scale only — no color shift, no glow. Focus is a 4px lime halo at 10% opacity on inputs, not buttons.
-- **Secondary / Ghost:** Transparent with a 1px hairline border, same 16px radius; ticket-context secondaries sit on blurred panels. Disabled uses flat translucent surfaces at full opacity — never `opacity-50`.
+- **Secondary / Ghost:** Transparent on the inset glass edge (`glassEdge()`), same 16px radius — no painted border; ticket-context secondaries sit on blurred panels. Disabled uses flat translucent surfaces at full opacity — never `opacity-50`.
 
 ### Chips (if used)
 - **Style:** Full pills; category pills pair a Lucide glyph with the category hue, readable-adjusted per theme (lifted on dark, deepened on light).
-- **State:** Active filter pills fill with lime (dark) or ink (light); inactive pills stay glass with hairline borders.
+- **State:** Active filter pills fill with lime (dark) or ink (light); inactive pills are glass (`glassEdge()`, inset light — no painted border).
 
 ### Cards / Containers
 - **Corner Style:** 24px event cards, 22px ticket rows, 28px detail modals.
 - **Background:** Near-black `#101010`–`#101115` on dark, white–`#f8f7fa` on light; ticket detail modals deepen to `#0c0a18`.
 - **Shadow Strategy:** Card-rest shadow only (see Elevation); depth otherwise comes from the 3px poster-hue accent edge on ticket rows.
-- **Border:** 1px hairline, white at 6–8% on dark, black at 6–8% on light, plus an inset top highlight.
+- **Edge:** reflected light, not a stroke — the `GlassReflection` overlay pair on the host, or `glassEdge()` inset top light on compact elements (ADR-0007).
 - **Internal Padding:** 12–16px; card footers breathe with 14px top padding.
 
 ### Inputs / Fields
-- **Style:** 12–14px radius, translucent fill (white 4% dark / indigo-ink 3% light), hairline rest border, 14px Inter values, tracked-out 10px uppercase labels.
-- **Focus:** Border warms to lime at 50% with a soft 4px halo; the leading icon flips to lime (dark) or ink (light).
-- **Error / Disabled:** Error border goes `#ef4444` with an animated icon-plus-message row; OTP uses six discrete boxes with lime fill rings; there is no backend OTP — codes shown are display-only patterns.
+- **Style:** 12–14px radius, `glassControl()` — glass fill (white 4% dark / indigo-ink 3% light) with an inset top light edge, no painted border; 14px Inter values, tracked-out 10px uppercase labels.
+- **Focus:** The inset edge and leading icon warm to lime on dark (ink on light) with a soft 4px halo.
+- **Error / Disabled:** Error takes the danger glass tint (`glass(isDark,'danger')`) with a red icon and message (never a stroke); OTP uses six discrete boxes with lime fill rings; there is no backend OTP — codes shown are display-only patterns.
 
 ### Navigation
-- **Style:** Mobile bottom tab bar (glass, lime hairline top edge, safe-area padded) vs desktop fixed top bar (72px, centered pill group, blur 48px). Active mobile item gets a shared-layout lime pip; active desktop pill fills lime-tinted glass.
+- **Style:** Mobile bottom tab bar (glass, a soft lime light edge, safe-area padded) vs desktop fixed top bar (72px, centered pill group, blur 48px). Active mobile item gets a shared-layout lime pip; active desktop pill fills lime-tinted glass.
 - **Typography:** 10px tracked labels on mobile, 12px tracked pills on desktop; icons at 22px, 1.5 stroke.
 - **States:** Taps compress to 0.88; scroll past 12px deepens the glass. Notification dots are red `#ef4444` pills with a page-background ring.
 
@@ -222,6 +228,7 @@ Non-invasive light for `relative overflow-hidden` hosts: the `GlassReflection` p
 - **Do** default to dark; persist the visitor's theme choice.
 - **Do** honor `prefers-reduced-motion` for loops (pulse, shimmer, countdown blink) — the system animates constantly and currently has no reduced-motion handling; new work must not extend that gap.
 - **Do** tune new reflective surfaces on the `/ui-preview` calibration page against the real modules — never guess reflection values.
+- **Do** build every boundary from light: glass fill + reflection, `glassEdge()` on compact controls, the tint for state (ADR-0007).
 
 ### Don't:
 - **Don't** use purple-to-blue gradients or cyan-on-dark washes — the system's most recognizable anti-pattern (flagged by the detector in legacy mock files).
@@ -232,3 +239,4 @@ Non-invasive light for `relative overflow-hidden` hosts: the `GlassReflection` p
 - **Don't** paint chrome (buttons, nav, inputs) in category or tier hues — data colors stay on data.
 - **Don't** wash owned-ticket surfaces in lime — neutral fill, lime only in status cues.
 - **Don't** let a reflection overlay replace a fill, image, blur, or transparency — it adds light, nothing else.
+- **Don't** paint a CSS `border` as a boundary — the boundary is light (ADR-0007). Border stays only as a mechanism: spinner ring, ticket perforation, seat-map data dot, skeleton shell.

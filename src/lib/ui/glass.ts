@@ -134,3 +134,14 @@ export function glassEdge(isDark: boolean): CSSProperties {
   const shadow = glassShadow(isDark).boxShadow;
   return { boxShadow: `inset 0 1px 0 rgba(255,255,255,${isDark ? 0.055 : 0.34}), ${shadow}` };
 }
+
+/**
+ * The boundary for compact controls (inputs, icon tiles, small buttons, pills)
+ * that are too small to host the reflection overlay: a glass fill composed with
+ * the restrained inset top light. `border` is deliberately absent — the edge is
+ * light, not a stroke (ADR-0007). Pass a tint for state (accent = selected,
+ * danger = error/destructive).
+ */
+export function glassControl(isDark: boolean, tint?: GlassTint): CSSProperties {
+  return { ...glass(isDark, tint), ...glassEdge(isDark) };
+}
