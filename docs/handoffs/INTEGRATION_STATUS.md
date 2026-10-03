@@ -17,17 +17,22 @@ public serializer expose no `ticket_id`, and `TicketWalletSerializer` carries no
 active-listing reference, so the My Listings "List a Ticket" picker cannot exclude
 tickets that already have an open listing (the backend rejects a second with
 `listing_already_open`). Fix: add `ticket_id` to the seller serializer (or an
-`active_resale_listing_id` on the wallet serializer). The frontend mitigation is
-session-scoped (below) — cross-session dedup waits on #66.
+`active_resale_listing_id` on the wallet serializer). The frontend mitigation is a
+client cache reconciled against the server's active listings (below) —
+cross-device dedup waits on #66.
 
 **Frontend fixes (resale only):**
 - **Wallet action-row copy:** middle tile "Payout methods" → **"Methods"**
   (`Cash out · Methods · History`); commit `364f426`.
-- **`listableTickets`:** removed the dead `myListings.some(l => l.ticket?.id …)`
-  clause (the query rows never carry `.ticket`). Replaced with a session pairing —
-  each created listing is paired with its wallet ticket (from the create response)
-  and the pair is dropped on a successful delist, so a just-listed ticket leaves
-  the picker within the session.
+- **`listableTickets` hides already-listed tickets:** the seller wire omits
+  `ticket_id`, so `resaleModule` caches each listing→ticket pair from the create
+  response (`localStorage`, with an in-memory fallback), reconciles it against the
+  active `resale_listings/mine` ids (`fetchMyListings` prunes; `cancelListing`
+  drops), and exposes `listedTicketIds()` for the picker. This survives reloads on
+  the same browser; it is a cache, never a source of truth. Unit-tested.
+- **List / Delist borders:** solid coloured borders replaced with the category-tag
+  glass treatment (`GlassReflection`, neutral) — red/lime stays on the fill and
+  label, so the One Accent Rule and red-only-on-destructive hold.
 - **Event grouping key:** browse event selection moved from `eventName` to
   `event_id` (`selectedEventName` → `selectedEventId`; React key `group.eventId`)
   so two events sharing a title no longer collide/merge.
