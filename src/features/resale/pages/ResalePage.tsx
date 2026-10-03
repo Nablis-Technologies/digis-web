@@ -874,7 +874,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       </div>
                     </div>
 
-                    {/* Three actions: Cash out · Payout methods · History */}
+                    {/* Three actions: Cash out · Methods · History */}
                     <div className="relative z-10 grid grid-cols-3 gap-2.5 mt-4">
                       <WalletAction
                         isDark={isDark}
@@ -886,7 +886,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       <WalletAction
                         isDark={isDark}
                         icon={<Landmark className="w-5 h-5" strokeWidth={1.75} />}
-                        label="Payout methods"
+                        label="Methods"
                         onClick={() => setMethodsOpen(true)}
                       />
                       <WalletAction
