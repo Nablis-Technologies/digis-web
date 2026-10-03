@@ -8,7 +8,7 @@ import { copyText } from '@/lib/utils/clipboard';
 import { toastError } from '@/lib/feedback';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glass, glassEdge } from '@/lib/ui/glass';
 
 export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClose }: { ticket: UserTicket; price: number; listingId: string; isDark: boolean; onClose: () => void }) {
   const brand = '#d6f905';
@@ -37,59 +37,19 @@ export function ListingSuccessOverlay({ ticket, price, listingId, isDark, onClos
         exit={{ scale: 0.94, y: -10, opacity: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="relative w-full max-w-sm rounded-[28px] overflow-hidden flex flex-col items-center text-center px-8 py-12"
-        style={{
-          background: isDark
-            ? 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.018) 100%)'
-            : 'linear-gradient(160deg, rgba(255,255,255,0.95) 0%, rgba(248,247,252,0.9) 100%)',
-          boxShadow: isDark ? '0 32px 80px -20px rgba(0,0,0,0.7)' : '0 32px 80px -24px rgba(40,40,80,0.18)',
-        }}
+        style={{ ...glass(isDark) }}
       >
         <GlassReflection isDark={isDark} />
-        {/* Brand glow behind checkmark */}
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${isDark ? 'rgba(217,255,0,0.22)' : 'rgba(214,249,5,0.3)'} 0%, transparent 66%)` }} />
 
-        {/* Animated checkmark ring */}
+        {/* Checkmark on the brand accent — no glow, no sparkle bursts */}
         <motion.div
           initial={{ scale: 0, rotate: -20 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-20 h-20 rounded-full flex items-center justify-center mb-6"
-          style={{
-            background: 'linear-gradient(135deg, #e9ff4d 0%, #b6dd00 100%)',
-          }}
+          className="relative z-10 w-16 h-16 rounded-full flex items-center justify-center mb-6"
+          style={{ background: brand, ...glassEdge(isDark) }}
         >
-          {/* Rotating dashed ring */}
-          <motion.div
-            className="absolute inset-[-6px] rounded-full"
-            style={{ border: '2px dashed rgba(180,220,0,0.6)' }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-          />
-          <motion.div
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ delay: 0.35, duration: 0.45, ease: 'easeOut' }}
-          >
-            <Check className="w-8 h-8" strokeWidth={2.75} style={{ color: '#0a0a0a' }} />
-          </motion.div>
-
-          {/* Sparkle bursts */}
-          {[0, 72, 144, 216, 288].map((deg, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1.5 h-1.5 rounded-full"
-              style={{ background: brand, top: '50%', left: '50%' }}
-              initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
-              animate={{
-                x: Math.cos((deg * Math.PI) / 180) * 38,
-                y: Math.sin((deg * Math.PI) / 180) * 38,
-                opacity: [0, 1, 0],
-                scale: [0, 1.2, 0],
-              }}
-              transition={{ delay: 0.3 + i * 0.04, duration: 0.6, ease: 'easeOut' }}
-            />
-          ))}
+          <Check className="w-7 h-7" strokeWidth={2.75} style={{ color: '#0a0a0a' }} />
         </motion.div>
 
         {/* Kicker */}
