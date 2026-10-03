@@ -61,7 +61,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'priceAsc' | 'priceDesc'>('recent');
   const [sortOpen, setSortOpen] = useState(false);
-  const [selectedEventName, setSelectedEventName] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [showListingSuccess, setShowListingSuccess] = useState(false);
   const [successListing, setSuccessListing] = useState<ResaleListing | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
@@ -97,10 +97,15 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const payableBalances = sellerBalance.filter((b) => b.availableMinor > 0);
   const hasVerifiedMethod = payoutMethods.some((m) => m.status === 'verified');
   const showWalletCard = !balanceError && sellerBalance.length > 0 && sellerHistory.length > 0;
-  // Tickets that can be listed for resale — active only, not already listed.
-  // Declared after `myListings` (above) to avoid a temporal-dead-zone crash.
+  // Tickets that can be listed for resale — active only, and not already listed.
+  // The seller wire omits `ticket_id` (BACKEND_GAPS #66), so a listing can't be
+  // matched back to its wallet ticket across sessions. Within a session we pair
+  // each created listing with its ticket (the create response carries it) and
+  // drop the pair on a successful delist; a full fix waits on #66.
+  const [sessionListings, setSessionListings] = useState<Array<{ listingId: string; ticketId: string }>>([]);
+  const sessionListedTicketIds = new Set(sessionListings.map((s) => s.ticketId));
   const listableTickets = userTickets.filter(
-    (t) => t.status === 'active' && !myListings.some((l) => l.ticket?.id === t.id),
+    (t) => t.status === 'active' && !sessionListedTicketIds.has(t.id),
   );
   const [showFilters, setShowFilters] = useState(false);
   // The selected-event rail is a separate view — it keeps its own open state so
@@ -206,9 +211,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
     );
   })();
 
-  const selectedGroup = selectedEventName
+  const selectedGroup = selectedEventId
     ? (() => {
-        const all = browseListings.filter(l => l.eventName === selectedEventName);
+        const all = browseListings.filter(l => l.event_id === selectedEventId);
         if (!all.length) return null;
         const first = all[0];
         return {
@@ -239,9 +244,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   // Route → drill-down sync: `/resale/events/:slug` selects the matching group
   // once browse has it; leaving the route clears the selection.
   useEffect(() => {
-    if (!selectedEventSlug) { setSelectedEventName(null); return; }
+    if (!selectedEventSlug) { setSelectedEventId(null); return; }
     const match = browseListings.find((l) => l.eventSlug === selectedEventSlug);
-    if (match) setSelectedEventName(match.eventName);
+    if (match) setSelectedEventId(match.event_id);
   }, [selectedEventSlug, browseListings]);
 
   // Resale purchase — the shared command used by every resale buy surface.
@@ -293,6 +298,13 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
           setSuccessListing(listing);
           setListingTicket(null);
           setShowListingSuccess(true);
+          if (listing.ticket) {
+            setSessionListings((prev) => (
+              prev.some((s) => s.listingId === listing.id)
+                ? prev
+                : [...prev, { listingId: listing.id, ticketId: listing.ticket!.id }]
+            ));
+          }
           // Keep the confirmation open so the seller can share their listing before continuing.
         },
       },
@@ -312,6 +324,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
     // that is still in flight or that may fail.
     removeListingMutation.mutate(id, {
       onSuccess: () => {
+        setSessionListings((prev) => prev.filter((s) => s.listingId !== id));
         setPendingRemoveId(null);
         setRemovedFlashId(id);
         setTimeout(() => setRemovedFlashId(null), 600);
@@ -390,7 +403,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
         {activeTab === 'browse' ? (
           <motion.div key="browse" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
             <AnimatePresence mode="wait">
-              {!selectedEventName ? (
+              {!selectedEventId ? (
                 /* ─── Event List View ─── */
                 <motion.div key="events"
                   initial={{ opacity: 0, x: -20 }}
@@ -461,12 +474,12 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                   {/* Event Cards — matching Discover page */}
                   <div className="px-5 pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {eventGroups.map((group, index) => (
-                      <motion.div key={group.eventName}
+                      <motion.div key={group.eventId}
                         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.08, duration: 0.35 }}>
                         <ResaleEventCard group={group} onClick={() => {
                           if (onOpenEvent && group.eventSlug) onOpenEvent(group.eventSlug);
-                          else setSelectedEventName(group.eventName);
+                          else setSelectedEventId(group.eventId);
                         }} />
                       </motion.div>
                     ))}
@@ -501,7 +514,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                   {/* Back link */}
                   <div className="px-5 lg:px-8 pt-5">
                     <AppButton whileTap={{ scale: 0.95 }}
-                      onClick={() => { if (onCloseEvent) onCloseEvent(); else setSelectedEventName(null); }}
+                      onClick={() => { if (onCloseEvent) onCloseEvent(); else setSelectedEventId(null); }}
                       className="flex items-center gap-1.5 mb-4 cursor-pointer">
                       <ArrowLeft className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }} strokeWidth={1.5} />
                       <span className="text-[12px] tracking-[0.3px]"
