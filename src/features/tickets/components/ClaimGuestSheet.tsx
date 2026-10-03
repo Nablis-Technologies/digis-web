@@ -12,6 +12,7 @@ import { guestWallet } from '@/lib/guest-wallet';
 import { ApiError, mapApiError, mapFieldErrors } from '@/lib/errors';
 import { FieldError } from '@/components/primitives/FieldError';
 import { glassField } from '@/lib/ui/glass';
+import { usePhoneInput } from '@/lib/usePhoneInput';
 
 /**
  * Guest ticket → account claim (#31 resolved). A guest whose ticket carries a
@@ -27,6 +28,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   const { isDark } = useTheme();
   const { signIn } = useAuth();
   const [phone, setPhone] = useState('');
+  const phoneInput = usePhoneInput(phone, setPhone, 'ET', '251');
   const [otpStage, setOtpStage] = useState<'idle' | 'sending' | 'sent' | 'submitting'>('idle');
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState('');
@@ -90,7 +92,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
     }
     setOtpStage('sending');
     try {
-      const { challengeId: id } = await registrationModule.claimOtpRequest(ticket.ticketViewToken, phone);
+      const { challengeId: id } = await registrationModule.claimOtpRequest(ticket.ticketViewToken, phoneInput.toE164());
       setChallengeId(id);
       setOtpStage('sent');
     } catch (err) {
@@ -110,14 +112,14 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
     try {
       const { verificationToken } = await registrationModule.verifyPhoneOtp(challengeId, otpCode);
       await registrationModule.claimGuest(ticket.registrationId, {
-        phone,
+        phone: phoneInput.toE164(),
         verificationToken,
         password,
         passwordConfirmation: passwordConfirm,
       });
       // The claim set this password on the identity — sign in with it so the
       // ticket appears in the account wallet.
-      const result = await signIn(phone, password);
+      const result = await signIn(phoneInput.toE164(), password);
       if (!result.ok) {
         setFormError(result.error ?? 'We could not sign you in after claiming.');
         setOtpStage('sent');
@@ -176,11 +178,14 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                 <GlassReflection isDark={isDark} />
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
                 <AppInput
-                  type="tel" value={phone} disabled={otpStage === 'sent' || otpStage === 'submitting'}
-                  onChange={(e) => { setPhone(e.target.value); clearField('phone'); }}
-                  {...focusProps('phone')}
+                  ref={phoneInput.ref}
+                  type="tel" inputMode="tel" autoComplete="tel"
+                  value={phoneInput.display} disabled={otpStage === 'sent' || otpStage === 'submitting'}
+                  onChange={(e) => { phoneInput.handleChange(e); clearField('phone'); }}
+                  onFocus={() => { setFocusedField('phone'); phoneInput.onFocus(); }}
+                  onBlur={() => { setFocusedField(null); phoneInput.onBlur(); }}
                   placeholder="The phone you checked out with"
-                  className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px]"
+                  className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px] tabular-nums"
                   style={inputStyle} aria-invalid={errors.phone ? true : undefined}
                 />
               </div>
