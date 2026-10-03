@@ -20,6 +20,7 @@ import { FilterPanel } from '@/features/resale/components/FilterPanel';
 import { ListingSuccessOverlay } from '@/features/resale/components/ListingSuccessOverlay';
 import { RemoveListingSheet } from '@/features/resale/components/RemoveListingSheet';
 import { BuyListingSheet } from '@/features/resale/components/BuyListingSheet';
+import { ListTicketPickerSheet } from '@/features/resale/components/ListTicketPickerSheet';
 import { ResaleEmptyState } from '@/features/resale/components/ResaleEmptyState';
 import { SellTicketSheet } from '@/features/resale/components/SellTicketSheet';
 import { PayoutMethodsSheet } from '@/features/resale/components/PayoutMethodsSheet';
@@ -27,7 +28,6 @@ import { ticketKeys } from '@/lib/tickets';
 import { sellerReportsService, sellerReportsKeys } from '@/lib/seller-reports';
 import { toastError } from '@/lib/feedback';
 import { mapApiError } from '@/lib/errors';
-import { isoToDisplayDate } from '@/lib/mappers';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -66,6 +66,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [removedFlashId, setRemovedFlashId] = useState<string | null>(null);
   const [showPayoutSheet, setShowPayoutSheet] = useState(false);
+  const [showListPicker, setShowListPicker] = useState(false);
   // Browse + my-listings read through the Resale module (live backend: browse
   // serves active listings; my-listings are the active rows created in this
   // session — the backend exposes no owner identifier on browse).
@@ -83,8 +84,9 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   } = useQuery({ queryKey: resaleModule.keys.myListings, queryFn: () => resaleModule.fetchMyListings() });
   // Seller earnings — read straight from the seller reports endpoints.
   const { data: sellerBalance = [], isError: balanceError, refetch: refetchBalance } = useQuery({ queryKey: sellerReportsKeys.balance, queryFn: () => sellerReportsService.fetchBalance() });
-  const { data: sellerHistory = [], isError: historyError, refetch: refetchHistory } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
-  const [showAllHistory, setShowAllHistory] = useState(false);
+  // History is used only to decide whether the wallet card shows (has earnings
+  // history). The full ledger lives on the /payouts page.
+  const { data: sellerHistory = [] } = useQuery({ queryKey: sellerReportsKeys.history, queryFn: () => sellerReportsService.fetchHistory() });
   // Skeletons only appear if loading persists.
   const showBrowseLoading = useShowSkeleton(browsePending);
   const showMyLoading = useShowSkeleton(myPending);
@@ -811,13 +813,76 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
           </motion.div>
         ) : (
           <motion.div key="myListings" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-            {/* Active Listings */}
+            {/* ── Wallet: balance + payout methods, one card → /payouts. Only
+                when the seller actually has earnings history. ── */}
+            {balanceError && (
+              <div className="px-5 pt-5">
+                <div className="relative p-4 rounded-2xl text-center overflow-hidden"
+                  style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#fff' }}>
+                  <GlassReflection isDark={isDark} />
+                  <p className="relative z-10 text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                    Couldn’t load your earnings.
+                  </p>
+                  <AppButton onClick={() => void refetchBalance()} className="relative z-10 cursor-pointer"
+                    style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
+                    Retry
+                  </AppButton>
+                </div>
+              </div>
+            )}
+            {/* Only when the seller actually has earnings history — an empty
+                wallet should not occupy the top of the tab. */}
+            {!balanceError && sellerBalance.length > 0 && sellerHistory.length > 0 && (
+              <div className="px-5 pt-5">
+                <AppButton whileTap={{ scale: 0.99 }}
+                  onClick={onOpenPayouts}
+                  disabled={!onOpenPayouts}
+                  className="relative w-full text-left rounded-2xl overflow-hidden p-4 cursor-pointer disabled:cursor-default"
+                  style={{ background: isDark ? 'rgba(255,255,255,0.04)' : '#fff', ...glassEdge(isDark) }}>
+                  <GlassReflection isDark={isDark} />
+                  <div className="relative z-10 flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
+                      <Wallet className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
+                        Available to pay out
+                      </p>
+                      <p className="text-[18px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#fff' : '#1a1a1a' }}>
+                        {sellerBalance.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')}
+                      </p>
+                    </div>
+                    {onOpenPayouts && (
+                      <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} strokeWidth={1.5} />
+                    )}
+                  </div>
+                  <div className="relative z-10 flex items-center justify-between gap-3 mt-3 pt-3"
+                    style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                    <div className="min-w-0">
+                      <p className="text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
+                        {sellerBalance.some((b) => b.reservedMinor > 0)
+                          ? sellerBalance.filter((b) => b.reservedMinor > 0)
+                              .map((b) => `${Money.fromMinor(b.reservedMinor, b.currency).format()} on hold`)
+                              .join(' · ')
+                          : 'Payout methods · History'}
+                      </p>
+                    </div>
+                    <span className="text-[11px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
+                      Cash out & history
+                    </span>
+                  </div>
+                </AppButton>
+              </div>
+            )}
+
+            {/* ── Active Listings ── */}
             {myError ? (
               <div className="px-5 pt-5">
                 <LoadErrorCard onRetry={() => void refetchMine()} />
               </div>
             ) : showMyLoading ? (
-              <div className="px-5 pt-5">
+              <div className="px-5 pt-6">
                 <p className="text-[11px] tracking-[2px] uppercase mb-3 ml-1"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
                   Active Listings
@@ -828,7 +893,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                 </div>
               </div>
             ) : myListings.length > 0 && (
-              <div className="px-5 pt-5">
+              <div className="px-5 pt-6">
                 <p className="text-[11px] tracking-[2px] uppercase mb-3 ml-1"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
                   Active Listings
@@ -905,177 +970,36 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
               </div>
             )}
 
-
-            {/* List a ticket — intentionally unboxed so the ticket rows read as the primary, full-width actions. */}
-            <div className="px-5 pt-7">
-              <div className="flex items-center gap-3 mb-3 px-1">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ background: isDark ? 'rgba(214,249,5,0.09)' : 'rgba(214,249,5,0.10)' }}>
-                  <Tag className="w-[18px] h-[18px]" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.6} />
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                    List a Ticket for Sale
-                  </h3>
-                  <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                    Choose a ticket from your collection
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-2.5">
-                {userTickets.filter((t) => t.status === 'active').map(ticket => (
-                  <AppButton key={ticket.id} whileTap={{ scale: 0.985 }}
-                    onClick={() => handleListTicket(ticket)}
-                    className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-pointer text-left"
-                    style={{
-                      background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
-                      ...glassEdge(isDark),
-                    }}>
-                    <div className="flex min-w-0 items-center gap-3.5">
-                      {ticket.image && (
-                        <img src={ticket.image} alt="" className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />
-                      )}
-                      <div className="min-w-0 text-left">
-                        <p className="text-[13px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                          {ticket.eventName}
-                        </p>
-                        <p className="text-[11px] truncate mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                          {ticket.ticketType} · {ticket.eventDate}
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 flex-shrink-0 ml-3" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }} strokeWidth={1.5} />
-                  </AppButton>
-                ))}
-              </div>
-
-              {/* Seller earnings — balance + ledger from the seller reports API. */}
-              {balanceError && (
-                <div className="relative mt-3 p-4 rounded-2xl text-center overflow-hidden"
-                  style={{
-                    background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                  }}>
-                  <GlassReflection isDark={isDark} />
-                  <p className="relative z-10 text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                    Couldn't load your earnings.
-                  </p>
-                  <AppButton onClick={() => void refetchBalance()} className="relative z-10 cursor-pointer"
-                    style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
-                    Retry
-                  </AppButton>
-                </div>
-              )}
-              {!balanceError && sellerBalance.length > 0 && (
-                <div className="relative mt-3 p-4 rounded-2xl overflow-hidden"
-                  style={{
-                    background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                  }}>
-                  <GlassReflection isDark={isDark} />
-                  <div className="relative z-10 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }}>
-                      <TrendingUp className="w-5 h-5" style={{ color: isDark ? '#34d399' : '#059669' }} strokeWidth={1.5} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                        Available to pay out
-                      </p>
-                      <p className="text-[18px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? '#fff' : '#1a1a1a' }}>
-                        {sellerBalance.map((b) => Money.fromMinor(b.availableMinor, b.currency).format()).join(' · ')}
-                      </p>
-                      {sellerBalance.some((b) => b.reservedMinor > 0) && (
-                        <p className="text-[11px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
-                          {sellerBalance
-                            .filter((b) => b.reservedMinor > 0)
-                            .map((b) => `${Money.fromMinor(b.reservedMinor, b.currency).format()} on hold`)
-                            .join(' · ')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {onOpenPayouts && sellerBalance.some((b) => b.availableMinor > 0) && (
-                    <AppButton whileTap={{ scale: 0.98 }} onClick={onOpenPayouts}
-                      className="relative z-10 w-full h-[44px] mt-3 rounded-xl flex items-center justify-center cursor-pointer"
-                      style={{ background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(10,10,10,0.06)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.28)' : 'rgba(10,10,10,0.22)'}` }}>
-                      <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#0a0a0a' }}>
-                        Cash out
-                      </span>
-                    </AppButton>
-                  )}
-
-                  {sellerHistory.length > 0 ? (
-                    <div className="relative z-10 mt-3 pt-3 space-y-2.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
-                      {(showAllHistory ? sellerHistory : sellerHistory.slice(0, 3)).map((entry) => (
-                        <div key={entry.id} className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[12.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                              {entry.description || entry.eventName || entry.type}
-                            </p>
-                            <p className="text-[10.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
-                              {entry.eventName ? `${entry.eventName} · ` : ''}Available {isoToDisplayDate(entry.availableAt)}
-                            </p>
-                          </div>
-                          <p className="text-[12.5px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: entry.amountMinor < 0 ? (isDark ? '#ff6b70' : '#c0392b') : (isDark ? '#34d399' : '#059669') }}>
-                            {entry.amountMinor < 0 ? '' : '+'}{Money.fromMinor(entry.amountMinor, entry.currency).format()}
-                          </p>
-                        </div>
-                      ))}
-                      {sellerHistory.length > 3 && (
-                        <AppButton onClick={() => setShowAllHistory((v) => !v)} className="cursor-pointer"
-                          style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
-                          {showAllHistory ? 'Show less' : `Show all ${sellerHistory.length}`}
-                        </AppButton>
-                      )}
-                    </div>
-                  ) : historyError ? (
-                    <div className="relative z-10 mt-3 pt-3 flex items-center justify-between gap-3"
-                      style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
-                      <span className="text-[11px]"
-                        style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                        Couldn’t load your activity.
-                      </span>
-                      <AppButton onClick={() => void refetchHistory()} className="cursor-pointer flex-shrink-0"
-                        style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 600, color: isDark ? '#d6f905' : '#0a0a0a' }}>
-                        Retry
-                      </AppButton>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {/* Payout methods entry */}
-              <AppButton whileTap={{ scale: 0.98 }}
-                onClick={() => setShowPayoutSheet(true)}
-                className="mt-3 w-full flex items-center gap-3 p-4 rounded-2xl cursor-pointer text-left"
-                style={{
-                  background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                  ...glassEdge(isDark),
-                }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                  <Wallet className="w-5 h-5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.5} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                    Payout methods
-                  </p>
-                  <p className="text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}>
-                    Manage where you get paid
-                  </p>
-                </div>
-                <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} strokeWidth={1.5} />
-              </AppButton>
-            </div>
-
             {!showMyLoading && !myError && myListings.length === 0 && (
-              <div className="flex flex-col items-center justify-center pt-12 text-center px-6">
+              <div className="flex flex-col items-center justify-center pt-10 text-center px-6">
                 <Sparkles className="w-6 h-6 mb-2" style={{ color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }} strokeWidth={1} />
                 <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }}>
                   No active listings yet
                 </p>
               </div>
             )}
+
+            {/* ── List a ticket — a distinct action card, not a content row ── */}
+            <div className="px-5 pt-6">
+              <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                onClick={() => setShowListPicker(true)}
+                className="relative w-full flex items-center gap-3 p-4 rounded-2xl cursor-pointer text-left overflow-hidden"
+                style={{ background: '#d6f905', ...glassEdge(isDark) }}>
+                <div className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(10,10,10,0.1)' }}>
+                  <Tag className="w-5 h-5" style={{ color: '#0a0a0a' }} strokeWidth={1.75} />
+                </div>
+                <div className="relative z-10 min-w-0 flex-1">
+                  <p className="text-[14px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: '#0a0a0a' }}>
+                    List a ticket for sale
+                  </p>
+                  <p className="text-[11.5px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(10,10,10,0.6)' }}>
+                    Pick a ticket from your collection
+                  </p>
+                </div>
+                <ArrowRight className="relative z-10 w-5 h-5 flex-shrink-0" style={{ color: '#0a0a0a' }} strokeWidth={2} />
+              </AppButton>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1099,6 +1023,17 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
             listingId={successListing.id}
             isDark={isDark}
             onClose={() => { setShowListingSuccess(false); setActiveTab('myListings'); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Ticket picker — opened by the "List a ticket" action card */}
+      <AnimatePresence>
+        {showListPicker && (
+          <ListTicketPickerSheet
+            tickets={userTickets.filter((t) => t.status === 'active')}
+            onPick={(ticket) => { setShowListPicker(false); handleListTicket(ticket); }}
+            onClose={() => setShowListPicker(false)}
           />
         )}
       </AnimatePresence>
