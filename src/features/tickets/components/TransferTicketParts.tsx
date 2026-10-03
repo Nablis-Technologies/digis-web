@@ -28,7 +28,7 @@ export function Field({
       className="relative flex items-center gap-3 px-4 py-3.5 rounded-2xl"
       style={{
         background: surfaceSoft,
-        ...(active ? glassField(isDark, { error, focused: true }) : glassField(isDark, { error })),
+        ...glassField(isDark),
         transition: 'box-shadow 0.25s',
       }}
     >

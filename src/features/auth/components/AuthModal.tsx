@@ -483,8 +483,8 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
   return (
     <div>
       <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}>
-        <GlassReflection isDark={isDark} />
+        style={glassField(isDark)}>
+        <GlassReflection isDark={isDark} edgeState={error ? 'error' : focused ? 'focus' : undefined} />
         <CountrySelector country={country} onChange={onCountryChange} isDark={isDark} />
         <AppInput
           type="tel" value={value} placeholder={placeholder || 'Phone number'}
@@ -507,8 +507,8 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
   return (
     <div>
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}>
-        <GlassReflection isDark={isDark} />
+        style={glassField(isDark)}>
+        <GlassReflection isDark={isDark} edgeState={error ? 'error' : focused ? 'focus' : undefined} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
@@ -527,8 +527,8 @@ function EmailField({ value, onChange, isDark, onEnter, error }: { value: string
   return (
     <div>
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}>
-        <GlassReflection isDark={isDark} />
+        style={glassField(isDark)}>
+        <GlassReflection isDark={isDark} edgeState={error ? 'error' : focused ? 'focus' : undefined} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
         <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Email (optional)" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
@@ -547,8 +547,8 @@ function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }:
   return (
     <div>
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}>
-        <GlassReflection isDark={isDark} />
+        style={glassField(isDark)}>
+        <GlassReflection isDark={isDark} edgeState={error ? 'error' : focused ? 'focus' : undefined} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Lock className="w-4 h-4" /></span>
         <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}

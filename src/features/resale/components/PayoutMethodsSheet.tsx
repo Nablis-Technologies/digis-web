@@ -309,7 +309,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
                 className="rounded-xl p-3 flex items-center gap-3 cursor-pointer text-left"
                 style={{
                   background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(10,10,10,0.05)') : cardBg,
-                  ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
+                  ...glassField(isDark),
                 }}>
                 <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>

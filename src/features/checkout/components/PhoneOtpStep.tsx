@@ -61,8 +61,8 @@ export function PhoneOtpStep({
         </div>
       </div>
 
-      <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error })}>
-        <GlassReflection isDark={isDark} />
+      <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark)}>
+        <GlassReflection isDark={isDark} edgeState={error ? 'error' : undefined} />
         <AppInput
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}

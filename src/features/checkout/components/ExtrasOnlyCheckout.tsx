@@ -186,8 +186,8 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             <p className="text-[10px] tracking-[1.6px] uppercase mb-4" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
               Contact details
             </p>
-            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.phone })}>
-              <GlassReflection isDark={isDark} />
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark)}>
+              <GlassReflection isDark={isDark} edgeState={fieldErrors.phone ? 'error' : undefined} />
               <AppInput
                 type="tel"
                 placeholder="Phone number"
@@ -198,8 +198,8 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
                 style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.name })}>
-              <GlassReflection isDark={isDark} />
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark)}>
+              <GlassReflection isDark={isDark} edgeState={fieldErrors.name ? 'error' : undefined} />
               <AppInput
                 type="text"
                 placeholder="Name (optional)"
@@ -210,8 +210,8 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
                 style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.email })}>
-              <GlassReflection isDark={isDark} />
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark)}>
+              <GlassReflection isDark={isDark} edgeState={fieldErrors.email ? 'error' : undefined} />
               <AppInput
                 type="email"
                 placeholder="Email (optional)"

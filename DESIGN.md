@@ -205,8 +205,8 @@ Tactile and confident: chunky, lime, begging to be pressed.
 - **Internal Padding:** 12–16px; card footers breathe with 14px top padding.
 
 ### Inputs / Fields
-- **Style:** 12–14px radius, `glassField()` — the full discovery-search chrome on every field: translucent surface + 40px backdrop blur + the reflected hairline (a border-box conic gradient, the same one-pixel edge the search bar paints) + the quiet float shadow. 14px Inter values, tracked-out 10px uppercase labels.
-- **Focus:** An unmistakable shift — the hairline goes solid lime, the ring brightens (3px @ ~28%), and the fill warms lime; the leading icon flips to lime. Error swaps lime for red hairline + red ring + a red-washed fill. The hairline is the one ADR-0007 exception — a field's edge is the affordance that separates an editable well from a borderless button.
+- **Style:** 12–14px radius, `glassField()` — the full discovery-search chrome on every field: translucent surface + 40px backdrop blur + the reflected hairline (the same one-pixel `GlassReflection` edge the search bar paints) + the quiet float shadow. 14px Inter values, tracked-out 10px uppercase labels.
+- **Focus:** The field's own glass hairline **recolours to lime** (`edgeState="focus"` → `glassFieldEdge()`); error recolours it red. No generic border is drawn around the field — the reflected hairline itself lights up. A field's edge is the one ADR-0007 exception: it separates an editable well from a borderless button.
 - **Error / Disabled:** Error takes the danger glass tint + red hairline (`glassField(isDark, { error })`) with a red icon and message; disabled fields use the flat translucent disabled surface (no ring). OTP uses six discrete boxes with lime fill rings; there is no backend OTP — codes shown are display-only patterns.
 
 ### Navigation

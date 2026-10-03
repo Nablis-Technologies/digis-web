@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+﻿import { motion } from 'motion/react';
 import { X, Phone, ShieldCheck, KeyRound, Lock, ArrowRight, Check, UserCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -14,9 +14,9 @@ import { FieldError } from '@/components/primitives/FieldError';
 import { glassField } from '@/lib/ui/glass';
 
 /**
- * Guest ticket → account claim (#31 resolved). A guest whose ticket carries a
+ * Guest ticket â†’ account claim (#31 resolved). A guest whose ticket carries a
  * signed view token + registration id ("Save to my account") proves phone
- * ownership via OTP, sets a password, and is signed in — the ticket then lives
+ * ownership via OTP, sets a password, and is signed in â€” the ticket then lives
  * in the account wallet instead of only the device wallet.
  */
 export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
@@ -38,7 +38,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   const [formError, setFormError] = useState('');
 
   // Pre-fill the phone we already captured at guest checkout, so the buyer
-  // never re-types what we know — they only confirm it with the OTP.
+  // never re-types what we know â€” they only confirm it with the OTP.
   useEffect(() => {
     let alive = true;
     void guestWallet.getPhone(ticket.id).then((stored) => {
@@ -52,7 +52,8 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   const surface = isDark ? '#101115' : '#fff';
   const accent = '#d6f905';
 
-  const inputSurface = (invalid = false): React.CSSProperties => glassField(isDark, { error: invalid });
+  const inputSurface = (_invalid = false): React.CSSProperties => glassField(isDark);
+  const edgeState = (invalid: boolean): "error" | undefined => (invalid ? 'error' : undefined);
   const inputStyle: React.CSSProperties = { color: text, fontFamily: "'Inter', sans-serif" };
 
   const clearAll = () => { setErrors({}); setFormError(''); };
@@ -83,7 +84,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
     clearAll();
     if (!validatePhone()) return;
     if (!ticket.ticketViewToken) {
-      setFormError('This ticket can’t be claimed — no signed view token.');
+      setFormError('This ticket canâ€™t be claimed â€” no signed view token.');
       return;
     }
     setOtpStage('sending');
@@ -101,7 +102,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
     clearAll();
     if (!validateClaim()) return;
     if (!ticket.registrationId || !challengeId) {
-      setFormError('Something went wrong — please try again.');
+      setFormError('Something went wrong â€” please try again.');
       return;
     }
     setOtpStage('submitting');
@@ -113,7 +114,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
         password,
         passwordConfirmation: passwordConfirm,
       });
-      // The claim set this password on the identity — sign in with it so the
+      // The claim set this password on the identity â€” sign in with it so the
       // ticket appears in the account wallet.
       const result = await signIn(phone, password);
       if (!result.ok) {
@@ -171,7 +172,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
             <div>
               <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Phone</label>
               <div className="relative rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.phone))}>
-                <GlassReflection isDark={isDark} />
+                <GlassReflection isDark={isDark} edgeState={edgeState(Boolean(errors.phone))} />
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
                 <AppInput
                   type="tel" value={phone} disabled={otpStage === 'sent' || otpStage === 'submitting'}
@@ -189,7 +190,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Verification code</label>
                   <div className="relative rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.otp))}>
-                    <GlassReflection isDark={isDark} />
+                    <GlassReflection isDark={isDark} edgeState={edgeState(Boolean(errors.otp))} />
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><ShieldCheck className="w-4 h-4" /></span>
                     <AppInput
                       type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otpCode}
@@ -209,7 +210,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Create a password</label>
                   <div className="relative mb-2 rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.password))}>
-                    <GlassReflection isDark={isDark} />
+                    <GlassReflection isDark={isDark} edgeState={edgeState(Boolean(errors.password))} />
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Lock className="w-4 h-4" /></span>
                     <AppInput
                       type="password" autoComplete="new-password" value={password}
@@ -221,7 +222,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                   </div>
                   <FieldError error={errors.password} />
                   <div className="relative mt-2 rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.passwordConfirm))}>
-                    <GlassReflection isDark={isDark} />
+                    <GlassReflection isDark={isDark} edgeState={edgeState(Boolean(errors.passwordConfirm))} />
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><KeyRound className="w-4 h-4" /></span>
                     <AppInput
                       type="password" autoComplete="new-password" value={passwordConfirm}
@@ -245,7 +246,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
             className="mt-5 w-full h-12 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
             style={{ background: accent, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13 }}
           >
-            {otpStage === 'submitting' ? 'Linking…' : otpStage === 'sent' ? 'Claim my tickets' : otpStage === 'sending' ? 'Sending…' : 'Send code'}
+            {otpStage === 'submitting' ? 'Linkingâ€¦' : otpStage === 'sent' ? 'Claim my tickets' : otpStage === 'sending' ? 'Sendingâ€¦' : 'Send code'}
             {otpStage === 'sent' && <Check className="w-4 h-4" strokeWidth={2.4} />}
             {otpStage === 'idle' && <ArrowRight className="w-4 h-4" strokeWidth={2.2} />}
           </AppButton>
