@@ -258,16 +258,16 @@ export function BoldCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
         <h2 className="mt-2 leading-[0.9] tracking-[-1.5px] line-clamp-3"
           style={{
             ...titleStyle, fontWeight: 800, fontSize: titleSize, color: '#ffffff',
-            textShadow: `0 2px 30px rgba(${hued},0.45)`,
+            textShadow: '0 2px 12px rgba(0,0,0,0.5)',
           }}>
           {event.name}
         </h2>
       </div>
 
-      {/* Framed poster — glowing centerpiece */}
+      {/* Framed poster */}
       <div className="relative px-6 mt-5 flex-1 min-h-0">
         <div className="relative w-full h-full rounded-[20px] overflow-hidden"
-          style={{ boxShadow: `0 0 0 1.5px rgba(255,255,255,0.25), 0 22px 60px -12px rgba(${hued},0.55), 0 8px 24px rgba(0,0,0,0.5)` }}>
+          style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.25), 0 12px 32px rgba(0,0,0,0.45)' }}>
           <img src={event.image} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
           {/* foil shimmer sweep */}
           <div className="absolute inset-0 pointer-events-none"
@@ -373,7 +373,7 @@ export function StubCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
       <Grain opacity={0.05} />
       <div className="absolute inset-0 p-3.5 flex z-10">
         <div className="relative w-full flex flex-col rounded-[22px] overflow-hidden"
-          style={{ background: '#0e0e11', boxShadow: `0 22px 60px -14px rgba(${hued},0.4), 0 0 0 1px rgba(255,255,255,0.06)` }}>
+          style={{ background: '#0e0e11', boxShadow: '0 12px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)' }}>
           {/* Foil top edge — two-tone */}
           <div className="shrink-0" style={{ height: 6, background: `linear-gradient(90deg, rgb(${hued}), rgb(${second}), rgb(${hued}))` }} />
 
