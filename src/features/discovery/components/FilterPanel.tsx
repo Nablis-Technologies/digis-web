@@ -90,7 +90,7 @@ export function FilterPanel({
       </AppButton>
 
       {activeFilterCount > 0 && (
-        <AppButton onClick={() => { onSortChange("soonest"); onOnlyAvailableChange(false); onEventTypesChange([]); onPriceRangeChange(null); }} className="mt-3 text-[11px] tracking-[1.2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)", fontWeight: 600, borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)"}`, paddingBottom: 1 }}>Reset filters</AppButton>
+        <AppButton onClick={() => { onSortChange("soonest"); onOnlyAvailableChange(false); onEventTypesChange([]); onPriceRangeChange(null); }} className="mt-3 text-[11px] tracking-[1.2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)", fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2, textDecorationColor: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)" }}>Reset filters</AppButton>
       )}
     </>
   );

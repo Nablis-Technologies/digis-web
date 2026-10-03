@@ -15,7 +15,7 @@ import type { SellerPayout } from '@/types/seller-payouts';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
 
 const FIELD_ERROR_CLASS = 'flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400';
 
@@ -95,7 +95,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
   const accent = isDark ? '#d6f905' : '#6d28d9';
   const inputStyle = {
-    fontFamily: "'Inter', sans-serif", color: text, background: cardBg, border: `1px solid ${cardBorder}`,
+    fontFamily: "'Inter', sans-serif", color: text, background: cardBg, ...glassField(isDark),
   } as const;
 
   const sheet = (
@@ -156,7 +156,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                             style={{
                               fontFamily: "'Inter', sans-serif", color: active ? accent : text,
                               background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
-                              border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.5)' : 'rgba(109,40,217,0.4)') : cardBorder}`,
+                              ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                             }}>
                             {b.currency}
                           </AppButton>
@@ -208,7 +208,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                             className="rounded-xl p-3 flex items-center gap-3 cursor-pointer text-left"
                             style={{
                               background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
-                              border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.5)' : 'rgba(109,40,217,0.4)') : cardBorder}`,
+                              ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                             }}>
                             <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                               style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
@@ -231,7 +231,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
 
             {mutation.error && (
               <div className="flex items-start gap-2 mb-4 rounded-xl px-3.5 py-3"
-                style={{ background: 'rgba(229,72,77,0.08)', border: '1px solid rgba(229,72,77,0.25)' }}>
+                style={{ ...glassControl(isDark, 'danger') }}>
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#e5484d' }} strokeWidth={2} />
                 <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
                   {mapApiError(mutation.error, 'Could not start this cash out. Please try again.')}

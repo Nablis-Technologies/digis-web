@@ -12,7 +12,7 @@ import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
 
 /** Shared styling for AppInput's built-in error output. */
 const FIELD_ERROR_CLASS = 'flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400';
@@ -151,7 +151,7 @@ export function PayoutMethodsSheet({ onClose, onMethodAdded, onMethodSelected }:
 
                 <AppButton whileTap={{ scale: 0.98 }} onClick={() => { addMutation.reset(); setAdding(true); }}
                   className="w-full h-[52px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer"
-                  style={{ background: cardBg, border: `1px dashed ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}` }}>
+                  style={{ background: cardBg, ...glassEdge(isDark) }}>
                   <span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
                     <Plus className="w-3.5 h-3.5" style={{ color: text }} strokeWidth={2.2} />
                   </span>
@@ -272,7 +272,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
 
   const inputStyle = {
     fontFamily: "'Inter', sans-serif", color: text,
-    background: cardBg, border: `1px solid ${cardBorder}`,
+    background: cardBg, ...glassField(isDark),
   } as const;
 
   return (
@@ -311,7 +311,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
                 className="rounded-xl p-3 flex items-center gap-3 cursor-pointer text-left"
                 style={{
                   background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(10,10,10,0.05)') : cardBg,
-                  border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.5)' : 'rgba(10,10,10,0.4)') : cardBorder}`,
+                  ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                 }}>
                 <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
@@ -356,7 +356,7 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
 
       {error && (
         <div className="flex items-start gap-2 mb-4 rounded-xl px-3.5 py-3"
-          style={{ background: 'rgba(229,72,77,0.08)', border: '1px solid rgba(229,72,77,0.25)' }}>
+          style={{ ...glassControl(isDark, 'danger') }}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#e5484d' }} strokeWidth={2} />
           <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
             {error}

@@ -25,7 +25,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge, glassField } from '@/lib/ui/glass';
+import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
 import { mapApiError } from '@/lib/errors';
 
 interface TransferTicketProps {
@@ -347,8 +347,8 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                       {giftExtras.map((extra) => {
                         const selected = selectedExtraIds.includes(extra.id);
                         return (
-                          <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, border: `1px solid ${selected ? accentBorder : borderSoft}` }}>
-                            <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: selected ? ACCENT_HEX : 'transparent', border: `1px solid ${selected ? ACCENT_HEX : border}` }}>{selected && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}</span>
+                          <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, ...(selected ? glassField(isDark, { focused: true }) : glassField(isDark)) }}>
+                            <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: selected ? ACCENT_HEX : 'transparent', boxShadow: `0 0 0 1px ${selected ? ACCENT_HEX : border}` }}>{selected && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}</span>
                             <span className="min-w-0 flex-1"><span className="block text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: text, fontWeight: 600 }}>{extra.name}</span><span className="block mt-0.5 text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>{extra.description}</span></span>
                             <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: text }}>ETB {Money.fromMinor(extra.priceMinor, "ETB").formatNumber()}</span>
                           </AppButton>
@@ -429,7 +429,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   className="w-full flex items-start gap-3 rounded-2xl p-3.5 text-left"
                   style={{
                     background: acknowledged ? accentSoft : surfaceSoft,
-                    border: `1px solid ${acknowledged ? accentBorder : borderSoft}`,
+                    ...(acknowledged ? glassField(isDark, { focused: true }) : glassField(isDark)),
                     transition: 'all 0.25s',
                   }}
                 >
@@ -437,7 +437,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
                     style={{
                       background: acknowledged ? ACCENT_HEX : 'transparent',
-                      border: `1.5px solid ${acknowledged ? ACCENT_HEX : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}`,
+                      boxShadow: `0 0 0 1.5px ${acknowledged ? ACCENT_HEX : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}`,
                       transition: 'all 0.2s',
                     }}
                   >
@@ -471,7 +471,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                 </div>
 
                 {sendError && (
-                  <div className="flex items-start gap-2 rounded-2xl px-3.5 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  <div className="flex items-start gap-2 rounded-2xl px-3.5 py-3" style={{ ...glassControl(isDark, 'danger') }}>
                     <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} strokeWidth={2} />
                     <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
                       {sendError}
@@ -499,7 +499,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   />
                   <motion.div
                     className="absolute inset-0 rounded-full flex items-center justify-center"
-                    style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}
+                    style={{ background: accentSoft, boxShadow: `0 0 0 1px ${accentBorder}` }}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', damping: 14, stiffness: 220, delay: 0.1 }}

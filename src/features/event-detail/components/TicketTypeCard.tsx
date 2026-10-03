@@ -104,21 +104,21 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
         style={{ background: `linear-gradient(165deg, ${accentBg} 0%, transparent 40%)` }}
       />
 
-      {/* Border — accent edge always on, stronger when selected */}
+      {/* Edge — accent light always on, stronger when selected (no stroke) */}
       <motion.div
         className="absolute inset-0 rounded-[22px] pointer-events-none transition-all duration-400"
         style={{
-          border: selected
+          boxShadow: selected
             ? pageIsDark
-              ? `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.55' : '0.25'})`
+              ? `inset 0 0 0 1.5px rgba(${accentRgb}, ${isPremium ? '0.55' : '0.25'})`
               : isElite
-                ? `1.5px solid rgba(${accentRgb}, 0.58)`
-                : `1.5px solid rgba(${accentRgb}, ${isPremium ? '0.48' : '0.38'})`
+                ? `inset 0 0 0 1.5px rgba(${accentRgb}, 0.58)`
+                : `inset 0 0 0 1.5px rgba(${accentRgb}, ${isPremium ? '0.48' : '0.38'})`
             : pageIsDark
-              ? `1px solid rgba(${accentRgb}, 0.1)`
+              ? `inset 0 0 0 1px rgba(${accentRgb}, 0.1)`
               : isElite
-                ? `1px solid rgba(${accentRgb}, 0.28)`
-                : `1px solid rgba(${accentRgb}, 0.2)`,
+                ? `inset 0 0 0 1px rgba(${accentRgb}, 0.28)`
+                : `inset 0 0 0 1px rgba(${accentRgb}, 0.2)`,
         }}
       />
 
@@ -172,9 +172,9 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
               style={{
                 fontFamily: "'Inter', sans-serif",
                 color: isElite ? (isDark ? '#f0d28a' : '#7c3aed') : accentColor,
-                border: isElite
-                  ? `1px solid rgba(217,178,89,${isDark ? '0.45' : '0.55'})`
-                  : `1px solid rgba(${accentRgb}, ${isDark ? '0.2' : '0.35'})`,
+                boxShadow: isElite
+                  ? `0 0 0 1px rgba(217,178,89,${isDark ? '0.45' : '0.55'})`
+                  : `0 0 0 1px rgba(${accentRgb}, ${isDark ? '0.2' : '0.35'})`,
                 background: isElite
                   ? (isDark ? 'linear-gradient(90deg, rgba(217,178,89,0.22), rgba(196,181,253,0.18))' : 'linear-gradient(90deg, rgba(217,178,89,0.18), rgba(124,58,237,0.14))')
                   : `rgba(${accentRgb}, ${isDark ? '0.08' : '0.16'})`,
@@ -199,7 +199,7 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 600,
                 color: accentColor,
-                border: `1px solid rgba(${accentRgb}, ${isDark ? '0.4' : '0.5'})`,
+                boxShadow: `0 0 0 1px rgba(${accentRgb}, ${isDark ? '0.4' : '0.5'})`,
                 background: `rgba(${accentRgb}, ${isDark ? '0.12' : '0.16'})`,
               }}>
               Join Waitlist
@@ -210,9 +210,9 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 600,
                 color: isDark ? 'rgba(255,110,100,0.95)' : 'rgba(190,18,60,0.9)',
-                border: isDark
-                  ? '1px solid rgba(248,113,113,0.35)'
-                  : '1px solid rgba(190,18,60,0.4)',
+                boxShadow: isDark
+                  ? '0 0 0 1px rgba(248,113,113,0.35)'
+                  : '0 0 0 1px rgba(190,18,60,0.4)',
                 background: isDark
                   ? 'rgba(248,113,113,0.12)'
                   : 'rgba(248,113,113,0.1)',
@@ -222,7 +222,7 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
           ) : (
             <motion.div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
               style={{
-                border: selected ? 'none' : `1.5px solid rgba(${accentRgb}, 0.3)`,
+                boxShadow: selected ? 'none' : `0 0 0 1.5px rgba(${accentRgb}, 0.3)`,
                 backgroundColor: selected ? accentColor : 'transparent',
               }}
               animate={{ scale: selected ? [1, 1.15, 1] : 1 }}

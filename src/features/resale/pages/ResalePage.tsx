@@ -34,7 +34,7 @@ import { Wallet, Banknote, Landmark, History } from 'lucide-react';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { EventCardSkeleton, ListingRowSkeleton, LoadErrorCard, useShowSkeleton } from '@/components/loading';
 
 interface ResaleMarketplaceProps {
@@ -406,7 +406,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       <div className="flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl"
                         style={{
                           background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
+                          ...glassField(isDark),
                         }}>
                         <Search className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }} strokeWidth={1.5} />
                         <AppInput
@@ -425,9 +425,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                           background: showFilters || activeFilterCount > 0
                             ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)')
                             : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                          border: `1px solid ${showFilters || activeFilterCount > 0
-                            ? (isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.2)')
-                            : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')}`,
+                          ...glassEdge(isDark),
                         }}>
                         <Filter className="w-4 h-4"
                           style={{ color: activeFilterCount > 0 ? (isDark ? '#d6f905' : '#0a0a0a') : (isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }}
@@ -605,9 +603,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                             background: showEventFilters || activeFilterCount > 0
                               ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)')
                               : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                            border: `1px solid ${showEventFilters || activeFilterCount > 0
-                              ? (isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.2)')
-                              : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')}`,
+                            ...glassEdge(isDark),
                           }}>
                           <Filter className="w-3 h-3"
                             style={{ color: activeFilterCount > 0 ? (isDark ? '#d6f905' : '#0a0a0a') : (isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }}
@@ -941,7 +937,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       className="relative flex items-center justify-between p-4 rounded-2xl overflow-hidden"
                       style={{
                         background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                        border: `1px solid ${isRemoving ? 'rgba(239,68,68,0.3)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)')}`,
+                        ...glassEdge(isDark),
                       }}
                     >
                       {/* "Delisted" flash overlay */}
@@ -1039,7 +1035,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       className="relative flex items-center justify-between p-4 rounded-2xl overflow-hidden"
                       style={{
                         background: isDark ? 'rgba(255,255,255,0.03)' : '#fff',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                        ...glassEdge(isDark),
                       }}>
                       <div className="flex items-center gap-3 min-w-0">
                         {ticket.image ? (

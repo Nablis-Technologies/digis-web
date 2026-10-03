@@ -10,7 +10,7 @@ import { PayoutMethodsSheet } from './PayoutMethodsSheet';
 import { Pulse, useShowSkeleton } from '@/components/loading';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 
 export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false, error = null }: { ticket: UserTicket; onClose: () => void; onConfirm: (price: number) => void; submitting?: boolean; error?: string | null }) {
   const { isDark } = useTheme();
@@ -135,10 +135,7 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
 
                 {blockedReason && (
                   <div className="flex items-start gap-3 mb-6 p-3 rounded-xl"
-                    style={{
-                      background: isDark ? 'rgba(229,72,77,0.08)' : 'rgba(229,72,77,0.06)',
-                      border: `1px solid ${isDark ? 'rgba(229,72,77,0.2)' : 'rgba(229,72,77,0.18)'}`,
-                    }}>
+                    style={{ ...glassControl(isDark, 'danger') }}>
                     <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#ff6b70' : '#c0392b' }} strokeWidth={1.5} />
                     <p className="text-[11px] leading-[1.5]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : '#8a1f1f' }}>
                       {blockedReason}
@@ -258,7 +255,7 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
                     className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 text-left cursor-pointer"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                      border: `1px solid ${isDark ? 'rgba(229,72,77,0.25)' : 'rgba(229,72,77,0.3)'}`,
+                      ...glassControl(isDark, 'danger'),
                     }}>
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] tracking-[1px] uppercase mb-0.5" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }}>
@@ -307,7 +304,7 @@ export function SellTicketSheet({ ticket, onClose, onConfirm, submitting = false
 
                 {error && (
                   <div className="flex items-start gap-2 mb-4 rounded-xl px-3.5 py-3"
-                    style={{ background: 'rgba(229,72,77,0.08)', border: '1px solid rgba(229,72,77,0.25)' }}>
+                    style={{ ...glassControl(isDark, 'danger') }}>
                     <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#e5484d' }} strokeWidth={2} />
                     <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
                       {error}

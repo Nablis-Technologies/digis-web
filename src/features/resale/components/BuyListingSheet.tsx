@@ -86,7 +86,7 @@ export function BuyListingSheet({ listing, submitting, error, onConfirm, onClose
                 </div>
               </div>
               <div className="relative z-10 flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3"
-                style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                style={{ boxShadow: `inset 0 1px 0 ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
                 {listing.eventDate && (
                   <span className="flex items-center gap-1.5 text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif", color: subtle }}>
                     <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} /> {listing.eventDate}

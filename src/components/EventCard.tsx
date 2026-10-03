@@ -183,10 +183,9 @@ export function CountdownBadge({ event }: { event: Event }) {
           background: bg,
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
-          border: `1px solid ${isLive ? "rgba(255,255,255,0.3)" : "rgba(214,249,5,0.4)"}`,
           boxShadow: isLive
-            ? "0 8px 20px rgba(220,38,38,0.3)"
-            : "0 8px 20px rgba(0,0,0,0.3)",
+            ? "0 0 0 1px rgba(255,255,255,0.3), 0 8px 20px rgba(220,38,38,0.3)"
+            : "0 0 0 1px rgba(214,249,5,0.4), 0 8px 20px rgba(0,0,0,0.3)",
         }}
       >
         {isLive ? (
@@ -303,13 +302,12 @@ export function EventCard({
             <div
               className="px-5 py-2 rounded-lg"
               style={{
-                border: `1.5px solid rgba(${accentRgb},0.85)`,
                 background: isDark
                   ? "rgba(10,10,10,0.34)"
                   : "rgba(10,10,10,0.42)",
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
-                boxShadow: `0 12px 30px rgba(0,0,0,0.28)`,
+                boxShadow: `0 0 0 1.5px rgba(${accentRgb},0.85), 0 12px 30px rgba(0,0,0,0.28)`,
               }}
             >
               <span
@@ -346,10 +344,7 @@ export function EventCard({
                 WebkitBackdropFilter: "blur(10px)",
                 color: "#fff",
                 fontWeight: 600,
-                border: `1px solid ${
-                  isLow ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.18)"
-                }`,
-                boxShadow: isLow ? "0 8px 20px rgba(220,38,38,0.25)" : "none",
+                boxShadow: `${isLow ? "0 0 0 1px rgba(255,255,255,0.28)" : "0 0 0 1px rgba(255,255,255,0.18)"}${isLow ? ", 0 8px 20px rgba(220,38,38,0.25)" : ""}`,
               }}
             >
               {isLow && (
@@ -464,10 +459,9 @@ export function EventCard({
                   ? "rgba(255,255,255,0.55)"
                   : "rgba(0,0,0,0.55)"
                 : "#0a0a0a",
-              border: isInactive
-                ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}`
-                : "1px solid transparent",
-              boxShadow: "none",
+              boxShadow: isInactive
+                ? `0 0 0 1px ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}`
+                : "none",
             }}
           >
             <span

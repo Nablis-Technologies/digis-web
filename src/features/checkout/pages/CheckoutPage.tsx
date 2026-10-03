@@ -17,6 +17,7 @@ import { CheckoutSheetFrame } from '@/features/checkout/components/CheckoutSheet
 import { useCheckoutFlow } from '@/features/checkout/hooks/useCheckoutFlow';
 import { ConflictSheet } from '@/features/checkout/components/ConflictSheet';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
+import { glassControl, glassField } from '@/lib/ui/glass';
 import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
 import { isoToDisplayDate } from '@/lib/mappers';
@@ -120,19 +121,19 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
       hideSteps
       footer={
         confirmedTicket ? (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
             <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={m.onViewTicket} className="w-full py-4 rounded-2xl cursor-pointer" style={{ background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)', color: '#000', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>View My Ticket</AppButton>
           </div>
         ) : m.terminal ? (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
-            <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={m.onGoToTickets} className="w-full py-4 rounded-2xl cursor-pointer flex items-center justify-center gap-2" style={{ background: isDark ? 'rgba(248,113,113,0.18)' : 'rgba(190,18,60,0.1)', color: isDark ? '#fca5a5' : '#b91c1c', border: `1px solid ${isDark ? 'rgba(248,113,113,0.3)' : 'rgba(190,18,60,0.25)'}`, fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>Go to Tickets</AppButton>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
+            <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={m.onGoToTickets} className="w-full py-4 rounded-2xl cursor-pointer flex items-center justify-center gap-2" style={{ ...glassControl(isDark, 'danger'), color: isDark ? '#fca5a5' : '#b91c1c', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px' }}>Go to Tickets</AppButton>
           </div>
         ) : m.timedOut ? (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
             <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={m.onGoToTickets} className="w-full py-4 rounded-2xl cursor-pointer flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)', color: '#000', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>Go to Tickets</AppButton>
           </div>
         ) : (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
             <div className="flex items-center justify-center gap-1.5" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(26,26,46,0.4)', fontFamily: "'Inter', sans-serif" }}>
               <Lock className="w-3 h-3" strokeWidth={1.8} />
               <span className="text-[10px] tracking-[1px] uppercase">Secure</span>
@@ -231,7 +232,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
       visibleStep={visibleStep}
       footer={
         inStepFlow ? (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
             <div className="flex items-center justify-between mb-3.5">
               <div>
                 <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>
@@ -254,7 +255,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
             </AppButton>
           </div>
         ) : step === 'success' ? (
-          <div className="relative px-6 pt-4 pb-6" style={{ borderTop: `1px solid ${borderSoft}` }}>
+          <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
             <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onComplete} className="w-full py-4 rounded-2xl cursor-pointer" style={{ background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)', color: '#000', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>View My Ticket</AppButton>
           </div>
         ) : undefined
@@ -275,7 +276,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
                     className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-pointer text-left"
                     style={{
                       background: active ? (isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.14)') : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)'),
-                      border: `1px solid ${active ? (isDark ? 'rgba(217,255,0,0.35)' : 'rgba(214,249,5,0.5)') : borderSoft}`,
+                      ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                     }}
                   >
                     <div>
@@ -284,7 +285,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
                       </p>
                       {d.name ? <p className="text-[11px] mt-0.5" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>{d.name}</p> : null}
                     </div>
-                    <div className="w-5 h-5 rounded-full grid place-items-center" style={{ border: `1px solid ${active ? '#d6f905' : borderSoft}` }}>
+                    <div className="w-5 h-5 rounded-full grid place-items-center" style={{ boxShadow: `0 0 0 1px ${active ? '#d6f905' : borderSoft}` }}>
                       {active && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#d6f905' }} />}
                     </div>
                   </button>
@@ -324,7 +325,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
         {step === 'pending' && (
           <motion.div key="pending" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-center py-10">
             <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
-              style={{ background: isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.12)', border: `1px solid ${isDark ? 'rgba(217,255,0,0.25)' : 'rgba(214,249,5,0.3)'}` }}>
+              style={{ ...glassControl(isDark, 'accent') }}>
               <Check className="w-7 h-7" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2} />
             </div>
             <h3 className="text-[20px] font-light mb-2"

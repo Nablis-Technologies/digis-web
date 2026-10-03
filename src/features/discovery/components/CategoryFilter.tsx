@@ -174,8 +174,7 @@ export function CategoryFilter({
                   : isDark
                     ? `linear-gradient(135deg, ${hexToRgba(color, 0.1)}, ${hexToRgba(color, 0.025)})`
                     : `linear-gradient(135deg, ${hexToRgba(color, 0.09)}, ${hexToRgba(color, 0.03)})`,
-                border: active ? `1px solid ${hexToRgba(color, isDark ? 0.6 : 0.5)}` : "none",
-                boxShadow: "none",
+                boxShadow: active ? `0 0 0 1px ${hexToRgba(color, isDark ? 0.6 : 0.5)}` : "none",
               }}
             >
               <GlassReflection isDark={isDark} />
