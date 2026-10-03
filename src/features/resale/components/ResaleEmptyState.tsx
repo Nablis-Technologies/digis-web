@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Search, Sparkles, Shield, ArrowUpDown, Tag } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -12,6 +12,7 @@ import { glass, glassEdge } from '@/lib/ui/glass';
  */
 export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boolean; searchQuery: string; onClear: () => void }) {
   const isSearch = !!searchQuery.trim();
+  const reduceMotion = useReducedMotion();
   const brand = '#d6f905';
   const subtle = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.6)';
 
@@ -41,7 +42,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
                   : 'linear-gradient(160deg, rgba(214,249,5,0.4) 0%, rgba(214,249,5,0.14) 100%)',
                 border: `1px solid ${isDark ? 'rgba(214,249,5,0.28)' : 'rgba(150,180,0,0.45)'}`,
               }}
-              animate={{ rotate: -8, y: [0, -3, 0] }}
+              animate={reduceMotion ? { rotate: -8 } : { rotate: -8, y: [0, -3, 0] }}
               transition={{ y: { duration: 4.5, repeat: Infinity, ease: 'easeInOut' } }}
             >
               <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
@@ -72,7 +73,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
                 ...glass(isDark),
                 border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
               }}
-              animate={{ rotate: 8, y: [0, -3, 0] }}
+              animate={reduceMotion ? { rotate: 8 } : { rotate: 8, y: [0, -3, 0] }}
               transition={{ y: { duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.3 } }}
             >
               <GlassReflection isDark={isDark} />
@@ -103,7 +104,7 @@ export function ResaleEmptyState({ isDark, searchQuery, onClear }: { isDark: boo
                 border: `1px solid ${isDark ? 'rgba(214,249,5,0.35)' : 'rgba(180,210,0,0.5)'}`,
                 ...glassEdge(isDark),
               }}
-              animate={{ y: [0, -4, 0] }}
+              animate={reduceMotion ? undefined : { y: [0, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             >
               <ArrowUpDown className="w-5 h-5 rotate-90" strokeWidth={2}
