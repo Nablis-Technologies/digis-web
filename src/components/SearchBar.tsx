@@ -4,7 +4,6 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassField } from '@/lib/ui/glass';
 
 interface SearchBarProps {
   value: string;
@@ -48,8 +47,14 @@ export function SearchBar({
       <div
         className="relative overflow-hidden rounded-2xl"
         style={{
-          ...glassField(isDark),
-          ...(isNav ? { boxShadow: 'none' } : {}),
+          background: isDark ? 'rgba(30,30,34,0.40)' : 'rgba(255,255,255,0.68)',
+          backdropFilter: 'blur(40px) saturate(1.5)',
+          WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
+          boxShadow: isNav
+            ? 'none'
+            : (isDark
+              ? '0 12px 36px -16px rgba(0,0,0,0.48)'
+              : '0 12px 36px -18px rgba(20,18,40,0.18)'),
         }}
       >
         <GlassReflection isDark={isDark} />
