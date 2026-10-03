@@ -78,13 +78,23 @@ Recorded in `AGENTS.md` → "Data integrity (seeds + e2e)".
 Verified: full `DIGIS_SEED_PROFILE=dev` reseed → seller balance 500000 + verified
 destination, attendee 1 ticket, buyer 0; Playwright suite **28/28**.
 
-**P1 — contract cleanup**
-4. Guard the `seeds_events.rb` `IN ()` path; reconcile `TEST_EVENT_SLUGS` so dev
-   doesn't delete preview's own fixtures.
-5. Remove dead `event_setting.config` keys; seed gated `AccessCode`/`Invitation`
-   rows; set `requires_ticket` on real add-ons and `public_guest_limit` where wanted.
-6. Resolve the `chapa-test-event` mixed ticket+`other` product (rename to a
-   fulfillable type or split) — see #63.
+**P1 — DONE 2026-10-02**
+4. ✅ Guarded the `seeds_events.rb` `IN ()` path (nil-uuid fallback when the
+   admin-event set is empty, so a standalone run doesn't crash). `TEST_EVENT_SLUGS`
+   left as-is — removing those preview-only events from dev is intentional (they'd
+   pollute discovery) and no frontend spec depends on them.
+5. ✅ Removed the dead admission/RSVP `event_setting.config` keys (kept the
+   non-admission data — `featured`/`rating`/`seat_map`/`lineup`/`age_restriction` —
+   that #53/#36 will re-expose). Seeded gated credentials in `dev_demo.rb`
+   (`DRILL-CODE` on psy-addis-saltland; `origins-invite-0001` on origins-2) — both
+   authorize live. `public_guest_limit` not seeded (no consumer yet).
+6. ✅ `Chapa Test Product` type `other` → `merchandise` + `metadata.requires_ticket`
+   (now a fulfillable add-on, no longer rejected as an unusable product); an
+   idempotent correction fixes existing dev DBs. (#63 — the public selection still
+   rejects ticket+add-on carts — remains open.)
+
+Verified: clean dev reseed; both credentials authorize (`authorized: true`);
+Playwright **28/28** (one transient parallel-login flake, green on re-run).
 
 **P2 — frontend mock hygiene**
 7. Make `mock-audit.spec.ts` assert; remove mock-host image fallbacks; delete the
