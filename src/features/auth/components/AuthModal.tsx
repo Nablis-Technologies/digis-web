@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
   X, Phone, Lock, Mail, User, ArrowRight, Eye, EyeOff,
-  AlertCircle, Check, ShieldCheck, Loader2, Sparkles, ChevronDown, Search,
+  AlertCircle, Check, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -343,12 +343,6 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
           </AnimatePresence>
         </div>
 
-        {!success && (
-          <div className="px-6 pb-6 pt-1 flex items-center justify-center gap-1.5" style={{ color: textDim }}>
-            <ShieldCheck className="w-3 h-3" strokeWidth={1.8} />
-            <span className="text-[10px] tracking-[1px] uppercase" style={{ fontFamily: "'Inter', sans-serif" }}>Encrypted &amp; secure</span>
-          </div>
-        )}
         </div>
       </motion.div>
     </motion.div>
