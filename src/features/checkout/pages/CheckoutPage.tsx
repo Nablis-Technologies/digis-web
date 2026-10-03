@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Check, Lock } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { CustomQuestion, EventProduct, SeatMapConfig, UserTicket } from '@/types';
 import { ReviewStep } from '@/features/checkout/components/ReviewStep';
@@ -134,10 +134,6 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
           </div>
         ) : (
           <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
-            <div className="flex items-center justify-center gap-1.5" style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(26,26,46,0.4)', fontFamily: "'Inter', sans-serif" }}>
-              <Lock className="w-3 h-3" strokeWidth={1.8} />
-              <span className="text-[10px] tracking-[1px] uppercase">Secure</span>
-            </div>
           </div>
         )
       }
@@ -248,7 +244,6 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1.5" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}><Lock className="w-3 h-3" strokeWidth={1.8} /><span className="text-[10px] tracking-[1px] uppercase">Secure</span></div>
             </div>
             <AppButton whileHover={{ scale: canContinue && !quoteLoading ? 1.01 : 1 }} whileTap={{ scale: canContinue && !quoteLoading ? 0.98 : 1 }} onClick={goNext} disabled={!canContinue || quoteLoading || (step === 'payment' && !isLiveTicket && !!eventId)} className="w-full py-4 rounded-2xl flex items-center justify-center gap-2.5 relative overflow-hidden" style={{ ...primaryButtonSurface(canContinue && !quoteLoading, isDark), boxShadow: 'none', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', fontWeight: 500 }}>
               {step === 'payment' ? `Pay ${Money.fromMinor(total, "ETB").format()}` : 'Continue'}<ArrowRight className="w-4 h-4" strokeWidth={2} />

@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useState } from 'react';
-import { X, Lock, Check } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { ExtrasStep } from '@/features/checkout/components/ExtrasStep';
 import type { EventProduct, SelectedEventProduct, UserTicket } from '@/types';
@@ -86,7 +86,6 @@ export function AddExtrasDialog({ ticket, products, isSaving = false, done = fal
                 <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>
                 <span className="text-[22px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>{Money.fromMinor(total, "ETB").format()}</span>
               </div>
-              <div className="flex items-center gap-1.5" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}><Lock className="w-3 h-3" strokeWidth={1.8} /><span className="text-[10px] tracking-[1px] uppercase">Secure</span></div>
             </div>
             <AppButton
               whileHover={{ scale: count && !isSaving ? 1.01 : 1 }} whileTap={{ scale: count && !isSaving ? 0.98 : 1 }}

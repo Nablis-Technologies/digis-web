@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { ExtrasStep } from '@/features/checkout/components/ExtrasStep';
 import { CheckoutSheetFrame } from '@/features/checkout/components/CheckoutSheetFrame';
@@ -154,7 +154,6 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
               <p className="text-[9px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Total</p>
               <span className="text-[22px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>{Money.fromMinor(total, "ETB").format()}</span>
             </div>
-            <div className="flex items-center gap-1.5" style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}><Lock className="w-3 h-3" strokeWidth={1.8} /><span className="text-[10px] tracking-[1px] uppercase">Secure</span></div>
           </div>
           <AppButton
             whileHover={{ scale: count && step !== 'paying' ? 1.01 : 1 }} whileTap={{ scale: count && step !== 'paying' ? 0.98 : 1 }}
