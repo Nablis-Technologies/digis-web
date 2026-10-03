@@ -11,7 +11,9 @@ import { test, expect, type Route } from '@playwright/test';
  * + destination + an Idempotency-Key, and the result renders as `pending`.
  */
 
-const SELLER = '+251900123456';
+// A dedicated payout-seller login (db/seeds/dev_demo.rb) — NOT the shared buyer
+// (+251900123456), whose concurrent login in checkout.spec races this one.
+const SELLER = '+251911000007';
 const PASSWORD = 'password123';
 
 const CORS = {
