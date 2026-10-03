@@ -7,7 +7,6 @@ import {
   X,
   User,
   Phone,
-  ShieldCheck,
   Check,
   AlertTriangle,
   Link2,
@@ -458,17 +457,6 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     </p>
                   </div>
                 </AppButton>
-
-                {/* Security note */}
-                <div className="flex items-center gap-2 px-1">
-                  <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textFaint }} strokeWidth={2} />
-                  <p
-                    className="text-[10.5px] leading-snug"
-                    style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}
-                  >
-                    Verified by Digis · {isGift ? 'secure gift delivery' : 'end-to-end ownership transfer'}
-                  </p>
-                </div>
 
                 {sendError && (
                   <div className="flex items-start gap-2 rounded-2xl px-3.5 py-3" style={{ ...glassControl(isDark, 'danger') }}>

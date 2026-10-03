@@ -337,7 +337,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
         </h1>
         <p className="text-[13px] mt-1"
           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }}>
-          Buy & sell tickets securely
+          Buy & sell tickets
         </p>
       </motion.div>
 

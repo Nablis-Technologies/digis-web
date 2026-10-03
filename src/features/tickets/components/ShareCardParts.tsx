@@ -121,7 +121,7 @@ export function TierBadge({ ticketType, isVIP, tier }: { ticketType?: string; is
 }
 
 /** Small status pill. */
-export function StatusChip({ accentText, label = 'Ticket Secured' }: { accentText: string; label?: string }) {
+export function StatusChip({ accentText, label = 'Ticket Ready' }: { accentText: string; label?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
       style={{
@@ -333,7 +333,7 @@ export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentT
           style={{ background: `rgba(${accentText},0.14)`, boxShadow: `0 0 0 1px rgba(${accentText},0.5)` }}>
           <Check className="w-3.5 h-3.5" strokeWidth={3} style={{ color: `rgb(${accentText})` }} />
           <span className="text-[11px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: `rgb(${accentText})` }}>
-            {purchased ? 'Ticket Secured' : 'Get Tickets'}
+            {purchased ? 'Ticket Ready' : 'Get Tickets'}
           </span>
         </div>
 

@@ -132,7 +132,7 @@ export function BuyListingSheet({ listing, submitting, error, onConfirm, onClose
               style={{ background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.14)' }}>
               <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: accent }} strokeWidth={2} />
               <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#3a3a00' }}>
-                Verified by Digis. The seller’s ticket is transferred to you the moment your payment settles — you’ll find it in My Tickets.
+                The seller’s ticket is transferred to you the moment your payment settles — you’ll find it in My Tickets.
               </p>
             </div>
 
