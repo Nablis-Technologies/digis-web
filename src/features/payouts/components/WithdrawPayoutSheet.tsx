@@ -51,6 +51,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
     verified.find((d) => d.isDefault)?.id ?? verified[0]?.id ?? '',
   );
   const [touched, setTouched] = useState(false);
+  const [amountFocused, setAmountFocused] = useState(false);
 
   const parsed = Number(amount);
   const amountMinor = Number.isFinite(parsed) ? Money.fromMajor(parsed, currency).amountMinor : 0;
@@ -94,7 +95,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
   const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
   const accent = isDark ? '#d6f905' : '#6d28d9';
-  const inputStyle = glassField(isDark);
+
 
   const sheet = (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -173,10 +174,11 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                       Withdraw all
                     </AppButton>
                   </div>
-                  <div className="relative rounded-2xl overflow-hidden" style={inputStyle}>
+                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!amountError, focused: amountFocused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal"
-                      onBlur={() => setTouched(true)} error={amountError} errorClassName={FIELD_ERROR_CLASS}
+                      onFocus={() => setAmountFocused(true)}
+                      onBlur={() => { setAmountFocused(false); setTouched(true); }} error={amountError} errorClassName={FIELD_ERROR_CLASS}
                       className="relative z-10 w-full h-[52px] px-4 text-[15px] outline-none"
                       style={{ fontFamily: "'Inter', sans-serif", color: text, paddingRight: 64 }} />
                     <span className="absolute z-10 right-4 top-1/2 -translate-y-1/2 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>

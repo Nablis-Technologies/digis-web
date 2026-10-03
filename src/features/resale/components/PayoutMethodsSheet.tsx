@@ -258,6 +258,8 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
   const [holderName, setHolderName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [touched, setTouched] = useState<{ holderName?: boolean; accountNumber?: boolean }>({});
+  const [holderFocused, setHolderFocused] = useState(false);
+  const [accountFocused, setAccountFocused] = useState(false);
 
   const selected = banks.find((bank) => bank.bankSlug === bankSlug) ?? null;
   const isPhone = selected?.type === 'mobile_money';
@@ -271,7 +273,6 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
     : undefined;
 
   const inputTextStyle = { fontFamily: "'Inter', sans-serif", color: text } as const;
-  const inputSurface = glassField(isDark);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -336,10 +337,11 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
         <label className="text-[10px] tracking-[1.5px] uppercase mb-2 block" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
           Account holder name
         </label>
-        <div className="relative rounded-2xl overflow-hidden" style={inputSurface}>
+        <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!holderError, focused: holderFocused })}>
           <GlassReflection isDark={isDark} />
           <AppInput value={holderName} onChange={e => setHolderName(e.target.value)} placeholder="Name"
-            onBlur={() => setTouched(t => ({ ...t, holderName: true }))} error={holderError} errorClassName={FIELD_ERROR_CLASS}
+            onFocus={() => setHolderFocused(true)}
+            onBlur={() => { setHolderFocused(false); setTouched(t => ({ ...t, holderName: true })); }} error={holderError} errorClassName={FIELD_ERROR_CLASS}
             className="relative z-10 w-full h-[52px] px-4 text-[14px] outline-none" style={inputTextStyle} />
         </div>
       </div>
@@ -348,11 +350,12 @@ function AddPayoutForm({ onSubmit, submitting, continueAfterSave = false, error 
         <label className="text-[10px] tracking-[1.5px] uppercase mb-2 block" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
           {isPhone ? 'Phone number' : 'Account number'}
         </label>
-        <div className="relative rounded-2xl overflow-hidden" style={inputSurface}>
+        <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!accountError, focused: accountFocused })}>
           <GlassReflection isDark={isDark} />
           <AppInput value={accountNumber} onChange={e => setAccountNumber(e.target.value)}
             inputMode={isPhone ? 'tel' : 'numeric'}
-            onBlur={() => setTouched(t => ({ ...t, accountNumber: true }))} error={accountError} errorClassName={FIELD_ERROR_CLASS}
+            onFocus={() => setAccountFocused(true)}
+            onBlur={() => { setAccountFocused(false); setTouched(t => ({ ...t, accountNumber: true })); }} error={accountError} errorClassName={FIELD_ERROR_CLASS}
             placeholder={isPhone ? '09xx xxx xxx' : 'Account number'}
             className="relative z-10 w-full h-[52px] px-4 text-[14px] outline-none" style={inputTextStyle} />
         </div>

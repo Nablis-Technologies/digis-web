@@ -50,6 +50,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
   const [guestName, setGuestName] = useState(user?.name ?? '');
   const [guestEmail, setGuestEmail] = useState(user?.email ?? '');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const payingRef = useRef(false);
 
   const clearField = (field: string) => setFieldErrors((prev) => {
@@ -186,37 +187,40 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             <p className="text-[10px] tracking-[1.6px] uppercase mb-4" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
               Contact details
             </p>
-            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.phone })}>
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.phone, focused: focusedField === 'phone' })}>
               <GlassReflection isDark={isDark} />
               <AppInput
                 type="tel"
                 placeholder="Phone number"
                 value={guestPhone}
                 onChange={(e) => { setGuestPhone(e.target.value); clearField('phone'); }}
+                onFocus={() => setFocusedField('phone')} onBlur={() => setFocusedField(null)}
                 error={fieldErrors.phone} errorClassName={FIELD_ERROR_CLASS}
                 className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
                 style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.name })}>
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.name, focused: focusedField === 'name' })}>
               <GlassReflection isDark={isDark} />
               <AppInput
                 type="text"
                 placeholder="Name (optional)"
                 value={guestName}
                 onChange={(e) => { setGuestName(e.target.value); clearField('name'); }}
+                onFocus={() => setFocusedField('name')} onBlur={() => setFocusedField(null)}
                 error={fieldErrors.name} errorClassName={FIELD_ERROR_CLASS}
                 className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
                 style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.email })}>
+            <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.email, focused: focusedField === 'email' })}>
               <GlassReflection isDark={isDark} />
               <AppInput
                 type="email"
                 placeholder="Email (optional)"
                 value={guestEmail}
                 onChange={(e) => { setGuestEmail(e.target.value); clearField('email'); }}
+                onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)}
                 error={fieldErrors.email} errorClassName={FIELD_ERROR_CLASS}
                 className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
                 style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}

@@ -51,6 +51,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
   const [challengeId, setChallengeId] = useState('');
   const [sending, setSending] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [error, setError] = useState('');
   const [accepted, setAccepted] = useState<AcceptedTransfer | null>(null);
   // A signed-in recipient accepts with one tap (authenticated accept, no OTP);
@@ -348,13 +349,14 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                     Enter your full phone number to verify ownership and receive the code.
                   </p>
-                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
                       type="tel"
                       placeholder="+251 9·· ·· ·· ··"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
                       style={{ color: text, fontFamily: "'Inter', sans-serif" }}
                     />
@@ -380,7 +382,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   <p className="mt-4 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                     Enter the code we texted you and create your account.
                   </p>
-                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
                       type="text"
@@ -389,11 +391,12 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                       placeholder="Code ••••••"
                       value={code}
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       className="relative z-10 w-full px-4 py-3.5 outline-none text-center text-[20px] tracking-[8px]"
                       style={{ color: text, fontFamily: "'Inter', sans-serif" }}
                     />
                   </div>
-                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
                       type="password"
@@ -401,11 +404,12 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                       placeholder="Password (at least 8 characters)"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
                       style={{ color: text, fontFamily: "'Inter', sans-serif" }}
                     />
                   </div>
-                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                  <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
                       type="password"
@@ -413,6 +417,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                       placeholder="Confirm password"
                       value={passwordConfirm}
                       onChange={(e) => setPasswordConfirm(e.target.value)}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
                       style={{ color: text, fontFamily: "'Inter', sans-serif" }}
                     />

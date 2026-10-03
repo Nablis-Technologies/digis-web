@@ -53,6 +53,7 @@ export function GatedTierGate({
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   // A token from the invitation link → unlock without the buyer typing anything.
   const idsKey = gatedTicketTypeIds.join(',');
@@ -116,7 +117,7 @@ export function GatedTierGate({
             animate={error ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
             transition={{ duration: 0.4 }}
             className="relative overflow-hidden flex items-center gap-2 rounded-2xl p-1.5"
-            style={glassField(isDark, { error: !!error })}>
+            style={glassField(isDark, { error: !!error, focused })}>
             <GlassReflection isDark={isDark} />
             <div className="relative z-10 flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
               style={{ background: `rgba(${accentRgb},0.1)` }}>
@@ -125,6 +126,7 @@ export function GatedTierGate({
             <AppInput
               value={code}
               onChange={(e) => setCode(e.target.value)}
+              onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
               onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
               placeholder="Enter your code"
               className="relative z-10 flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"

@@ -28,6 +28,7 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
   const [phase, setPhase] = useState<'form' | 'code' | 'done'>('form');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+  const [focused, setFocused] = useState(false);
 
   const notRegistered = async (e: unknown) => {
     setError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Something went wrong. Please try again.');
@@ -159,11 +160,12 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
                 </p>
 
                 {phase === 'code' ? (
-                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
                       value={code}
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       placeholder="6-digit code"
                       inputMode="numeric"
                       className="relative z-10 w-full h-12 px-4 text-[16px] tracking-[6px] text-center outline-none"
@@ -171,11 +173,12 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
                     />
                   </div>
                 ) : (
-                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark)}>
+                  <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       placeholder="+251 9.."
                       inputMode="tel"
                       disabled={isAuthenticated}

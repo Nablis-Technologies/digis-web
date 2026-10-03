@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Tag, X } from 'lucide-react';
 import type { AppliedPromo } from '@/features/checkout/hooks/useCheckoutFlow';
@@ -11,6 +12,7 @@ import { Money } from '@/lib/money';
 interface PromoCodeFieldProps { promoApplied: AppliedPromo | null; promoCodeInput: string; setPromoCodeInput: (value: string) => void; promoExpanded: boolean; setPromoExpanded: (value: boolean) => void; promoError: string; setPromoError: (value: string) => void; promoLoading: boolean; validatePromo: () => void; removePromo: () => void; discountAmount: number; isDark: boolean; }
 
 export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, discountAmount, isDark }: PromoCodeFieldProps) {
+  const [focused, setFocused] = useState(false);
   return (
         <>{promoApplied && !promoLoading ? (
           <motion.div
@@ -63,12 +65,13 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                   transition={{ duration: 0.25 }}
                   className="overflow-hidden">
                   <div className="flex gap-2 mt-3">
-                    <div className="relative flex-1 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!promoError })}>
+                    <div className="relative flex-1 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!promoError, focused })}>
                       <GlassReflection isDark={isDark} />
                       <AppInput
                         type="text"
                         value={promoCodeInput}
                         onChange={(e) => { setPromoCodeInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                         onKeyDown={(e) => e.key === 'Enter' && validatePromo()}
                         placeholder="Enter code"
                         className="relative z-10 w-full px-4 py-2.5 text-[13px] tracking-[1px] uppercase outline-none placeholder:normal-case placeholder:tracking-normal"

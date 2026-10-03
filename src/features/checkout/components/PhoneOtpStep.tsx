@@ -32,6 +32,7 @@ export function PhoneOtpStep({
   onResend: () => void;
 }) {
   const [code, setCode] = useState('');
+  const [focused, setFocused] = useState(false);
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
   const canSubmit = !loading && code.trim().length >= 4;
@@ -61,11 +62,12 @@ export function PhoneOtpStep({
         </div>
       </div>
 
-      <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error })}>
+      <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
         <GlassReflection isDark={isDark} />
         <AppInput
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           placeholder="6-digit code"
           inputMode="numeric"
           aria-label="Verification code"
