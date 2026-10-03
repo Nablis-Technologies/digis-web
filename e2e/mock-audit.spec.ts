@@ -16,15 +16,12 @@ test('runtime provenance audit - discovery + detail', async ({ page }) => {
   await page.waitForTimeout(2500);
   console.log('DISCOVERY API calls:', JSON.stringify(apiCalls));
 
-  const cardImgs = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('main img, img'))
+  const mockImgs = await page.evaluate((hosts) =>
+    Array.from(document.querySelectorAll('img'))
       .map((i) => i.src)
-      .filter((s) => s && !s.startsWith('data:'))
+      .filter((s) => s && !s.startsWith('data:') && hosts.some((h) => s.includes(h))),
+    MOCK_HOSTS,
   );
-  const backendImgs = cardImgs.filter((s) => s.includes('localhost:3000'));
-  const mockImgs = cardImgs.filter((s) => MOCK_HOSTS.some((h) => s.includes(h)));
-  console.log(`DISCOVERY images: ${cardImgs.length} total | backend: ${backendImgs.length} | mock-host: ${mockImgs.length}`);
-  mockImgs.slice(0, 4).forEach((s) => console.log('  mock img:', s.slice(0, 90)));
   // Provenance assertion: no mock-host artwork may render on a live surface.
   expect(mockImgs, `mock-host images leaked: ${JSON.stringify(mockImgs.slice(0, 4))}`).toHaveLength(0);
 
@@ -34,10 +31,11 @@ test('runtime provenance audit - discovery + detail', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'On & On' })).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(2000);
   console.log('DETAIL API calls:', JSON.stringify(apiCalls));
-  const detailImgs = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('img')).map((i) => i.src).filter((s) => s && !s.startsWith('data:'))
+  const detailMockHost = await page.evaluate((hosts) =>
+    Array.from(document.querySelectorAll('img'))
+      .map((i) => i.src)
+      .filter((s) => s && !s.startsWith('data:') && hosts.some((h) => s.includes(h))),
+    MOCK_HOSTS,
   );
-  const detailMockHost = detailImgs.filter((s) => MOCK_HOSTS.some((h) => s.includes(h)));
-  console.log(`DETAIL images: ${detailImgs.length} total | backend: ${detailImgs.filter((s) => s.includes('localhost:3000')).length} | mock-host: ${detailMockHost.length}`);
   expect(detailMockHost, `mock-host images leaked: ${JSON.stringify(detailMockHost.slice(0, 4))}`).toHaveLength(0);
 });
