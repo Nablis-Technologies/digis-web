@@ -1,8 +1,9 @@
 import { motion } from 'motion/react';
-import { Sparkles, ArrowRight, Compass } from 'lucide-react';
+import { ArrowRight, Compass } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glass, glassEdge } from '@/lib/ui/glass';
 
 export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming' | 'past'; isDark: boolean; onDiscover?: () => void }) {
   const isUpcoming = tab === 'upcoming';
@@ -30,127 +31,54 @@ export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming'
     >
       <div
         className="relative mx-auto max-w-md rounded-[28px] overflow-hidden"
-        style={{
-          padding: '44px 28px 36px',
-          background: isDark
-            ? 'linear-gradient(165deg, rgba(40,40,20,0.55) 0%, rgba(18,18,10,0.75) 100%)'
-            : 'linear-gradient(165deg, rgba(255,255,255,0.8) 0%, rgba(250,250,235,0.9) 100%)',
-          border: 'none',
-          backdropFilter: 'blur(40px) saturate(1.4)',
-          boxShadow: isDark
-            ? '0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)'
-            : 'none',
-        }}
+        style={{ padding: '44px 28px 36px', ...glass(isDark) }}
       >
         <GlassReflection isDark={isDark} />
-        {/* Animated colorful Digis ticket passes */}
-        <div className="relative flex items-center justify-center mb-7" style={{ height: '170px' }}>
+        {/* Ticket stack — one front pass on the standard glass, two behind */}
+        <div className="relative flex items-center justify-center mb-7" style={{ height: '160px' }}>
           {[
-            // back-left — violet
-            {
-              rot: -16, x: -54, dur: 6, delay: 0,
-              grad: 'linear-gradient(155deg, #a78bfa 0%, #6d28d9 100%)',
-              text: '#fff', sub: 'rgba(255,255,255,0.7)',
-              glow: 'rgba(124,58,237,0.45)', border: 'rgba(167,139,250,0.6)', scale: 0.84, front: false,
-            },
-            // back-right — cyan
-            {
-              rot: 14, x: 54, dur: 5.5, delay: 0.3,
-              grad: 'linear-gradient(155deg, #22d3ee 0%, #0e7490 100%)',
-              text: '#fff', sub: 'rgba(255,255,255,0.75)',
-              glow: 'rgba(34,211,238,0.45)', border: 'rgba(103,232,249,0.6)', scale: 0.89, front: false,
-            },
-            // front — brand lime
-            {
-              rot: -2, x: 0, dur: 4.5, delay: 0.15,
-              grad: 'linear-gradient(155deg, #e9ff4d 0%, #b6dd00 100%)',
-              text: '#0a0a0a', sub: 'rgba(10,10,10,0.6)',
-              glow: 'rgba(214,249,5,0.6)', border: 'rgba(180,221,0,0.9)', scale: 1, front: true,
-            },
+            { rot: -14, x: -46, dur: 5, delay: 0 },
+            { rot: 12, x: 46, dur: 5.5, delay: 0.3 },
           ].map((card, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 30, rotate: card.rot * 0.4 }}
-              animate={{ opacity: 1, y: [0, card.front ? -8 : -4, 0], rotate: card.rot }}
-              transition={{
-                opacity: { duration: 0.5, delay: card.delay },
-                rotate: { duration: 0.5, delay: card.delay },
-                y: { duration: card.dur, repeat: Infinity, ease: 'easeInOut', delay: card.delay + 0.4 },
-              }}
-              className="absolute rounded-[16px] overflow-hidden"
+              className="absolute rounded-[16px] w-[108px] h-[134px]"
               style={{
-                width: '112px', height: '138px',
                 marginLeft: `${card.x}px`,
-                scale: card.scale,
-                background: card.grad,
-                border: `1px solid ${card.border}`,
-                boxShadow: `0 20px 44px -16px rgba(0,0,0,0.45), 0 6px 16px -8px rgba(0,0,0,0.4)`,
+                rotate: card.rot,
+                background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.035)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}`,
               }}
-            >
-              {/* Glossy sheen */}
-              <div className="absolute inset-0 pointer-events-none"
-                style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.35) 0%, transparent 42%)' }} />
-              {/* Top row */}
-              <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                <span className="text-[6px] tracking-[1.5px] uppercase"
-                  style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: card.sub }}>
-                  Admit One
-                </span>
-                <motion.div
-                  animate={card.front ? { rotate: 360 } : { rotate: 0 }}
-                  transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
-                >
-                  <Sparkles className="w-3 h-3" strokeWidth={1.75} style={{ color: card.text }} />
-                </motion.div>
-              </div>
-              {/* Digis wordmark */}
-              <div className="absolute inset-x-0 top-[36%] -translate-y-1/2 flex flex-col items-center">
-                <span className="leading-none"
-                  style={{
-                    fontFamily: "'Zalando Sans Expanded', sans-serif", fontWeight: 600,
-                    fontSize: card.front ? '20px' : '16px', letterSpacing: '-0.5px', color: card.text,
-                  }}>
-                  Digis
-                </span>
-                <span className="mt-1 text-[5.5px] tracking-[2px] uppercase"
-                  style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: card.sub }}>
-                  Event Pass
-                </span>
-              </div>
-              {/* Notches + perforation */}
-              <div className="absolute -left-[5px] top-[60%] -translate-y-1/2 w-2.5 h-2.5 rounded-full"
-                style={{ background: isDark ? '#121009' : '#fafaf0' }} />
-              <div className="absolute -right-[5px] top-[60%] -translate-y-1/2 w-2.5 h-2.5 rounded-full"
-                style={{ background: isDark ? '#121009' : '#fafaf0' }} />
-              <div className="absolute left-2.5 right-2.5"
-                style={{ top: '60%', borderTop: `1px dashed ${card.front ? 'rgba(10,10,10,0.25)' : 'rgba(255,255,255,0.4)'}` }} />
-              {/* Barcode */}
-              <div className="absolute left-2.5 right-2.5 bottom-2.5 flex items-end gap-[2px] h-5">
-                {[3, 1, 2, 1, 3, 2, 1, 2, 3, 1, 1, 2, 3].map((w, b) => (
-                  <div key={b} className="rounded-[1px]"
-                    style={{ width: w, height: '100%', background: card.text, opacity: b % 2 === 0 ? 0.85 : 0.5 }} />
-                ))}
-              </div>
-            </motion.div>
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: card.dur, repeat: Infinity, ease: 'easeInOut', delay: card.delay }}
+            />
           ))}
-
-          {/* Confetti sparkles */}
-          {[
-            { x: -82, y: -34, d: 0 },
-            { x: 80, y: -44, d: 0.5 },
-            { x: -74, y: 46, d: 1 },
-            { x: 84, y: 36, d: 1.4 },
-          ].map((s, i) => (
-            <motion.div
-              key={i}
-              animate={{ y: [s.y, s.y - 6, s.y], opacity: [0.3, 0.9, 0.3], scale: [0.8, 1.1, 0.8] }}
-              transition={{ duration: 3, repeat: Infinity, delay: s.d, ease: 'easeInOut' }}
-              className="absolute"
-              style={{ left: `calc(50% + ${s.x}px)`, top: `calc(50% + ${s.y}px)` }}
-            >
-              <Sparkles className="w-3 h-3" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={1.5} />
-            </motion.div>
-          ))}
+          {/* Front — the standard glass surface */}
+          <motion.div
+            className="relative rounded-[16px] w-[108px] h-[134px] overflow-hidden"
+            style={{ rotate: -2, ...glass(isDark), border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}` }}
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
+              <span className="text-[6px] tracking-[1.5px] uppercase"
+                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(10,10,10,0.45)' }}>
+                Admit One
+              </span>
+            </div>
+            <div className="relative z-10 absolute inset-x-0 top-[40%] -translate-y-1/2 flex flex-col items-center">
+              <span className="text-[20px] leading-none"
+                style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", fontWeight: 600, letterSpacing: '-0.5px', color: isDark ? '#fff' : '#1a1a1a' }}>
+                Digis
+              </span>
+              <span className="mt-1 text-[5.5px] tracking-[2px] uppercase"
+                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(10,10,10,0.45)' }}>
+                Event Pass
+              </span>
+            </div>
+            <div className="absolute left-2.5 right-2.5" style={{ top: '60%', borderTop: `1px dashed ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.1)'}` }} />
+          </motion.div>
         </div>
 
         <div className="relative text-center">
@@ -186,30 +114,19 @@ export function TicketsEmptyState({ tab, isDark, onDiscover }: { tab: 'upcoming'
             whileHover={{ scale: 1.03, y: -2 }}
             whileTap={{ scale: 0.97 }}
             onClick={onDiscover}
-            className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full cursor-pointer relative overflow-hidden"
+            className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full cursor-pointer"
             style={{
               fontFamily: "'Inter', sans-serif",
-              background: isDark
-                ? 'linear-gradient(135deg, #d9ff00, #d6f905)'
-                : 'linear-gradient(135deg, #d6f905, #d6f905)',
+              background: '#d6f905',
               color: '#000',
               fontSize: '13px',
               letterSpacing: '0.5px',
-              boxShadow: 'none',
+              ...glassEdge(isDark),
             }}
           >
             <Compass className="w-4 h-4" strokeWidth={1.8} />
             {copy.cta}
             <ArrowRight className="w-4 h-4" strokeWidth={1.8} />
-            {/* Shine sweep */}
-            <motion.span
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%)',
-              }}
-              animate={{ x: ['-100%', '200%'] }}
-              transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
-            />
           </AppButton>
         </div>
       </div>
