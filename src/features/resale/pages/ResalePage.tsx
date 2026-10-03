@@ -13,7 +13,6 @@ import type { ResaleListing, UserTicket } from '@/types';
 import { resaleModule } from '@/lib/resale';
 import { eventsModule } from '@/lib/events';
 import { useResalePurchase } from '@/features/resale/hooks/useResalePurchase';
-import { InfoCardsGrid } from '@/features/event-detail/components/InfoCards';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
 import { OrganizerCard, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
 import { FilterPanel } from '@/features/resale/components/FilterPanel';
@@ -546,7 +545,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         <div className="relative">
                           <AppButton whileTap={{ scale: 0.95 }}
                             onClick={() => setSortOpen(v => !v)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer"
                             style={{
                               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
                               ...glassEdge(isDark),
@@ -584,7 +583,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         </div>
                         <AppButton whileTap={{ scale: 0.95 }}
                           onClick={() => setShowEventFilters(v => !v)}
-                          className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer"
+                          className="relative flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer"
                           style={{
                             background: showEventFilters || activeFilterCount > 0
                               ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)')
@@ -765,13 +764,8 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                       nothing rather than inventing it. */}
                   {selectedEvent && (
                     <div className="px-5 lg:px-8 mt-8 lg:mt-10">
-                      <InfoCardsGrid
-                        items={[
-                          { icon: <Calendar className="w-4 h-4" />, label: 'Date', value: selectedGroup!.eventDate },
-                          { icon: <Clock className="w-4 h-4" />, label: 'Time', value: selectedGroup!.eventTime },
-                          { icon: <MapPin className="w-4 h-4" />, label: 'Venue', value: selectedGroup!.venue },
-                        ]}
-                      />
+                      {/* Date/time/venue already sit in the hero — no repeated
+                          info cards. Only the parts the hero doesn't carry. */}
                       {selectedEvent.description && (
                         <>
                           <h2 className="text-[13px] tracking-[2px] uppercase mb-4 mt-8"
@@ -890,7 +884,7 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleRemoveListing(listing.id)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer ml-3"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full cursor-pointer ml-3"
                         style={{
                           background: 'rgba(239,68,68,0.08)',
                           border: '1px solid rgba(239,68,68,0.18)',
