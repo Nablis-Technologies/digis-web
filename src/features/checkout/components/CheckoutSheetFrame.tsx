@@ -46,7 +46,7 @@ export function CheckoutSheetFrame({
         initial={{ y: 60, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
         className="relative w-full sm:max-w-lg max-h-[94vh] overflow-hidden flex flex-col rounded-t-[32px] sm:rounded-[32px]"
-        style={{ background: bgPanel, boxShadow: '0 -20px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02) inset' }}>
+        style={{ background: bgPanel, ...glassEdge(isDark) }}>
         <GlassReflection isDark={isDark} />
         <div className="relative z-10 contents">
         {/* Header */}
