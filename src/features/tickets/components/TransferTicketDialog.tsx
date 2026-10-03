@@ -335,8 +335,8 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   <GlassReflection isDark={isDark} />
                   <p className="relative z-10 text-[12px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add a short personal note if you’d like. It will travel with the secure claim link.</p>
                 </div>
-                <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark)}>
-                  <GlassReflection isDark={isDark} edgeState={note ? 'focus' : undefined} />
+                <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { focused: !!note })}>
+                  <GlassReflection isDark={isDark} />
                   <AppTextArea placeholder="Write something thoughtful…" value={note} onChange={(e) => setNote(e.target.value.slice(0, 140))} rows={2} className={`relative z-10 w-full px-4 py-3 text-[13.5px] outline-none resize-none ${placeholderClass}`} style={{ color: text, fontFamily: "'Inter', sans-serif" }} />
                   <span className="absolute bottom-2.5 right-3 z-10 text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>{note.length}/140</span>
                 </div>
@@ -347,7 +347,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                       {giftExtras.map((extra) => {
                         const selected = selectedExtraIds.includes(extra.id);
                         return (
-                          <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, ...glassField(isDark) }}>
+                          <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, ...(selected ? glassField(isDark, { focused: true }) : glassField(isDark)) }}>
                             <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: selected ? ACCENT_HEX : 'transparent', boxShadow: `0 0 0 1px ${selected ? ACCENT_HEX : border}` }}>{selected && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}</span>
                             <span className="min-w-0 flex-1"><span className="block text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: text, fontWeight: 600 }}>{extra.name}</span><span className="block mt-0.5 text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>{extra.description}</span></span>
                             <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: text }}>ETB {Money.fromMinor(extra.priceMinor, "ETB").formatNumber()}</span>
@@ -429,7 +429,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   className="w-full flex items-start gap-3 rounded-2xl p-3.5 text-left"
                   style={{
                     background: acknowledged ? accentSoft : surfaceSoft,
-                    ...glassField(isDark),
+                    ...(acknowledged ? glassField(isDark, { focused: true }) : glassField(isDark)),
                     transition: 'all 0.25s',
                   }}
                 >

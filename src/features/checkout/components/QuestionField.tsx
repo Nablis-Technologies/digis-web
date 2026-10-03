@@ -41,8 +41,8 @@ function CustomDropdown({
 
   return (
     <div className="relative" ref={ref}>
-      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark)}>
-        <GlassReflection isDark={isDark} edgeState={hasError ? 'error' : open ? 'focus' : undefined} />
+      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused: open })}>
+        <GlassReflection isDark={isDark} />
         <AppButton
           type="button"
           onClick={() => setOpenState(!open)}
@@ -155,8 +155,8 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
       {labelBlock}
 
       {question.type === 'text' && (
-        <div className="relative rounded-xl overflow-hidden" style={glassField(isDark)}>
-          <GlassReflection isDark={isDark} edgeState={hasError ? 'error' : focused ? 'focus' : undefined} />
+        <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+          <GlassReflection isDark={isDark} />
           <AppInput
             type="text" value={value || ''} maxLength={question.maxLength}
             placeholder={question.placeholder}
@@ -172,8 +172,8 @@ export function QuestionField({ question, value, error, onChange, isDark }: {
       )}
 
       {question.type === 'textarea' && (
-        <div className="relative rounded-xl overflow-hidden" style={glassField(isDark)}>
-          <GlassReflection isDark={isDark} edgeState={hasError ? 'error' : focused ? 'focus' : undefined} />
+        <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+          <GlassReflection isDark={isDark} />
           <AppTextArea
             value={value || ''} maxLength={question.maxLength}
             placeholder={question.placeholder}

@@ -116,8 +116,8 @@ export function GatedTierGate({
             animate={error ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
             transition={{ duration: 0.4 }}
             className="relative overflow-hidden flex items-center gap-2 rounded-2xl p-1.5"
-            style={glassField(isDark)}>
-            <GlassReflection isDark={isDark} edgeState={error ? 'error' : undefined} />
+            style={glassField(isDark, { error: !!error })}>
+            <GlassReflection isDark={isDark} />
             <div className="relative z-10 flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
               style={{ background: `rgba(${accentRgb},0.1)` }}>
               <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />

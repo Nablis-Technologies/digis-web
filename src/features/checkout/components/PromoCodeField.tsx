@@ -63,8 +63,8 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                   transition={{ duration: 0.25 }}
                   className="overflow-hidden">
                   <div className="flex gap-2 mt-3">
-                    <div className="relative flex-1 rounded-xl overflow-hidden" style={glassField(isDark)}>
-                      <GlassReflection isDark={isDark} edgeState={promoError ? 'error' : undefined} />
+                    <div className="relative flex-1 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!promoError })}>
+                      <GlassReflection isDark={isDark} />
                       <AppInput
                         type="text"
                         value={promoCodeInput}

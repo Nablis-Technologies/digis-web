@@ -141,9 +141,9 @@ export function EditField({ icon, type = 'text', placeholder, value, onChange, i
   const dim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
   return (
     <div className="relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all overflow-hidden"
-      style={glassField(isDark)}
+      style={glassField(isDark, { focused })}
     >
-      <GlassReflection isDark={isDark} edgeState={focused ? 'focus' : undefined} />
+      <GlassReflection isDark={isDark} />
       <span className="relative z-10" style={{ color: focused ? (isDark ? '#d6f905' : '#5a6b00') : dim }}>{icon}</span>
       <AppInput
         type={type} value={value} placeholder={placeholder}

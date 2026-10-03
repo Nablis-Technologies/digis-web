@@ -113,35 +113,7 @@ export function glassEdgeReflection(
 
   return {
     padding: "0.5px",
-    background: `conic-gradient(from ${config.hairlineAngle}deg at 50% 50%, ${hairlineStops("255,255,255", opacity)})`,
-    borderRadius: "inherit",
-    WebkitMask: mask,
-    WebkitMaskComposite: "xor",
-    maskComposite: "exclude",
-  };
-}
-
-/** The travelling-brightness stops shared by every reflected edge. */
-function hairlineStops(rgb: string, o: number): string {
-  return `rgba(${rgb},${o * 0.24}) 0deg, rgba(${rgb},${o}) 50deg, rgba(${rgb},${o * 0.34}) 132deg, rgba(${rgb},${o * 0.08}) 230deg, rgba(${rgb},${o * 0.24}) 360deg`;
-}
-
-/**
- * The reflected hairline recoloured for field state: a lime edge on focus, a
- * red edge on error. Same conic sweep and mask as `glassEdgeReflection()`, just
- * a different hue — so the field's own glass hairline lights up rather than an
- * extra generic border being drawn around it.
- */
-export function glassFieldEdge(isDark: boolean, state: "focus" | "error"): CSSProperties {
-  const config = defaultGlassReflection;
-  const mask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
-  const rgb = state === "error" ? "248,113,113" : "214,249,5";
-  const peak = state === "error" ? 0.6 : 0.55;
-  const opacity = peak * (isDark ? 1 : 1.1);
-
-  return {
-    padding: "0.5px",
-    background: `conic-gradient(from ${config.hairlineAngle}deg at 50% 50%, ${hairlineStops(rgb, opacity)})`,
+    background: `conic-gradient(from ${config.hairlineAngle}deg at 50% 50%, rgba(255,255,255,${opacity * 0.24}) 0deg, rgba(255,255,255,${opacity}) 50deg, rgba(255,255,255,${opacity * 0.34}) 132deg, rgba(255,255,255,${opacity * 0.08}) 230deg, rgba(255,255,255,${opacity * 0.24}) 360deg)`,
     borderRadius: "inherit",
     WebkitMask: mask,
     WebkitMaskComposite: "xor",
@@ -192,10 +164,18 @@ export function glassInputSurface(isDark: boolean): CSSProperties {
 }
 
 /**
- * Field/input surface. The same `glassInputSurface()` as the search bar — the
- * reflected hairline itself carries the state via `glassFieldEdge()` (lime on
- * focus, red on error), so no generic border is drawn around the field.
+ * Field/input surface + state. The same `glassInputSurface()` as the search
+ * bar at rest. Focus is a *quiet* shift: one hairline lime ring (no fill tint,
+ * no glow), so it reads as active without shouting. Error swaps lime for red
+ * (the message under the field still carries the failure). The reflected
+ * hairline comes from a `GlassReflection` overlay on the wrapper.
  */
-export function glassField(isDark: boolean): CSSProperties {
-  return glassInputSurface(isDark);
+export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
+  const out = glassInputSurface(isDark);
+  if (opts.error) {
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(248,113,113,0.5)" : "rgba(190,18,60,0.4)"}`;
+  } else if (opts.focused) {
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.4)" : "rgba(124,154,0,0.34)"}`;
+  }
+  return out;
 }

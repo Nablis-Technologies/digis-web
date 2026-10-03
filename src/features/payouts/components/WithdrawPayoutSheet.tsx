@@ -154,7 +154,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                             style={{
                               fontFamily: "'Inter', sans-serif", color: active ? accent : text,
                               background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
-                              ...glassField(isDark),
+                              ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                             }}>
                             {b.currency}
                           </AppButton>
@@ -174,7 +174,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                     </AppButton>
                   </div>
                   <div className="relative rounded-2xl overflow-hidden" style={inputStyle}>
-                    <GlassReflection isDark={isDark} edgeState={amountError ? 'error' : undefined} />
+                    <GlassReflection isDark={isDark} />
                     <AppInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal"
                       onBlur={() => setTouched(true)} error={amountError} errorClassName={FIELD_ERROR_CLASS}
                       className="relative z-10 w-full h-[52px] px-4 text-[15px] outline-none"
@@ -207,7 +207,7 @@ export function WithdrawPayoutSheet({ balances, destinations, onClose, onSubmitt
                             className="rounded-xl p-3 flex items-center gap-3 cursor-pointer text-left"
                             style={{
                               background: active ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(109,40,217,0.05)') : cardBg,
-                              ...glassField(isDark),
+                              ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                             }}>
                             <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                               style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>

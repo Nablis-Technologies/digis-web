@@ -16,15 +16,15 @@ that fought it. Removing the stroke leaves one depth language:
   `glassControl(isDark, tint?)` = `glass()` fill + `glassEdge()` (inset top
   light + quiet shadow). No room for an overlay, so the inset highlight is the
   whole edge.
-- **Inputs / fields** keep the discovery-search chrome verbatim: `glassField()`
-  is the search surface (translucent fill + 40px backdrop blur + float shadow),
-  and a `GlassReflection` overlay paints the reflected hairline. State needs no
-  generic border — the overlay's own hairline is **recoloured** via
-  `edgeState` (`glassFieldEdge()`: the same conic sweep in lime on focus, red on
-  error). A field's edge is thus still an affordance that separates an editable
-  well from a borderless button, but it is the *glass* hairline lighting up, not
-  a box drawn around the field. Added after the first pass, when inputs and
-  buttons collapsed into the same raised glass and focus was invisible.
+- **Inputs / fields** are the one exception that keeps a thin hairline:
+  `glassField(isDark, { error, focused })` reproduces the full discovery-search
+  chrome on every field — translucent surface + 40px backdrop blur + the
+  reflected hairline (a border-box conic gradient, the same edge the search's
+  `GlassReflection` paints) + float shadow. The hairline is rest-quiet and turns
+  lime on focus / red on error, because a field's edge is an affordance: it
+  separates an editable well from a borderless button. Added after the first
+  pass, when inputs and buttons collapsed into the same raised glass and focus
+  was invisible.
 - **State** is carried by the tint, never a stroke: selected/active =
   `glass(isDark, 'accent')`; error/destructive = `glass(isDark, 'danger')` with
   red icon + copy. A failure still cannot look like success — danger keeps its

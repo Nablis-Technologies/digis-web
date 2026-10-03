@@ -271,7 +271,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
                     className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-pointer text-left"
                     style={{
                       background: active ? (isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.14)') : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)'),
-                      ...glassField(isDark),
+                      ...(active ? glassField(isDark, { focused: true }) : glassField(isDark)),
                     }}
                   >
                     <div>
