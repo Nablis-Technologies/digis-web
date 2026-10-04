@@ -19,10 +19,10 @@ const SELLER = { identifier: '+251911000007', password: 'password123' };
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).click();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(SELLER.identifier);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(SELLER.identifier);
   await page.getByPlaceholder('Your password', { exact: true }).fill(SELLER.password);
   await page.getByRole('button', { name: 'Log in' }).last().click();
-  await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({ timeout: 15_000 });
 }
 
 test('LIVE: seller cashes out a real payout (pending) and the balance drops', async ({ page, request }) => {

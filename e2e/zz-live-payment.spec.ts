@@ -12,10 +12,10 @@ const TIER = 'Final Wave';
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).click();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(BUYER);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(BUYER);
   await page.getByPlaceholder('Your password', { exact: true }).fill(PASS);
   await page.getByRole('button', { name: 'Log in' }).last().click();
-  await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({ timeout: 15_000 });
 }
 
 test('LIVE: full real payment → ticket lands in wallet (no mocks)', async ({ page }) => {

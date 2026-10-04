@@ -28,7 +28,7 @@ async function loginThroughUi(page: Page, identifier = SEED_IDENTIFIER, password
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).click();
   await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(identifier);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(identifier);
   await page.getByPlaceholder('Your password', { exact: true }).fill(password);
   // Two "Log in" buttons exist while the modal is open (TopBar + modal submit);
   // the modal is mounted last in the DOM, so .last() is the submit button.
@@ -41,7 +41,7 @@ async function loginThroughUi(page: Page, identifier = SEED_IDENTIFIER, password
   // The success screen self-closes after ~1.4s; wait for that so callers see the
   // settled state (and the URL back at the return path, not /login).
   await expect(page.getByText('Welcome to Digis')).toBeHidden({ timeout: 20_000 });
-  await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({
+  await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({
     timeout: 20_000,
   });
 }
@@ -80,7 +80,7 @@ test.describe('auth', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
-    await page.getByPlaceholder('Phone number or email', { exact: true }).fill(SEED_IDENTIFIER);
+    await page.getByPlaceholder('Phone number', { exact: true }).fill(SEED_IDENTIFIER);
     await page.getByPlaceholder('Your password', { exact: true }).fill('wrong-password');
     await page.getByRole('button', { name: 'Log in' }).last().click();
 
@@ -139,9 +139,8 @@ test.describe('auth', () => {
     // does not persist it yet, so it is currently dropped server-side).
     await page.getByPlaceholder('Name', { exact: true }).fill('Test User');
     await page.getByPlaceholder('Phone number', { exact: true }).fill(phone);
-    // Registration carries the identity fields the backend accepts: an optional
-    // email plus an explicit password confirmation.
-    await expect(page.getByPlaceholder('Email (optional)', { exact: true })).toBeVisible();
+    // Signup is phone-first now — no email field, but still an explicit
+    // password confirmation.
     await page.getByPlaceholder('Create a password (min 8 chars)', { exact: true }).fill('Test1234!');
     await page.getByPlaceholder('Confirm your password', { exact: true }).fill('Test1234!');
     await expect(page.getByRole('button', { name: 'Create account' })).toBeEnabled();

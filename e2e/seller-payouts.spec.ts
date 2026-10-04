@@ -67,10 +67,10 @@ const PAYOUT = {
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).click();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(SELLER);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(SELLER);
   await page.getByPlaceholder('Your password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Log in' }).last().click();
-  await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({ timeout: 15_000 });
 }
 
 test('seller cashes out the full balance → POST carries amount + account + key, row shows pending', async ({ page }) => {

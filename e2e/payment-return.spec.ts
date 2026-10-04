@@ -20,11 +20,11 @@ const WALLET_WIRE = {
 async function loginThroughUi(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).click();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(BUYER_IDENTIFIER);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(BUYER_IDENTIFIER);
   await page.getByPlaceholder('Your password', { exact: true }).fill(BUYER_PASSWORD);
   await page.getByRole('button', { name: 'Log in' }).last().click();
   await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({ timeout: 15_000 });
 }
 
 test('payment return confirms when the wallet holds a ticket', async ({ page }) => {

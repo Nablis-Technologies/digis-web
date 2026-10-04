@@ -14,11 +14,11 @@ test('wallet renders real GET /tickets, not the mock store', async ({ page }) =>
   // Log in through the real UI so the session carries the bearer token.
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).click();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(SEED_IDENTIFIER);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(SEED_IDENTIFIER);
   await page.getByPlaceholder('Your password', { exact: true }).fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Log in' }).last().click();
   await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByPlaceholder('Phone number or email', { exact: true })).toBeHidden({ timeout: 10_000 });
+  await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({ timeout: 10_000 });
 
   // Open My Tickets via the nav.
   await page.getByRole('button', { name: 'Tickets' }).first().click();

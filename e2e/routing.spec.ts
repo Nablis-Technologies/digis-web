@@ -10,7 +10,7 @@ const BUYER_PASSWORD = 'password123';
 async function loginThroughUi(page: Page, identifier: string) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in' }).first().click();
-  await page.getByPlaceholder('Phone number or email', { exact: true }).fill(identifier);
+  await page.getByPlaceholder('Phone number', { exact: true }).fill(identifier);
   await page.getByPlaceholder('Your password', { exact: true }).fill(BUYER_PASSWORD);
   await page.getByRole('button', { name: 'Log in' }).last().click();
   await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 20_000 });
