@@ -114,7 +114,16 @@ describe('transferService', () => {
     expect(result).toEqual({ verificationToken: 'proof-1' });
   });
 
-  it('acceptAuthenticated accepts as the signed-in recipient with the bearer, no OTP', async () => {
+  it('acceptAuthenticated is tokenless in-app — empty body, bearer proves identity (G-45)', async () => {
+    mockedApiFetch.mockResolvedValue({ data: { id: 'tr-1', status: 'accepted' } });
+    await transferService.acceptAuthenticated('tr-1');
+    expect(mockedApiFetch).toHaveBeenCalledWith('ticket_transfers/tr-1/accept', {
+      method: 'POST',
+      body: {},
+    });
+  });
+
+  it('acceptAuthenticated still forwards a legacy token when one is supplied', async () => {
     mockedApiFetch.mockResolvedValue({ data: { id: 'tr-1', status: 'accepted' } });
     await transferService.acceptAuthenticated('tr-1', 's3cr3t');
     expect(mockedApiFetch).toHaveBeenCalledWith('ticket_transfers/tr-1/accept', {

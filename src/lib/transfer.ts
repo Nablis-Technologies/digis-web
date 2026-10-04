@@ -182,11 +182,16 @@ export const transferService = {
 
   /**
    * POST /ticket_transfers/:id/accept (authenticated) — accepts a pending
-   * transfer as the signed-in recipient. No OTP or password: the bearer proves
-   * identity and the backend checks `to_user == current_user`. The accepted
-   * ticket then appears in GET /tickets.
+   * transfer as the signed-in recipient. TOKENLESS: the bearer proves identity
+   * and the backend validates recipient phone/user under a lock (G-45). Send an
+   * empty body — the client only supplies the Idempotency-Key (injected by
+   * `apiFetch`) so a retried accept is a safe no-op. A legacy `token` is still
+   * forwarded when present (old SMS/web links), but is not required in-app.
    */
-  async acceptAuthenticated(id: string, token: string): Promise<void> {
-    await apiFetch(`ticket_transfers/${id}/accept`, { method: 'POST', body: { token } });
+  async acceptAuthenticated(id: string, token?: string): Promise<void> {
+    await apiFetch(`ticket_transfers/${id}/accept`, {
+      method: 'POST',
+      body: token ? { token } : {},
+    });
   },
 };

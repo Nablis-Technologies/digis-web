@@ -132,6 +132,7 @@ const TYPE_FROM_BACKEND: Record<string, NotificationType> = {
   refund_succeeded: 'ticket',
   refund_failed: 'ticket',
   transfer_received: 'transfer',
+  transfer_incoming: 'transfer',
   waitlist_offer_created: 'event',
   waitlist_offer_expired: 'event',
   registration_rejected: 'event',
@@ -148,6 +149,7 @@ function titleFor(type: string, data: Record<string, unknown>): string {
     case 'refund_succeeded': return 'Refund issued';
     case 'refund_failed': return 'Refund failed';
     case 'transfer_received': return 'Ticket received';
+    case 'transfer_incoming': return 'You received a ticket';
     case 'waitlist_offer_created': return 'A waitlist spot opened';
     case 'waitlist_offer_expired': return 'Waitlist offer expired';
     case 'registration_rejected': return 'Registration not approved';
@@ -174,6 +176,7 @@ function bodyFor(type: string, data: Record<string, unknown>): string {
   if (type === 'refund_succeeded') return event ?? 'Your refund has been issued.';
   if (type === 'refund_failed') return event ?? 'Your refund could not be processed.';
   if (type === 'transfer_received') return event ?? 'A ticket was transferred to you.';
+  if (type === 'transfer_incoming') return event ? `${event} · Accept it in Tickets.` : 'A ticket is waiting — accept it in Tickets.';
   if (type === 'waitlist_offer_created') return 'A spot opened — claim it before it expires.';
   if (type === 'waitlist_offer_expired') return 'The waitlist offer has expired.';
   if (type === 'registration_rejected') return event ?? 'Your registration was not approved.';
