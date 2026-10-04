@@ -7,6 +7,36 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-03 (pm) — G-12/G-44/G-45 wired + auth e2e repaired
+
+**Backend pulled** `a101cf2 → 90d79ae`; rebased the 4 `chore(dev)` commits
+(HEAD `af7949d`). Its working tree was mid-edit and unbuildable (a stale lineup
+WIP referencing a non-existent `Events::Public::EventParticipantSerializer`) —
+stashed, not discarded. Restarted `web`.
+
+**Wired the three Telegram-guide items:**
+- **G-12** `cbebirr`: `PaymentMethod` type + `PaymentStep` (CBE now enabled) +
+  `ProcessingView` copy; dropped the disabled guard.
+- **G-45** tokenless in-app accept (`{}` body) + `transfer_incoming` mapped in
+  `notifications.ts`.
+- **G-44** `event_lifecycle`/`ticket_availability` mapped in the adapter, new
+  `availabilityMeta()` state matrix, `EventCard` badge/CTA prefer server state,
+  and the detail page's ended-gate prefers `eventLifecycle === 'ended'`.
+
+**Fixed pre-existing e2e breakage** (from `8888fa6 fix(auth): phone-only`): the
+login placeholder + the removed "Email (optional)" field — 10 spec files updated.
+Suite back to 28/28.
+
+**Non-backend audit (this session):**
+- **#55** detail "from" price — **already implemented** (`useTicketPricing` +
+  `PurchaseBar`); closed.
+- **#36 venue half** — **reclassified seed-blocked**: live `GET /venues/:id`
+  returns blank coords + no media for all 25 seed venues; the seed never sets
+  them. API is fine, data is missing.
+- Removed dead `VITE_USE_MOCK` from `.env.example` (nothing reads it).
+
+**Verified:** `tsc` · vitest **155/155** · build · Playwright **28/28**.
+
 ## Session 2026-10-03 — resale My Listings polish (frontend only)
 
 **Backend:** read-only review of `digis_backend` @

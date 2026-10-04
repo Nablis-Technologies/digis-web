@@ -110,7 +110,7 @@
 | 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
 | 54 | open — degrading | no discovery availability — `GET /public/events` has no `sold_out` / per-offer `available` (products are per-event) |
-| 55 | frontend-fixable | detail "from" price is derivable from `GET /public/events/:slug/products` `price_options` (or the list payload) — not a backend blocker |
+| 55 | frontend-fixable — done | detail "from" price implemented via `useTicketPricing` + `PurchaseBar` (2026-10-03) |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
 | 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change/reset |
@@ -517,8 +517,10 @@ for the offers — or reuse the list payload's `price_from_minor`.
 **Fix (optional, convenience only):** mirror `price_from_minor` onto the detail
 serializer to save the second request. Not required.
 
-**Status: frontend-fixable — reclassified 2026-10-02 (filed 2026-09-30).** This is
-a frontend derivation task, not a backend blocker; removed from the open-gap count.
+**Status: frontend-fixable — IMPLEMENTED 2026-10-03.** The detail page already
+derives it: `useTicketPricing` computes `minPrice` from the loaded products and
+`PurchaseBar` renders "From {minPrice}" when no tier is selected
+(`PurchaseBar.tsx:27,60`). No work remained; closed as done.
 
 ### #41. A released order permanently burns its registration — RESOLVED 2026-09-30
 
@@ -1159,9 +1161,19 @@ so the frontend can hydrate the venue. Only the **event participants/artists
 (`events_event_participants` is auth-gated, `routes.rb:94`; `Events::Event` has no
 `artists` association).
 
+**Correction 2026-10-03 — the venue half is now SEED-BLOCKED, not frontend-fixable.**
+Live verification (local `e6...`, authed `GET /venues` + `GET /venues/:id`): all 25
+seed venues return **blank `latitude`/`longitude`, `gallery_urls == []`,
+`profile_url == null`**. The API is correct; the seed never sets venue coords or
+attaches media (`rg latitude|longitude db/seeds` → 0 hits). So wiring the fetch
+cannot surface anything until the seed populates venue geo/media — a **seed task**,
+not frontend wiring. The frontend keeps its name→coords stopgap
+(`src/lib/utils/venueCoords.ts`) and should switch to `GET /venues/:id` once the
+seed carries the data.
+
 **Fix (backend, lineup only):** add `participants`/`artists` to the public event
 serializers (or a public participants endpoint). Venue media/coords: no backend
-change needed.
+change needed — **seed must populate coordinator lat/lng + photos**.
 
 ### #37. No public waitlist-join or access-request endpoint
 
