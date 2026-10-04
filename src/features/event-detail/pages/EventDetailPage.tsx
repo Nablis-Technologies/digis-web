@@ -66,9 +66,9 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const [waitlistOffer, setWaitlistOffer] = useState<TicketTier | null>(null);
   const carouselImages = event.images && event.images.length > 0 ? event.images : [event.image];
   const posterRgb = useDominantColor(carouselImages[0]);
-  // BACKEND_GAPS #34 mitigation: the backend still quotes/orders for past
-  // events, so the frontend disables the buy entry once every date has ended.
-  const ended = useMemo(() => eventEnded(event), [event]);
+  // G-44: the server now evaluates lifecycle — prefer `ended` from it. Fall
+  // back to the local past-date gate (#34 mitigation) when the backend omits it.
+  const ended = useMemo(() => event.eventLifecycle === 'ended' || eventEnded(event), [event]);
   const { isDark } = useTheme();
   const { rgb } = useImageColor(event.image);
 
