@@ -7,9 +7,11 @@ import { Money } from "@/lib/money";
 import { readableAccent } from "@/lib/utils/color";
 import { useProminentHue } from "@/lib/hooks/useProminentHue";
 import { EventDateBadge } from "@/components/EventDateBadge";
+import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadges";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { AppButton } from '@/components/primitives/AppButton';
 import { eventActionLabel } from "@/lib/eventAction";
+import { cardFormat, cardDateRange } from "@/components/EventCard";
 
 // Invite-only distinguisher accent — a fixed amber, matching the grid card so a
 // gated event reads the same everywhere in discovery.
@@ -34,6 +36,8 @@ export function FeaturedEventCard({
 
   const isLarge = variant === "large" || large;
   const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const format = cardFormat(event);
+  const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
 
   // Desktop magazine layout — unchanged
   if (isLarge) {
@@ -87,7 +91,16 @@ export function FeaturedEventCard({
             </div>
 
           </div>
-          <EventDateBadge date={event.date} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
+          {range ? (
+            <FeaturedDateRangeBadge month={range.month} range={range.range} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
+          ) : (
+            <EventDateBadge date={event.date} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
+          )}
+          {format !== "single" && (
+            <div className="absolute top-5 right-5 translate-y-10">
+              <FormatTag format={format} label="MULTI-DAY" isDark size="md" />
+            </div>
+          )}
           <div className="absolute bottom-3 left-5 right-5">
             <h3
               className="text-[42px] xl:text-[52px] font-light tracking-[-0.5px] leading-[1.02] text-white"
@@ -274,7 +287,11 @@ export function FeaturedEventCard({
         }}
       >
         <div className="flex items-center gap-3">
-          <EventDateBadge date={event.date} accentRgb={hued} tone="featured" className="rounded-[13px]" />
+          {range ? (
+            <FeaturedDateRangeBadge month={range.month} range={range.range} accentRgb={hued} tone="featured" className="rounded-[13px]" />
+          ) : (
+            <EventDateBadge date={event.date} accentRgb={hued} tone="featured" className="rounded-[13px]" />
+          )}
 
           {/* Price */}
           <div className="flex flex-col min-w-0 flex-1">
