@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, SlidersHorizontal } from 'lucide-react';
-import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassField } from '@/lib/ui/glass';
 
-interface SearchBarProps {
+export interface SearchBarProps {
+  isDark: boolean;
   value: string;
   onChange: (v: string) => void;
   variant?: 'hero' | 'nav';
@@ -21,6 +21,7 @@ interface SearchBarProps {
 }
 
 export function SearchBar({
+  isDark,
   value,
   onChange,
   variant = 'hero',
@@ -32,7 +33,6 @@ export function SearchBar({
   onFocus,
   onBlur,
 }: SearchBarProps) {
-  const { isDark } = useTheme();
   const isNav = variant === 'nav';
   const [focused, setFocused] = useState(false);
 

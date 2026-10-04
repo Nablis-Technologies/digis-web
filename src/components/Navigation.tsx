@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Compass, Ticket, User, ArrowUpDown, LogIn } from 'lucide-react';
-import { useTheme } from '@/app/components/ThemeContext';
-import { useAuth } from '@/features/auth/context/AuthContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
-interface NavigationProps {
+export interface NavigationProps {
+  isDark: boolean;
+  /** Signed-in users get Profile; guests get a Log in tab. */
+  isAuthenticated: boolean;
   currentView: string;
   onNavigate: (view: 'discover' | 'tickets' | 'profile' | 'resale') => void;
   onRequestAuth?: () => void;
@@ -19,9 +20,7 @@ export const NAV_ITEMS = [
   { id: 'profile' as const, label: 'Profile', Icon: User },
 ];
 
-export function Navigation({ currentView, onNavigate, onRequestAuth }: NavigationProps) {
-  const { isDark } = useTheme();
-  const { isAuthenticated } = useAuth();
+export function Navigation({ isDark, isAuthenticated, currentView, onNavigate, onRequestAuth }: NavigationProps) {
   const [scrolled, setScrolled] = useState(false);
   const ticking = useRef(false);
 
@@ -87,6 +86,7 @@ export function Navigation({ currentView, onNavigate, onRequestAuth }: Navigatio
             {items.map(({ id, label, Icon }) => (
               <NavItem
                 key={id}
+                isDark={isDark}
                 icon={<Icon className="w-[22px] h-[22px]" strokeWidth={1.5} />}
                 label={label}
                 active={id === 'login' ? false : currentView === id}
@@ -106,11 +106,9 @@ export function Navigation({ currentView, onNavigate, onRequestAuth }: Navigatio
   );
 }
 
-function NavItem({ icon, label, active, onClick }: {
-  icon: React.ReactNode; label: string; active: boolean; onClick: () => void;
+function NavItem({ isDark, icon, label, active, onClick }: {
+  isDark: boolean; icon: ReactNode; label: string; active: boolean; onClick: () => void;
 }) {
-  const { isDark } = useTheme();
-
   return (
     <AppButton
       whileTap={{ scale: 0.88 }}

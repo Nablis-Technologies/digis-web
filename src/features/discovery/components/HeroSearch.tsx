@@ -95,6 +95,7 @@ export function HeroSearch({
         )}
         <div className="relative">
           <SearchBar
+            isDark={isDark}
             value={searchQuery}
             onChange={onSearchChange}
             variant="hero"
@@ -152,7 +153,7 @@ export function HeroSearch({
                   City
                 </p>
                 <div className="mb-4">
-                  <LocationSelector />
+                  <LocationSelector isDark={isDark} />
                 </div>
 
                 {/* Divider */}
@@ -166,6 +167,7 @@ export function HeroSearch({
                 />
 
                 <FilterPanel
+                  isDark={isDark}
                   sortBy={sortBy}
                   onSortChange={onSortChange}
                   onlyAvailable={onlyAvailable}

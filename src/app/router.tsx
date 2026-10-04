@@ -602,6 +602,8 @@ function AppContent() {
       {!selectedEvent && (
         <div className="lg:hidden">
           <Navigation
+            isDark={isDark}
+            isAuthenticated={isAuthenticated}
             currentView={currentView}
             onRequestAuth={requestAuth}
             onNavigate={(view) => {

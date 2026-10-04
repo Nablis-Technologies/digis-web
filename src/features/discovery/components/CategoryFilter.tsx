@@ -6,21 +6,23 @@ import {
   useState,
 } from "react";
 import { LayoutGrid } from "lucide-react";
-import { useTheme } from "@/app/components/ThemeContext";
 import { CATEGORIES, categoryMeta, FALLBACK_CATEGORY_HEX, hexToRgb, hexToRgba, readableCategoryRgb } from "@/lib/categoryColors";
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 
-export function CategoryFilter({
-  categories,
-  selectedCategory,
-  onChange,
-}: {
+export interface CategoryFilterProps {
+  isDark: boolean;
   categories: string[];
   selectedCategory: string;
   onChange: (category: string) => void;
-}) {
-  const { isDark } = useTheme();
+}
+
+export function CategoryFilter({
+  isDark,
+  categories,
+  selectedCategory,
+  onChange,
+}: CategoryFilterProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Scroll indicator state

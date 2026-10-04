@@ -96,6 +96,7 @@ export function EventGrid({
 
       {events.length === 0 ? (
         <EmptyState
+          isDark={isDark}
           selectedCategory={selectedCategory}
           searchQuery={searchQuery}
           onReset={onReset ?? (() => {})}
