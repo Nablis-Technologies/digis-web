@@ -168,6 +168,23 @@ export interface Event {
   rating?: number;
   /** Explicitly mark an event as sold out regardless of ticketsLeft. */
   soldOut?: boolean;
+  /**
+   * Server-evaluated timing state (G-44). Drives the "Ended"/"Happening Now"
+   * badge and gates the buy CTA. Absent when the backend omits it.
+   */
+  eventLifecycle?: "upcoming" | "ongoing" | "ended" | "unscheduled";
+  /**
+   * Server-evaluated sellability (G-44) — distinguishes sold-out / coming-soon
+   * / sales-closed / gated offers. Absent when the backend omits it.
+   */
+  ticketAvailability?:
+    | "available"
+    | "coming_soon"
+    | "sold_out"
+    | "sales_closed"
+    | "no_public_tickets"
+    | "no_eligible_dates"
+    | "unavailable";
   /** Tailwind gradient classes used for the event's artwork overlay. */
   gradient?: string;
   /** Starting price for international/foreign-currency buyers, in cents (backend `*_minor`). */

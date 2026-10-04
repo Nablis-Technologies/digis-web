@@ -22,7 +22,7 @@
  * is merged in — absent backend data renders as absent.
  */
 
-import type { Event, EventOrganizer } from "@/types";
+import type { Event, EventArtist, EventOrganizer } from "@/types";
 import { isoToDisplayDate, isoToDisplayTime } from "@/lib/mappers";
 
 /* ─── Backend wire types ─── */
@@ -43,6 +43,17 @@ export interface BackendEventDate {
   venue?: { id: string; name: string; city?: string } | null;
 }
 
+/** G-44 lifecycle + sellability states — served on every list card. */
+export type EventLifecycle = "upcoming" | "ongoing" | "ended" | "unscheduled";
+export type TicketAvailability =
+  | "available"
+  | "coming_soon"
+  | "sold_out"
+  | "sales_closed"
+  | "no_public_tickets"
+  | "no_eligible_dates"
+  | "unavailable";
+
 export interface BackendEvent {
   id: string;
   slug?: string;
@@ -51,6 +62,8 @@ export interface BackendEvent {
   visibility?: string;
   currency?: string;
   price_from_minor?: number | null;
+  event_lifecycle?: EventLifecycle;
+  ticket_availability?: TicketAvailability;
   categories?: { id: string; name: string }[];
   event_dates?: BackendEventDate[];
   event_media?: BackendMedia[];
@@ -62,6 +75,21 @@ export interface BackendEvent {
   event_organizations?: {
     role?: string;
     organization?: { id: string; name: string; slug?: string } | null;
+  }[];
+  /** Lineup — public EventParticipantSerializer (artist profile per entry). */
+  event_participants?: {
+    id?: string;
+    name?: string;
+    handle?: string;
+    role?: string;
+    time?: string;
+    genre?: string;
+    verified?: boolean;
+    followers?: number;
+    eventsPlayed?: number;
+    rating?: number;
+    bio?: string;
+    image?: string;
   }[];
   organization?: { id: string; name: string; slug?: string } | null;
 }
@@ -131,12 +159,16 @@ export function backendEventToEvent(be: BackendEvent): Event {
     category: be.categories?.[0]?.name ?? "",
     priceFromMinor: typeof be.price_from_minor === "number" ? be.price_from_minor : 0,
     currency: (be.currency as Event["currency"]) ?? "ETB",
+    // G-44: server-evaluated lifecycle + availability. Absent renders as
+    // absent (ADR-0002) — never inferred client-side.
+    ...(be.event_lifecycle ? { eventLifecycle: be.event_lifecycle } : {}),
+    ...(be.ticket_availability ? { ticketAvailability: be.ticket_availability } : {}),
     // Co-organizers come from the live `event_organizations` association. The
     // event_setting.config projection no longer carries `organizers` (#53).
     ...(organizers.length > 0 ? { organizers } : {}),
   };
-  // NOTE: `age_restriction`, `lineup`, and `seat_map` have no public source
-  // after the 2026-09-30 backend release and render absent (ADR-0002) — see
-  // BACKEND_GAPS #53 / #36. Per-offer admission (price, availability, audience,
-  // approval, waitlist) comes from `GET /public/events/:slug/products`.
+  // NOTE: `age_restriction` and `seat_map` have no public source after the
+  // 2026-09-30 backend release and render absent (ADR-0002) — see #53.
+  // Per-offer admission (price, availability, audience, approval, waitlist)
+  // comes from `GET /public/events/:slug/products`.
 }

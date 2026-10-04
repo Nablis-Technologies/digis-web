@@ -11,6 +11,7 @@ import { glassShadow } from "@/lib/ui/glass";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { eventEnded } from "@/lib/eventDates";
 import { eventActionLabel } from "@/lib/eventAction";
+import { availabilityMeta } from "@/lib/eventAvailability";
 
 // Invite-only distinguisher accent — a fixed amber, deliberately not the
 // per-event category hue, so a gated event reads distinctly.
@@ -229,14 +230,13 @@ export function EventCard({
 }) {
   const { rgb } = useImageColor(event.image);
   const { isDark } = useTheme();
-  // Sold out only when the backend says so — a missing tickets_left value
-  // must not read as zero left.
-  const isSoldOut = event.soldOut === true || event.ticketsLeft === 0;
-  // BACKEND_GAPS #34 mitigation: a past event stays on the grid but is flagged
-  // Ended — the same "not buyable" treatment as Sold Out (the backend still
-  // accepts orders for it; purchase is disabled on the detail page).
-  const isEnded = eventEnded(event);
-  const isInactive = isSoldOut || isEnded;
+  // G-44: prefer the server's sellability/lifecycle. Fall back to the local
+  // derivation only when the backend omits them (ADR-0002 — never invent).
+  const availability = availabilityMeta(event);
+  const isSoldOut = availability.badge === 'Sold Out';
+  // Ended: server lifecycle wins; else the local past-date gate (#34).
+  const isEnded = event.eventLifecycle === 'ended' || eventEnded(event);
+  const isInactive = isSoldOut || isEnded || (availability.buyBlocked && event.ticketAvailability !== 'no_public_tickets');
   const isLow =
     typeof event.ticketsLeft === "number" && event.ticketsLeft > 0 && event.ticketsLeft <= 45;
   const accent = isDark ? "#d6f905" : "#d6f905";
@@ -319,7 +319,7 @@ export function EventCard({
                   textShadow: `0 2px 10px rgba(0,0,0,0.5)`,
                 }}
               >
-                {isSoldOut ? "Sold Out" : "Ended"}
+                {isEnded && !isSoldOut ? "Ended" : (availability.badge ?? "Unavailable")}
               </span>
             </div>
           </motion.div>
@@ -471,7 +471,9 @@ export function EventCard({
                 fontWeight: 700,
               }}
             >
-              {isSoldOut ? "Sold Out" : isEnded ? "Ended" : eventActionLabel()}
+              {isEnded && !isSoldOut
+                ? "Ended"
+                : (availability.badge ?? eventActionLabel())}
             </span>
             <ChevronRight
               className="w-2.5 h-2.5"
