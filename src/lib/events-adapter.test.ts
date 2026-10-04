@@ -75,4 +75,35 @@ describe("backendEventToEvent", () => {
     const ev = backendEventToEvent(wire({ price_from_minor: undefined }));
     expect(ev.priceFromMinor).toBe(0);
   });
+
+  it("maps the G-44 lifecycle + availability states when served", () => {
+    const ev = backendEventToEvent(
+      wire({ event_lifecycle: "ongoing", ticket_availability: "sold_out" }),
+    );
+    expect(ev.eventLifecycle).toBe("ongoing");
+    expect(ev.ticketAvailability).toBe("sold_out");
+  });
+
+  it("leaves G-44 fields absent when the backend omits them (never inferred)", () => {
+    const ev = backendEventToEvent(wire());
+    expect(ev.eventLifecycle).toBeUndefined();
+    expect(ev.ticketAvailability).toBeUndefined();
+  });
+
+  it("maps lineup from event_participants when served, absent when not", () => {
+    const served = backendEventToEvent(
+      wire({
+        event_participants: [
+          { name: "Teddy Afro", role: "performer", handle: "@teddy", followers: 1200, verified: true },
+        ],
+      }),
+    );
+    expect(served.lineup).toHaveLength(1);
+    expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", role: "performer", handle: "@teddy", followers: 1200, verified: true });
+
+    // The public payload does not expose participants yet (BACKEND_GAPS #36) —
+    // the adapter must not fabricate a lineup.
+    const absent = backendEventToEvent(wire());
+    expect(absent.lineup).toBeUndefined();
+  });
 });

@@ -72,6 +72,28 @@ test.describe('event detail', () => {
     await expect(page.getByText(products[0].name).first()).toBeVisible({ timeout: 15_000 });
   });
 
+  test('lineup renders iff the backend serves participants (contract guard)', async ({ page }) => {
+    // The lineup was silently missing because the API never sent participants
+    // (BACKEND_GAPS #36) and no test asserted the contract. This pins it: read
+    // the live detail payload, then require the UI to match — section visible
+    // when `event_participants` is served, hidden when it is not.
+    const detailRes = await page.request.get('http://localhost:3000/public/events/on-on');
+    expect(detailRes.status()).toBe(200);
+    const body = (await detailRes.json()) as { data?: { event_participants?: unknown[] } };
+    const served = Array.isArray(body.data?.event_participants) && body.data!.event_participants!.length > 0;
+
+    await page.goto('/events/on-on');
+    await expect(page.getByRole('heading', { name: 'On & On' })).toBeVisible({ timeout: 15_000 });
+
+    const lineupHeading = page.getByRole('heading', { name: 'Lineup' });
+    if (served) {
+      await expect(lineupHeading.first()).toBeVisible({ timeout: 10_000 });
+    } else {
+      // Backend still omits it → the section must render nothing (no fabrication).
+      await expect(page.getByRole('heading', { name: 'Lineup' })).toHaveCount(0);
+    }
+  });
+
   test('unknown slug redirects back to discovery', async ({ page }) => {
     await page.goto('/events/does-not-exist');
     await page.waitForURL('http://localhost:5173/', { timeout: 15_000 });

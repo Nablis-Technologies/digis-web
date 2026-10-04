@@ -130,6 +130,23 @@ export function backendEventToEvent(be: BackendEvent): Event {
     .filter((org): org is NonNullable<typeof org> => Boolean(org))
     .map((org) => ({ id: org.id, name: org.name }));
 
+  // Lineup from the public `event_participants` association. The backend does
+  // not expose it yet (BACKEND_GAPS #36), so this maps nothing until it does —
+  // the section then renders; absent stays absent (ADR-0002).
+  const lineup: EventArtist[] = (be.event_participants ?? []).map((p) => ({
+    name: p.name ?? "",
+    ...(p.handle ? { handle: p.handle } : {}),
+    ...(p.role ? { role: p.role } : {}),
+    ...(p.time ? { time: p.time } : {}),
+    ...(p.genre ? { genre: p.genre } : {}),
+    ...(typeof p.verified === "boolean" ? { verified: p.verified } : {}),
+    ...(typeof p.followers === "number" ? { followers: p.followers } : {}),
+    ...(typeof p.eventsPlayed === "number" ? { eventsPlayed: p.eventsPlayed } : {}),
+    ...(typeof p.rating === "number" ? { rating: p.rating } : {}),
+    ...(p.bio ? { bio: p.bio } : {}),
+    ...(p.image ? { image: p.image } : {}),
+  }));
+
   return {
     id: be.id,
     slug: be.slug,
@@ -166,6 +183,8 @@ export function backendEventToEvent(be: BackendEvent): Event {
     // Co-organizers come from the live `event_organizations` association. The
     // event_setting.config projection no longer carries `organizers` (#53).
     ...(organizers.length > 0 ? { organizers } : {}),
+    // Lineup — only when the backend serves participants (#36).
+    ...(lineup.length > 0 ? { lineup } : {}),
   };
   // NOTE: `age_restriction` and `seat_map` have no public source after the
   // 2026-09-30 backend release and render absent (ADR-0002) — see #53.
