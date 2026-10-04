@@ -18,12 +18,11 @@ export function PaymentStep({
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
 
-  // BACKEND_GAPS.md: the backend's PAYMENT_METHODS are telebirr/card/bank —
-  // "cbe" is rejected (invalid_payment_method). CBE stays visible but disabled
-  // until the backend adds it; nothing here maps cbe → bank (ADR-0002).
+  // The backend recognizes only the canonical `cbebirr` (not `cbe` / `cbe_birr`,
+  // which 422 invalid_payment_method) — see G-12.
   const methods: { id: PaymentMethod; label: string; tag: string; icon: any; accent: string; disabled?: boolean; note?: string }[] = [
     { id: 'telebirr', label: 'Telebirr', tag: 'Mobile money', icon: <ProviderLogo kind="telebirr" size={40} />, accent: '#1aa64b' },
-    { id: 'cbe', label: 'CBE Birr', tag: 'Bank transfer', icon: <ProviderLogo kind="cbe" size={40} />, accent: '#7b2d8e', disabled: true, note: 'Coming soon' },
+    { id: 'cbebirr', label: 'CBE Birr', tag: 'Bank transfer', icon: <ProviderLogo kind="cbe" size={40} />, accent: '#7b2d8e' },
     { id: 'card', label: 'Credit / Debit Card', tag: 'Visa, Mastercard', icon: <CreditCard className="w-5 h-5" />, accent: '#d6f905' },
   ];
 

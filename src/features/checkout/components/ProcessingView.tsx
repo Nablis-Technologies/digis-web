@@ -39,7 +39,7 @@ export function ProcessingView({ isDark, method, mode = 'payment' }: { isDark: b
         style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
         {mode === 'confirming'
           ? 'We’re waiting for the payment processor to confirm. This usually takes a moment.'
-          : `Authorizing payment via ${method === 'telebirr' ? 'Telebirr' : method === 'cbe' ? 'CBE Birr' : method === 'card' ? 'your card' : 'the provider'}. This usually takes a moment.`}
+          : `Authorizing payment via ${method === 'telebirr' ? 'Telebirr' : method === 'cbebirr' ? 'CBE Birr' : method === 'card' ? 'your card' : 'the provider'}. This usually takes a moment.`}
       </p>
     </div>
   );

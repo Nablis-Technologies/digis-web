@@ -13,7 +13,7 @@ export type CustomQuestion = {
 };
 
 export type CheckoutStep = 'seat' | 'date' | 'review' | 'extras' | 'details' | 'questions' | 'payment' | 'otp' | 'processing' | 'pending' | 'success';
-export type PaymentMethod = 'telebirr' | 'cbe' | 'card';
+export type PaymentMethod = 'telebirr' | 'cbebirr' | 'card';
 
 export interface ContactDetails {
   name: string;

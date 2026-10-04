@@ -575,9 +575,6 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   const canContinue = useMemo(() => {
     if (step === 'seat') return hasFixedSeatRequirement ? selectedSeats.length === seatLimit : selectedSeats.length > 0;
     if (step === 'date') return Boolean(selectedEventDateId);
-    // CBE is disabled (backend gap) — it can never be the active method, but
-    // guard anyway so a stale selection can't submit.
-    if (step === 'payment' && payMethod === 'cbe') return false;
     return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
   }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId]);
 
