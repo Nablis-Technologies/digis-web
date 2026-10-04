@@ -1,7 +1,7 @@
 ﻿import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
-  X, Phone, Lock, Mail, User, ArrowRight, Eye, EyeOff,
+  X, Phone, Lock, User, ArrowRight, Eye, EyeOff,
   AlertCircle, Check, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -87,10 +87,9 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   const [success, setSuccess] = useState(false);
 
   // form state
-  const [identifier, setIdentifier] = useState(''); // unified entry (phone or email)
+  const [identifier, setIdentifier] = useState(''); // sign-in phone
   const [fullName, setFullName] = useState(''); // signup only
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState(''); // signup only â€” optional server-side
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
@@ -134,7 +133,6 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     clearAllErrors();
     const trimmedName = fullName.trim();
     const e164 = buildPhone(phone, country.dial);
-    const trimmedEmail = email.trim();
     // Client-side policy â€” the backend currently enforces none of these
     // (BACKEND_GAPS.md #10), so the signup form is the only gate. Each message
     // is attached to the field it concerns. Name is collected here and sent to
@@ -142,9 +140,6 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     const next: Record<string, string> = {};
     if (!trimmedName) next.name = 'Enter your name.';
     if (!/^\+[1-9]\d{6,14}$/.test(e164)) next.phone = 'Enter a valid mobile number for the selected country.';
-    // Email is optional (`Core::User` validates it with `allow_blank`), so only
-    // shape-check it when the user supplies one.
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) next.email = 'Enter a valid email address, or leave it blank.';
     if (password.length < 8) next.password = 'Password must be at least 8 characters.';
     if (password !== confirmPassword) next.passwordConfirmation = 'Passwords do not match.';
     if (Object.keys(next).length) { setErrors(next); return; }
@@ -153,7 +148,6 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     const res = await auth.signUp({
       name: trimmedName,
       phone: e164,
-      ...(trimmedEmail ? { email: trimmedEmail } : {}),
       password,
       passwordConfirmation: confirmPassword,
     });
@@ -164,7 +158,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     // the exact input; whatever names no field shows as a form-level line.
     const { fields, general } = mapFieldErrors(res.fieldErrors);
     const mapped: Record<string, string> = {};
-    for (const key of ['name', 'phone', 'email', 'password', 'passwordConfirmation']) {
+    for (const key of ['name', 'phone', 'password', 'passwordConfirmation']) {
       if (fields[key]) mapped[key] = fields[key];
     }
     // The phone already owns an account â€” either a real one, or the shadow user
@@ -186,8 +180,8 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   };
 
   const titles = {
-    signin: { kicker: 'Welcome back', title: 'Log in', sub: 'Enter your phone number or email and password to continue.' },
-    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required â€” email is optional.' },
+    signin: { kicker: 'Welcome back', title: 'Log in', sub: 'Enter your phone number and password to continue.' },
+    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required.' },
   };
   const t = titles[mode];
 
@@ -299,7 +293,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                   <>
                     <PhoneField
                       country={country} onCountryChange={setCountry}
-                      placeholder="Phone number or email"
+                      placeholder="Phone number"
                       value={identifier} onChange={(v) => { setIdentifier(v); clearField('identifier'); }} error={errors.identifier}
                       isDark={isDark} onEnter={handleSignIn}
                     />
@@ -318,7 +312,6 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                       value={phone} onChange={(v) => { setPhone(v); clearField('phone'); }} error={errors.phone}
                       isDark={isDark} onEnter={handleSignUp}
                     />
-                    <EmailField value={email} onChange={(v) => { setEmail(v); clearField('email'); }} error={errors.email} isDark={isDark} onEnter={handleSignUp} />
                     <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleSignUp} />
                     <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); clearField('passwordConfirmation'); }} error={errors.passwordConfirmation} isDark={isDark} placeholder="Confirm your password" onEnter={handleSignUp} />
                     <ErrorLine error={formError} />
@@ -512,26 +505,6 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="Name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
-      </div>
-      <FieldError error={error} />
-    </div>
-  );
-}
-
-/* â”€â”€â”€ Email field (signup only â€” optional server-side) â”€â”€â”€â”€â”€â”€ */
-function EmailField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
-  const [focused, setFocused] = useState(false);
-  const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
-  return (
-    <div>
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}>
-        <GlassReflection isDark={isDark} />
-        <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Mail className="w-4 h-4" /></span>
-        <AppInput type="email" value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="Email (optional)" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
       </div>
