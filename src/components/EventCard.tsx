@@ -7,6 +7,7 @@ import type { Event } from "@/types";
 import { Money } from "@/lib/money";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { EventDateBadge } from "@/components/EventDateBadge";
+import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadges";
 import { glassShadow } from "@/lib/ui/glass";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { eventEnded } from "@/lib/eventDates";
@@ -62,6 +63,44 @@ export function formatCountdown(ms: number): string {
   if (d > 0) return `${d}d ${String(h).padStart(2, "0")}h`;
   if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
   return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+/** Month abbreviation + day-of-month from an ISO date, for the range badge. */
+function monthDayOf(iso: string): { month: string; day: string } {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return { month: "---", day: "--" };
+  return {
+    month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
+    day: String(d.getDate()).padStart(2, "0"),
+  };
+}
+
+/**
+ * Card format vocabulary. We only ever emit `single` or `multiDay` — the
+ * backend surfaces no recurrence flag (ADR-0002: never invent), so `recurring`
+ * is never produced here.
+ */
+export type CardFormat = "single" | "multiDay";
+
+/** Multi-day when the event has more than one scheduled date. */
+export function cardFormat(event: Pick<Event, "eventDates">): CardFormat {
+  return (event.eventDates?.length ?? 0) > 1 ? "multiDay" : "single";
+}
+
+/** Month/day range across an event's dates, e.g. { month: "AUG–SEP", range: "28–30" }. */
+export function cardDateRange(eventDates: Event["eventDates"]): { month: string; range: string } {
+  const dates = (eventDates ?? [])
+    .map((d) => new Date(d.startsAt))
+    .filter((d) => !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (dates.length < 2) {
+    const md = dates[0] ? monthDayOf(dates[0].toISOString()) : { month: "---", day: "--" };
+    return { month: md.month, range: md.day };
+  }
+  const first = monthDayOf(dates[0].toISOString());
+  const last = monthDayOf(dates[dates.length - 1].toISOString());
+  const month = first.month === last.month ? first.month : `${first.month}–${last.month}`;
+  return { month, range: first.day === last.day ? first.day : `${first.day}–${last.day}` };
 }
 
 export function parseDateParts(dateStr: string): {
@@ -243,6 +282,10 @@ export function EventCard({
   const accentRgb = "214,249,5";
   const priceColor = isDark ? "#d6f905" : "#0a0a0a";
   const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const format = cardFormat(event);
+  const formatLabel = format === "multiDay" ? "MULTI-DAY" : "";
+  const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
+  const showDayPasses = format === "multiDay";
 
   return (
     <motion.div
@@ -325,9 +368,17 @@ export function EventCard({
           </motion.div>
         )}
 
+        {/* Top-left format chip: names a multi-day/recurring schedule. */}
+        {format !== "single" && (
+          <div className="absolute top-3 left-3 z-20 inline-flex items-center h-[22px] px-2.5 rounded-full"
+            style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.18)" }}>
+            <FormatTag format={format} label={formatLabel} isDark />
+          </div>
+        )}
+
         {/* Top-left status chip: remaining tickets, when the backend exposes a
             count (event.type is offer-driven now — no invite-only mode). */}
-        {!isEnded && !isSoldOut && typeof event.ticketsLeft === "number" && (
+        {format === "single" && !isEnded && !isSoldOut && typeof event.ticketsLeft === "number" && (
           <div className="absolute top-3 left-3 z-20">
             <motion.span
               animate={isLow ? { opacity: [0.72, 1, 0.72] } : { opacity: 1 }}
@@ -354,7 +405,11 @@ export function EventCard({
             </motion.span>
           </div>
         )}
-        <EventDateBadge date={event.date} accentRgb={rgb} className="absolute top-3 right-3 rounded-[13px]" />
+        {range ? (
+          <FeaturedDateRangeBadge month={range.month} range={range.range} accentRgb={rgb} className="absolute top-3 right-3 rounded-[13px]" />
+        ) : (
+          <EventDateBadge date={event.date} accentRgb={rgb} className="absolute top-3 right-3 rounded-[13px]" />
+        )}
 
         {/* Bottom-left of image: category + optional invite */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
@@ -442,6 +497,11 @@ export function EventCard({
             >
               {priceLabel}
             </span>
+            {showDayPasses && (
+              <span className="text-[7.5px] tracking-[1.1px] truncate" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}>
+                · DAY PASSES
+              </span>
+            )}
           </div>
 
           <motion.div
