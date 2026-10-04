@@ -9,7 +9,6 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { mapFieldErrors } from '@/lib/errors';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { glassEdge, glassField } from '@/lib/ui/glass';
-import { usePhoneInput } from '@/lib/usePhoneInput';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
@@ -480,22 +479,19 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
   placeholder?: string; value: string; onChange: (v: string) => void;
   isDark: boolean; onEnter?: () => void; error?: string;
 }) {
-  const phone = usePhoneInput(value, onChange, country.code, country.dial);
+  const [focused, setFocused] = useState(false);
   return (
     <div>
       <div className="flex items-center gap-0 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused: phone.focused })}>
+        style={glassField(isDark, { error: !!error, focused })}>
         <GlassReflection isDark={isDark} />
         <CountrySelector country={country} onChange={onCountryChange} isDark={isDark} />
         <AppInput
-          ref={phone.ref}
-          type="tel" inputMode="tel" autoComplete="tel"
-          value={phone.display} placeholder={placeholder || 'Phone number'}
-          onChange={phone.handleChange}
-          onFocus={phone.onFocus} onBlur={phone.onBlur}
+          type="tel" value={value} placeholder={placeholder || 'Phone number'}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
           aria-invalid={error ? true : undefined}
-          className="tabular-nums"
           style={{ ...inputStyle(isDark), paddingLeft: '10px' }}
         />
       </div>

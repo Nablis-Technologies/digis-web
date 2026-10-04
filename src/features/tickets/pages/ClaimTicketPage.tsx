@@ -16,7 +16,6 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
-import { usePhoneInput } from '@/lib/usePhoneInput';
 import { toastError } from '@/lib/feedback';
 
 const ACCENT_HEX = '#d6f905';
@@ -46,7 +45,6 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
-  const phoneInput = usePhoneInput(phone, setPhone, 'ET', '251');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -76,7 +74,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
     setSending(true);
     setError('');
     try {
-      const result = await transferService.requestOtp(id, token, phoneInput.toE164());
+      const result = await transferService.requestOtp(id, token, phone.trim());
       setChallengeId(result.challengeId);
       setStep('claim');
     } catch (err) {
@@ -95,7 +93,7 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
       const result = await transferService.accept({
         id,
         token,
-        phone: phoneInput.toE164(),
+        phone: phone.trim(),
         verificationToken,
         password: password || undefined,
         passwordConfirmation: passwordConfirm || undefined,
@@ -354,22 +352,18 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
                   <div className="relative mt-3 rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
-                      ref={phoneInput.ref}
                       type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
                       placeholder="+251 9·· ·· ·· ··"
-                      value={phoneInput.display}
-                      onChange={phoneInput.handleChange}
-                      onFocus={() => { setFocused(true); phoneInput.onFocus(); }}
-                      onBlur={() => { setFocused(false); phoneInput.onBlur(); }}
-                      className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px] tabular-nums"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+                      className="relative z-10 w-full px-4 py-3.5 outline-none text-[14px]"
                       style={{ color: text, fontFamily: "'Inter', sans-serif" }}
                     />
                   </div>
                   <AppButton
                     onClick={handleSendCode}
-                    disabled={!phoneInput.toE164() || sending}
+                    disabled={!phone.trim() || sending}
                     className="mt-4 w-full py-3.5 rounded-full flex items-center justify-center gap-2 cursor-pointer"
                     style={{ background: ACCENT_HEX, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13.5 }}
                   >
@@ -473,4 +467,3 @@ export function ClaimTicketPage({ id, token, onRequestAuth, onNavigateHome, onNa
     </div>
   );
 }
-

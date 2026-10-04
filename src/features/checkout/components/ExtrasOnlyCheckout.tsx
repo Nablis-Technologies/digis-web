@@ -14,7 +14,6 @@ import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { glassField } from '@/lib/ui/glass';
-import { usePhoneInput } from '@/lib/usePhoneInput';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { EventProduct, SelectedEventProduct } from '@/types';
 
@@ -47,12 +46,11 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
   const [selected, setSelected] = useState<SelectedEventProduct[]>(existing);
   const [step, setStep] = useState<'extras' | 'details' | 'paying' | 'error'>('extras');
   const [error, setError] = useState<string>();
-  const [guestPhone, setGuestPhone] = useState(user?.phone ?? '');
+  const [guestPhone, setGuestPhone] = useState(user?.phone ?? '+251');
   const [guestName, setGuestName] = useState(user?.name ?? '');
   const [guestEmail, setGuestEmail] = useState(user?.email ?? '');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const guestPhoneInput = usePhoneInput(guestPhone, setGuestPhone, 'ET', '251');
   const payingRef = useRef(false);
 
   const clearField = (field: string) => setFieldErrors((prev) => {
@@ -84,7 +82,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
 
   const submitPhone = async () => {
     const next: Record<string, string> = {};
-    if (guestPhone.replace(/\D/g, '').length < 9) next.phone = 'Enter your phone number to continue.';
+    if (guestPhone.replace(/\s/g, '').length < 9) next.phone = 'Enter your phone number to continue.';
     if (guestEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) next.email = 'Enter a valid email address, or leave it blank.';
     if (Object.keys(next).length) { setFieldErrors(next); return; }
     setFieldErrors({});
@@ -98,7 +96,7 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
     setStep('paying');
     setError(undefined);
     try {
-      const guest = !isAuthenticated ? { phone: guestPhoneInput.toE164() } : undefined;
+      const guest = !isAuthenticated ? { phone: guestPhone.trim() } : undefined;
       const quote = await orderModule.quote({
         eventId,
         items: selected.filter((a) => a.quantity > 0).map((a) => ({ eventProductId: a.productId, quantity: a.quantity })),
@@ -192,17 +190,13 @@ export function ExtrasOnlyCheckout({ event, eventId, products, existing = [], on
             <div className="relative mb-3 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!fieldErrors.phone, focused: focusedField === 'phone' })}>
               <GlassReflection isDark={isDark} />
               <AppInput
-                ref={guestPhoneInput.ref}
                 type="tel"
-                inputMode="tel"
-                autoComplete="tel"
                 placeholder="Phone number"
-                value={guestPhoneInput.display}
-                onChange={(e) => { guestPhoneInput.handleChange(e); clearField('phone'); }}
-                onFocus={() => { setFocusedField('phone'); guestPhoneInput.onFocus(); }}
-                onBlur={() => { setFocusedField(null); guestPhoneInput.onBlur(); }}
+                value={guestPhone}
+                onChange={(e) => { setGuestPhone(e.target.value); clearField('phone'); }}
+                onFocus={() => setFocusedField('phone')} onBlur={() => setFocusedField(null)}
                 error={fieldErrors.phone} errorClassName={FIELD_ERROR_CLASS}
-                className="relative z-10 w-full px-4 py-3 text-[14px] outline-none tabular-nums"
+                className="relative z-10 w-full px-4 py-3 text-[14px] outline-none"
                 style={{ color: textPrimary, fontFamily: "'Inter', sans-serif" }}
               />
             </div>

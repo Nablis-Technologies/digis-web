@@ -6,7 +6,6 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassControl, glassField } from '@/lib/ui/glass';
-import { usePhoneInput } from '@/lib/usePhoneInput';
 import { waitlistModule } from '@/lib/waitlist';
 import { registrationModule } from '@/lib/registration';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -24,7 +23,6 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
   const accent = '#d6f905';
 
   const [phone, setPhone] = useState(user?.phone ?? '');
-  const phoneInput = usePhoneInput(phone, setPhone, 'ET', '251');
   const [code, setCode] = useState('');
   const [challengeId, setChallengeId] = useState<string>();
   const [phase, setPhase] = useState<'form' | 'code' | 'done'>('form');
@@ -43,7 +41,7 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
       await waitlistModule.join(slug, {
         eventProductId: offer.id ?? '',
         ...(verificationToken ? { verificationToken } : {}),
-        ...(phone ? { phone: phoneInput.toE164() } : {}),
+        ...(phone ? { phone } : {}),
         // Audience proof for a gated offer — the backend re-authorizes it inside
         // the waitlist submit, so omitting it fails an invite/access-code offer.
         ...(accessCode ? { accessCode } : {}),
@@ -67,7 +65,7 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
     setError(undefined);
     try {
       const challenge = await waitlistModule.requestOtp(slug, offer.id ?? '', {
-        phone: phoneInput.toE164(),
+        phone,
         ...(accessCode ? { accessCode } : {}),
         ...(invitationToken ? { invitationToken } : {}),
       });
@@ -178,16 +176,13 @@ export function WaitlistSheet({ slug, offer, accessCode, invitationToken, onClos
                   <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { error: !!error, focused })}>
                     <GlassReflection isDark={isDark} />
                     <AppInput
-                      ref={phoneInput.ref}
-                      value={phoneInput.display}
-                      onChange={phoneInput.handleChange}
-                      onFocus={() => { setFocused(true); phoneInput.onFocus(); }}
-                      onBlur={() => { setFocused(false); phoneInput.onBlur(); }}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       placeholder="+251 9.."
                       inputMode="tel"
-                      autoComplete="tel"
                       disabled={isAuthenticated}
-                      className="relative z-10 w-full h-12 px-4 text-[14px] outline-none tabular-nums"
+                      className="relative z-10 w-full h-12 px-4 text-[14px] outline-none"
                       style={{ color: isDark ? '#fff' : '#111' }}
                     />
                   </div>

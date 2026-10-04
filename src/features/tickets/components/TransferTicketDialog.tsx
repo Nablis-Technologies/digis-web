@@ -25,7 +25,6 @@ import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { FieldError } from '@/components/primitives/FieldError';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
-import { usePhoneInput } from '@/lib/usePhoneInput';
 import { mapApiError } from '@/lib/errors';
 
 interface TransferTicketProps {
@@ -62,7 +61,7 @@ function isValidContact(method: ContactMethod, value: string) {
   const v = value.trim();
   if (!v) return false;
   if (method === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  return v.replace(/\D/g, '').length >= 9;
+  return /^[+\d][\d\s()-]{6,}$/.test(v);
 }
 
 export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer', giftExtras = [] }: TransferTicketProps) {
@@ -72,7 +71,6 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
   const [step, setStep] = useState(0); // 0=recipient, 1=note, 2=review, 3=sent
   const [recipientName, setRecipientName] = useState('');
   const [contactValue, setContactValue] = useState('');
-  const contactPhone = usePhoneInput(contactValue, setContactValue, 'ET', '251');
   const [note, setNote] = useState('');
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -125,7 +123,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
         ticketId: ticket.id,
         recipientName: recipientName.trim(),
         contactMethod: 'phone',
-        contactValue: contactPhone.toE164(),
+        contactValue: contactValue.trim(),
         note: note.trim(),
         extraIds: isGift ? selectedExtraIds : undefined,
       }))
@@ -311,17 +309,13 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   error={Boolean(contactError)}
                 >
                   <AppInput
-                    ref={contactPhone.ref}
                     type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
                     placeholder="+251 9·· ·· ·· ··"
-                    value={contactPhone.display}
-                    onChange={contactPhone.handleChange}
-                    onFocus={contactPhone.onFocus}
-                    onBlur={() => { contactPhone.onBlur(); setTouched((t) => ({ ...t, contact: true })); }}
+                    value={contactValue}
+                    onChange={(e) => setContactValue(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, contact: true }))}
                     aria-invalid={contactError ? true : undefined}
-                    className={`w-full bg-transparent outline-none text-[14px] tabular-nums ${placeholderClass}`}
+                    className={`w-full bg-transparent outline-none text-[14px] ${placeholderClass}`}
                     style={{ fontFamily: "'Inter', sans-serif", color: text }}
                   />
                 </Field>

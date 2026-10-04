@@ -6,7 +6,6 @@ import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassField } from '@/lib/ui/glass';
-import { usePhoneInput } from '@/lib/usePhoneInput';
 
 export function DetailsStep({
   name, setName, email, setEmail, phone, setPhone,
@@ -79,12 +78,9 @@ export function DetailsStep({
 
 function Field({ icon, label, type = 'text', placeholder, value, onChange, error, isDark }: any) {
   const [focused, setFocused] = useState(false);
-  const isPhone = type === 'tel';
-  const phone = usePhoneInput(value, onChange, 'ET', '251');
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   const hasError = !!error;
-  const fieldFocused = isPhone ? phone.focused : focused;
 
   return (
     <div>
@@ -94,38 +90,26 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
           {label}
         </label>
       )}
-      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused: fieldFocused })}>
+      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
         <GlassReflection isDark={isDark} />
         <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
-          style={{ color: fieldFocused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim, transition: 'color 0.2s' }}>
+          style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim, transition: 'color 0.2s' }}>
           {icon}
         </div>
-        {isPhone ? (
-          <AppInput
-            ref={phone.ref}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={phone.display}
-            onChange={phone.handleChange}
-            onFocus={() => { setFocused(true); phone.onFocus(); }}
-            onBlur={() => { setFocused(false); phone.onBlur(); }}
-            placeholder={placeholder}
-            className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all tabular-nums"
-            style={{ fontFamily: "'Inter', sans-serif", fontSize: '14px', color: textPrimary }}
-          />
-        ) : (
-          <AppInput
-            type={type}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder={placeholder}
-            className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
-            style={{ fontFamily: "'Inter', sans-serif", fontSize: '14px', color: textPrimary }}
-          />
-        )}
+        <AppInput
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: '14px',
+            color: textPrimary,
+          }}
+        />
       </div>
       <AnimatePresence>
         {hasError && (
