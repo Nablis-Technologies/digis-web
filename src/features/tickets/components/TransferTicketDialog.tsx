@@ -12,6 +12,7 @@ import {
   Link2,
   Copy,
   Bell,
+  ShieldCheck,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -467,6 +468,17 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     </p>
                   </div>
                 )}
+
+                {/* Security note */}
+                <div className="flex items-center gap-2 px-1">
+                  <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textFaint }} strokeWidth={2} />
+                  <p
+                    className="text-[10.5px] leading-snug"
+                    style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}
+                  >
+                    Verified by Digis · {isGift ? 'secure gift delivery' : 'end-to-end ownership transfer'}
+                  </p>
+                </div>
               </motion.div>
             )}
 
