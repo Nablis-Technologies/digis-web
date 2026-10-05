@@ -189,6 +189,12 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
             {admitsMultiple && (
               <Users className="w-3 h-3" strokeWidth={2} style={{ color: accentColor }} />
             )}
+            {savingsPct > 0 && (
+              <span className="text-[9px] tracking-[1.2px] uppercase flex-shrink-0"
+                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: isDark ? 'rgba(214,249,5,0.75)' : '#4a5800' }}>
+                Save {savingsPct}%
+              </span>
+            )}
           </div>
           {waitingList ? (
             <AppButton
