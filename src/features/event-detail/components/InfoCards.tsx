@@ -3,7 +3,7 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
-export type InfoItem = { icon: React.ReactNode; label: string; value: string; onClick?: () => void };
+export type InfoItem = { icon: React.ReactNode; label: string; value: string; /** Optional second line (e.g. venue address under the venue name). */ sub?: string; onClick?: () => void };
 
 function boostSaturation([r, g, b]: [number, number, number], factor = 1.25): [number, number, number] {
   const avg = (r + g + b) / 3;
@@ -12,7 +12,7 @@ function boostSaturation([r, g, b]: [number, number, number], factor = 1.25): [n
 }
 
 export function InfoStrip({ items, rgb, reflectionSettings }: {
-  items: { icon: React.ReactNode; label: string; value: string }[];
+  items: { icon: React.ReactNode; label: string; value: string; sub?: string }[];
   rgb?: [number, number, number] | null;
   reflectionSettings?: GlassReflectionSettings;
 }) {
@@ -58,6 +58,12 @@ export function InfoStrip({ items, rgb, reflectionSettings }: {
               style={{ color: valueColor, fontFamily: "'Inter', sans-serif" }}>
               {item.value}
             </p>
+            {item.sub && (
+              <p className="text-[11px] leading-snug"
+                style={{ color: labelColor, fontFamily: "'Inter', sans-serif" }}>
+                {item.sub}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -134,7 +140,7 @@ function InfoRow({ items, isDark, cardBg, iconColor, labelColor, valueColor }: {
   const measureRefs = React.useRef<(HTMLSpanElement | null)[]>([]);
   const [mode, setMode] = React.useState<{ compact: boolean; widest: number }>({ compact: false, widest: 0 });
   // Stable dep so the inline `items` array identity doesn't re-run the effect.
-  const valueKey = items.map((i) => i.value).join('\u0000');
+  const valueKey = items.map((i) => `${i.value}\u0000${i.sub ?? ''}`).join('\u0001');
 
   React.useLayoutEffect(() => {
     const measure = () => {
@@ -188,15 +194,24 @@ function InfoRow({ items, isDark, cardBg, iconColor, labelColor, valueColor }: {
             style={{ color: valueColor, fontFamily: "'Inter', sans-serif" }}>
             {item.value}
           </p>
+          {item.sub && (
+            <p className="relative z-10 mt-0.5 text-[11px] truncate"
+              style={{ color: labelColor, fontFamily: "'Inter', sans-serif" }}>
+              {item.sub}
+            </p>
+          )}
         </div>
       ))}
-      {/* Off-layout intrinsic-width measurers (same font as the value text). */}
+      {/* Off-layout intrinsic-width measurers (same font as the value text).
+          Measures the stacked value + optional sub-line so a two-line card is
+          sized for both lines, not just the first. */}
       {items.map((item, idx) => (
         <span key={`measure-${item.label}`} aria-hidden="true"
           ref={(el) => { measureRefs.current[idx] = el; }}
-          className="pointer-events-none invisible absolute left-0 top-0 whitespace-nowrap text-[13.5px] font-light"
+          className="pointer-events-none invisible absolute left-0 top-0 flex flex-col whitespace-nowrap"
           style={{ fontFamily: "'Inter', sans-serif" }}>
-          {item.value}
+          <span className="text-[13.5px] font-light">{item.value}</span>
+          {item.sub && <span className="text-[11px]">{item.sub}</span>}
         </span>
       ))}
     </div>
