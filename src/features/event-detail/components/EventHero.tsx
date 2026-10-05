@@ -190,28 +190,35 @@ export function EventHero({
       {/* Mobile / tablet hero with scroll zoom — full-bleed poster (any aspect
           via object-cover). The immersive blurred artwork lives behind the page. */}
       <div className="lg:hidden relative h-[56vh] overflow-hidden">
-        <motion.div
+        <div
           className="absolute inset-0"
           style={{
-            scale: heroScale,
-            transformOrigin: "center center",
+            maskImage: "linear-gradient(180deg,#000 0%,#000 66%,rgba(0,0,0,0.75) 80%,rgba(0,0,0,0.35) 92%,transparent 100%)",
+            WebkitMaskImage: "linear-gradient(180deg,#000 0%,#000 66%,rgba(0,0,0,0.75) 80%,rgba(0,0,0,0.35) 92%,transparent 100%)",
           }}
         >
-          <ImageCarousel
-            images={carouselImages}
-            alt={event.name}
-            idx={carouselIdx}
-            onIdxChange={onCarouselIdxChange}
-          />
-        </motion.div>
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              scale: heroScale,
+              transformOrigin: "center center",
+            }}
+          >
+            <ImageCarousel
+              images={carouselImages}
+              alt={event.name}
+              idx={carouselIdx}
+              onIdxChange={onCarouselIdxChange}
+            />
+          </motion.div>
 
-        {/* Poster-aware progressive shade — keeps title readable and gives the
-            metadata cards a surface to overlap into */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: isDark
-              ? `
+          {/* Poster-aware progressive shade — keeps title readable and gives the
+              metadata cards a surface to overlap into */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: isDark
+                ? `
                 linear-gradient(
                   to bottom,
                   rgba(0,0,0,0.10) 0%,
@@ -225,22 +232,22 @@ export function EventHero({
                   transparent 72%
                 )
               `
-                          : `
+                            : `
                 linear-gradient(
                   to bottom,
-                  rgba(0,0,0,0.03) 0%,
-                  transparent 34%,
-                  rgba(0,0,0,0.20) 74%,
-                  rgba(0,0,0,0.42) 100%
+                  rgba(0,0,0,0.04) 0%,
+                  transparent 32%,
+                  transparent 100%
                 ),
                 radial-gradient(
                   ellipse 110% 48% at 50% 100%,
-                  rgba(${rgb},0.26),
+                  rgba(${rgb},0.22),
                   transparent 74%
                 )
               `,
-          }}
-        />
+            }}
+          />
+        </div>
         {/* Top nav */}
         <div className="absolute top-0 left-0 right-0 p-5 flex items-center justify-between">
           <AppButton
@@ -327,6 +334,13 @@ export function EventHero({
           </div>
         )}
 
+        {/* Soft local shade behind the title — dissolves on every side, so it never forms an edge */}
+        {!isDark && (
+          <div
+            className="absolute inset-x-0 bottom-0 h-[48%] pointer-events-none"
+            style={{ background: "radial-gradient(ellipse 95% 46% at 40% 58%, rgba(12,10,24,0.55), transparent 100%)" }}
+          />
+        )}
         {/* Title */}
         <div className="absolute bottom-0 left-0 right-0 px-6 pb-6">
           <motion.div
