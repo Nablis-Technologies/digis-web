@@ -1,4 +1,4 @@
-﻿import { motion } from "motion/react";
+import { motion } from "motion/react";
 import {
   LayoutGrid,
   Music,
@@ -18,6 +18,7 @@ import {
   Compass,
   Search,
 } from "lucide-react";
+import { useTheme } from "@/app/components/ThemeContext";
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glass, glassEdge } from '@/lib/ui/glass';
@@ -39,25 +40,24 @@ const categoryIcons: Record<string, typeof Music> = {
   "Spoken Word": Mic2,
 };
 
-// Short, playful copy per category â€” the headline stays human, never error-y.
+// Short, playful copy per category — the headline stays human, never error-y.
 const categoryCopy: Record<string, string> = {
-  Music: "The stage is set â€” no acts have been announced just yet.",
+  Music: "The stage is set — no acts have been announced just yet.",
   Sports: "The field is empty. The next fixture hasn't been scheduled.",
   Nightlife: "Lights are low and the floor is quiet. No parties dropped yet.",
   Culture: "We're between exhibitions right now. Something's coming.",
-  Food: "Kitchen's prepping â€” no tastings on the menu just yet.",
+  Food: "Kitchen's prepping — no tastings on the menu just yet.",
   Art: "The walls are blank, waiting for the next show.",
   Comedy: "Mic's on the stand, but no sets are booked yet.",
-  Fitness: "Mats are rolled out â€” no sessions scheduled yet.",
+  Fitness: "Mats are rolled out — no sessions scheduled yet.",
   Film: "Projector's warm, but the reel's empty for now.",
   Tech: "No talks or meetups on the calendar right now.",
-  Wellness: "Breathe easy â€” no sessions are scheduled yet.",
+  Wellness: "Breathe easy — no sessions are scheduled yet.",
   Education: "The chalkboard's clean. No classes posted yet.",
   "Spoken Word": "The mic awaits its next voice.",
 };
 
-export interface EmptyStateProps {
-  isDark: boolean;
+interface EmptyStateProps {
   selectedCategory: string;
   searchQuery?: string;
   onReset: () => void;
@@ -68,14 +68,14 @@ const brand = "#d6f905";
 /**
  * Discovery empty state. Uses the app's standard glass surface
  * (`glass()` + `GlassReflection` + `glassEdge`) with a single restrained
- * event-pass motif â€” no aurora blobs, starfields, or glow shadows.
+ * event-pass motif — no aurora blobs, starfields, or glow shadows.
  */
 export function EmptyState({
-  isDark,
   selectedCategory,
   searchQuery,
   onReset,
 }: EmptyStateProps) {
+  const { isDark } = useTheme();
   const isSearch = !!searchQuery?.trim();
   const Icon = isSearch
     ? Search
@@ -85,12 +85,12 @@ export function EmptyState({
     ? "Nothing matched that"
     : selectedCategory === "All"
       ? "A clean slate"
-      : `No ${selectedCategory.toLowerCase()} events â€” yet`;
+      : `No ${selectedCategory.toLowerCase()} events — yet`;
 
   const subline = isSearch
     ? `We couldn't find anything for "${searchQuery!.trim()}". Try a different spelling or a broader search.`
     : selectedCategory === "All"
-      ? "There are no upcoming events on Digis right now. New drops land all the time â€” check back soon."
+      ? "There are no upcoming events on Digis right now. New drops land all the time — check back soon."
       : categoryCopy[selectedCategory] ??
         "No upcoming events in this category right now.";
 
@@ -112,7 +112,7 @@ export function EmptyState({
         <GlassReflection isDark={isDark} />
 
         <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Ticket stack â€” one front card on the standard glass, two behind */}
+          {/* Ticket stack — one front card on the standard glass, two behind */}
           <div className="relative w-[200px] h-[170px] mb-10">
             {/* back-left */}
             <motion.div
@@ -136,7 +136,7 @@ export function EmptyState({
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
             />
-            {/* front â€” the standard glass surface */}
+            {/* front — the standard glass surface */}
             <motion.div
               className="absolute left-1/2 top-1/2 w-[118px] h-[146px] rounded-[18px] overflow-hidden"
               style={{ marginLeft: -59, marginTop: -73, ...glass(isDark), ...glassEdge(isDark) }}
@@ -232,4 +232,3 @@ export function EmptyState({
     </motion.div>
   );
 }
-

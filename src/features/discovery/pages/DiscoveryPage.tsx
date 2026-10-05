@@ -190,7 +190,6 @@ export function EventDiscovery({
       />
 
       <CategoryFilter
-        isDark={isDark}
         categories={categoryNames}
         selectedCategory={selectedCategory}
         onChange={setSelectedCategory}

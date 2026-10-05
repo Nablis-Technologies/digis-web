@@ -1,18 +1,11 @@
-﻿import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, MapPin, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
-export interface LocationOption {
-  city: string;
-  region: string;
-  /** Preformatted or raw event count shown next to the city. */
-  events: number | string;
-}
-
-/** Fallback list until a real locations source exists. */
-const DEFAULT_LOCATIONS: LocationOption[] = [
+const LOCATIONS = [
   { city: 'Addis Ababa', region: 'Ethiopia', events: 142 },
   { city: 'Bahir Dar', region: 'Amhara', events: 28 },
   { city: 'Hawassa', region: 'Sidama', events: 19 },
@@ -23,19 +16,10 @@ const DEFAULT_LOCATIONS: LocationOption[] = [
   { city: 'Jimma', region: 'Oromia', events: 7 },
 ];
 
-export interface LocationSelectorProps {
-  isDark: boolean;
-  /** Cities to offer. Defaults to the built-in list. */
-  locations?: LocationOption[];
-  /** Controlled selection; falls back to internal state. */
-  selected?: string;
-  onSelect?: (city: string) => void;
-}
-
-export function LocationSelector({ isDark, locations = DEFAULT_LOCATIONS, selected, onSelect }: LocationSelectorProps) {
+export function LocationSelector() {
+  const { isDark } = useTheme();
   const [open, setOpen] = useState(false);
-  const [internalSelected, setInternalSelected] = useState('Addis Ababa');
-  const active = selected ?? internalSelected;
+  const [selected, setSelected] = useState('Addis Ababa');
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,7 +52,7 @@ export function LocationSelector({ isDark, locations = DEFAULT_LOCATIONS, select
       >
         <GlassReflection isDark={isDark} />
         <MapPin className="relative z-10 w-3 h-3" strokeWidth={2.5} />
-        <span className="relative z-10 text-[11px] tracking-[3px] uppercase">{active}</span>
+        <span className="relative z-10 text-[11px] tracking-[3px] uppercase">{selected}</span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.25 }}
@@ -106,29 +90,28 @@ export function LocationSelector({ isDark, locations = DEFAULT_LOCATIONS, select
               Choose your city
             </div>
             <div className="relative z-10 max-h-[280px] overflow-y-auto py-1 scrollbar-hide">
-              {locations.map((loc) => {
-                const locActive = loc.city === active;
+              {LOCATIONS.map((loc) => {
+                const active = loc.city === selected;
                 return (
                   <AppButton
                     key={loc.city}
                     onClick={() => {
-                      setInternalSelected(loc.city);
-                      onSelect?.(loc.city);
+                      setSelected(loc.city);
                       setOpen(false);
                     }}
                     className="w-full flex items-center justify-between gap-3 px-4 py-2.5 transition-colors duration-200"
                     style={{
-                      background: locActive
+                      background: active
                         ? isDark ? 'rgba(214,249,5,0.06)' : 'rgba(214,249,5,0.1)'
                         : 'transparent',
                     }}
                     onMouseEnter={(e) => {
-                      if (!locActive) e.currentTarget.style.background = isDark
+                      if (!active) e.currentTarget.style.background = isDark
                         ? 'rgba(255,255,255,0.03)'
                         : 'rgba(81,72,101,0.055)';
                     }}
                     onMouseLeave={(e) => {
-                      if (!locActive) e.currentTarget.style.background = 'transparent';
+                      if (!active) e.currentTarget.style.background = 'transparent';
                     }}
                   >
                     <div className="flex flex-col items-start gap-0.5">
@@ -136,7 +119,7 @@ export function LocationSelector({ isDark, locations = DEFAULT_LOCATIONS, select
                         className="text-[13px] tracking-[0.3px]"
                         style={{
                           fontFamily: "'Inter', sans-serif",
-                          color: locActive ? activeText : isDark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
+                          color: active ? activeText : isDark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
                         }}
                       >
                         {loc.city}
@@ -148,10 +131,10 @@ export function LocationSelector({ isDark, locations = DEFAULT_LOCATIONS, select
                           color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)',
                         }}
                       >
-                        {loc.region} Â· {loc.events} events
+                        {loc.region} · {loc.events} events
                       </span>
                     </div>
-                    {locActive ? (
+                    {active ? (
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center"
                         style={{ background: accent }}
@@ -179,4 +162,3 @@ export function LocationSelector({ isDark, locations = DEFAULT_LOCATIONS, select
     </div>
   );
 }
-
