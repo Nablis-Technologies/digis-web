@@ -4,6 +4,8 @@ import type { Event } from '@/types';
 import { InfoStrip } from './InfoCards';
 import { LineupSection } from './LineupSection';
 import { OrganizerCard, OrganizerInline, resolveOrganizers } from './OrganizerSection';
+import { FormatTag } from '@/components/EventFormatBadges';
+import { cardFormat } from '@/components/EventCard';
 
 export function EventInfoRail({
   event,
@@ -15,6 +17,7 @@ export function EventInfoRail({
   posterRgb?: [number, number, number] | null;
 }) {
   const organizers = resolveOrganizers(event);
+  const format = cardFormat(event);
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -22,6 +25,11 @@ export function EventInfoRail({
       transition={{ duration: 0.5, delay: 0.1 }}
       className="col-span-7 flex flex-col py-2"
     >
+      {format !== 'single' && (
+        <div className="mb-4">
+          <FormatTag format={format} label="MULTI-DAY" isDark={isDark} size="md" />
+        </div>
+      )}
       <h1 className="tracking-[-1px] leading-[0.95]"
         style={{
           fontFamily: "'Zalando Sans Expanded', sans-serif",
