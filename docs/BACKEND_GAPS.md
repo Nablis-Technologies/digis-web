@@ -123,7 +123,7 @@
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
-| 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
+| 63 | resolved 2026-10-05 | G-41 mixed ticket + add-on checkout implemented (backend commits `b157e36`, `d5a8320`); frontend wired in `admissionModule` & `useCheckoutFlow` |
 | 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
 | 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
@@ -1027,7 +1027,7 @@ can't carry add-ons, so "ticket + parking" is un-buyable in one order.
 **Evidence:** code read 2026-10-01; live products probe shows only
 `chapa-test-event` currently has available extras.
 
-**Status: open — filed 2026-10-01 (frontend wiring audit).**
+**Status: resolved 2026-10-05 (backend commits `b157e36`, `d5a8320` implemented G-41 mixed ticket + add-on checkout; frontend wired in `src/lib/admission.ts` and `src/features/checkout/hooks/useCheckoutFlow.ts`).**
 
 ### #64. Wallet ticket omits the acquisition (sold) price — RESOLVED 2026-10-01 (no longer needed)
 

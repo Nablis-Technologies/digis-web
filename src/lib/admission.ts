@@ -38,6 +38,8 @@ export interface AdmissionItemInput {
   registrationId?: string;
   /** Required when the offer's ticket_type.date_selection is `choose_one`. */
   selectedEventDateId?: string;
+  /** Optional event_date_ids for date-scoped add-ons (parking, extras). */
+  eventDateIds?: string[];
   /** Audience-proof for a gated offer (audience != public). */
   accessCode?: string;
   invitationToken?: string;
@@ -152,6 +154,7 @@ function wireItems(items: AdmissionItemInput[]) {
       quantity: item.quantity,
       ...(item.registrationId ? { registration_id: item.registrationId } : {}),
       ...(item.selectedEventDateId ? { selected_event_date_id: item.selectedEventDateId } : {}),
+      ...(item.eventDateIds && item.eventDateIds.length > 0 ? { event_date_ids: item.eventDateIds } : {}),
       ...(item.accessCode || item.invitationToken
         ? {
             audience_proof: {
@@ -160,18 +163,26 @@ function wireItems(items: AdmissionItemInput[]) {
             },
           }
         : {}),
-      answers: (item.answers ?? []).map((answer) => ({
-        ...(answer.formVersionId ? { form_version_id: answer.formVersionId } : {}),
-        question_key: answer.questionKey,
-        value: answer.value,
-      })),
-      consents: (item.consents ?? []).map((consent) => ({
-        consent_document_version_id: consent.versionId,
-        request_uuid: requestUuid,
-        acceptance_method: "checkbox",
-        content_sha256: consent.contentSha256,
-        idempotency_key: `consent-${consent.versionId}-${requestUuid}`,
-      })),
+      ...(item.answers !== undefined
+        ? {
+            answers: item.answers.map((answer) => ({
+              ...(answer.formVersionId ? { form_version_id: answer.formVersionId } : {}),
+              question_key: answer.questionKey,
+              value: answer.value,
+            })),
+          }
+        : {}),
+      ...(item.consents !== undefined
+        ? {
+            consents: item.consents.map((consent) => ({
+              consent_document_version_id: consent.versionId,
+              request_uuid: requestUuid,
+              acceptance_method: "checkbox",
+              content_sha256: consent.contentSha256,
+              idempotency_key: `consent-${consent.versionId}-${requestUuid}`,
+            })),
+          }
+        : {}),
     };
   });
 }

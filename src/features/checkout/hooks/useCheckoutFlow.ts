@@ -398,7 +398,11 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     };
     const addOnItems = addOns
       .filter((a) => a.quantity > 0)
-      .map((a) => ({ eventProductId: a.productId, quantity: a.quantity, answers: [], consents: [] }));
+      .map((a) => ({
+        eventProductId: a.productId,
+        quantity: a.quantity,
+        ...(selectedEventDateId ? { eventDateIds: [selectedEventDateId] } : {}),
+      }));
     return {
       items: [ticketItem, ...addOnItems],
       chargeCurrency: 'ETB' as const,
