@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Money } from '@/lib/money';
@@ -99,10 +99,15 @@ export function ResaleMarketplace({ userTickets, initialListTicket, selectedEven
   const hasVerifiedMethod = payoutMethods.some((m) => m.status === 'verified');
   const showWalletCard = !balanceError && sellerBalance.length > 0 && sellerHistory.length > 0;
   // Tickets that can be listed for resale — active only, and not already listed.
-  // The seller wire omits `ticket_id` (BACKEND_GAPS #66), so `resaleModule`
-  // caches each listing→ticket pair and reconciles it against the active
-  // `myListings` ids; a full cross-device fix waits on #66.
-  const listedTicketIds = resaleModule.listedTicketIds(myListings.map((l) => l.id));
+  // The seller wire now returns `ticket_id` natively (BACKEND_GAPS #66 resolved).
+  // We reconcile listing IDs with both the server ticket_id and client cache.
+  const listedTicketIds = useMemo(() => {
+    const ids = resaleModule.listedTicketIds(myListings.map((l) => l.id));
+    for (const l of myListings) {
+      if (l.ticket_id) ids.add(l.ticket_id);
+    }
+    return ids;
+  }, [myListings]);
   const listableTickets = userTickets.filter(
     (t) => t.status === 'active' && !listedTicketIds.has(t.id),
   );

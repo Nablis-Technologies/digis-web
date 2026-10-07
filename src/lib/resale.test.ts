@@ -374,5 +374,17 @@ describe('resaleModule listing→ticket cache (BACKEND_GAPS #66)', () => {
     expect(resaleModule.listedTicketIds(['rl-stale'])).toEqual(new Set());
     expect(resaleModule.listedTicketIds(['rl-1'])).toEqual(new Set(['tk-1']));
   });
+
+  it('fetchMyListings populates ticket_id from wire and updates cache (BACKEND_GAPS #66)', async () => {
+    mockedApiFetch.mockImplementation((async (path: string) => {
+      if (path === 'resale_listings/mine') return { data: [sellerWire({ id: 'rl-wire', ticket_id: 'tk-wire' })] };
+      if (path === 'resale_listings') return { data: [browseWire({ id: 'rl-wire' })] };
+      return { data: null };
+    }) as typeof apiFetch);
+
+    const listings = await resaleModule.fetchMyListings();
+    expect(listings[0]?.ticket_id).toBe('tk-wire');
+    expect(resaleModule.listedTicketIds(['rl-wire'])).toEqual(new Set(['tk-wire']));
+  });
 });
 

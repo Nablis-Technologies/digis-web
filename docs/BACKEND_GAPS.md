@@ -126,7 +126,7 @@
 | 63 | open — degrading | `admission_selections` is ticket-only → a ticket + extra selection is rejected, so the checkout extras step fails at Pay |
 | 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
-| 66 | open — degrading | seller listing wire (`GET /resale_listings/mine`) omits `ticket_id` → the wallet can't tell which tickets already have an open listing, so they stay in the "list a ticket" picker |
+| 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -484,8 +484,7 @@ sheet and submitting.
 `Ticketing::TicketWalletSerializer`). The seller scope already owns the ticket, so
 this exposes nothing to buyers.
 
-**Status: open — filed 2026-10-03 (code read: seller + wallet + public
-serializers; `ticket_id` present on the model, absent from every wire).**
+**Status: resolved 2026-10-05 (backend commit `360f9c7` added `ticket_id` to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS`; frontend wired in `src/lib/resale.ts` and `src/features/resale/pages/ResalePage.tsx`).**
 
 ### #54. Discovery availability has no backend source
 

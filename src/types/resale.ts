@@ -53,6 +53,7 @@ export interface PublicResaleListingWire {
 export interface SellerResaleListingWire {
   id: string;
   event_id: string;
+  ticket_id?: string;
   ticket_type_id: string;
   seller_user_id: string;
   status: 'active' | 'reserved' | 'sold' | 'cancelled' | 'expired' | 'draft';
@@ -73,6 +74,7 @@ export interface SellerResaleListingWire {
  */
 export interface ResaleListing {
   id: string;
+  ticket_id?: string;
   status: 'active' | 'reserved' | 'sold' | 'cancelled' | 'expired' | 'draft';
   asking_amount_minor: number;
   currency: string;

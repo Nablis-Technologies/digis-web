@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Resale module — mirrors digis_backend's marketplace flow.
  *
  * Backend endpoints (all mutating ones require Idempotency-Key):
@@ -109,6 +109,7 @@ export function mapPublicListing(wire: PublicResaleListingWire, image: string): 
 function sellerWireToListing(wire: SellerResaleListingWire): ResaleListing {
   return {
     id: wire.id,
+    ticket_id: wire.ticket_id,
     status: wire.status,
     asking_amount_minor: wire.asking_amount_minor,
     currency: wire.currency,
@@ -161,6 +162,7 @@ function withDisplayContext(base: ResaleListing, row: ResaleListing | undefined)
   if (!row) return base;
   return {
     ...base,
+    ticket_id: base.ticket_id ?? row.ticket_id,
     eventSlug: row.eventSlug || base.eventSlug,
     eventName: row.eventName || base.eventName,
     eventDate: row.eventDate || base.eventDate,
@@ -242,13 +244,25 @@ export const resaleModule = {
   async fetchMyListings(): Promise<ResaleListing[]> {
     const { data } = await apiFetch<SellerResaleListingWire[]>("resale_listings/mine");
     const mineWires = Array.isArray(data) ? data : [];
+    // Populate client cache directly from server-authoritative ticket_id
+    // (BACKEND_GAPS #66 resolved).
+    for (const w of mineWires) {
+      if (w.ticket_id) {
+        resaleModule.rememberListingTicket(w.id, w.ticket_id);
+      }
+    }
     // Reconcile the listing→ticket cache against the server's active ids so it
-    // never hides a ticket whose listing has closed (see the #66 cache note).
+    // never hides a ticket whose listing has closed.
     resaleModule.pruneListingTickets(mineWires.map((w) => w.id));
     if (mineWires.length === 0) return [];
-    const mineIds = new Set(mineWires.map((w) => w.id));
+    const mineMap = new Map(mineWires.map((w) => [w.id, w]));
     const all = await resaleModule.fetchListings();
-    return all.filter((l) => mineIds.has(l.id));
+    return all
+      .filter((l) => mineMap.has(l.id))
+      .map((l) => {
+        const wire = mineMap.get(l.id);
+        return wire?.ticket_id ? { ...l, ticket_id: wire.ticket_id } : l;
+      });
   },
 
   /**
@@ -260,6 +274,9 @@ export const resaleModule = {
     if (isPublicListingWire(data)) {
       const image = (await resolveImages([data])).get(data.event.slug) || undefined;
       return mapPublicListing(data, image);
+    }
+    if (data.ticket_id) {
+      resaleModule.rememberListingTicket(data.id, data.ticket_id);
     }
     // Seller view is flat — enrich display from the browse row when the listing
     // is browsable. Missing context stays absent, never invented.
@@ -293,17 +310,17 @@ export const resaleModule = {
       method: 'POST',
       body: { resale_listing: { asking_amount_minor: askingAmountMinor } },
     });
-    // Remember which ticket this listing came from — the wire won't tell us
-    // later (BACKEND_GAPS #66), so the picker uses this cache to hide it.
-    resaleModule.rememberListingTicket(data.id, ticket.id);
+    // Wire now returns ticket_id natively (BACKEND_GAPS #66 resolved).
+    // Local storage acts as a resilient fallback cache across reloads.
+    resaleModule.rememberListingTicket(data.id, data.ticket_id || ticket.id);
     // Enrichment is cosmetic — the listing exists either way. A failed detail
     // or browse read must NOT fail the create (the seller would be left on a
     // stuck sheet for a listing that was actually created).
     try {
       const listing = await resaleModule.fetchListingDetail(data.id);
-      return { ...listing, ticket };
+      return { ...listing, ticket_id: data.ticket_id || ticket.id, ticket };
     } catch {
-      return { ...sellerWireToListing(data), ticket };
+      return { ...sellerWireToListing(data), ticket_id: data.ticket_id || ticket.id, ticket };
     }
   },
 
