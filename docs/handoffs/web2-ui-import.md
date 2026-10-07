@@ -19,6 +19,10 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - `TransferTicketDialog` — "Verified by Digis" security note (d5f8ae3)
 - `ScheduleSections` — multi-day festival day bar, day lineup running orders, day strip, festival ticket selector & pass upsell, alerts
 - `lib/festival` — multi-day date/day adapter and state resolver
+- `lib/resale` — native `ticket_id` mapped from `SellerResaleListingWire` (closes BACKEND_GAPS #66)
+- `lib/auth` + `AuthModal` — phone-OTP signup flow via `POST /auth/signup/request_otp`, `/phone_verifications/:id/verify`, and `/auth/signup` with `verification_token`
+- `lib/admission` + `useCheckoutFlow` — G-41 mixed ticket + add-on admission selections with date-scoped add-on lines (closes BACKEND_GAPS #63)
+- `lib/gifts` + `ClaimGiftPage` — recipient gift resolution (`/public/gift_purchases/:id/resolve`), claim (`/claim`), and buyer redelivery (`/orders/:order_id/gift_purchases`)
 
 ## Skipped as noise (no action)
 
@@ -49,4 +53,4 @@ merge. `DESIGN.md` is the design authority; boundaries follow
  
 ## Verification
  
-`npx tsc --noEmit` clean · `npx vitest run` 160/160 · `pnpm build` OK.
+`npx tsc --noEmit` clean · `npx vitest run` 173/173 · `pnpm build` OK.
