@@ -18,6 +18,12 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppButton } from '@/components/primitives/AppButton';
 import type { Event, TicketTier } from '@/types';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
+import { resolveFestivalSchedule } from '@/lib/festival';
+import {
+  FestivalDayBar,
+  DayLineup,
+  FestivalTicketSelector,
+} from '@/features/event-detail/components/ScheduleSections';
 import { OrganizerCard, OrganizerInline, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
 import { VenueSection } from '@/features/event-detail/components/VenueMap';
 import { YourTicketAccess } from '@/features/event-detail/components/YourTicketAccess';
@@ -108,6 +114,10 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const publicTicketTypes = displayTicketTypes.filter((t) => !t.audience || t.audience === 'public');
   const hasPublicTiers = publicTicketTypes.length > 0;
   const visibleTicketTypes = hasGatedTiers && !gatedUnlocked ? publicTicketTypes : displayTicketTypes;
+  const festivalSchedule = useMemo(() => {
+    return resolveFestivalSchedule(event, displayTicketTypes);
+  }, [event, displayTicketTypes]);
+  const [festivalDayId, setFestivalDayId] = useState<string>('all');
   const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes: displayTicketTypes, selectedTicketType, event, isDark });
  const scrollToTicketSelection = () => {
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -172,6 +182,19 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
           <YourTicketAccess eventId={eventId} eventName={event.name} onNavigate={onNavigate} />
         </motion.div>
 
+        {/* Festival Day Bar — pinned day track for multi-day events */}
+        {festivalSchedule && (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }} className="mb-8">
+            <FestivalDayBar
+              days={festivalSchedule.days}
+              showPass={festivalSchedule.showPass}
+              passSpanLabel={festivalSchedule.passSpanLabel}
+              value={festivalDayId}
+              onPick={setFestivalDayId}
+            />
+          </motion.div>
+        )}
+
         {/* About — mobile/tablet only (desktop renders inside hero rail) */}
         {event.description && (
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-10 lg:hidden">
@@ -189,10 +212,21 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
         </motion.div>
         )}
 
-        {/* Lineup — mobile/tablet only (desktop renders inside hero rail) */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.305 }} className="mb-10 lg:hidden">
-          <LineupSection lineup={event.lineup} isDark={isDark} />
-        </motion.div>
+        {/* Lineup / Schedule */}
+        {festivalSchedule ? (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.305 }} className="mb-10">
+            <DayLineup
+              days={festivalDayId === 'all' ? festivalSchedule.lineupDays : festivalSchedule.lineupDays.filter((d) => d.id === festivalDayId)}
+              dayId={festivalDayId}
+              onPickDay={setFestivalDayId}
+              agenda={festivalSchedule.agendaDays}
+            />
+          </motion.div>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.305 }} className="mb-10 lg:hidden">
+            <LineupSection lineup={event.lineup} isDark={isDark} />
+          </motion.div>
+        )}
 
         {/* Organizer(s) — mobile/tablet only (desktop renders inside hero rail) */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.31 }} className="mb-10 lg:hidden">
@@ -239,18 +273,47 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
             acceptsCode={acceptsCode}
             onUnlocked={(proof) => { setGatedUnlocked(true); setAudienceProof(proof); }}
           >
-          <TicketSelector
-            event={event}
-            ticketTypes={visibleTicketTypes}
-            selectedTicketType={selectedTicketType}
-            onSelectTicketType={setSelectedTicketType}
-            isSoldOut={isSoldOut}
-            isDark={isDark}
-            loading={productsQuery.isPending}
-            loadError={productsQuery.isError}
-            onRetry={() => void productsQuery.refetch()}
-            onJoinWaitlist={(tier) => setWaitlistOffer(tier)}
-          />
+          {festivalSchedule ? (
+            <FestivalTicketSelector
+              dayId={festivalDayId}
+              onDayChange={setFestivalDayId}
+              selectedTicketType={selectedTicketType}
+              onSelectTicketType={setSelectedTicketType}
+              underway={festivalSchedule.underway}
+              cancelledCount={festivalSchedule.cancelledCount}
+              showPasses={festivalDayId === 'all' && festivalSchedule.showPass}
+              title={
+                festivalDayId === 'all'
+                  ? (festivalSchedule.days.length === 1 ? '1 day pass' : `All ${festivalSchedule.days.length} days`)
+                  : (festivalSchedule.lineupDays.find((d) => d.id === festivalDayId)?.monDay
+                      ? `Day ${festivalSchedule.days.findIndex((d) => d.id === festivalDayId) + 1} · ${festivalSchedule.lineupDays.find((d) => d.id === festivalDayId)?.monDay}`
+                      : 'Day pass')
+              }
+              passFromLabel={festivalSchedule.passFromLabel}
+              doorsLabel={festivalDayId !== 'all' ? 'Doors 6 PM' : undefined}
+              tiers={festivalSchedule.tiersByDay[festivalDayId] ?? []}
+              passUpsell={
+                festivalDayId !== 'all' && festivalSchedule.showPass
+                  ? {
+                      label: `all ${festivalSchedule.days.length} days for ${festivalSchedule.passFromLabel?.replace('From ', '') || ''}`,
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <TicketSelector
+              event={event}
+              ticketTypes={visibleTicketTypes}
+              selectedTicketType={selectedTicketType}
+              onSelectTicketType={setSelectedTicketType}
+              isSoldOut={isSoldOut}
+              isDark={isDark}
+              loading={productsQuery.isPending}
+              loadError={productsQuery.isError}
+              onRetry={() => void productsQuery.refetch()}
+              onJoinWaitlist={(tier) => setWaitlistOffer(tier)}
+            />
+          )}
           </GatedTierGate>
           )}
         </motion.div>

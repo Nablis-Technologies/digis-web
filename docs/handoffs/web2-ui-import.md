@@ -17,6 +17,8 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - `EventHero` — mobile poster mask-fade + light-mode radial title shade (6f0b2cb)
 - `EventInfoRail` — `FormatTag` above the title for multi-day events (a9eb71a)
 - `TransferTicketDialog` — "Verified by Digis" security note (d5f8ae3)
+- `ScheduleSections` — multi-day festival day bar, day lineup running orders, day strip, festival ticket selector & pass upsell, alerts
+- `lib/festival` — multi-day date/day adapter and state resolver
 
 ## Skipped as noise (no action)
 
@@ -41,14 +43,10 @@ merge. `DESIGN.md` is the design authority; boundaries follow
   payload currently exposes only free/paid.
 - **VenueMap** photos carousel (and venue image avatar) — needs images in `venue_summary`.
 
-## Large — parked
-
-**`ScheduleSections`** (festival multi-day + recurring: per-day running orders/agenda,
-festival passes, session carousel / calendar / reminders, waitlist, ended notice). It depends
-on data the backend does not serve — no per-day lineup/agenda, and no recurrence (ADR-0002) —
-and `EventDetailPage` has no format branching to host it. Porting it now would build dead UI.
-Revisit once the backend exposes festival/recurring data.
-
-## Verification (at d5f8ae3)
-
-`npx tsc --noEmit` clean · `npx vitest run` 158/158 · `pnpm build` OK.
+## Parked / Policy
+ 
+- **Recurring subsystem** (weekly series carousel, session calendar sheet, session waitlists): parked per ADR-0002 (no recurring engine on backend). The multi-day festival half of `ScheduleSections` is now fully imported and active on `EventDetailPage`.
+ 
+## Verification
+ 
+`npx tsc --noEmit` clean · `npx vitest run` 160/160 · `pnpm build` OK.
