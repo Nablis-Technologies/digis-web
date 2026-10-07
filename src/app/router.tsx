@@ -19,6 +19,7 @@ import { ResaleMarketplace } from '@/features/resale/pages/ResalePage';
 import { PayoutsView } from '@/features/payouts/pages/PayoutsPage';
 import { resaleModule } from '@/lib/resale';
 import { ClaimTicketPage } from '@/features/tickets/pages/ClaimTicketPage';
+import { ClaimGiftPage } from '@/features/tickets/pages/ClaimGiftPage';
 import { UIPreviewPage } from '@/features/ui-preview/pages/UIPreviewPage';
 import { Navigation } from '@/components/Navigation';
 import { useTheme } from './components/ThemeContext';
@@ -848,6 +849,37 @@ function ClaimRoute() {
   );
 }
 
+function ClaimGiftRoute() {
+  const navigate = useNavigate();
+  usePageTitle('Claim your gift ticket · Digis');
+  const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
+  const { isDark } = useTheme();
+  const { id = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') ?? '';
+  return (
+    <div
+      className="relative min-h-screen"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        background: isDark ? '#0a0a0a' : '#f8f7fc',
+        color: isDark ? '#fff' : '#1a1a1a',
+      }}
+    >
+      <ClaimGiftPage
+        id={id}
+        token={token}
+        onRequestAuth={() => setAuthModal('signin')}
+        onNavigateHome={() => navigate(VIEW_PATHS.discover)}
+        onNavigateTickets={() => navigate(VIEW_PATHS.tickets)}
+      />
+      <AnimatePresence>
+        {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function AppRouterProvider() {
   // Create the router lazily inside the component so it is always constructed
   // inside the React tree (and therefore inside AuthProvider / ThemeProvider).
@@ -869,6 +901,8 @@ export function AppRouterProvider() {
       { path: '/login', Component: AuthLoginRoute },
       { path: '/signup', Component: AuthSignupRoute },
       { path: '/claim/:id', Component: ClaimRoute },
+      { path: '/gift/:id', Component: ClaimGiftRoute },
+      { path: '/gifts/:id', Component: ClaimGiftRoute },
       // UI preview is a dev-only design sandbox; it is not registered in prod.
       ...(import.meta.env.DEV ? [{ path: '/ui-preview', Component: UIPreviewPage }] : []),
     ])
