@@ -52,14 +52,26 @@ export type AuthResult<T = {}> = AuthSuccessResponse<T> | AuthErrorResponse;
 export type SignInRequest = { identifier: string; password: string };
 export type SignInResponse = AuthResult<AuthSession>;
 
-/** Signup is phone-first. Backend accepts email/phone + password. */
+export type SignupOtpRequest = { phone: string };
+export type SignupOtpResponse = AuthResult<{
+  challenge_id: string;
+  status: string;
+  expires_at: string;
+}>;
+
+export type VerifySignupOtpRequest = {
+  challenge_id: string;
+  code: string;
+};
+export type VerifySignupOtpResponse = AuthResult<{
+  verification_token: string;
+  expires_at: string;
+}>;
+
 /**
- * POST /auth/signup body. Phone-first: phone is the identity, email is
- * optional (`Core::User` validates `email` with `allow_blank`), and the backend
- * validates `password_confirmation` — so we send the confirmation explicitly
- * instead of echoing the password. `name` is collected and sent; the backend
- * does not persist it yet (BACKEND_GAPS #8), so it is dropped server-side until
- * the `name` column / serializer field lands.
+ * POST /auth/signup body. Phone-first with required OTP verification token.
+ * `name` is collected and sent; the backend does not persist it yet
+ * (BACKEND_GAPS #8), falling back to derived display name.
  */
 export type SignUpRequest = {
   name: string;
@@ -67,8 +79,9 @@ export type SignUpRequest = {
   email?: string;
   password: string;
   passwordConfirmation: string;
+  verification_token: string;
 };
-export type SignUpResponse = AuthResult<{ user: AuthUser }>;
+export type SignUpResponse = AuthResult<AuthSession>;
 
 export type MeResponse = AuthResult<{ user: AuthUser }>;
 export type LogoutResponse = AuthResult<Record<string, never>>;

@@ -2,7 +2,12 @@ import { createContext, useContext, useEffect, useMemo, ReactNode } from "react"
 import { useSyncExternalStore } from "react";
 import { getSession, setSession, clearSession, subscribe, getSnapshot } from "@/lib/session";
 import { authService, toAuthUser } from "@/lib/auth";
-import type { AuthUser, SignUpRequest } from "@/types/auth";
+import type {
+  AuthUser,
+  SignUpRequest,
+  SignupOtpResponse,
+  VerifySignupOtpResponse,
+} from "@/types/auth";
 
 export type Result = { ok: boolean; error?: string; fieldErrors?: string[] };
 
@@ -10,6 +15,8 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   signIn: (identifier: string, password: string) => Promise<Result>;
+  requestSignupOtp: (phone: string) => Promise<SignupOtpResponse>;
+  verifySignupOtp: (challenge_id: string, code: string) => Promise<VerifySignupOtpResponse>;
   signUp: (data: SignUpRequest) => Promise<Result>;
   signOut: () => Promise<void>;
 }
@@ -48,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const requestSignupOtp: AuthContextValue["requestSignupOtp"] = async (phone) => {
+    return authService.requestSignupOtp(phone);
+  };
+
+  const verifySignupOtp: AuthContextValue["verifySignupOtp"] = async (challenge_id, code) => {
+    return authService.verifySignupOtp(challenge_id, code);
+  };
+
   const signUp: AuthContextValue["signUp"] = async (data) => {
     const up = await authService.signUp(data);
     if (!up.ok) {
@@ -57,12 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fieldErrors: "fieldErrors" in up ? up.fieldErrors : undefined,
       };
     }
-    const si = await authService.signIn({ identifier: data.phone, password: data.password });
-    if (!si.ok) return { ok: false, error: si.error };
     setSession({
-      access_token: si.access_token,
-      refresh_token: si.refresh_token,
-      user: si.user,
+      access_token: up.access_token,
+      refresh_token: up.refresh_token,
+      user: up.user,
     });
     return { ok: true };
   };
@@ -76,7 +89,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        signIn,
+        requestSignupOtp,
+        verifySignupOtp,
+        signUp,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

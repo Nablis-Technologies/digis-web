@@ -30,6 +30,8 @@ import type {
   SignInResponse,
   SignUpRequest,
   SignUpResponse,
+  SignupOtpResponse,
+  VerifySignupOtpResponse,
 } from "@/types/auth";
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
@@ -90,12 +92,45 @@ export const authService = {
     }
   },
 
-  /** POST /auth/signup — create the account (phone-first, email optional).
+  /** POST /auth/signup/request_otp — initiate phone verification for account creation. */
+  async requestSignupOtp(phone: string): Promise<SignupOtpResponse> {
+    try {
+      const { data } = await apiFetch<{ challenge_id: string; status: string; expires_at: string }>(
+        "/auth/signup/request_otp",
+        {
+          method: "POST",
+          body: { phone },
+        },
+      );
+      return { ok: true, ...data };
+    } catch (e) {
+      return { ok: false, error: mapApiError(e) };
+    }
+  },
+
+  /** POST /phone_verifications/:id/verify — trade 6-digit OTP code for signed verification_token. */
+  async verifySignupOtp(challenge_id: string, code: string): Promise<VerifySignupOtpResponse> {
+    try {
+      const { data } = await apiFetch<{ verification_token: string; expires_at: string }>(
+        `/phone_verifications/${challenge_id}/verify`,
+        {
+          method: "POST",
+          body: { code },
+        },
+      );
+      return { ok: true, ...data };
+    } catch (e) {
+      return { ok: false, error: mapApiError(e) };
+    }
+  },
+
+  /** POST /auth/signup — create the account (phone-first, requires verification_token).
+   *  The backend returns user + access_token + refresh_token.
    *  Surfaces the backend's per-field errors (e.g. "Phone has already been taken")
    *  alongside the friendly message so the modal can show real validation output. */
   async signUp(input: SignUpRequest): Promise<SignUpResponse> {
     try {
-      const { data } = await apiFetch<{ user: AuthUserWire }>("/auth/signup", {
+      const { data } = await apiFetch<AuthSessionWire>("/auth/signup", {
         method: "POST",
         body: {
           user: {
@@ -105,9 +140,10 @@ export const authService = {
             password: input.password,
             password_confirmation: input.passwordConfirmation,
           },
+          verification_token: input.verification_token,
         },
       });
-      return { ok: true, user: toAuthUser(data.user) };
+      return { ok: true, ...toSession(data) };
     } catch (e) {
       const fieldErrors = e instanceof ApiError ? e.fieldErrors : undefined;
       return { ok: false, error: mapApiError(e), fieldErrors };

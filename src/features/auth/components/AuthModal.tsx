@@ -1,7 +1,7 @@
-﻿import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import {
-  X, Phone, Lock, User, ArrowRight, Eye, EyeOff,
+  X, Phone, Lock, User, ArrowRight, ArrowLeft, ShieldCheck, Eye, EyeOff,
   AlertCircle, Check, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -94,6 +94,12 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   const [confirmPassword, setConfirmPassword] = useState('');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
 
+  // signup phone verification state
+  const [signupStep, setSignupStep] = useState<'details' | 'otp'>('details');
+  const [challengeId, setChallengeId] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [resendingOtp, setResendingOtp] = useState(false);
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -115,7 +121,11 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     return next;
   });
 
-  const switchMode = (m: 'signin' | 'signup') => { clearAllErrors(); setMode(m); };
+  const switchMode = (m: 'signin' | 'signup') => {
+    clearAllErrors();
+    setSignupStep('details');
+    setMode(m);
+  };
 
   const finishAuthed = () => {
     setSuccess(true);
@@ -129,14 +139,12 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     if (res.ok) finishAuthed();
     else setFormError(res.error || 'Could not log in.');
   };
-  const handleSignUp = async () => {
+
+  const handleRequestSignupOtp = async () => {
     clearAllErrors();
     const trimmedName = fullName.trim();
     const e164 = buildPhone(phone, country.dial);
-    // Client-side policy â€” the backend currently enforces none of these
-    // (BACKEND_GAPS.md #10), so the signup form is the only gate. Each message
-    // is attached to the field it concerns. Name is collected here and sent to
-    // the backend, which does not persist it yet (BACKEND_GAPS.md #8).
+
     const next: Record<string, string> = {};
     if (!trimmedName) next.name = 'Enter your name.';
     if (!/^\+[1-9]\d{6,14}$/.test(e164)) next.phone = 'Enter a valid mobile number for the selected country.';
@@ -145,43 +153,85 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     if (Object.keys(next).length) { setErrors(next); return; }
 
     setLoading(true);
+    const res = await auth.requestSignupOtp(e164);
+    setLoading(false);
+
+    if (!res.ok) {
+      const errStr = res.error || '';
+      if (/taken|already/i.test(errStr)) {
+        setErrors({ phone: 'This phone already has a Digis account.' });
+        setFormError('Log in with your password — or if you bought a ticket as a guest, log in to set a password.');
+      } else {
+        setFormError(errStr || 'Could not send verification code.');
+      }
+      return;
+    }
+
+    setChallengeId(res.challenge_id);
+    setSignupStep('otp');
+    setOtpCode('');
+  };
+
+  const handleVerifyAndSignUp = async () => {
+    clearAllErrors();
+    const trimmedCode = otpCode.trim();
+    if (trimmedCode.length < 4) {
+      setErrors({ otp: 'Please enter the 6-digit verification code.' });
+      return;
+    }
+
+    setLoading(true);
+    const verifyRes = await auth.verifySignupOtp(challengeId, trimmedCode);
+    if (!verifyRes.ok) {
+      setLoading(false);
+      setErrors({ otp: verifyRes.error || 'Invalid or expired verification code.' });
+      return;
+    }
+
+    const trimmedName = fullName.trim();
+    const e164 = buildPhone(phone, country.dial);
     const res = await auth.signUp({
       name: trimmedName,
       phone: e164,
       password,
       passwordConfirmation: confirmPassword,
+      verification_token: verifyRes.verification_token,
     });
     setLoading(false);
-    if (res.ok) { finishAuthed(); return; }
 
-    // Backend per-field messages (e.g. "Phone has already been taken") map to
-    // the exact input; whatever names no field shows as a form-level line.
+    if (res.ok) {
+      finishAuthed();
+      return;
+    }
+
     const { fields, general } = mapFieldErrors(res.fieldErrors);
     const mapped: Record<string, string> = {};
     for (const key of ['name', 'phone', 'password', 'passwordConfirmation']) {
       if (fields[key]) mapped[key] = fields[key];
     }
-    // The phone already owns an account â€” either a real one, or the shadow user
-    // a guest checkout created. The backend has no claim-on-signup yet
-    // (BACKEND_GAPS #56), so a guest who bought a ticket cannot create an
-    // account with that phone. Replace the raw "has already been taken" line
-    // with an actionable route instead of a dead end.
-    const phoneTaken =
-      /taken|already/i.test(fields.phone ?? '') || /taken/i.test(res.error ?? '');
-    if (phoneTaken) {
-      setErrors({ ...mapped, phone: 'This phone already has a Digis account.' });
-      setFormError(
-        'Log in with your password â€” or, if you bought a ticket as a guest, open it under Tickets and set a password there.',
-      );
-      return;
-    }
     setErrors(mapped);
     setFormError(general.join(' ') || (Object.keys(mapped).length ? '' : res.error || 'Could not create account.'));
   };
 
+  const handleResendOtp = async () => {
+    const e164 = buildPhone(phone, country.dial);
+    setResendingOtp(true);
+    setFormError('');
+    const res = await auth.requestSignupOtp(e164);
+    setResendingOtp(false);
+    if (res.ok) {
+      setChallengeId(res.challenge_id);
+      setOtpCode('');
+    } else {
+      setFormError(res.error || 'Failed to resend code.');
+    }
+  };
+
   const titles = {
     signin: { kicker: 'Welcome back', title: 'Log in', sub: 'Enter your phone number and password to continue.' },
-    signup: { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required.' },
+    signup: signupStep === 'otp'
+      ? { kicker: 'Confirm phone', title: 'Enter verification code', sub: `Enter the 6-digit code sent to ${buildPhone(phone, country.dial)}` }
+      : { kicker: 'Create your account', title: 'Create an account', sub: 'Your phone number is required.' },
   };
   const t = titles[mode];
 
@@ -303,23 +353,63 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                   </>
                 )}
 
-                {mode === 'signup' && (
+                {mode === 'signup' && signupStep === 'details' && (
                   <>
-                    <NameField value={fullName} onChange={(v) => { setFullName(v); clearField('name'); }} error={errors.name} isDark={isDark} onEnter={handleSignUp} />
+                    <NameField value={fullName} onChange={(v) => { setFullName(v); clearField('name'); }} error={errors.name} isDark={isDark} onEnter={handleRequestSignupOtp} />
                     <PhoneField
                       country={country} onCountryChange={setCountry}
                       placeholder="Phone number"
                       value={phone} onChange={(v) => { setPhone(v); clearField('phone'); }} error={errors.phone}
-                      isDark={isDark} onEnter={handleSignUp}
+                      isDark={isDark} onEnter={handleRequestSignupOtp}
                     />
-                    <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleSignUp} />
-                    <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); clearField('passwordConfirmation'); }} error={errors.passwordConfirmation} isDark={isDark} placeholder="Confirm your password" onEnter={handleSignUp} />
+                    <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleRequestSignupOtp} />
+                    <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); clearField('passwordConfirmation'); }} error={errors.passwordConfirmation} isDark={isDark} placeholder="Confirm your password" onEnter={handleRequestSignupOtp} />
                     <ErrorLine error={formError} />
-                    <PrimaryButton onClick={handleSignUp} loading={loading} isDark={isDark} label="Create account" disabled={!fullName.trim() || !phone.trim() || !password || !confirmPassword} />
+                    <PrimaryButton onClick={handleRequestSignupOtp} loading={loading} isDark={isDark} label="Continue" disabled={!fullName.trim() || !phone.trim() || !password || !confirmPassword} />
                     <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                      By continuing you agree to Digisâ€™ Terms & Privacy Policy.
+                      By continuing you agree to Digis’ Terms & Privacy Policy.
                     </p>
                   </>
+                )}
+
+                {mode === 'signup' && signupStep === 'otp' && (
+                  <div className="space-y-4">
+                    <OtpCodeField
+                      value={otpCode}
+                      onChange={(v) => { setOtpCode(v); clearField('otp'); }}
+                      error={errors.otp}
+                      isDark={isDark}
+                      onEnter={handleVerifyAndSignUp}
+                    />
+                    <ErrorLine error={formError} />
+                    <PrimaryButton
+                      onClick={handleVerifyAndSignUp}
+                      loading={loading}
+                      isDark={isDark}
+                      label="Verify & create account"
+                      disabled={otpCode.trim().length < 4}
+                    />
+                    <div className="flex items-center justify-between pt-1 px-1 text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif" }}>
+                      <button
+                        type="button"
+                        onClick={() => { clearAllErrors(); setSignupStep('details'); }}
+                        className="cursor-pointer flex items-center gap-1.5 transition-opacity hover:opacity-80"
+                        style={{ color: textMuted, background: 'none', border: 'none' }}
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Edit details</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={resendingOtp}
+                        className="cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                        style={{ color: accent, background: 'none', border: 'none', fontWeight: 500 }}
+                      >
+                        {resendingOtp ? 'Sending…' : 'Resend code'}
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 <div className="text-center pt-1">
@@ -530,6 +620,51 @@ function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }:
         <AppButton type="button" onClick={() => setShow((s) => !s)} className="cursor-pointer flex-shrink-0" style={{ color: textDim }}>
           {show ? <EyeOff className="w-4 h-4" strokeWidth={1.75} /> : <Eye className="w-4 h-4" strokeWidth={1.75} />}
         </AppButton>
+      </div>
+      <FieldError error={error} />
+    </div>
+  );
+}
+
+function OtpCodeField({
+  value,
+  onChange,
+  isDark,
+  onEnter,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  isDark: boolean;
+  onEnter?: () => void;
+  error?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div>
+      <div
+        className="flex items-center justify-center px-4 py-3 rounded-xl transition-all overflow-hidden"
+        style={glassField(isDark, { error: !!error, focused })}
+      >
+        <GlassReflection isDark={isDark} />
+        <AppInput
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="••••••"
+          className="text-center font-mono text-[22px] tracking-[8px] outline-none w-full bg-transparent"
+          style={{ color: isDark ? '#fff' : '#111' }}
+          aria-invalid={error ? true : undefined}
+          aria-label="Verification code"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && onEnter) onEnter();
+          }}
+        />
       </div>
       <FieldError error={error} />
     </div>
