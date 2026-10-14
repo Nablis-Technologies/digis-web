@@ -127,30 +127,139 @@ test.describe('auth', () => {
     // Must satisfy the backend's Ethiopian-mobile format (`+2519` + 8 digits,
     // enforced since BACKEND_GAPS #10) — a random but valid number.
     const phone = `+2519${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
+    const challengeId = `ch-${Date.now()}`;
+    const verificationToken = `ver-${Date.now()}`;
+
+    // Mock OTP delivery & verification endpoints so the e2e test does not require live SMS
+    await page.route(`${API}/auth/signup/request_otp`, async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            challenge_id: challengeId,
+            status: 'pending',
+            expires_at: new Date(Date.now() + 900_000).toISOString(),
+          },
+        }),
+      });
+    });
+
+    await page.route(`${API}/phone_verifications/${challengeId}/verify`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            verification_token: verificationToken,
+            expires_at: new Date(Date.now() + 900_000).toISOString(),
+          },
+        }),
+      });
+    });
+
+    await page.route(`${API}/auth/signup`, async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            access_token: 'acc-e2e-token',
+            refresh_token: 'ref-e2e-token',
+            user: {
+              id: 'user-e2e',
+              phone,
+              name: 'Test User',
+              permissions: ['read:events'],
+              roles: [],
+              profile: {
+                first_name: 'Test',
+                last_name: 'User',
+                full_name: 'Test User',
+                avatar_url: null,
+              },
+            },
+          },
+        }),
+      });
+    });
+
+    await page.route(`${API}/notifications**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: [] }),
+      });
+    });
+
+    await page.route(`${API}/user**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            id: 'user-e2e',
+            phone,
+            name: 'Test User',
+            permissions: ['read:events'],
+            roles: [],
+            profile: {
+              first_name: 'Test',
+              last_name: 'User',
+              full_name: 'Test User',
+              avatar_url: null,
+            },
+          },
+        }),
+      });
+    });
+
+    await page.route(`${API}/tickets**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: [] }),
+      });
+    });
+
+    await page.route(`${API}/auth/refresh**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            access_token: 'acc-e2e-token-refreshed',
+            refresh_token: 'ref-e2e-token-refreshed',
+          },
+        }),
+      });
+    });
 
     await page.goto('/');
     await page.getByRole('button', { name: 'Log in' }).click();
     await page.getByRole('button', { name: "Don't have an account? Create one" }).click();
-    // Wait for the signup form to fully swap in (AnimatePresence mode="wait"
-    // keeps the exiting signin form mounted briefly — a substring match on
-    // "Phone number" would hit the dying signin input instead).
     await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
-    // Full name is collected on registration (BACKEND_GAPS #8 — the backend
-    // does not persist it yet, so it is currently dropped server-side).
+
     await page.getByPlaceholder('Name', { exact: true }).fill('Test User');
     await page.getByPlaceholder('Phone number', { exact: true }).fill(phone);
-    // Signup is phone-first now — no email field, but still an explicit
-    // password confirmation.
     await page.getByPlaceholder('Create a password (min 8 chars)', { exact: true }).fill('Test1234!');
     await page.getByPlaceholder('Confirm your password', { exact: true }).fill('Test1234!');
-    await expect(page.getByRole('button', { name: 'Create account' })).toBeEnabled();
-    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Continue' }).click();
 
-    // signUp returns the user only; AuthContext auto-signs in with the same
-    // credentials, so the success screen appears only after both round-trips.
-    // The chain is slow (~5-10s) and the screen self-closes after 1.4s.
+    // OTP step
+    await expect(page.getByRole('heading', { name: 'Enter verification code' })).toBeVisible();
+    await page.getByLabel('Verification code').fill('123456');
+    await expect(page.getByRole('button', { name: 'Verify & create account' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Verify & create account' }).click();
+
+    // Success screen
     await expect(page.getByText('Welcome to Digis')).toBeVisible({ timeout: 25_000 });
-    // Wait for the success screen to self-close before asserting the settled UI.
     await expect(page.getByText('Welcome to Digis')).toBeHidden({ timeout: 25_000 });
     await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({
       timeout: 25_000,

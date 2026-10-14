@@ -49,9 +49,9 @@ async function openCheckoutForTier(page: Page, tierName: string) {
  * when none renders, the event has no terms and checkout proceeds without.
  */
 async function acceptConsentIfPresent(page: Page) {
-  const consentToggle = page.locator('[role="checkbox"]').first();
+  const consentToggle = page.locator('button[aria-label^="Accept "]').first();
   try {
-    await consentToggle.waitFor({ state: 'visible', timeout: 5_000 });
+    await consentToggle.waitFor({ state: 'visible', timeout: 3_000 });
     await consentToggle.click();
   } catch {
     /* no terms on this event — nothing to accept */
