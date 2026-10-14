@@ -17,7 +17,7 @@
  */
 
 import axios from "axios";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, apiClient } from "@/lib/api";
 import { mapApiError } from "@/lib/errors";
 import { getSession } from "@/lib/session";
 import type {
@@ -32,6 +32,10 @@ import type {
   SignUpResponse,
   SignupOtpResponse,
   VerifySignupOtpResponse,
+  UpdateProfileInput,
+  UpdateProfileResponse,
+  AvatarResponse,
+  UserProfile,
 } from "@/types/auth";
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
@@ -45,17 +49,28 @@ export interface AuthSessionWire {
 /* ─── Wire -> domain mapping ─── */
 
 /**
- * Display name: the server value once the backend persists it (BACKEND_GAPS.md
- * #8), else derived from email local-part / phone so the UI always has one.
+ * Display name: server full_name from profile when present, then wire.name,
+ * else derived from email local-part / phone so the UI always has one.
  */
 export function toAuthUser(wire: AuthUserWire): AuthUser {
   const email = wire.email ?? undefined;
   const phone = wire.phone ?? undefined;
+  const profile: UserProfile | null = wire.profile
+    ? {
+        first_name: wire.profile.first_name || "",
+        last_name: wire.profile.last_name || "",
+        full_name: wire.profile.full_name || `${wire.profile.first_name || ""} ${wire.profile.last_name || ""}`.trim(),
+        avatar_url: wire.profile.avatar_url ?? null,
+      }
+    : null;
+
   const name =
+    profile?.full_name?.trim() ||
     wire.name?.trim() ||
     (email ? email.split("@")[0] : "") ||
     (phone ? phone.slice(-4) : "") ||
     "Member";
+
   return {
     id: wire.id,
     name,
@@ -69,6 +84,7 @@ export function toAuthUser(wire: AuthUserWire): AuthUser {
       name: r.name,
       active: r.active,
     })),
+    profile,
   };
 }
 
@@ -124,17 +140,17 @@ export const authService = {
     }
   },
 
-  /** POST /auth/signup — create the account (phone-first, requires verification_token).
+  /** POST /auth/signup (G-14) — create the account with first_name & last_name.
    *  The backend returns user + access_token + refresh_token.
-   *  Surfaces the backend's per-field errors (e.g. "Phone has already been taken")
-   *  alongside the friendly message so the modal can show real validation output. */
+   *  Surfaces the backend's per-field errors alongside the friendly message. */
   async signUp(input: SignUpRequest): Promise<SignUpResponse> {
     try {
       const { data } = await apiFetch<AuthSessionWire>("/auth/signup", {
         method: "POST",
         body: {
           user: {
-            name: input.name,
+            first_name: input.firstName,
+            last_name: input.lastName,
             phone: input.phone,
             ...(input.email ? { email: input.email } : {}),
             password: input.password,
@@ -150,13 +166,92 @@ export const authService = {
     }
   },
 
-  /** GET /auth/me — current authenticated user. Caller handles the session. */
+  /** GET /user (G-14 breaking change: replaces retired GET /auth/me). Caller handles the session. */
   async me(): Promise<MeResponse> {
     try {
-      const { data } = await apiFetch<{ user: AuthUserWire }>("/auth/me");
-      return { ok: true, user: toAuthUser(data.user) };
+      // The backend returns { success: true, data: user }
+      const res = await apiFetch<AuthUserWire | { user: AuthUserWire }>("/user");
+      const rawUser = "user" in res.data ? res.data.user : res.data;
+      return { ok: true, user: toAuthUser(rawUser) };
     } catch (e) {
       return { ok: false, error: mapApiError(e) };
+    }
+  },
+
+  /** PATCH /user (G-14) — update first_name and/or last_name. */
+  async updateProfile(input: UpdateProfileInput): Promise<UpdateProfileResponse> {
+    try {
+      const res = await apiFetch<AuthUserWire | { user: AuthUserWire }>("/user", {
+        method: "PATCH",
+        body: {
+          profile: {
+            ...(input.first_name !== undefined ? { first_name: input.first_name } : {}),
+            ...(input.last_name !== undefined ? { last_name: input.last_name } : {}),
+          },
+        },
+      });
+      const rawUser = "user" in res.data ? res.data.user : res.data;
+      return { ok: true, user: toAuthUser(rawUser) };
+    } catch (e) {
+      const fieldErrors = e instanceof ApiError ? e.fieldErrors : undefined;
+      return { ok: false, error: mapApiError(e), fieldErrors };
+    }
+  },
+
+  /** PUT /user/avatar (G-47) — upload or replace user avatar image via multipart/form-data. */
+  async uploadAvatar(file: File): Promise<AvatarResponse> {
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await apiClient.put<{ success: boolean; data: AuthUserWire }>("/user/avatar", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return { ok: true, user: toAuthUser(res.data.data) };
+    } catch (e) {
+      const fieldErrors = e instanceof ApiError ? e.fieldErrors : undefined;
+      return { ok: false, error: mapApiError(e), fieldErrors };
+    }
+  },
+
+  /** DELETE /user/avatar (G-47) — remove current user avatar (idempotent). */
+  async removeAvatar(): Promise<AvatarResponse> {
+    try {
+      const { data } = await apiFetch<AuthUserWire>("/user/avatar", {
+        method: "DELETE",
+      });
+      return { ok: true, user: toAuthUser(data) };
+    } catch (e) {
+      return { ok: false, error: mapApiError(e) };
+    }
+  },
+
+  /**
+   * Fetch authenticated avatar binary (GET /user/avatar) and return an Object URL blob.
+   * Returns null if avatar is not found (404) or on error.
+   */
+  async getAvatarBlobUrl(etag?: string): Promise<{ url: string | null; etag?: string; notModified?: boolean }> {
+    try {
+      const res = await apiClient.get<Blob>("/user/avatar", {
+        responseType: "blob",
+        headers: etag ? { "If-None-Match": etag } : undefined,
+        validateStatus: (status) => (status >= 200 && status < 300) || status === 304 || status === 404,
+      });
+
+      if (res.status === 304) {
+        return { url: null, notModified: true, etag };
+      }
+      if (res.status === 404) {
+        return { url: null };
+      }
+
+      const newEtag = res.headers["etag"] as string | undefined;
+      const objectUrl = URL.createObjectURL(res.data);
+      return { url: objectUrl, etag: newEtag };
+    } catch {
+      return { url: null };
     }
   },
 

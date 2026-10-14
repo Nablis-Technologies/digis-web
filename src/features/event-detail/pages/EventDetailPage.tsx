@@ -123,12 +123,15 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const [checkoutGiftMode, setCheckoutGiftMode] = useState(false);
+
   const handlePurchase = () => {
     if (ended) return;
     if (!selectedTicketType) {
       scrollToTicketSelection();
       return;
     }
+    setCheckoutGiftMode(false);
     setShowCheckout(true);
   };
 
@@ -138,7 +141,8 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
       scrollToTicketSelection();
       return;
     }
-    setShowGift(true);
+    setCheckoutGiftMode(true);
+    setShowCheckout(true);
   };
 
   return (
@@ -414,6 +418,7 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
             }
             dateSelection={selectedTicket?.dateSelection}
             eventDates={event.eventDates?.filter((d) => Date.parse(d.startsAt) > Date.now())}
+            initialGiftMode={checkoutGiftMode}
             onClose={() => setShowCheckout(false)}
             onComplete={() => { setShowCheckout(false); onPurchase(); }}
           />

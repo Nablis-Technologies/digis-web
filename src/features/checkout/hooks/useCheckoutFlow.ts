@@ -22,10 +22,16 @@ function sectionsForTier(seatMap: SeatMapConfig | undefined, ticketType: string)
   return scoped.length ? scoped : seatMap.sections.filter((s) => !s.tierName);
 }
 
-export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products = [], includedProductIds = [], answerEditWindowHours, seatMap, requiredSeatCount = 1, dateSelection, eventDates = [], onClose }: {
-  basePrice: number; eventId?: string; /** Backend slug — consent_requirements is slug-addressed. */ eventSlug?: string; ticketType: string; /** Real backend product id — what order_quotes consumes. Falls back to the synthetic id for mock tiers. */ ticketProductId?: string; /** Real Ticketing::TicketType id — consent + registration address it. */ ticketTypeId?: string; /** Audience proof for gated ticket types (access-code / invitation). */ accessCode?: string; invitationToken?: string; customQuestions?: CustomQuestion[]; products?: EventProduct[]; includedProductIds?: string[]; answerEditWindowHours?: number | null; seatMap?: SeatMapConfig; /** Tier-specific assigned-seat count; couples require two seats. */ requiredSeatCount?: number; /** Ticket-type date_selection mode (choose_one tiers need a selected date). */ dateSelection?: 'fixed' | 'choose_one'; /** Backend event dates (id + startsAt) for the choose_one date step. */ eventDates?: { id: string; startsAt: string; name?: string }[]; onClose: () => void;
+export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products = [], includedProductIds = [], answerEditWindowHours, seatMap, requiredSeatCount = 1, dateSelection, eventDates = [], initialGiftMode = false, onClose }: {
+  basePrice: number; eventId?: string; /** Backend slug — consent_requirements is slug-addressed. */ eventSlug?: string; ticketType: string; /** Real backend product id — what order_quotes consumes. Falls back to the synthetic id for mock tiers. */ ticketProductId?: string; /** Real Ticketing::TicketType id — consent + registration address it. */ ticketTypeId?: string; /** Audience proof for gated ticket types (access-code / invitation). */ accessCode?: string; invitationToken?: string; customQuestions?: CustomQuestion[]; products?: EventProduct[]; includedProductIds?: string[]; answerEditWindowHours?: number | null; seatMap?: SeatMapConfig; /** Tier-specific assigned-seat count; couples require two seats. */ requiredSeatCount?: number; /** Ticket-type date_selection mode (choose_one tiers need a selected date). */ dateSelection?: 'fixed' | 'choose_one'; /** Backend event dates (id + startsAt) for the choose_one date step. */ eventDates?: { id: string; startsAt: string; name?: string }[]; initialGiftMode?: boolean; onClose: () => void;
 }) {
   const { user, isAuthenticated } = useAuth();
+  const [isGift, setIsGiftState] = useState<boolean>(Boolean(initialGiftMode));
+  const [giftRecipientPhone, setGiftRecipientPhone] = useState('');
+  const [giftNote, setGiftNote] = useState('');
+  const [giftErrors, setGiftErrors] = useState<{ recipientPhone?: string; note?: string }>({});
+  const [giftPurchases, setGiftPurchases] = useState<Array<{ id: string; status: string; deliveryStatus?: string }>>([]);
+  const [orderId, setOrderId] = useState<string>();
   // Sections available for the chosen tier: those matching its name, else all.
   const [selectedAddOns, setSelectedAddOns] = useState<SelectedEventProduct[]>(() =>
     products
@@ -47,8 +53,17 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   );
   const [step, setStep] = useState<CheckoutStep>(hasSeats ? 'seat' : (needsDate ? 'date' : 'review'));
   const [manualQuantity, setManualQuantity] = useState(1);
-  const quantity = hasSeats ? selectedSeats.length : manualQuantity;
-  const setQuantity = setManualQuantity;
+  const quantity = isGift ? 1 : (hasSeats ? selectedSeats.length : manualQuantity);
+  const setQuantity = (q: number) => {
+    if (!isGift) setManualQuantity(q);
+  };
+  const setIsGift = (val: boolean) => {
+    setIsGiftState(val);
+    if (val) {
+      setManualQuantity(1);
+    }
+    setGiftErrors({});
+  };
   const [paying, setPaying] = useState(false);
   const [promoApplied, setPromoApplied] = useState<AppliedPromo | null>(null);
   const [promoCodeInput, setPromoCodeInput] = useState('');
@@ -66,7 +81,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   }));
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
   const questions = customQuestions ?? [];
-  const hasQuestions = questions.length > 0;
+  const hasQuestions = questions.length > 0 && !isGift;
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {
     const seed: Record<string, unknown> = {};
     questions.forEach((q) => { seed[q.id] = q.type === 'checkbox' ? [] : ''; });
@@ -351,6 +366,39 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   const removePromo = () => { setPromoApplied(null); setPromoCodeInput(''); setPromoError(''); setPromoLoading(false); };
   const removePromoErrorOnly = () => { setPromoError(''); };
 
+  const normalizePhone = (phone: string): string => {
+    const cleaned = phone.replace(/[\s()-]/g, '');
+    if (cleaned.startsWith('+251')) return cleaned;
+    if (cleaned.startsWith('09')) return '+251' + cleaned.slice(1);
+    if (cleaned.startsWith('9') && cleaned.length === 9) return '+251' + cleaned;
+    if (cleaned.startsWith('+')) return cleaned;
+    return cleaned;
+  };
+
+  const validateGift = (): boolean => {
+    if (!isGift) return true;
+    const errs: typeof giftErrors = {};
+    const rawPhone = giftRecipientPhone.trim();
+    if (!rawPhone) {
+      errs.recipientPhone = 'Recipient phone number is required';
+    } else {
+      const cleaned = rawPhone.replace(/[\s()-]/g, '');
+      if (!/^(\+251|0)?9\d{8}$/.test(cleaned) && !/^\+\d{10,15}$/.test(cleaned)) {
+        errs.recipientPhone = 'Enter a valid phone number (e.g. +251 91 123 4567)';
+      } else {
+        const normRecipient = normalizePhone(rawPhone);
+        if (user?.phone && normalizePhone(user.phone) === normRecipient) {
+          errs.recipientPhone = 'You cannot send a gift ticket to your own phone number';
+        }
+      }
+    }
+    if (giftNote.length > 500) {
+      errs.note = 'Gift note cannot exceed 500 characters';
+    }
+    setGiftErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const validateDetails = () => {
     const e: typeof errors = {};
     if (!contactDetails.name.trim() || contactDetails.name.trim().length < 2) e.name = 'Please enter your name';
@@ -385,16 +433,28 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     const accepted = consents.filter((c) => acceptedConsents[c.versionId]);
     const ticketItem = {
       eventProductId: ticketProductId ?? `ticket:${ticketType}`,
-      quantity,
+      quantity: isGift ? 1 : quantity,
       ...(selectedEventDateId ? { selectedEventDateId } : {}),
-      ...(accessCode ? { accessCode } : {}),
-      ...(invitationToken ? { invitationToken } : {}),
-      answers: questions.map((q) => ({
-        ...(formVersionId ? { formVersionId } : {}),
-        questionKey: q.id,
-        value: answers[q.id],
-      })),
-      consents: accepted,
+      ...(!isGift && accessCode ? { accessCode } : {}),
+      ...(!isGift && invitationToken ? { invitationToken } : {}),
+      ...(!isGift
+        ? {
+            answers: questions.map((q) => ({
+              ...(formVersionId ? { formVersionId } : {}),
+              questionKey: q.id,
+              value: answers[q.id],
+            })),
+            consents: accepted,
+          }
+        : {}),
+      ...(isGift
+        ? {
+            gift: {
+              recipientPhone: normalizePhone(giftRecipientPhone.trim()),
+              ...(giftNote.trim() ? { note: giftNote.trim() } : {}),
+            },
+          }
+        : {}),
     };
     const addOnItems = addOns
       .filter((a) => a.quantity > 0)
@@ -422,7 +482,11 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   const goNext = async () => {
     if (step === 'seat') setStep(multiDate ? 'date' : 'review');
     else if (step === 'date') { if (selectedEventDateId) setStep('review'); }
-    else if (step === 'review') { if (validateConsents()) setStep(hasExtras ? 'extras' : (needsDetails ? 'details' : (hasQuestions ? 'questions' : 'payment'))); }
+    else if (step === 'review') {
+      if (!validateConsents()) return;
+      if (isGift && !validateGift()) return;
+      setStep(hasExtras ? 'extras' : (needsDetails ? 'details' : (hasQuestions ? 'questions' : 'payment')));
+    }
     else if (step === 'extras') setStep(needsDetails ? 'details' : (hasQuestions ? 'questions' : 'payment'));
     else if (step === 'details') { if (validateDetails()) setStep(hasQuestions ? 'questions' : 'payment'); }
     else if (step === 'questions') { if (validateQuestions()) setStep('payment'); }
@@ -502,7 +566,12 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         guestPhone,
         verificationToken: verificationTokenRef.current,
       });
-      const { nextAction, order, guestOrderToken } = result;
+      const { nextAction, order, guestOrderToken, giftPurchases: resultGifts } = result;
+      if (order?.id) setOrderId(order.id);
+      else if (nextAction.orderId) setOrderId(nextAction.orderId);
+      if (resultGifts && resultGifts.length > 0) {
+        setGiftPurchases(resultGifts);
+      }
 
       // Free / fully-discounted admission — the backend confirms + issues.
       if (nextAction.type === 'confirmed' || nextAction.type === 'issuing') {
@@ -582,5 +651,5 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
   }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId]);
 
-  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, closeConflictSheet, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp };
+  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, closeConflictSheet, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp, isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId };
 }

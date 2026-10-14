@@ -7,6 +7,20 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-14 — G-14 (Profile Names) & G-47 (Avatar Management) wired
+
+**Backend alignment:**
+- Swapped retired `GET /auth/me` with `GET /user` for current session user projection.
+- Handled `user.profile` projection (`first_name`, `last_name`, `full_name`, `avatar_url`) with fallback to local derivations for legacy/null profiles.
+
+**User Profile & Self-Service (G-14 & G-47):**
+- **Single "Name" Input on Signup:** User provides "Name"; `splitFullName()` safely decomposes it into `first_name` and `last_name` with Ge'ez/Unicode support and single-name fallback.
+- **Profile Name Updating:** Implemented `PATCH /user` with `{ profile: { first_name, last_name } }` and idempotency key handling; last name is optional in the UI.
+- **Avatar Management:** Multipart upload via `PUT /user/avatar`, idempotent removal via `DELETE /user/avatar`, and authenticated binary streaming via `GET /user/avatar` with `ETag` and `304 Not Modified` caching.
+- **Settings UI:** Added interactive Edit Profile bottom sheet (`SettingsSheet`) using existing glass primitives (`EditField`, `AppButton`, `GlassReflection`, `UserAvatar`).
+
+**Verified:** `tsc --noEmit` clean · vitest **182/182** passing.
+
 ## Session 2026-10-03 (pm) — G-12/G-44/G-45 wired + auth e2e repaired
 
 **Backend pulled** `a101cf2 → 90d79ae`; rebased the 4 `chore(dev)` commits

@@ -76,7 +76,7 @@ export function DetailsStep({
   );
 }
 
-function Field({ icon, label, type = 'text', placeholder, value, onChange, error, isDark }: any) {
+export function Field({ icon, label, type = 'text', placeholder, value, onChange, error, isDark, textarea, rows = 2, maxLength, helpText }: any) {
   const [focused, setFocused] = useState(false);
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
@@ -84,32 +84,57 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
 
   return (
     <div>
-      {label && (
-        <label className="text-[10px] tracking-[1.5px] uppercase mb-2 ml-1 block"
-          style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-          {label}
-        </label>
-      )}
+      <div className="flex items-center justify-between mb-2 ml-1">
+        {label && (
+          <label className="text-[10px] tracking-[1.5px] uppercase block"
+            style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+            {label}
+          </label>
+        )}
+        {helpText && (
+          <span className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+            {helpText}
+          </span>
+        )}
+      </div>
       <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
         <GlassReflection isDark={isDark} />
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
+        <div className={`absolute left-4 z-10 ${textarea ? 'top-4' : 'top-1/2 -translate-y-1/2'}`}
           style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim, transition: 'color 0.2s' }}>
           {icon}
         </div>
-        <AppInput
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={placeholder}
-          className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: '14px',
-            color: textPrimary,
-          }}
-        />
+        {textarea ? (
+          <AppTextArea
+            rows={rows}
+            maxLength={maxLength}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder}
+            className="relative z-10 w-full pl-11 pr-4 py-3 outline-none transition-all resize-none"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '14px',
+              color: textPrimary,
+            }}
+          />
+        ) : (
+          <AppInput
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder}
+            className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '14px',
+              color: textPrimary,
+            }}
+          />
+        )}
       </div>
       <AnimatePresence>
         {hasError && (

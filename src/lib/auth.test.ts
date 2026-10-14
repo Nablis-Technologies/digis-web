@@ -130,11 +130,12 @@ describe('authService.signUp', () => {
     mockedApiFetch.mockReset();
   });
 
-  it('posts user data with verification_token and returns established session', async () => {
+  it('posts user data with first_name, last_name, verification_token and returns established session', async () => {
     mockedApiFetch.mockResolvedValueOnce({ data: sampleSessionWire() } as any);
 
     const res = await authService.signUp({
-      name: 'Abebe Bikila',
+      firstName: 'Abebe',
+      lastName: 'Bikila',
       phone: '+251911123456',
       password: 'password123',
       passwordConfirmation: 'password123',
@@ -145,7 +146,8 @@ describe('authService.signUp', () => {
       method: 'POST',
       body: {
         user: {
-          name: 'Abebe Bikila',
+          first_name: 'Abebe',
+          last_name: 'Bikila',
           phone: '+251911123456',
           password: 'password123',
           password_confirmation: 'password123',
@@ -160,3 +162,68 @@ describe('authService.signUp', () => {
     }
   });
 });
+
+describe('authService.me and updateProfile (G-14)', () => {
+  beforeEach(() => {
+    mockedApiFetch.mockReset();
+  });
+
+  it('me calls GET /user', async () => {
+    mockedApiFetch.mockResolvedValueOnce({ data: sampleUserWire() } as any);
+    const res = await authService.me();
+    expect(mockedApiFetch).toHaveBeenCalledWith('/user');
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.user.name).toBe('Abebe Bikila');
+    }
+  });
+
+  it('updateProfile calls PATCH /user with profile payload', async () => {
+    mockedApiFetch.mockResolvedValueOnce({
+      data: sampleUserWire({
+        profile: {
+          first_name: 'Haile',
+          last_name: 'Gebrselassie',
+          full_name: 'Haile Gebrselassie',
+          avatar_url: null,
+        },
+      }),
+    } as any);
+
+    const res = await authService.updateProfile({
+      first_name: 'Haile',
+      last_name: 'Gebrselassie',
+    });
+
+    expect(mockedApiFetch).toHaveBeenCalledWith('/user', {
+      method: 'PATCH',
+      body: {
+        profile: {
+          first_name: 'Haile',
+          last_name: 'Gebrselassie',
+        },
+      },
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.user.name).toBe('Haile Gebrselassie');
+      expect(res.user.profile?.first_name).toBe('Haile');
+    }
+  });
+});
+
+describe('authService.removeAvatar (G-47)', () => {
+  beforeEach(() => {
+    mockedApiFetch.mockReset();
+  });
+
+  it('removeAvatar calls DELETE /user/avatar', async () => {
+    mockedApiFetch.mockResolvedValueOnce({ data: sampleUserWire() } as any);
+    const res = await authService.removeAvatar();
+    expect(mockedApiFetch).toHaveBeenCalledWith('/user/avatar', {
+      method: 'DELETE',
+    });
+    expect(res.ok).toBe(true);
+  });
+});
+

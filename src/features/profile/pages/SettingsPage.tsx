@@ -4,16 +4,17 @@ import {
   ArrowLeft, Moon, Sun, Bell, Mail, Phone,
   Globe, CreditCard, Languages, Shield, Lock, Eye, FileText, HelpCircle,
   ChevronRight, LogOut, User, BadgeCheck, Sparkles, Pencil, Loader2,
-  X, ShieldCheck,
+  X, ShieldCheck, Camera, Trash2,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
+import { UserAvatar } from '@/components/UserAvatar';
 import { flatAvatarColor } from '@/lib/utils/avatarColor';
 import {
   fetchNotificationPreferences, channelPreferences, updateChannelPreference,
   type NotificationChannel, type ChannelPreferences,
 } from '@/lib/notifications';
-import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill } from '@/features/profile/components/SettingsPrimitives';
+import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill, EditField } from '@/features/profile/components/SettingsPrimitives';
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -79,12 +80,81 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   // Security
   const [twoFaEnabled, setTwoFaEnabled] = useState(false);
 
+  // Profile editing state (G-14 & G-47)
+  const { updateProfile, uploadAvatar, removeAvatar } = useAuth();
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarRemoving, setAvatarRemoving] = useState(false);
+
   // Sheet state — which bottom sheet is open
-  type Sheet = 'none' | 'language' | 'currency' | 'region' | '2fa' | 'help' | 'terms' | 'privacy';
+  type Sheet = 'none' | 'profile' | 'language' | 'currency' | 'region' | '2fa' | 'help' | 'terms' | 'privacy';
   const [sheet, setSheet] = useState<Sheet>('none');
 
-  const openSheet = (s: Sheet) => setSheet(s);
-  const closeSheet = () => setSheet('none');
+  const openSheet = (s: Sheet) => {
+    if (s === 'profile') {
+      const parts = (user?.name || '').trim().split(' ');
+      setEditFirstName(user?.profile?.first_name ?? parts[0] ?? '');
+      setEditLastName(user?.profile?.last_name ?? parts.slice(1).join(' ') ?? '');
+      setProfileError(null);
+    }
+    setSheet(s);
+  };
+  const closeSheet = () => {
+    setProfileError(null);
+    setSheet('none');
+  };
+
+  const handleSaveProfile = async () => {
+    const trimmedFirst = editFirstName.trim();
+    const trimmedLast = editLastName.trim();
+    if (!trimmedFirst) {
+      setProfileError('Please enter your name.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError(null);
+    const res = await updateProfile({
+      first_name: trimmedFirst,
+      last_name: trimmedLast || trimmedFirst,
+    });
+    setProfileSaving(false);
+    if (res.ok) {
+      closeSheet();
+    } else {
+      setProfileError(res.error || 'Could not update profile names.');
+    }
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Avatar image must be under 5 MB.');
+      return;
+    }
+    setAvatarUploading(true);
+    setProfileError(null);
+    const res = await uploadAvatar(file);
+    setAvatarUploading(false);
+    if (!res.ok) {
+      setProfileError(res.error || 'Could not upload avatar image.');
+    }
+    // Reset file input value
+    e.target.value = '';
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarRemoving(true);
+    setProfileError(null);
+    const res = await removeAvatar();
+    setAvatarRemoving(false);
+    if (!res.ok) {
+      setProfileError(res.error || 'Could not remove avatar.');
+    }
+  };
 
   const avatarColor = flatAvatarColor(user?.name || user?.email || 'Digis');
   const brand = '#d6f905';
@@ -130,6 +200,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         accentText={accentText}
         subtle={subtle}
         onRequestAuth={onRequestAuth}
+        onEditProfile={() => openSheet('profile')}
       />
 
       {/* Appearance */}
@@ -264,6 +335,132 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
               style={{ background: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(20,18,40,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
               onClick={closeSheet}
             />
+
+            {/* ── Profile Editor (G-14 & G-47) ── */}
+            {sheet === 'profile' && (
+              <SettingsSheet key="profile" title="Edit Profile" onClose={closeSheet} isDark={isDark} brand={brand} cardBorder={cardBorder}>
+                <div className="space-y-4">
+                  {/* Avatar section */}
+                  <div className="flex items-center gap-4 py-1">
+                    <UserAvatar user={user} size={64} />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={handleAvatarFileChange}
+                            disabled={avatarUploading || avatarRemoving}
+                          />
+                          <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-opacity"
+                            style={{
+                              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                              color: heading,
+                              fontFamily: "'Inter', sans-serif",
+                              opacity: avatarUploading ? 0.6 : 1,
+                            }}
+                          >
+                            {avatarUploading ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Camera className="w-3.5 h-3.5" />
+                            )}
+                            {avatarUploading ? 'Uploading…' : 'Change photo'}
+                          </span>
+                        </label>
+                        {user?.profile?.avatar_url && (
+                          <AppButton
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleRemoveAvatar}
+                            disabled={avatarUploading || avatarRemoving}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium cursor-pointer"
+                            style={{
+                              background: isDark ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.08)',
+                              color: '#ef4444',
+                              fontFamily: "'Inter', sans-serif",
+                              opacity: avatarRemoving ? 0.6 : 1,
+                            }}
+                          >
+                            {avatarRemoving ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            {avatarRemoving ? 'Removing…' : 'Remove'}
+                          </AppButton>
+                        )}
+                      </div>
+                      <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: subtle }}>
+                        JPEG, PNG, or WebP. Max 5 MB.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Name Fields */}
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-[11px] mb-1 font-medium tracking-wide uppercase" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
+                        First Name
+                      </label>
+                      <EditField
+                        icon={<User className="w-4 h-4" />}
+                        placeholder="First name"
+                        value={editFirstName}
+                        onChange={setEditFirstName}
+                        isDark={isDark}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] mb-1 font-medium tracking-wide uppercase" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
+                        Last Name <span className="opacity-60 normal-case font-normal">(optional)</span>
+                      </label>
+                      <EditField
+                        icon={<User className="w-4 h-4" />}
+                        placeholder="Last name (optional)"
+                        value={editLastName}
+                        onChange={setEditLastName}
+                        isDark={isDark}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Error feedback */}
+                  {profileError && (
+                    <div
+                      className="p-3 rounded-xl text-[12px] leading-snug"
+                      style={{
+                        background: 'rgba(239,68,68,0.1)',
+                        color: '#ef4444',
+                        fontFamily: "'Inter', sans-serif",
+                      }}
+                    >
+                      {profileError}
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="pt-2">
+                    <AppButton
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSaveProfile}
+                      disabled={profileSaving}
+                      className="w-full py-3 rounded-2xl cursor-pointer text-[13px] flex items-center justify-center gap-2 font-semibold"
+                      style={{
+                        background: isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a',
+                        color: isDark ? '#000' : '#fff',
+                        fontFamily: "'Inter', sans-serif",
+                        opacity: profileSaving ? 0.7 : 1,
+                      }}
+                    >
+                      {profileSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {profileSaving ? 'Saving…' : 'Save changes'}
+                    </AppButton>
+                  </div>
+                </div>
+              </SettingsSheet>
+            )}
 
             {/* ── Language picker ── */}
             {sheet === 'language' && (

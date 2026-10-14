@@ -22,6 +22,34 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glass, glassControl, glassField } from '@/lib/ui/glass';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { isoToDisplayDate } from '@/lib/mappers';
+import { ApiError } from '@/lib/errors';
+
+function giftErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case 'gift_invalid':
+        return 'This gift link is invalid or has expired.';
+      case 'gift_not_ready':
+        return 'This gift order is still awaiting payment confirmation.';
+      case 'idempotency_conflict':
+        return 'This claim is already being processed. Please refresh.';
+      case 'gift_expired':
+        return 'This gift ticket has expired.';
+      case 'gift_revoked':
+        return 'This gift purchase was refunded or cancelled by the purchaser.';
+      case 'gift_quantity_invalid':
+        return 'Gift tickets must be sent 1 per recipient.';
+      case 'recipient_phone_invalid':
+        return 'Please enter a valid recipient phone number.';
+      case 'gift_recipient_same_as_purchaser':
+        return 'You cannot send a gift ticket to your own phone number.';
+      default:
+        return err.message || fallback;
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 interface ClaimGiftPageProps {
   id: string;
@@ -97,7 +125,7 @@ export function ClaimGiftPage({
       }
     },
     onError: (err: any) => {
-      setClaimError(err?.message || 'Failed to claim gift. Please try again.');
+      setClaimError(giftErrorMessage(err, 'Failed to claim gift. Please try again.'));
     },
   });
 
@@ -135,7 +163,7 @@ export function ClaimGiftPage({
             Gift Unavailable
           </h2>
           <p className="text-[13px] leading-relaxed" style={{ color: textMuted }}>
-            {error instanceof Error ? error.message : 'This gift link is invalid or has expired.'}
+            {giftErrorMessage(error, 'This gift link is invalid or has expired.')}
           </p>
           <div className="pt-2 flex justify-center gap-3">
             <AppButton

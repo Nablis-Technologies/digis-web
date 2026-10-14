@@ -1,5 +1,5 @@
 export type { Event, TicketTier, TicketTierFeature, EventArtist, EventOrganizer, EventProduct, EventProductType, SelectedEventProduct, SeatMapConfig, SeatSection, SeatRow, Seat, SeatStatus, SelectedSeat } from './event';
-export type { AuthUser, AuthUserWire, AuthRole, AuthSession, AuthResult, SignInRequest, SignInResponse, SignUpRequest, SignUpResponse, MeResponse, LogoutResponse } from './auth';
+export type { AuthUser, AuthUserWire, AuthRole, AuthSession, AuthResult, SignInRequest, SignInResponse, SignUpRequest, SignUpResponse, MeResponse, LogoutResponse, UserProfile, UserProfileWire, UpdateProfileInput, UpdateProfileResponse, AvatarResponse } from './auth';
 
 export type { CustomQuestion, AnswerEditWindowHours } from './checkout';
 

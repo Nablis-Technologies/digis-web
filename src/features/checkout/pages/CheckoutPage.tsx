@@ -83,6 +83,8 @@ interface CheckoutProps {
   dateSelection?: 'fixed' | 'choose_one';
   /** Backend event dates (id + startsAt) for the choose_one date step. */
   eventDates?: { id: string; startsAt: string; name?: string }[];
+  /** When true, initializes checkout in gift mode. */
+  initialGiftMode?: boolean;
   /** When set, this sheet renders the post-Chapa return confirmation instead
    *  of the purchase flow. */
   returnMode?: CheckoutReturnMode;
@@ -172,9 +174,9 @@ function CheckoutReturn({ returnMode, onClose }: CheckoutProps) {
   );
 }
 
-function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProductId, ticketTypeId, accessCode, invitationToken, basePrice, eventId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, dateSelection, eventDates, onClose, onComplete }: CheckoutProps) {
+function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProductId, ticketTypeId, accessCode, invitationToken, basePrice, eventId, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, dateSelection, eventDates, initialGiftMode, onClose, onComplete }: CheckoutProps) {
   const { isDark } = useTheme();
-  const flow = useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, dateSelection, eventDates, onClose });
+  const flow = useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products, includedProductIds, answerEditWindowHours, seatMap, requiredSeatCount, dateSelection, eventDates, initialGiftMode, onClose });
   const {
     step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats, requiredSeats,
     promoApplied, promoCodeInput, setPromoCodeInput,
@@ -191,6 +193,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
     conflict, closeConflictSheet,
     guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp,
     eventDates: flowDates, selectedEventDateId, setSelectedEventDateId,
+    isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId,
   } = flow;
 
   // Post-Chapa confirmation lives in the router (AppContent): the return URL
@@ -251,7 +254,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
           </div>
         ) : step === 'success' ? (
           <div className="relative px-6 pt-4 pb-6" style={{ boxShadow: `inset 0 1px 0 ${borderSoft}` }}>
-            <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onComplete} className="w-full py-4 rounded-2xl cursor-pointer" style={{ background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)', color: '#000', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>View My Ticket</AppButton>
+            <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onComplete} className="w-full py-4 rounded-2xl cursor-pointer" style={{ background: 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)', color: '#000', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', boxShadow: 'none' }}>{isGift ? 'Done' : 'View My Ticket'}</AppButton>
           </div>
         ) : undefined
       }
@@ -292,7 +295,24 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
         {step === 'review' && (
           <StepFrame key="review">
             <div className="space-y-4">
-              <ReviewStep event={event} ticketType={ticketType} ticketLevel={ticketLevel} quantity={quantity} setQuantity={setQuantity} basePrice={basePrice} isDark={isDark} hasSeats={hasSeats} selectedSeats={selectedSeats} />
+              <ReviewStep
+                event={event}
+                ticketType={ticketType}
+                ticketLevel={ticketLevel}
+                quantity={quantity}
+                setQuantity={setQuantity}
+                basePrice={basePrice}
+                isDark={isDark}
+                hasSeats={hasSeats}
+                selectedSeats={selectedSeats}
+                isGift={isGift}
+                setIsGift={setIsGift}
+                giftRecipientPhone={giftRecipientPhone}
+                setGiftRecipientPhone={setGiftRecipientPhone}
+                giftNote={giftNote}
+                setGiftNote={setGiftNote}
+                giftErrors={giftErrors}
+              />
               {/* Terms consent — its own box, separate from the ticket review card. */}
               {(consents.length > 0 || consentsLoading || consentsError) && (
                 <ConsentSection consents={consents} accepted={acceptedConsents} onToggle={toggleConsent} error={consentError} isDark={isDark} loading={consentsLoading} loadError={consentsError} onRetry={reloadConsents} />
@@ -333,7 +353,20 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
             </p>
           </motion.div>
         )}
-        {step === 'success' && <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 22, stiffness: 250 }} className="flex flex-col items-center justify-center py-12"><SuccessView event={event} ticketType={ticketType} total={total} isDark={isDark} /></motion.div>}
+        {step === 'success' && (
+          <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 22, stiffness: 250 }} className="flex flex-col items-center justify-center py-12">
+            <SuccessView
+              event={event}
+              ticketType={ticketType}
+              total={total}
+              isDark={isDark}
+              isGift={isGift}
+              giftRecipientPhone={giftRecipientPhone}
+              giftPurchases={giftPurchases}
+              orderId={orderId}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <ConflictSheet

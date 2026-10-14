@@ -1,11 +1,15 @@
+import { useEffect, useState, type CSSProperties } from 'react';
 import { flatAvatarColor, initialsOf } from '@/lib/utils/avatarColor';
+import { authService } from '@/lib/auth';
 import type { AuthUser } from '@/types/auth';
-import type { CSSProperties } from 'react';
+
+// Memory cache for avatar blob URLs keyed by user ID + avatar_url timestamp/path
+const avatarBlobCache = new Map<string, { blobUrl: string; etag?: string }>();
 
 /**
  * Consistent profile avatar used across TopBar, UserProfile, and Settings.
- * Shows initials on a hash-based avatar color. (No photo — the backend has no
- * profile photo field, see docs/BACKEND_GAPS.md.)
+ * Displays private user avatar photo via authenticated fetch (G-47), falling
+ * back to initials on a hash-based color when no photo is attached or while loading.
  */
 export function UserAvatar({
   user,
@@ -18,6 +22,43 @@ export function UserAvatar({
   className?: string;
   style?: CSSProperties;
 }) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(() => {
+    if (!user?.id || !user?.profile?.avatar_url) return null;
+    return avatarBlobCache.get(user.id)?.blobUrl ?? null;
+  });
+
+  const avatarUrl = user?.profile?.avatar_url;
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId || !avatarUrl) {
+      setPhotoUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    const cached = avatarBlobCache.get(userId);
+    if (cached?.blobUrl) {
+      setPhotoUrl(cached.blobUrl);
+    }
+
+    authService.getAvatarBlobUrl(cached?.etag).then((res) => {
+      if (!isMounted) return;
+      if (res.notModified && cached?.blobUrl) {
+        setPhotoUrl(cached.blobUrl);
+      } else if (res.url) {
+        avatarBlobCache.set(userId, { blobUrl: res.url, etag: res.etag });
+        setPhotoUrl(res.url);
+      } else {
+        setPhotoUrl(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, avatarUrl]);
+
   if (!user) return null;
 
   const color = flatAvatarColor(user.name || user.email || 'U');
@@ -40,6 +81,22 @@ export function UserAvatar({
     overflow: 'hidden',
     ...style,
   };
+
+  if (photoUrl) {
+    return (
+      <div
+        className={`inline-flex items-center justify-center relative ${className}`}
+        style={{ ...shared, background: color, boxShadow: `0 4px 14px -4px ${color}88` }}
+      >
+        <img
+          src={photoUrl}
+          alt={user.name || 'User avatar'}
+          className="w-full h-full object-cover"
+          onError={() => setPhotoUrl(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

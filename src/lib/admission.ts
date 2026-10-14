@@ -30,6 +30,12 @@ export interface AdmissionAnswerInput {
   value: unknown;
 }
 
+export interface AdmissionGiftInput {
+  recipientPhone: string;
+  recipientEmail?: string;
+  note?: string;
+}
+
 export interface AdmissionItemInput {
   /** Catalog::EventProduct id. */
   eventProductId: string;
@@ -45,6 +51,7 @@ export interface AdmissionItemInput {
   invitationToken?: string;
   answers?: AdmissionAnswerInput[];
   consents?: ConsentDocument[];
+  gift?: AdmissionGiftInput;
 }
 
 export interface AdmissionSelectionInput {
@@ -105,6 +112,7 @@ export interface AdmissionResult {
   order?: AdmissionOrder;
   registration?: { id: string; status: string };
   registrations: AdmissionRegistration[];
+  giftPurchases?: Array<{ id: string; status: string; deliveryStatus?: string }>;
   nextAction: AdmissionNextAction;
   /** Bound to the order for guest payment endpoints (`order_access_token`). */
   guestOrderToken?: string;
@@ -136,10 +144,17 @@ interface WireOrder {
   expires_at?: string | null;
 }
 
+interface WireGiftPurchase {
+  id: string;
+  status: string;
+  delivery_status?: string;
+}
+
 interface WireSelectionResponse {
   order?: WireOrder | null;
   registration?: { id: string; status: string } | null;
   registrations?: Array<{ id: string; status: string; next_action: string }> | null;
+  gift_purchases?: WireGiftPurchase[] | null;
   next_action: WireNextAction;
   guest_order_token?: string;
 }
@@ -149,13 +164,23 @@ interface WireSelectionResponse {
 function wireItems(items: AdmissionItemInput[]) {
   return items.map((item) => {
     const requestUuid = randomUuid();
+    const isGift = Boolean(item.gift);
     return {
       event_product_id: item.eventProductId,
       quantity: item.quantity,
+      ...(item.gift
+        ? {
+            gift: {
+              recipient_phone: item.gift.recipientPhone,
+              ...(item.gift.recipientEmail ? { recipient_email: item.gift.recipientEmail } : {}),
+              ...(item.gift.note ? { note: item.gift.note } : {}),
+            },
+          }
+        : {}),
       ...(item.registrationId ? { registration_id: item.registrationId } : {}),
       ...(item.selectedEventDateId ? { selected_event_date_id: item.selectedEventDateId } : {}),
       ...(item.eventDateIds && item.eventDateIds.length > 0 ? { event_date_ids: item.eventDateIds } : {}),
-      ...(item.accessCode || item.invitationToken
+      ...(!isGift && (item.accessCode || item.invitationToken)
         ? {
             audience_proof: {
               ...(item.accessCode ? { access_code: item.accessCode } : {}),
@@ -163,7 +188,7 @@ function wireItems(items: AdmissionItemInput[]) {
             },
           }
         : {}),
-      ...(item.answers !== undefined
+      ...(!isGift && item.answers !== undefined
         ? {
             answers: item.answers.map((answer) => ({
               ...(answer.formVersionId ? { form_version_id: answer.formVersionId } : {}),
@@ -172,7 +197,7 @@ function wireItems(items: AdmissionItemInput[]) {
             })),
           }
         : {}),
-      ...(item.consents !== undefined
+      ...(!isGift && item.consents !== undefined
         ? {
             consents: item.consents.map((consent) => ({
               consent_document_version_id: consent.versionId,
@@ -235,6 +260,15 @@ function mapResult(wire: WireSelectionResponse): AdmissionResult {
       status: r.status,
       nextAction: r.next_action,
     })),
+    ...(wire.gift_purchases
+      ? {
+          giftPurchases: wire.gift_purchases.map((g) => ({
+            id: g.id,
+            status: g.status,
+            deliveryStatus: g.delivery_status,
+          })),
+        }
+      : {}),
     nextAction: mapNextAction(wire.next_action),
     ...(wire.guest_order_token ? { guestOrderToken: wire.guest_order_token } : {}),
   };

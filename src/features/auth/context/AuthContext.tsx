@@ -18,6 +18,10 @@ interface AuthContextValue {
   requestSignupOtp: (phone: string) => Promise<SignupOtpResponse>;
   verifySignupOtp: (challenge_id: string, code: string) => Promise<VerifySignupOtpResponse>;
   signUp: (data: SignUpRequest) => Promise<Result>;
+  updateProfile: (input: { first_name?: string; last_name?: string }) => Promise<Result>;
+  uploadAvatar: (file: File) => Promise<Result>;
+  removeAvatar: () => Promise<Result>;
+  refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -80,6 +84,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const updateProfile: AuthContextValue["updateProfile"] = async (input) => {
+    const res = await authService.updateProfile(input);
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: res.error,
+        fieldErrors: "fieldErrors" in res ? res.fieldErrors : undefined,
+      };
+    }
+    const current = getSession();
+    if (current) setSession({ ...current, user: res.user });
+    return { ok: true };
+  };
+
+  const uploadAvatar: AuthContextValue["uploadAvatar"] = async (file) => {
+    const res = await authService.uploadAvatar(file);
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: res.error,
+        fieldErrors: "fieldErrors" in res ? res.fieldErrors : undefined,
+      };
+    }
+    const current = getSession();
+    if (current) setSession({ ...current, user: res.user });
+    return { ok: true };
+  };
+
+  const removeAvatar: AuthContextValue["removeAvatar"] = async () => {
+    const res = await authService.removeAvatar();
+    if (!res.ok) {
+      return { ok: false, error: res.error };
+    }
+    const current = getSession();
+    if (current) setSession({ ...current, user: res.user });
+    return { ok: true };
+  };
+
+  const refreshUser = async () => {
+    if (!getSession()) return;
+    try {
+      const res = await authService.me();
+      if (res.ok) {
+        const current = getSession();
+        if (current) setSession({ ...current, user: res.user });
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   const signOut = async () => {
     try {
       await authService.logout();
@@ -97,6 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         requestSignupOtp,
         verifySignupOtp,
         signUp,
+        updateProfile,
+        uploadAvatar,
+        removeAvatar,
+        refreshUser,
         signOut,
       }}
     >

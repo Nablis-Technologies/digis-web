@@ -161,6 +161,13 @@ const CODE_MESSAGES: Record<string, string> = {
   attempts_exhausted: 'Too many wrong codes. Request a new one and try again.',
   phone_mismatch: 'That phone doesn’t match the one on this transfer.',
   challenge_not_found: 'This verification code has expired — request a new one.',
+  // User profile & avatar management (G-14 & G-47)
+  avatar_route_required: 'Avatar changes must be made through the avatar management endpoint.',
+  profile_required: 'Please set your first and last name before uploading a photo.',
+  invalid_avatar: 'Please choose a valid image file (JPEG, PNG, or WebP up to 5 MB).',
+  avatar_not_found: 'No avatar image is currently set.',
+  avatar_unavailable: 'Could not load your avatar image right now. Please try again later.',
+  avatar_processing_unavailable: 'Could not process the uploaded image. Please try a different photo.',
 };
 
 /** Map a known backend `code` to friendly text, else the fallback. */
@@ -184,6 +191,8 @@ export type FieldErrorMap = {
  */
 const FIELD_MATCHERS: ReadonlyArray<{ field: string; pattern: RegExp }> = [
   { field: 'passwordConfirmation', pattern: /password confirmation|passwords? (?:do(?:es)? not|don'?t) match|confirmation/i },
+  { field: 'firstName', pattern: /first[ _]?name/i },
+  { field: 'lastName', pattern: /last[ _]?name/i },
   { field: 'phone', pattern: /phone|mobile/i },
   { field: 'email', pattern: /email/i },
   { field: 'name', pattern: /\bname\b/i },

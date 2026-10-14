@@ -17,18 +17,33 @@ export type AuthRole = {
   active: boolean;
 };
 
+export type UserProfile = {
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  avatar_url: string | null;
+};
+
+export type UserProfileWire = {
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
+};
+
 export type AuthUser = {
   id: string;
-  /** Server name when the backend provides one; else derived from email/phone. */
+  /** Server name when the backend provides one; else derived from profile/email/phone. */
   name: string;
   email?: string;
   phone?: string;
   verified_at?: string;
   permissions: string[];
   roles: AuthRole[];
+  profile?: UserProfile | null;
 };
 
-/** Raw user as the backend serializes it (Core::UserAuthSerializer). */
+/** Raw user as the backend serializes it (Core::CurrentUserSerializer / Core::UserAuthSerializer). */
 export type AuthUserWire = {
   id: string;
   name?: string | null;
@@ -37,6 +52,7 @@ export type AuthUserWire = {
   verified_at?: string | null;
   permissions?: string[] | null;
   roles?: Array<{ id: string; code: string; name: string; active: boolean }> | null;
+  profile?: UserProfileWire | null;
 };
 
 export type AuthSession = {
@@ -69,12 +85,12 @@ export type VerifySignupOtpResponse = AuthResult<{
 }>;
 
 /**
- * POST /auth/signup body. Phone-first with required OTP verification token.
- * `name` is collected and sent; the backend does not persist it yet
- * (BACKEND_GAPS #8), falling back to derived display name.
+ * POST /auth/signup body (G-14). Phone-first with separate first_name and last_name,
+ * and required OTP verification token.
  */
 export type SignUpRequest = {
-  name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   email?: string;
   password: string;
@@ -82,6 +98,14 @@ export type SignUpRequest = {
   verification_token: string;
 };
 export type SignUpResponse = AuthResult<AuthSession>;
+
+export type UpdateProfileInput = {
+  first_name?: string;
+  last_name?: string;
+};
+
+export type UpdateProfileResponse = AuthResult<{ user: AuthUser }>;
+export type AvatarResponse = AuthResult<{ user: AuthUser }>;
 
 export type MeResponse = AuthResult<{ user: AuthUser }>;
 export type LogoutResponse = AuthResult<Record<string, never>>;

@@ -7,6 +7,7 @@ import {
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { mapFieldErrors } from '@/lib/errors';
+import { splitFullName } from '@/lib/utils/nameSplit';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { glassEdge, glassField } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -88,7 +89,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
   // form state
   const [identifier, setIdentifier] = useState(''); // sign-in phone
-  const [fullName, setFullName] = useState(''); // signup only
+  const [name, setName] = useState(''); // signup name (split into first/last on submit)
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -142,7 +143,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
   const handleRequestSignupOtp = async () => {
     clearAllErrors();
-    const trimmedName = fullName.trim();
+    const trimmedName = name.trim();
     const e164 = buildPhone(phone, country.dial);
 
     const next: Record<string, string> = {};
@@ -188,10 +189,11 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
       return;
     }
 
-    const trimmedName = fullName.trim();
+    const { firstName, lastName } = splitFullName(name);
     const e164 = buildPhone(phone, country.dial);
     const res = await auth.signUp({
-      name: trimmedName,
+      firstName,
+      lastName,
       phone: e164,
       password,
       passwordConfirmation: confirmPassword,
@@ -206,8 +208,11 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
     const { fields, general } = mapFieldErrors(res.fieldErrors);
     const mapped: Record<string, string> = {};
-    for (const key of ['name', 'phone', 'password', 'passwordConfirmation']) {
+    for (const key of ['firstName', 'lastName', 'name', 'phone', 'password', 'passwordConfirmation']) {
       if (fields[key]) mapped[key] = fields[key];
+    }
+    if (mapped.firstName || mapped.lastName) {
+      mapped.name = mapped.firstName || mapped.lastName;
     }
     setErrors(mapped);
     setFormError(general.join(' ') || (Object.keys(mapped).length ? '' : res.error || 'Could not create account.'));
@@ -355,7 +360,14 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
                 {mode === 'signup' && signupStep === 'details' && (
                   <>
-                    <NameField value={fullName} onChange={(v) => { setFullName(v); clearField('name'); }} error={errors.name} isDark={isDark} onEnter={handleRequestSignupOtp} />
+                    <NameField
+                      value={name}
+                      onChange={(v) => { setName(v); clearField('name'); clearField('firstName'); clearField('lastName'); }}
+                      error={errors.name || errors.firstName || errors.lastName}
+                      placeholder="Name"
+                      isDark={isDark}
+                      onEnter={handleRequestSignupOtp}
+                    />
                     <PhoneField
                       country={country} onCountryChange={setCountry}
                       placeholder="Phone number"
@@ -365,7 +377,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                     <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleRequestSignupOtp} />
                     <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); clearField('passwordConfirmation'); }} error={errors.passwordConfirmation} isDark={isDark} placeholder="Confirm your password" onEnter={handleRequestSignupOtp} />
                     <ErrorLine error={formError} />
-                    <PrimaryButton onClick={handleRequestSignupOtp} loading={loading} isDark={isDark} label="Continue" disabled={!fullName.trim() || !phone.trim() || !password || !confirmPassword} />
+                    <PrimaryButton onClick={handleRequestSignupOtp} loading={loading} isDark={isDark} label="Continue" disabled={!name.trim() || !phone.trim() || !password || !confirmPassword} />
                     <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                       By continuing you agree to Digis’ Terms & Privacy Policy.
                     </p>
@@ -584,7 +596,21 @@ function PhoneField({ country, onCountryChange, placeholder, value, onChange, is
 }
 
 /* â”€â”€â”€ Name field (signup only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-function NameField({ value, onChange, isDark, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; onEnter?: () => void; error?: string }) {
+function NameField({
+  value,
+  onChange,
+  isDark,
+  placeholder = "Name",
+  onEnter,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  isDark: boolean;
+  placeholder?: string;
+  onEnter?: () => void;
+  error?: string;
+}) {
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
@@ -594,7 +620,8 @@ function NameField({ value, onChange, isDark, onEnter, error }: { value: string;
         <GlassReflection isDark={isDark} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
         <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="Name" style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
+          placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
+          maxLength={100}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
       </div>

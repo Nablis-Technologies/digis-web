@@ -4,6 +4,8 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
+import type { AuthUser } from '@/types/auth';
+
 interface SettingsAccountCardProps {
   isDark: boolean;
   cardBorder: string;
@@ -12,21 +14,20 @@ interface SettingsAccountCardProps {
   heading: string;
   avatarColor: string;
   isAuthenticated: boolean;
-  user: any;
+  user?: AuthUser | null;
   accentText: string;
   subtle: string;
   onRequestAuth?: () => void;
+  onEditProfile?: () => void;
 }
 
 /**
- * Display-only account card. Profile editing (name/email/phone/photo) is
- * deferred — the backend has no self-service profile-update endpoint
- * (only admin/users CRUD + auth/*). See docs/BACKEND_GAPS.md.
+ * Account card with profile summary and edit trigger (G-14 & G-47).
  */
 export function SettingsAccountCard(props: SettingsAccountCardProps) {
   const {
     isDark, cardBorder, heading, avatarColor, isAuthenticated, user,
-    accentText, subtle, onRequestAuth,
+    accentText, subtle, onRequestAuth, onEditProfile,
   } = props;
   return (
     <motion.div
@@ -59,10 +60,21 @@ export function SettingsAccountCard(props: SettingsAccountCardProps) {
                 {user.phone}
               </p>
             )}
-            <p className="text-[10px] mt-2" style={{ fontFamily: "'Inter', sans-serif", color: subtle }}>
-              Profile editing is coming soon.
-            </p>
           </div>
+          {onEditProfile && (
+            <AppButton
+              whileTap={{ scale: 0.94 }}
+              onClick={onEditProfile}
+              className="px-3.5 py-1.5 rounded-full flex-shrink-0 cursor-pointer text-[12px] font-medium"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                color: heading,
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              Edit
+            </AppButton>
+          )}
         </div>
       ) : (
         /* Guest card */
