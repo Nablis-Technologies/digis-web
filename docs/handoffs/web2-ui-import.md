@@ -53,4 +53,4 @@ merge. `DESIGN.md` is the design authority; boundaries follow
  
 ## Verification
  
-`npx tsc --noEmit` clean · `npx vitest run` 173/173 · `pnpm build` OK.
+`npx tsc --noEmit` clean · `npx vitest run` 183/183 · `npx playwright test` 29/29 · `pnpm build` OK.
