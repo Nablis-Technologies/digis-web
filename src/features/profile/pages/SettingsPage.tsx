@@ -96,8 +96,10 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const openSheet = (s: Sheet) => {
     if (s === 'profile') {
       const parts = (user?.name || '').trim().split(' ');
-      setEditFirstName(user?.profile?.first_name ?? parts[0] ?? '');
-      setEditLastName(user?.profile?.last_name ?? parts.slice(1).join(' ') ?? '');
+      const rawFirst = user?.profile?.first_name ?? parts[0] ?? '';
+      const rawLast = user?.profile?.last_name ?? parts.slice(1).join(' ') ?? '';
+      setEditFirstName(rawFirst);
+      setEditLastName(rawLast === rawFirst ? '' : rawLast);
       setProfileError(null);
     }
     setSheet(s);

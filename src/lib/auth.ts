@@ -59,7 +59,12 @@ export function toAuthUser(wire: AuthUserWire): AuthUser {
     ? {
         first_name: wire.profile.first_name || "",
         last_name: wire.profile.last_name || "",
-        full_name: wire.profile.full_name || `${wire.profile.first_name || ""} ${wire.profile.last_name || ""}`.trim(),
+        full_name:
+          wire.profile.full_name && wire.profile.full_name !== `${wire.profile.first_name || ""} ${wire.profile.first_name || ""}`.trim()
+            ? wire.profile.full_name
+            : wire.profile.first_name === wire.profile.last_name
+            ? wire.profile.first_name || ""
+            : `${wire.profile.first_name || ""} ${wire.profile.last_name || ""}`.trim(),
         avatar_url: wire.profile.avatar_url ?? null,
       }
     : null;

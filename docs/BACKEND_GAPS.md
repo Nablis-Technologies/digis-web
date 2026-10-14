@@ -127,6 +127,7 @@
 | 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
 | 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
+| 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -485,6 +486,42 @@ sheet and submitting.
 this exposes nothing to buyers.
 
 **Status: resolved 2026-10-05 (backend commit `360f9c7` added `ticket_id` to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS`; frontend wired in `src/lib/resale.ts` and `src/features/resale/pages/ResalePage.tsx`).**
+
+### #67. `Core::UserProfile` requires mandatory `last_name` (`null: false` and presence validation)
+
+In `Core::UserProfile` (`app/models/core/user_profile.rb:16`):
+```ruby
+validates :first_name, :last_name, presence: true, length: { maximum: 100 }
+```
+and DB migration `db/migrate/20261011090000_create_core_user_profiles.rb:8`:
+```ruby
+t.string :last_name, limit: 100, null: false
+```
+`Core::Signups::Complete` (`app/services/core/signups/complete.rb:126-130`) creates the profile by passing `first_name` and `last_name`:
+```ruby
+Core::UserProfile.create!(
+  user: user,
+  first_name: @attributes[:first_name],
+  last_name: @attributes[:last_name]
+)
+```
+If `last_name` is absent or empty, signup 422s with `errors: { "last_name" => ["can't be blank"] }`. Furthermore, `UserProfile#full_name` (`user_profile.rb:19-21`) joins both names:
+```ruby
+def full_name
+  [ first_name, last_name ].compact.join(" ").gsub(/\p{Space}+/u, " ").strip
+end
+```
+
+**Why it matters:**
+In the Ethiopia market and globally, many users have only a single mononym or single name, or choose not to provide a distinct surname. The consumer UI presents a single "Name" field during signup and treats "Last Name" as optional in settings. Because the backend strictly mandates a non-null, present `last_name`, the frontend must apply a mitigation: duplicating single names (`last_name: first_name`) on submission, and then deduplicating `"FirstName FirstName"` back to `"FirstName"` when reading the wire response.
+
+**Fix for backend dev:**
+1. Migration: Change column constraint `change_column_null :core_user_profiles, :last_name, true`.
+2. Model: Remove `:last_name` from presence validation (`validates :first_name, presence: true, length: { maximum: 100 }; validates :last_name, length: { maximum: 100 }, allow_nil: true, allow_blank: true`).
+3. `full_name`: Already uses `[ first_name, last_name ].compact.join(" ")` which naturally produces just `first_name` when `last_name` is `nil` or empty.
+
+**Status: open — degrading (filed 2026-10-14; frontend mitigates via `splitFullName` and `toAuthUser` display deduplication).**
+
 
 ### #54. Discovery availability has no backend source
 

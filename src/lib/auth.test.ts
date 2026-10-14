@@ -48,6 +48,20 @@ describe('toAuthUser mapping', () => {
     expect(user.roles).toHaveLength(1);
   });
 
+  it('displays single name without duplication when first_name equals last_name', () => {
+    const singleNameUser = toAuthUser(
+      sampleUserWire({
+        profile: {
+          first_name: 'Aster',
+          last_name: 'Aster',
+          full_name: 'Aster Aster',
+          avatar_url: null,
+        },
+      })
+    );
+    expect(singleNameUser.name).toBe('Aster');
+  });
+
   it('derives name from email local part or phone when name is empty', () => {
     const fromEmail = toAuthUser(sampleUserWire({ name: null, email: 'dagm@test.com' }));
     expect(fromEmail.name).toBe('dagm');
