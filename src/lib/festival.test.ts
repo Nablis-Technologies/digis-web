@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { resolveFestivalSchedule } from './festival';
+import { resolveFestivalSchedule, guestsForDay } from './festival';
 import type { Event, TicketTier } from '@/types';
+import type { FestivalSchedule } from './festival';
 
 describe('resolveFestivalSchedule', () => {
   it('returns null for single-day events without festival category', () => {
@@ -42,5 +43,33 @@ describe('resolveFestivalSchedule', () => {
     expect(schedule!.showPass).toBe(true);
     expect(schedule!.passFromLabel).toContain('1,500');
     expect(schedule!.allGuests).toHaveLength(2);
+  });
+});
+
+describe('guestsForDay', () => {
+  // Minimal fixture: the adapter always fills guestsByDay, so build the shape
+  // by hand to pin the fallback rules precisely.
+  const schedule = {
+    allGuests: [{ name: 'All One' }, { name: 'All Two' }],
+    guestsByDay: {
+      d1: [{ name: 'Day One' }],
+      d2: [],
+    },
+  } as unknown as FestivalSchedule;
+
+  it('returns everyone when "All days" is picked', () => {
+    expect(guestsForDay(schedule, 'all')).toEqual(schedule.allGuests);
+  });
+
+  it("returns the picked day's guests", () => {
+    expect(guestsForDay(schedule, 'd1')).toEqual([{ name: 'Day One' }]);
+  });
+
+  it('falls back to everyone when the picked day has no guests', () => {
+    expect(guestsForDay(schedule, 'd2')).toEqual(schedule.allGuests);
+  });
+
+  it('falls back to everyone for an unknown day id', () => {
+    expect(guestsForDay(schedule, 'missing')).toEqual(schedule.allGuests);
   });
 });

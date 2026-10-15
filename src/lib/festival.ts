@@ -286,3 +286,14 @@ export function resolveFestivalSchedule(
     cancelledCount,
   };
 }
+
+/**
+ * The guests to surface for a picked day ("all" = everyone across the festival).
+ * Falls back to the full roster when the day has no assigned guests, so the
+ * strip never goes empty while the lineup still has people to show.
+ */
+export function guestsForDay(schedule: FestivalSchedule, dayId: string): ScheduleArtist[] {
+  if (dayId === 'all') return schedule.allGuests;
+  const day = schedule.guestsByDay[dayId];
+  return day && day.length > 0 ? day : schedule.allGuests;
+}

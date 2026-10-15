@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Users, Gift, Lock, CalendarX, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Gift, Lock, ArrowRight } from 'lucide-react';
 import { useState, useLayoutEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -18,11 +18,13 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppButton } from '@/components/primitives/AppButton';
 import type { Event, TicketTier } from '@/types';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
-import { resolveFestivalSchedule } from '@/lib/festival';
+import { resolveFestivalSchedule, guestsForDay } from '@/lib/festival';
 import {
   FestivalDayBar,
   DayLineup,
   FestivalTicketSelector,
+  SessionGuests,
+  EventEndedNotice,
 } from '@/features/event-detail/components/ScheduleSections';
 import { OrganizerCard, OrganizerInline, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
 import { VenueSection } from '@/features/event-detail/components/VenueMap';
@@ -36,7 +38,7 @@ import { ImmersiveBackdrop } from '@/features/event-detail/components/ImmersiveB
 import { useDominantColor } from '@/features/event-detail/hooks/useDominantColor';
 import { useTicketPricing } from '@/features/event-detail/hooks/useTicketPricing';
 import { EndedBar } from '@/features/event-detail/components/EndedBar';
-import { eventEnded } from '@/lib/eventDates';
+import { eventEnded, eventDateSpanLabel } from '@/lib/eventDates';
 
 interface EventDetailProps {
   event: Event;
@@ -118,6 +120,11 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
     return resolveFestivalSchedule(event, displayTicketTypes);
   }, [event, displayTicketTypes]);
   const [festivalDayId, setFestivalDayId] = useState<string>('all');
+  // Guests for the picked day (everyone across the festival on "All days").
+  const dayGuests = useMemo(
+    () => (festivalSchedule ? guestsForDay(festivalSchedule, festivalDayId) : []),
+    [festivalSchedule, festivalDayId],
+  );
   const { selectedTicket, basePrice, totalPrice, minPrice, isSoldOut, selectedTicketAccentReadable } = useTicketPricing({ ticketTypes: displayTicketTypes, selectedTicketType, event, isDark });
  const scrollToTicketSelection = () => {
     ticketsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -199,6 +206,17 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
           </motion.div>
         )}
 
+        {/* Special guests for the picked day (or everyone across the festival on "All days") */}
+        {dayGuests.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }} className="mb-10">
+            <SessionGuests
+              sessionId={festivalDayId}
+              guests={dayGuests}
+              embedded
+            />
+          </motion.div>
+        )}
+
         {/* About — mobile/tablet only (desktop renders inside hero rail) */}
         {event.description && (
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-10 lg:hidden">
@@ -250,24 +268,10 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
         {/* Ticket Selection */}
         <motion.div ref={ticketsSectionRef} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mb-6 lg:mb-32 scroll-mt-6">
           {ended ? (
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="relative rounded-3xl overflow-hidden p-6 text-center"
-              style={{
-                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              }}
-            >
-              <GlassReflection isDark={isDark} />
-              <CalendarX className="relative z-10 w-5 h-5 mx-auto mb-3" style={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }} strokeWidth={1.8} />
-              <p className="relative z-10 text-[16px] font-light mb-1" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                Event ended
-              </p>
-              <p className="relative z-10 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)' }}>
-                Tickets are no longer available — this event has finished.
-              </p>
-            </motion.div>
+            <EventEndedNotice
+              dateSpanLabel={eventDateSpanLabel(event)}
+              onBrowse={onNavigate ? () => onNavigate('discover') : undefined}
+            />
           ) : (
           <GatedTierGate
             gatedTicketTypeIds={gatedTicketTypeIds}

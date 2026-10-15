@@ -17,7 +17,7 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - `EventHero` — mobile poster mask-fade + light-mode radial title shade (6f0b2cb)
 - `EventInfoRail` — `FormatTag` above the title for multi-day events (a9eb71a)
 - `TransferTicketDialog` — "Verified by Digis" security note (d5f8ae3)
-- `ScheduleSections` — multi-day festival day bar, day lineup running orders, day strip, festival ticket selector & pass upsell, alerts
+- `ScheduleSections` — multi-day festival day bar, day lineup running orders, day strip, festival ticket selector & pass upsell, alerts; `SessionGuests` wired under the day bar (per-day guests, or the full roster on "All days", via `guestsForDay`) and `EventEndedNotice` replaces the inline ended card (date-span label + Browse CTA; `eventDateSpanLabel`)
 - `lib/festival` — multi-day date/day adapter and state resolver
 - `lib/resale` — native `ticket_id` mapped from `SellerResaleListingWire` (closes BACKEND_GAPS #66)
 - `lib/auth` + `AuthModal` — phone-OTP signup flow via `POST /auth/signup/request_otp`, `/phone_verifications/:id/verify`, and `/auth/signup` with `verification_token`
@@ -51,7 +51,9 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 ## Parked / Policy
  
 - **Recurring subsystem** (weekly series carousel, session calendar sheet, session waitlists): parked per ADR-0002 (no recurring engine on backend). The multi-day festival half of `ScheduleSections` is now fully imported and active on `EventDetailPage`.
+- **Reserved (unwired) scaffolding — kept deliberately, not wired:** `DaySwitcher`, `FestivalDayStrip` (superseded by `FestivalDayBar`), and the recurring-only vocabulary (`OccurrenceStrip`, `SessionPill`, `FormatTag` recurring branch, `SessionGuests`/`SessionWaitlist` session variants). These are dead in the web2 export too; they stay as reserved surface until a backend surface justifies them. Do NOT wire them to invented data.
+- **Wired this pass:** `SessionGuests` under the festival day bar (per-day guests / full roster on "All days" via `guestsForDay`) and `EventEndedNotice` for the ended state (`eventDateSpanLabel` + Browse CTA). Guarded by `e2e/festival.spec.ts` (route-mocked — the seed has no multi-day event).
  
 ## Verification
  
-`npx tsc --noEmit` clean · `npx vitest run` 183/183 · `npx playwright test` 29/29 · `pnpm build` OK.
+`npx tsc --noEmit` clean · `npx vitest run` 192/192 · `npx playwright test` 31/31 · `pnpm build` OK.

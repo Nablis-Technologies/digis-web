@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { eventHasFutureDate, eventEnded } from '@/lib/eventDates';
+import { eventHasFutureDate, eventEnded, eventDateSpanLabel } from '@/lib/eventDates';
 
 const iso = (daysFromNow: number) => new Date(Date.now() + daysFromNow * 86400000).toISOString();
 const future = iso(10);
@@ -42,5 +42,53 @@ describe('eventHasFutureDate / eventEnded (purchase gate)', () => {
     expect(eventHasFutureDate(ev([]))).toBe(false);
     expect(eventEnded(ev([]))).toBe(false);
     expect(eventEnded({})).toBe(false);
+  });
+});
+
+describe('eventDateSpanLabel', () => {
+  // Build ISO strings from local components so the formatted output is
+  // timezone-independent.
+  const at = (y: number, m: number, d: number) => new Date(y, m - 1, d, 19).toISOString();
+
+  it('renders a single date', () => {
+    expect(eventDateSpanLabel({ eventDates: [{ id: 'd1', startsAt: at(2026, 8, 1) }] })).toBe('Aug 1, 2026');
+  });
+
+  it('collapses a same-month range', () => {
+    expect(
+      eventDateSpanLabel({
+        eventDates: [
+          { id: 'a', startsAt: at(2026, 12, 12) },
+          { id: 'b', startsAt: at(2026, 12, 10) },
+        ],
+      }),
+    ).toBe('Dec 10 – 12, 2026');
+  });
+
+  it('shows both months across a month boundary', () => {
+    expect(
+      eventDateSpanLabel({
+        eventDates: [
+          { id: 'a', startsAt: at(2026, 12, 30) },
+          { id: 'b', startsAt: at(2027, 1, 2) },
+        ],
+      }),
+    ).toBe('Dec 30 – Jan 2, 2027');
+  });
+
+  it('returns an empty label when there are no dates', () => {
+    expect(eventDateSpanLabel({})).toBe('');
+    expect(eventDateSpanLabel({ eventDates: [] })).toBe('');
+  });
+
+  it('excludes cancelled dates from the span', () => {
+    expect(
+      eventDateSpanLabel({
+        eventDates: [
+          { id: 'a', startsAt: at(2026, 12, 10) },
+          { id: 'b', startsAt: at(2026, 12, 12), status: 'cancelled' },
+        ],
+      }),
+    ).toBe('Dec 10, 2026');
   });
 });

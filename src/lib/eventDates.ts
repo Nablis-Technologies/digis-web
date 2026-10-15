@@ -34,3 +34,31 @@ export function eventEnded(event: Pick<Event, 'eventDates'>): boolean {
   if (!event.eventDates || event.eventDates.length === 0) return false;
   return !eventHasFutureDate(event);
 }
+
+/**
+ * A compact human label for the event's full date span, used on the ended
+ * notice: "Aug 1, 2026", "Dec 10 – 12, 2026" or "Dec 30 – Jan 2, 2027".
+ * Matches the export's contract: the span covers non-cancelled dates (falling
+ * back to every date when all are cancelled). Returns '' when there are no
+ * usable dates.
+ */
+export function eventDateSpanLabel(event: Pick<Event, 'eventDates'>): string {
+  const all = event.eventDates ?? [];
+  const live = all.filter((d) => d.status !== 'cancelled');
+  const dates = (live.length > 0 ? live : all)
+    .map((d) => new Date(d.startsAt))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (dates.length === 0) return '';
+
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  const year = last.getFullYear();
+
+  if (first.getTime() === last.getTime()) return `${fmt(first)}, ${year}`;
+  if (first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear()) {
+    return `${fmt(first)} – ${last.getDate()}, ${year}`;
+  }
+  return `${fmt(first)} – ${fmt(last)}, ${year}`;
+}
