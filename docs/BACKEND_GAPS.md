@@ -104,12 +104,12 @@
 | 17 | open — blocking | persisted enum `PAYMENT_METHODS = %w[telebirr card bank]` rejects `cbe`/`cbebirr` (the Chapa adapter already advertises `cbebirr`) |
 | 56 | open — blocking | signup can't take over an existing (shadow) phone → a guest who bought a ticket can never create an account ("Phone has already been taken") |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
-| 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `featured` / `rating`; lineup → #36). The `rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model |
+| 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `rating`; lineup → #36). `featured` is superseded — served by the paid **Featured endpoint** (2026-10-15). The `rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
-| 54 | open — degrading | no discovery availability — `GET /public/events` has no `sold_out` / per-offer `available` (products are per-event) |
+| 54 | resolved 2026-10-15 | discovery availability served — `GET /public/events` carries `ticket_availability` + `event_lifecycle` per event; frontend wired (`eventAvailability` → SOLD OUT badge, verified live) |
 | 55 | frontend-fixable — done | detail "from" price implemented via `useTicketPricing` + `PurchaseBar` (2026-10-03) |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
 | 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
@@ -270,21 +270,28 @@ confirms the strings are gone).
   (`ticket_type.approval_mode` / `audience` / `waitlist_enabled` + `price_options`);
   the frontend must source gating from the offer, not from event config (see #44).
 - **Genuinely lost non-admission data (real gap).** `age_restriction`, `seat_map`,
-  `featured`, `rating`, `answer_edit_window_hours`, `price_foreign_from_minor`.
-  No substitute exists: the event-detail Age info card, SeatMap step, and the
-  discovery Featured/rating surfaces lose their data. `lineup` is tracked under
-  #36 (needs a participants/artists surface, not just a config key).
+  `rating`, `answer_edit_window_hours`, `price_foreign_from_minor`.
+  No substitute exists: the event-detail Age info card, the SeatMap step, and the
+  discovery rating surface lose their data. `lineup` is tracked under #36 (needs
+  a participants/artists surface, not just a config key).
+- **`featured` — RESOLVED by a dedicated surface (2026-10-15).** Discovery
+  Featured is no longer a config key: it is a paid, rotating placement served by
+  `GET /public/featured_events` (and `GET /public/events?featured=true`), now
+  consumed by `eventsModule.fetchAll`/`fetchFeatured`. Superseded, not restored
+  — see the Resolved archive.
 
 **Why it blocks:** those event-detail modules can only render absent. ADR-0002
 forbids fabricating them.
 
 **Fix:** expose the non-admission public-safe fields on the detail serializer —
 at minimum `age_restriction`, `seat_map` (and `lineup` via #36); decide explicitly
-whether `featured` / `rating` / `answer_edit_window_hours` /
-`price_foreign_from_minor` are part of the public contract.
+whether `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` are
+part of the public contract (`featured` is now its own endpoint).
 
-**Status: open (re-scoped 2026-10-02) — filed 2026-09-30 (verified against
-`326f6a3` by code read + live `GET /public/events/:slug` → `event_setting.config == {}`).**
+**Status: open (re-scoped 2026-10-02; `featured` superseded 2026-10-15 by the
+Featured endpoint — see the Resolved archive) — filed 2026-09-30 (verified
+against `326f6a3` by code read + live `GET /public/events/:slug` →
+`event_setting.config == {}`).**
 
 ### #56. Signup cannot take over an existing (shadow) phone
 
@@ -660,7 +667,18 @@ their only source; events on the grid can't signal availability.
 `sold_out` / `has_available_offer` per event), or a `GET /public/events?ids=`
 availability batch.
 
-**Status: open — filed 2026-09-30 (verified against `326f6a3`).**
+**Status: RESOLVED 2026-10-15** — the batched projection asked for is served:
+`Events::Public::EventListSerializer` exposes `ticket_availability`
+(`available` / `coming_soon` / `sold_out` / `sales_closed` /
+`no_public_tickets` / `no_eligible_dates` / `unavailable`) and
+`event_lifecycle` (`upcoming` / `ongoing` / `ended` / `unscheduled`) per event,
+computed by `Catalog::Public::EventAvailabilitySummary.call`. Verified live
+2026-10-15: `GET /public/events` carries both keys on every row, and the
+discovery grid renders real **SOLD OUT** badges (`jubilation-africa`,
+`musical-karaoke`). The frontend was already wired
+(`events-adapter` → `Event.ticketAvailability`/`eventLifecycle` →
+`lib/eventAvailability` → `EventCard`). Original filing: 2026-09-30
+(`326f6a3`).
 
 ### #55. `EventDetailSerializer` omits `price_from_minor` — FRONTEND-FIXABLE (not a backend gap)
 
@@ -893,27 +911,20 @@ finished published event remains quotable and payable.
 ### #1. Public `event_setting.config` projection truncated to 2 keys
 
 `Events::Public::EventSettingSerializer` whitelists only
-`%w[allow_waitlist public_guest_limit]`
-(`app/serializers/events/public/event_setting_serializer.rb:8`). The frontend
-`src/lib/events-adapter.ts` consumes 17 config keys for discovery: `featured`,
-`rating`, `sold_out`, `tickets_left`, `price_foreign_from_minor`,
-`foreign_currency`, `event_type`, `seat_map`, `answer_edit_window_hours`,
-`rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`,
-`rsvp_requirements`, `access_mode`, `invite_only_paid`, `on_guest_list`. Absent
-keys render **absent** (ADR-0002): no featured ordering, no Sold Out badge, no
-ratings, no seat map, no RSVP capacity/going counts.
+`%w[public_guest_limit]`
+(`app/serializers/events/public/event_setting_serializer.rb`). This is
+**re-scoped, not widened** (2026-09-30): the "widen to 17 keys" ask is moot. The
+frontend no longer reads `event_setting.config` for discovery at all — the
+adapter maps only what the public serializers actually serve, and the genuinely
+lost non-admission fields are tracked under **#53**. The superseded
+type/access/rsvp keys are per-offer now (#44), and discovery **Featured** has its
+own surface as of 2026-10-15 (the Featured endpoint — see the Resolved archive).
 
-**Why it degrades:** the frontend cannot source the discovery config the design
-uses; those surfaces collapse to their empty/absent state.
-
-**Fix (backend):** widen `PUBLIC_CONFIG_KEYS` to the 17 public-safe keys the
-frontend consumes (or expose a dedicated public config projection).
-
-**Status: open — re-filed 2026-09-21.** It had been recorded resolved on the
-strength of a **local-only commit of ours** (`648d21d`, which widened the
-whitelist to 19 keys) that is **not on the backend branch** (`origin` still has
-the 2-key whitelist). A patch of ours does not resolve a gap (see `AGENTS.md`);
-that change has been reverted.
+**Status: resolved 2026-09-30 (re-scoped).** It had briefly been recorded
+resolved on the strength of a **local-only commit of ours** (`648d21d`, which
+widened the whitelist to 19 keys); that patch is not on the backend branch and
+was reverted. The gap as originally written is moot: `%w[public_guest_limit]`
+remains the whole public projection.
 
 ### #44. Event-level `event_setting.config` type/access keys are inert and unwritable
 
@@ -1442,6 +1453,8 @@ history). Every item below was re-verified against the pulled
 | 43 / 45 / 37 | RSVP audience-proof + sold-out/waitlist — the unified `POST /public/events/:slug/admission_selections` accepts `audience_proof { access_code, invitation_token }`, a sold-out cart returns `next_action.type: "waitlist_available"` + `event_product_ids`, and the offer-scoped public waitlist (`/admission_offers/:product_id/waitlist` + `/request_otp`) exists | `config/routes.rb:121-128` + `Orders::AdmissionSelections::Create` 2026-09-30 (`326f6a3`) |
 | 27 | **Superseded** — the public RSVP routes (`/rsvps`, `/rsvps/request_otp`) were deleted; free admission is now a `$0` `admission_selections` (`next_action: confirmed` / `issuing`). Frontend `registrationModule.rsvpRequestOtp`/`rsvpSubmit` are dead code | `config/routes.rb` (no `rsvps`) 2026-09-30 (`326f6a3`) |
 | 1 | **Re-scoped, not widened** — the public projection is now `%w[public_guest_limit]`; the "widen to 17 keys" fix is moot and the lost non-admission fields are tracked as #53 | code + live `GET /public/events/:slug` 2026-09-30 (`326f6a3`) |
+| 54 | Discovery availability — `EventListSerializer` serves `ticket_availability` + `event_lifecycle` per event; frontend already wired (`events-adapter` → `lib/eventAvailability` → `EventCard`) | live HTTP 2026-10-15 (SOLD OUT badges on `jubilation-africa` / `musical-karaoke`) |
+| 53 (`featured`) | Discovery Featured — superseded by the paid **Featured endpoint** (`GET /public/featured_events`, `GET /public/events?featured=true`), not the removed `event_setting.config.featured`. Wired: `events-adapter` maps `placement_label` → `Event.featured`; `eventsModule.fetchAll` overlays the Featured set on the list; `fetchFeatured` reads the endpoint | live HTTP + browser 2026-10-15 (HEADLINERS · 2 EVENTS) |
 
 ---
 
@@ -1478,6 +1491,26 @@ verified live (quote applies `discount_minor`, unknown codes →
 ## Discovered endpoints
 
 Recorded for knowledge; most are now consumed (see the relevant gap/archive row).
+
+### Public Featured discovery — paid placements (verified live 2026-10-15; wired)
+
+- `GET /public/featured_events` → `Public::EventsController#featured`; renders the
+  currently-serving paid placements (`Marketing::FeaturedPlacements::PublicQuery`)
+  with `Marketing::FeaturedEventSerializer` (an `EventListSerializer` subclass
+  that adds `placement_label: "featured"`). Unpaginated. Answers **503
+  `featured_events_unavailable`** when placement resolution fails — there is no
+  organic fallback.
+- `GET /public/events?featured=true` → the same placement set, paginated, still
+  serialized with the Featured serializer.
+- Serving rule (why a fixture is needed to see anything): a placement must be
+  `scheduled`/`active`, its event published + public with a future scheduled date
+  and `ticket_availability == "available"`, and it must be backed by a **paid**
+  `orders_billing_purchases` row and a **succeeded, accepted** `orders_payments`
+  row. The dev fixture lives in `db/seeds/dev_demo.rb` §5.
+- New on the branch but organizer/admin-facing (no consumer surface owed):
+  `events/:event_id/featured_placements` CRUD, `admin/marketing/placement_offers`,
+  `admin/marketing/placement_capacity_policies`,
+  `admin/orders/refunds/:id/resolve_manual`.
 
 ### Guest checkout + claim (verified against `config/routes.rb` 2026-09-09; wired)
 

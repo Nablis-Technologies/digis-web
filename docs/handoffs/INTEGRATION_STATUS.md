@@ -7,6 +7,72 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-15f — backend pull (new Featured endpoint) + full gap status sweep
+
+**Prompt:** "pull the latest changes from the backend, re-check each gap in
+`docs/BACKEND_GAPS.md` for resolution, and wire up (frontend) whatever the
+backend now serves."
+
+**Backend pulled:** `feat/launch-hardening-telemetry` merged forward
+(`e5e63e59..67e3a281`, 19 commits) — a **paid marketing/Featured + billing +
+manual-refund** batch. The local seed-only commits were preserved (merge commit
+`3b8d24b3`); the preserved WIP in `db/seeds/preview.rb` /
+`db/seeds/dev_extensions.rb` / `db/structure.sql` auto-merged (only the generated
+`structure.sql` conflicted — resolved by regenerating it from a true migration run).
+
+**Gap sweep — what this batch changed for the frontend (one item):**
+
+- **Discovery Featured is now served.** `GET /public/featured_events`
+  (`Public::EventsController#featured`) and `GET /public/events?featured=true`
+  render the currently-serving paid placements via
+  `Marketing::FeaturedEventSerializer` — an `EventListSerializer` subclass that
+  adds `placement_label: "featured"`. Unpaginated on the dedicated route; **503
+  `featured_events_unavailable`** when placement resolution fails (no organic
+  fallback). This **supersedes the `featured` half of #53/#1** — it is *not*
+  restored to `event_setting.config`, it is its own paid surface. Wired + verified.
+- **Everything else in the batch is organizer/admin-facing** — placement offers,
+  capacity policies, `events/:event_id/featured_placements`, platform billing
+  entries, `admin/orders/refunds/:id/resolve_manual` — **no consumer surface owed**.
+- **Unchanged by the merge:** recurrence (#68), per-date allocations (#69),
+  lineup (#36), unbounded `event_dates` (#70), search/filter/sort/pagination
+  (#49), the config projection (#53). The merge touches only marketing / billing /
+  refund code plus the public events controller.
+- **#54 (discovery availability) re-verified as served** (it already was, from an
+  earlier commit): the list carries `ticket_availability` + `event_lifecycle` and
+  the grid renders real SOLD OUT badges. Moved to **resolved**.
+
+**Frontend wiring (this session, frontend only):**
+
+- `src/lib/events-adapter.ts` — `BackendEvent.placement_label` → `Event.featured`.
+  The label is the backend's own word; an absent label stays absent (#53).
+- `src/lib/events.ts` — `fetchFeatured()` now reads `GET /public/featured_events`
+  (it was dead code that filtered the list); `fetchAll()` overlays the Featured
+  set on the list by slug so the discovery carousel *and* the featured-first
+  ordering read one real backend signal. The Featured read is optional
+  enrichment: a 503 leaves the grid intact rather than faking "nothing is
+  featured".
+- Tests: `src/lib/events.test.ts` (new) + an adapter case for the label.
+
+**Backend (dev-env only, `chore(dev)`):** `db/seeds/dev_demo.rb` §5 seeds a
+*serving* paid Featured placement (active capacity policy + the
+`public_discovery_preview` offer + a paid billing purchase + a succeeded, accepted
+payment) so the surface is non-empty from a clean seed.
+
+**Dev-env gotcha found while pulling (not a product issue):** upstream edits
+migrations in place (`create_orders_billing_purchases`, `create_refunds`), so the
+dev DB had to be **rebuilt** — but `db:migrate` on an empty database
+**schema-loads the stale `structure.sql`** (it carries
+`INSERT INTO "schema_migrations"`), silently re-applying the old constraints and
+marking everything applied. Pre-creating an empty `schema_migrations` table forces
+a true migration run. The rebuild then follows
+`config/environments/development.rb:83-93`: `db:migrate` → load `db/queue_schema.rb`
+→ strip the stray non-timestamp `schema_migrations` version → `db:seed`.
+
+**Verified:** `npx tsc --noEmit` clean · `npx vitest run` **220/220** · `pnpm build`
+OK · `npx playwright test` **36/36** · live `GET /public/featured_events` → 2
+placements · browser: discovery renders **HEADLINERS · 2 EVENTS**
+(`.openchamber/screenshots/featured-discovery-live-2026-10-15T20-40-02-783.jpg`).
+
 ## Session 2026-10-15e — profile-sheet artwork environment + design-element audit
 
 **Prompt:** "we need to bring the background implementation for the artist and

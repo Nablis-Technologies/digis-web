@@ -11,8 +11,8 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
-npx vitest run    # unit tests (213)
-npx playwright test  # e2e vs the live backend on :3000 (34 deterministic; zz-* manual)
+npx vitest run    # unit tests (220)
+npx playwright test  # e2e vs the live backend on :3000 (36 deterministic; zz-* manual)
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
@@ -184,10 +184,10 @@ sweep is the rule that prevents that.
   the provider's rails → no payout method can be added. Blocking. The frontend is
   currently wired to a **local, uncommitted** backend change — that does not
   resolve the gap (see BACKEND_GAPS.md).
-- **#1** Public `event_setting.config` truncated to 2 keys
-  (`allow_waitlist`, `public_guest_limit`) — discovery degrades (featured,
-  sold_out, rating, seat_map, rsvp). It had been marked resolved by a **local-only
-  commit of ours**; re-filed open and the patch reverted.
+- **#1** *(re-scoped — not a live gap)* Public `event_setting.config` is
+  `%w[public_guest_limit]` only; the old "widen to 17 keys" ask is moot. The lost
+  non-admission fields are tracked in #53, and discovery **featured** is now its
+  own paid surface (`GET /public/featured_events`, wired 2026-10-15).
 - **#43** RSVP rejects `access_code` / `invitation_token` → an audience-gated RSVP
   event cannot be registered for. Blocking.
 - **#44** Event-level `event_type` / `access_mode` / `rsvp_*` config is inert and
@@ -240,7 +240,10 @@ copyable "Ticket link" on guest tickets), #30 (parking products seeded with
 the true ticket "from" price), #16 (Chapa API V2 — `api.chapa.global`,
 `CHAPA_TEST_`/`CHAPA_LIVE_` keys), #26 (seller payout destination create now
 succeeds — Chapa V2 direct transfer; frontend rewired to the flat
-`bank_slug`/`account_number`/`holder_name` payload).
+`bank_slug`/`account_number`/`holder_name` payload), #54 (discovery availability —
+`ticket_availability` + `event_lifecycle` on the list; the grid shows real SOLD OUT
+badges), discovery **featured** (the paid Featured endpoint —
+`GET /public/featured_events`; wired in `eventsModule.fetchAll`/`fetchFeatured`).
 
 ## Data integrity (seeds + e2e) — update after changing things
 
