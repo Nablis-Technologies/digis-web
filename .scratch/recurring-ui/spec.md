@@ -1,6 +1,8 @@
 # Recurring events (weekly series) — wire-up spec
 
-**Status:** parked — blocked on a backend gap (`BACKEND_GAPS.md` **#68**).
+**Status:** UI ported + wired **inert** (2026-10-15) — the remaining steps (card
+`FormatTag`, occurrence vocabulary) are blocked on a backend gap
+(`BACKEND_GAPS.md` **#68**). Nothing renders until the signal ships.
 **Source:** `digis-web2` export (`export/src/features/event-detail/components/ScheduleSections.tsx`,
 "Recurring" section) — the Figma Make UI exists, the public backend signal does not.
 
@@ -48,11 +50,16 @@ ticket). Do **not** start this work against a guessed shape.
 
 ## Porting inventory
 
-**In the export (`ScheduleSections.tsx`, "Recurring" section, ~line 671+):**
-`SessionCarousel` (+ `ShowtimePicker`, `SessionCalendarSheet`, `ReminderToggle`)
-and `SessionWaitlist`, with types `SessionShowtime`, `SessionRailDay`,
-`SelectedSession`, `CalendarSession`, `SessionCalendarData`, `SessionCarouselProps`.
-`SessionGuests` also has a session variant (shared with the festival half).
+**Ported into `digis-web` (2026-10-15):** `ScheduleSections.tsx` now carries
+`SessionCarousel` (+ `ShowtimePicker`, `SessionCalendarSheet`, `ReminderToggle`),
+`SessionSwitcher` and `SessionWaitlist`; the view-model types + `resolveSeries` /
+`isSeries` live in `src/lib/recurring.ts`. `EventDetailPage` renders the series
+branch behind `resolveSeries` (inert without the signal). Pinned by
+`e2e/recurring.spec.ts` (route-mocked) + `src/lib/recurring.test.ts`.
+
+**Still in the export / not ported:** nothing structural — only the *card* half
+(`FormatTag` is already present, unrendered) and `OccurrenceStrip` / `SessionPill`
+remain dormant until a series signal justifies rendering them.
 
 **Already in `digis-web`:** the festival half of `ScheduleSections`; the card
 vocabulary `FormatTag` (already accepts `recurring`, renders the ⟳ icon),

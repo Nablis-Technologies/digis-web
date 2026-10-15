@@ -11,6 +11,7 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - Icons → `@thesvg/react` (8fcfea5); `docs/GLASS_INDEX.md` (145e39a)
 - `EventFormatBadges` — date-range / format / session / occurrence badges (5404917)
 - `EventCard` — format chip + multi-day range badge + day-passes label (4cfc0d9)
+- `EventCard` / `EventInfoRail` / `FeaturedEventCard` — `cardFormat()` returns `recurring` when the backend signals a series, and `cardFormatLabel()` renders the "RECURRING" chip on all three card surfaces (unit-tested in `EventCard.test.ts`)
 - `FeaturedEventCard` — format tag + range badge (321ffff)
 - `InfoCards` — optional measured `sub` line on strip + grid (16031b6)
 - `TicketTypeCard` — early-bird savings chip from `originalPriceMinor` (cafdcd6)
@@ -19,6 +20,10 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - `TransferTicketDialog` — "Verified by Digis" security note (d5f8ae3)
 - `ScheduleSections` — multi-day festival day bar, day lineup running orders, day strip, festival ticket selector & pass upsell, alerts; `SessionGuests` wired under the day bar (per-day guests, or the full roster on "All days", via `guestsForDay`) and `EventEndedNotice` replaces the inline ended card (date-span label + Browse CTA; `eventDateSpanLabel`)
 - `lib/festival` — multi-day date/day adapter and state resolver; prefers the backend per-date participant link (`EventArtist.eventDateId`) for the day roster, round-robins only as a fallback when the link is absent
+- `lib/recurring` — recurring-series view-model (`resolveSeries`/`isSeries`): session rail days, selected session, that session's guests, monthly-calendar data, and cadence copy, all derived from `eventDates` + `lineup`; returns `null` with no series signal (#68)
+- `ScheduleSections` recurring half — `SessionCarousel` ("Choose a date" rail), `SessionSwitcher` (pinned mini-bar), `SessionCalendarSheet` (monthly bottom sheet), `ShowtimePicker` (multi-showtime picker), `ReminderToggle`, `SessionWaitlist`. Wired on `EventDetailPage` behind `resolveSeries` (inert until #68); pinned by `e2e/recurring.spec.ts` (route-mocked)
+- `TicketTypeCard` — pass `savings` chip beside the level chip (festival pass savings, from `originalPriceMinor`)
+- `TimelineEntry` — no longer invents a time when `artist.time` is absent (was a hardcoded `6:00 PM`; ADR-0002)
 - `lib/resale` — native `ticket_id` mapped from `SellerResaleListingWire` (closes BACKEND_GAPS #66)
 - `lib/auth` + `AuthModal` — phone-OTP signup flow via `POST /auth/signup/request_otp`, `/phone_verifications/:id/verify`, and `/auth/signup` with `verification_token`
 - `lib/admission` + `useCheckoutFlow` — G-41 mixed ticket + add-on admission selections with date-scoped add-on lines (closes BACKEND_GAPS #63)
@@ -58,8 +63,8 @@ components first. The table is the whole remaining frontend cost per surface.
 |---|---|---|---|
 | Event lineup (`LineupSection`) | `event_participants` in the public payload (#36) | adapter maps `event_participants` → `Event.lineup` (`events-adapter.ts`) | **None in principle** — the adapter already reads `event_participants`; if the backend names it differently (`participants`/`artists`), that's one adapter line |
 | Festival day roster + per-day guests | `event_date_id` on each participant (#36 addendum) | adapter maps `event_date_id` → `EventArtist.eventDateId`; `resolveFestivalSchedule` groups by it, falls back to round-robin (`lib/festival.ts`) | **None** — lights up when the field appears (prepared 2026-10-15); a day the backend leaves empty stays empty (no invented roster) |
-| Recurring badge on cards | recurrence / series signal (#68) | `FormatTag` already accepts `recurring`; `cardFormat()` only sees `eventDates` | add the recurrence field to `Event`, map it, return the format from `cardFormat()` — **shape unconfirmed, do not guess** |
-| Recurring carousel / per-session view | same (#68) | `OccurrenceStrip`/`SessionPill` present but unrendered; `SessionCarousel`/`SessionWaitlist` **not ported** | **build** — port the two components, then wire |
+| Recurring badge on cards | recurrence / series signal (#68) | `FormatTag` accepts `recurring`; the adapter maps a series signal onto `Event.recurrence`/`isRecurring`; `cardFormat()` now returns `recurring` when `isSeries(event)` and `cardFormatLabel()` renders "RECURRING" on all three card surfaces; the dormant `OccurrenceStrip`/`SessionPill` remain unrendered | **None** — done (unit-tested in `EventCard.test.ts`); the occurrence strip stays reserved |
+| Recurring carousel / per-session view | same (#68) | `resolveSeries` (`lib/recurring.ts`) builds the whole view-model; `SessionCarousel`/`SessionSwitcher`/`SessionCalendarSheet`/`SessionWaitlist` ported and wired on `EventDetailPage` | **None** — lights up when the payload carries `recurrence` (or `is_recurring`). Per-session *tickets* stay event-level until offers carry a session link |
 | Venue photos + real map pin | seed venue lat/lng + media (seed task, #36) | `VenueMap` takes a venue *name* only, uses the `venueCoords` stopgap, renders no photos | adapter must carry `venue.id` (already public on `event_dates[].venue`) + `VenueMap` hydrates via `GET /venues/:id` |
 | `age_restriction` (Age card) | re-expose on the detail serializer (#53) | `EventInfoRail` + `EventDetailPage` already render `event.ageRestriction`; adapter maps nothing | 1 adapter line, **once the backend fixes the field location** (top-level vs `event_setting.config` is undecided) |
 | `featured` (discovery sort / pick) | re-expose (#53) | `useEventFilter` / `DiscoveryPage` / `lib/events.ts` read `event.featured`; adapter maps nothing | 1 adapter line, same location caveat |
@@ -74,10 +79,10 @@ step instead of inventing a shape.
 
 ## Parked / Policy
  
-- **Recurring subsystem** (weekly series carousel, session calendar sheet, session waitlists): parked per ADR-0002 — the backend **has** a recurrence engine (`Events::RecurrenceRule` + materialize job), but the public event payload exposes **no recurrence/series signal** (#68), so wiring it would mean inventing the series. The multi-day festival half of `ScheduleSections` is fully imported and active on `EventDetailPage`. **Queued ticket:** `.scratch/recurring-ui/` (spec + `issues/01-recurring-session-wireup.md`) — the port/wire checklist for when #68 lands.
-- **Reserved (unwired) scaffolding — kept deliberately, not wired:** `DaySwitcher`, `FestivalDayStrip` (superseded by `FestivalDayBar`), and the recurring-only vocabulary (`OccurrenceStrip`, `SessionPill`, `FormatTag` recurring branch, `SessionGuests`/`SessionWaitlist` session variants). These are dead in the web2 export too; they stay as reserved surface until a backend surface justifies them. Do NOT wire them to invented data.
-- **Wired this pass:** `SessionGuests` under the festival day bar (per-day guests / full roster on "All days" via `guestsForDay`) and `EventEndedNotice` for the ended state (`eventDateSpanLabel` + Browse CTA). Guarded by `e2e/festival.spec.ts` (route-mocked — the seed has no multi-day event).
+- **Recurring subsystem** (weekly series carousel, session calendar sheet, session waitlists): **UI ported + wired 2026-10-15**, inert until the backend serves a series signal (#68). `resolveSeries` (`lib/recurring.ts`) returns `null` with no signal, so `EventDetailPage` renders nothing and never invents a series (ADR-0002). The backend already has the engine (`Events::RecurrenceRule` + materialize job); only the public projection is missing. Guarded by `e2e/recurring.spec.ts` (route-mocked). Ticket: `.scratch/recurring-ui/`.
+- **Reserved (unwired) scaffolding — kept deliberately, not wired:** `DaySwitcher`, `FestivalDayStrip` (superseded by `FestivalDayBar`), and the recurring-only vocabulary (`OccurrenceStrip`, `SessionPill`, `FormatTag` recurring branch, and `SessionSwitcher` — unused in the web2 export too). Dead in the export too; they stay as reserved surface until a backend surface justifies them. Do NOT wire them to invented data.
+- **Wired this pass:** `SessionGuests` under the festival day bar (per-day guests / full roster on "All days" via `guestsForDay`) and `EventEndedNotice` for the ended state (`eventDateSpanLabel` + Browse CTA), plus the recurring session branch (`SessionCarousel` → that session's `SessionGuests` → `SessionWaitlist` when a session is sold out). Guarded by `e2e/festival.spec.ts` and `e2e/recurring.spec.ts` (both route-mocked — the seed has no multi-day or recurring event).
  
 ## Verification
  
-`npx tsc --noEmit` clean · `npx vitest run` 197/197 · `npx playwright test` 31/31 · `pnpm build` OK.
+`npx tsc --noEmit` clean · `npx vitest run` 213/213 · `npx playwright test` 34/34 · `pnpm build` OK.

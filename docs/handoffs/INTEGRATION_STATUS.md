@@ -7,6 +7,51 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-15b — recurring (weekly series) UI ported + wired (inert)
+
+**Wired (frontend only):** the recurring half of `ScheduleSections` is now ported
+and rendered behind a guard. `lib/recurring.ts` (`resolveSeries` / `isSeries`)
+builds the session view-model (rail days, selected session, that session's guests,
+monthly-calendar data, cadence copy) from `eventDates` + `lineup`; new components
+`SessionCarousel`, `SessionSwitcher`, `SessionCalendarSheet`, `ShowtimePicker`,
+`ReminderToggle`, `SessionWaitlist` are in `ScheduleSections.tsx`. `EventDetailPage`
+renders the series branch (carousel → that session's guests → waitlist when a
+session is sold out) and a series is **never** also rendered as a festival.
+
+**Inert by design (ADR-0002):** `resolveSeries` returns `null` without a series
+signal. The adapter reads a **provisional** shape (`recurrence` / `is_recurring`
+on `BackendEvent`, `Source: events-adapter.ts`) isolated to the adapter — nothing
+renders on today's payload, and when #68 fixes the wire shape only the adapter
+changes. Per-session *ticket scoping* is deferred (offers are event-level until
+the products payload links an offer to a session — a separate backend ask).
+
+**Multi-day completeness (same pass):** the festival pass `savings` chip now
+renders (`TicketTypeCard` `savings` prop ← `FestivalTicketSelector`), and
+`TimelineEntry` no longer invents a time when `artist.time` is absent (was a
+hardcoded `6:00 PM` / `PM`; ADR-0002).
+
+**Card vocabulary (same pass):** `cardFormat()` now returns `recurring` when
+`isSeries(event)` — never inferred from the date count — and `cardFormatLabel()`
+renders the "RECURRING" chip on all three card surfaces (`EventCard`,
+`EventInfoRail`, `FeaturedEventCard`). Unit-tested in
+`src/components/EventCard.test.ts`. (Label is "RECURRING", not the export's
+"WEEKLY · THU": the cadence word is not derivable from the public dates.)
+
+**Docs:** `web2-ui-import.md` (Ported + readiness rows + Parked), `CONTEXT.md`
+(new `RecurringSeries` term documenting the session/showtime UI vocabulary) and
+`BACKEND_GAPS.md` #68 updated; `.scratch/recurring-ui/issues/01-...md` steps 2–5
+marked done, 1 provisional, 6 pending the shape.
+
+**Two-axis review (same pass):** dropped a dead `eventDates[].seriesId` type
+field (nothing read or wrote it), moved `selectedSoldOut` onto `SeriesView` so
+the page stops re-deriving it, replaced a painted calendar-avatar border with a
+shadow ring (ADR-0007), deduped the recurring rails' palette + centering effect,
+and documented that `ReminderToggle` is display-only until a backend reminder
+surface exists.
+
+**Verified:** `tsc` clean · vitest **213/213** · build · Playwright **34/34**
+(incl. new `e2e/recurring.spec.ts` — 3 route-mocked tests).
+
 ## Session 2026-10-15 — web2 festival wiring + backend gap sweep
 
 **Wired (frontend only):** `SessionGuests` under the multi-day festival day bar

@@ -552,21 +552,28 @@ rdates, …`).
   from hand-added ones.
 
 **Why it matters:** the ported web2 recurring UI (weekly series carousel,
-session grouping, per-session waitlists, the `recurring` `FormatTag`) cannot be
-wired without inventing the series (ADR-0002), so it stays parked. The consumer
-can only flatten a series into a plain list of dates, and
-`EventCard.cardFormat()` never returns `recurring`.
+session grouping, per-session waitlists, the `recurring` `FormatTag`) is now
+wired but **inert**: `resolveSeries` (`src/lib/recurring.ts`) returns `null`
+without a series signal, so the detail page renders nothing rather than invent
+the series (ADR-0002). The adapter reads a **provisional** shape
+(`recurrence` / `is_recurring`, `src/lib/events-adapter.ts`) that the payload
+does not carry yet. The consumer can only flatten a series into a plain list of
+dates, and `EventCard.cardFormat()` never returns `recurring`.
 
 **Fix (backend):** expose a series signal on the public payload — e.g.
 `recurrence: { rule_id, rrule, active }` (or `is_recurring`) on
 `EventListSerializer` / `EventDetailSerializer`, and surface `source_key` (or a
 `series_id`) on the public `event_dates[]` so the client can group sessions.
 
-**Status: open — degrading (filed 2026-10-15; frontend renders multi-day as a flat day list — no invented series).**
+**Status: open — degrading (filed 2026-10-15; frontend renders multi-day as a flat day list — no invented series. 2026-10-15: recurring UI ported + wired behind the signal, so it lights up with no further frontend change once this resolves).**
 
 **Frontend follow-up (tracked):** `.scratch/recurring-ui/` — spec + ticket
-`01-recurring-session-wireup.md` (queued, `needs-triage`), to wire the session UI
-once this resolves.
+`01-recurring-session-wireup.md`. Steps 2–5 (card `FormatTag` + `cardFormat`,
+port + `lib/recurring` view-model + inert `EventDetailPage` wiring, guarded by
+`e2e/recurring.spec.ts` and `src/components/EventCard.test.ts`) are **done**;
+step 1 exists against a **provisional** shape isolated to the adapter. Only
+step 6 (`OccurrenceStrip`/`SessionPill` on cards) remains, gated on the
+confirmed wire shape.
 
 
 ### #54. Discovery availability has no backend source

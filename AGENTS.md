@@ -11,8 +11,8 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
-npx vitest run    # unit tests (107)
-npx playwright test  # e2e vs the live backend on :3000 (17)
+npx vitest run    # unit tests (213)
+npx playwright test  # e2e vs the live backend on :3000 (34 deterministic; zz-* manual)
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
@@ -202,9 +202,10 @@ sweep is the rule that prevents that.
 - **#68** Public event payload exposes no recurrence/series signal (no
   `recurrence`/`is_recurring`, `source_key` not in the public `event_dates[]`)
   even though the backend models recurrence and materializes dates → the
-  recurring consumer UI stays parked. Broadens **#36**: `EventParticipant`
-  already models a per-date link (`event_date_id`); expose it when the public
-  lineup surface lands.
+  recurring consumer UI is ported + wired but stays inert (no signal to render;
+  `lib/recurring.ts#resolveSeries` returns null without it). Broadens **#36**:
+  `EventParticipant` already models a per-date link (`event_date_id`); expose it
+  when the public lineup surface lands.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),

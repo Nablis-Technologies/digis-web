@@ -12,6 +12,10 @@ _Avoid_: show, gig, listing
 A single scheduled occurrence of an Event (start/end time, doors, venue). An Event has one or more.
 _Avoid_: showtime, session, "the event's date" (when you mean the time slot)
 
+**RecurringSeries**:
+An Event whose dates come from a recurrence rule (a weekly resident night, a monthly series). Its EventDates are the series' *sessions*. Not a separate domain entity — the type stays `EventDate`; "session"/"showtime" survive only as the user-facing UI vocabulary of the ported recurring components (`SessionCarousel`, `ShowtimePicker`), matching the design labels. Gated on the backend series signal (`BACKEND_GAPS.md` #68).
+_Avoid_: calling a single-day or festival EventDate a "session" — it means a recurring occurrence specifically.
+
 **Venue**:
 The physical location where an EventDate happens. Has a name and a city.
 _Avoid_: place, location, hall
