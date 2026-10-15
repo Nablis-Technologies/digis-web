@@ -8,6 +8,9 @@ import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassEdge } from '@/lib/ui/glass';
+import { useDominantColor } from '@/features/event-detail/hooks/useDominantColor';
+import { artworkPalette } from '@/lib/ui/artworkPalette';
+import { SheetEnvironment } from './SheetEnvironment';
 
 export function resolveLineup(lineup: any): any[] {
   // Backend-sourced only — never fabricate a lineup or fill missing artist
@@ -179,6 +182,10 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
   const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
   const isHeadliner = (artist.role || '').toLowerCase().includes('headliner');
   const [eventsTab, setEventsTab] = useState<'upcoming' | 'past'>('upcoming');
+  // The portrait drives the sheet's colour world — a tinted base, the blurred
+  // artwork, and a glow (the export's "artwork-driven environment"). No image →
+  // the brand-hue fallback; never a fabricated palette.
+  const palette = artworkPalette(useDominantColor(artist.image), isDark);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -198,10 +205,14 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
-          background: isDark ? '#101010' : '#fff',
+          background: palette.bg1,
           maxHeight: '90vh',
+          transition: 'background 600ms ease',
         }}>
         <GlassReflection isDark={isDark} />
+
+        <SheetEnvironment palette={palette} artwork={artist.image} isDark={isDark} />
+
         {/* Close — sticky top-right, always reachable */}
         <AppButton onClick={onClose}
           className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"

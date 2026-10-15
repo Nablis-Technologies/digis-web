@@ -9,6 +9,8 @@ import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, glassEdge, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { artworkPalette } from '@/lib/ui/artworkPalette';
+import { SheetEnvironment } from './SheetEnvironment';
 
 export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFollow, reflectionSettings }: {
   venue: string; isDark: boolean;
@@ -202,6 +204,12 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
   const active = eventsTab === 'upcoming' ? upcoming : past;
   const isPast = eventsTab === 'past';
   const initials = venueName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  // The venue sheet shares the artwork environment. The public venue payload is
+  // not carried into this sheet yet (it takes a name only — see
+  // `.scratch/web2-ui-import/issues/01-venue-detail-wireup.md`), so there is no
+  // artwork: the brand-hue fallback. Swap `null` for the venue photo's dominant
+  // colour when the wire-up lands.
+  const palette = artworkPalette(null, isDark);
 
   return (
     <motion.div
@@ -215,10 +223,18 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
-          background: isDark ? '#101010' : '#fff',
+          background: palette.bg1,
           maxHeight: '90vh',
+          transition: 'background 600ms ease',
         }}>
         <GlassReflection isDark={isDark} />
+
+        {/* No artwork layer yet: this sheet receives a venue name only
+            (`.scratch/web2-ui-import/issues/01-venue-detail-wireup.md`), so it
+            keeps the brand-hue base. Pass `artwork` when the venue photo is
+            hydrated from `GET /venues/:id`. */}
+        <SheetEnvironment palette={palette} isDark={isDark} />
+
         <AppButton onClick={onClose}
           className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
           style={{
@@ -230,20 +246,14 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
         </AppButton>
 
         <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {/* Banner */}
-          <div className="relative h-28"
-            style={{
-              background: isDark
-                ? 'linear-gradient(135deg, rgba(214,249,5,0.12) 0%, rgba(26,26,26,0.18) 100%)'
-                : 'linear-gradient(135deg, rgba(214,249,5,0.1) 0%, rgba(26,26,26,0.12) 100%)',
-            }} />
-
-          <div className="px-6 pb-6 -mt-10">
+          {/* Profile — sits on the artwork environment (the tinted base is the
+              banner now; the export has no separate banner). */}
+          <div className="px-6 pb-6 pt-7">
             <div className="flex items-end gap-4 mb-4">
               <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{
                   background: venueName ? flatAvatarColor(venueName) : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                  boxShadow: `0 0 0 3px ${isDark ? '#101010' : '#fff'}`,
+                  boxShadow: `0 0 0 3px ${palette.glass}`,
                 }}>
                 <span className="text-[26px] uppercase"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: '#fff' }}>

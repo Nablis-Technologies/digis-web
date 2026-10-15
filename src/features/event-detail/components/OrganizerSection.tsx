@@ -12,6 +12,8 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { followEntity, unfollowEntity } from '@/lib/follows';
 import { fetchOrganizationProfile, type OrganizationProfile } from '@/lib/organizations';
 import { toastError, toastWarning } from '@/lib/feedback';
+import { artworkPalette } from '@/lib/ui/artworkPalette';
+import { SheetEnvironment } from './SheetEnvironment';
 
 export function resolveOrganizers(event: any): any[] {
   // The backend nests a single organization summary `{ id, name, slug }`.
@@ -509,6 +511,10 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
   const [eventsTab, setEventsTab] = useState<'upcoming' | 'past'>('upcoming');
   const [profile, setProfile] = useState<OrganizationProfile | null>(null);
   const [profileError, setProfileError] = useState(false);
+  // The sheet's colour world. No organizer artwork exists in the payload yet, so
+  // this is the brand-hue fallback — the environment lights up with the profile
+  // image when the backend serves one.
+  const palette = artworkPalette(null, isDark);
 
   // The event payload carries only `{ id, name, slug }`; fetch the public
   // organization profile for the description / counts / socials, and surface a
@@ -555,10 +561,17 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
-          background: isDark ? '#101010' : '#fff',
+          background: palette.bg1,
           maxHeight: '90vh',
+          transition: 'background 600ms ease',
         }}>
         <GlassReflection isDark={isDark} />
+
+        {/* No artwork layer: the organizer payload carries no logo yet
+            (`resolveOrganizers` → `{ id, name, slug }`), so the sheet keeps the
+            brand-hue base. Pass `artwork` here when a profile image is served. */}
+        <SheetEnvironment palette={palette} isDark={isDark} />
+
         {/* Close — sticky top-right, always reachable */}
         <AppButton onClick={onClose}
           className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
@@ -574,21 +587,14 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
         {/* Scrollable content */}
         <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
 
-        {/* Banner */}
-        <div className="relative h-24"
-          style={{
-            background: isDark
-              ? 'linear-gradient(135deg, rgba(214,249,5,0.15) 0%, rgba(214,249,5,0.15) 100%)'
-              : 'linear-gradient(135deg, rgba(214,249,5,0.12) 0%, rgba(214,249,5,0.12) 100%)',
-          }} />
-
-        {/* Profile */}
-        <div className="px-6 pb-6 -mt-10">
+        {/* Profile — sits on the artwork environment (the tinted base is the
+            banner now; the export has no separate banner). */}
+        <div className="px-6 pb-6 pt-7">
           <div className="flex items-end gap-4 mb-4">
             <div className="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0"
               style={{
                 background: flatAvatarColor(organizer.name),
-                boxShadow: `0 0 0 3px ${isDark ? '#101010' : '#fff'}`,
+                boxShadow: `0 0 0 3px ${palette.glass}`,
               }}>
               <span className="text-[22px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
                 {initials}
