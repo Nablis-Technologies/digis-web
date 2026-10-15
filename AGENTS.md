@@ -122,16 +122,19 @@ Real routes for destinations; state only for the transient.
 
 ## Backend gaps (do NOT build against these — flag to backend dev)
 
-Single source of truth: **`docs/BACKEND_GAPS.md`** (reorganized
-2026-09-04: blocking → degrading → informational → deferred → resolved
-archive). Open items that matter for new work:
+Single source of truth: **`docs/BACKEND_GAPS.md`** — **backend defects only**
+(blocking → degrading → resolved archive). Items that are *not* backend defects
+(reclassified/frontend-fixable, setup, superseded, informational, deferred) live
+in **`docs/NOT_BACKEND_GAPS.md`** — do not re-file them as gaps. Open backend
+items that matter for new work:
 
 **A backend gap is a deficiency in the backend's code/API/contract** that the
 backend dev must fix (missing field/endpoint, wrong status or rule,
 serializer/policy gap). **Setup is NOT a gap** — seeds, dev env config
 (`config.hosts`, `config/recurring.yml` dev jobs), provider/dashboard webhook
 registration, API keys, webhook secret hashes, env vars, tunnels, deploys. Never
-file a setup chore as a gap.
+file a setup chore as a gap — record it in the setup section of
+`docs/NOT_BACKEND_GAPS.md` (or the setup doc it belongs to).
 
 **Filing is the whole action.** Fixing a gap is backend product work and is never
 ours — do not patch `digis_backend` to close a gap, and do not mark a gap
@@ -184,10 +187,11 @@ sweep is the rule that prevents that.
   the provider's rails → no payout method can be added. Blocking. The frontend is
   currently wired to a **local, uncommitted** backend change — that does not
   resolve the gap (see BACKEND_GAPS.md).
-- **#1** *(re-scoped — not a live gap)* Public `event_setting.config` is
-  `%w[public_guest_limit]` only; the old "widen to 17 keys" ask is moot. The lost
-  non-admission fields are tracked in #53, and discovery **featured** is now its
-  own paid surface (`GET /public/featured_events`, wired 2026-10-15).
+- **#1** *(moved — not a live gap)* Public `event_setting.config` is
+  `%w[public_guest_limit]` only; the old "widen to 17 keys" ask is moot. Re-scoped
+  in `docs/NOT_BACKEND_GAPS.md`; the lost non-admission fields are #53, and
+  discovery **featured** is now its own paid surface (`GET /public/featured_events`,
+  wired 2026-10-15).
 - **#43** RSVP rejects `access_code` / `invitation_token` → an audience-gated RSVP
   event cannot be registered for. Blocking.
 - **#44** Event-level `event_type` / `access_mode` / `rsvp_*` config is inert and
@@ -197,8 +201,7 @@ sweep is the rule that prevents that.
   saved-events / home feed (`GET /feed` has no controller) / reviews / social
   graph (#46), gift tickets (#47), account preferences + 2FA + password (#48),
   public-event search/filter/sort/pagination (#49), wallet answers + capability
-  flags + buyer history (#50), events-by-followable + profile stats (#51),
-  venue/artist detail omit `is_following` (#52).
+  flags + buyer history (#50), events-by-followable + profile stats (#51).
 - **#68** Public event payload exposes no recurrence/series signal (no
   `recurrence`/`is_recurring`, `source_key` not in the public `event_dates[]`)
   even though the backend models recurrence and materializes dates → the

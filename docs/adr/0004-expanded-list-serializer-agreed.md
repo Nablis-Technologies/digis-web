@@ -5,9 +5,15 @@ The backend dev agreed to expand `Events::Public::EventListSerializer` to includ
 so the discovery grid can render those per-card without N+1 detail fetches. The
 frontend adapter already reads `event_setting.config`, so this is a backend-only
 change — the mock fallback for those fields drops automatically once it lands.
-Resolves BACKEND_GAPS.md #1.
+Resolves the gap then filed as `BACKEND_GAPS.md` #1 (**now
+`docs/NOT_BACKEND_GAPS.md` #1** — re-scoped 2026-09-30).
 
-**Status (2026-09-07):** fulfilled — the 17-key projection is live in
+**Status (2026-09-07):** fulfilled at the time — the 17-key projection was live in
 `EventSettingSerializer` on both list and detail (verified in serializer code +
-live HTTP). Recorded as BACKEND_GAPS #1 resolved. Remaining work is frontend-only:
-map the served-but-unmapped keys in `src/lib/events-adapter.ts`.
+live HTTP). Recorded as BACKEND_GAPS #1 resolved.
+
+**Superseded (2026-09-30):** the Composable Admission Selection release gutted the
+public projection back to `%w[public_guest_limit]`, so this ADR's "expand the
+serializer" decision is **moot**. #1 is now *re-scoped* in
+`docs/NOT_BACKEND_GAPS.md`, and the frontend never mapped the served config keys
+(it maps only what the public serializers actually serve).

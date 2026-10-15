@@ -1,9 +1,16 @@
 # Confirmed Backend Gaps (digis_backend)
 
-> Every confirmed gap between what the frontend needs and what the backend provides,
-> **verified against the actual backend code** (serializers, policies, controllers,
-> routes). The frontend does NOT work around these (ADR-0002) — it disables/hides
-> until the backend resolves them.
+> **Backend defects only — this is the backend dev's worklist.** Every confirmed
+> deficiency in the backend's **code / API / contract** that the backend dev must
+> fix, **verified against the actual backend code** (serializers, policies,
+> controllers, routes). The frontend does NOT work around these (ADR-0002) — it
+> disables/hides until the backend resolves them.
+>
+> **Not a backend defect → not here.** Reclassified (frontend-fixable) items,
+> setup chores, superseded halves, informational notes, and deferred product ideas
+> live in **`docs/NOT_BACKEND_GAPS.md`**, each with the reason it is not a backend
+> gap, so it is never re-filed. (The dated sweep logs below are historical records
+> and may name items that have since moved there.)
 >
 > **What counts as a backend gap:** a deficiency in the backend's
 > **code / API / contract** that the backend dev must fix — a missing field or
@@ -92,9 +99,7 @@
 |---|---|
 | **open — blocking** | frontend feature cannot ship until fixed |
 | **open — degrading** | works but suboptimal; frontend has a mitigation |
-| **frontend-fixable** | **not a backend gap** — the frontend can satisfy this from an existing surface (reclassified 2026-10-02) |
-| **informational** | note for backend correctness; no frontend impact |
-| **deferred** | product decision, not a bug |
+| **superseded** | it was a gap under an older contract; the ask is moot now (detail in `NOT_BACKEND_GAPS.md`) |
 | **resolved** | fixed; detail in the Resolved archive |
 
 ## At a glance
@@ -104,22 +109,19 @@
 | 17 | open — blocking | persisted enum `PAYMENT_METHODS = %w[telebirr card bank]` rejects `cbe`/`cbebirr` (the Chapa adapter already advertises `cbebirr`) |
 | 56 | open — blocking | signup can't take over an existing (shadow) phone → a guest who bought a ticket can never create an account ("Phone has already been taken") |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
-| 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `rating`; lineup → #36). `featured` is superseded — served by the paid **Featured endpoint** (2026-10-15). The `rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model |
+| 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `rating`; lineup → #36). (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
 | 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
 | 9 | open — degrading | no self-service `PATCH /auth/me` |
 | 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
 | 54 | resolved 2026-10-15 | discovery availability served — `GET /public/events` carries `ticket_availability` + `event_lifecycle` per event; frontend wired (`eventAvailability` → SOLD OUT badge, verified live) |
-| 55 | frontend-fixable — done | detail "from" price implemented via `useTicketPricing` + `PurchaseBar` (2026-10-03) |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
 | 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change/reset |
 | 49 | open — degrading | `GET /public/events` has no search/filter/sort/pagination; no events-by-organizer/artist/venue |
 | 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/registration/transfer history, unread-count/mark-all-read |
 | 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
-| 52 | frontend-fixable | venue/artist detail omit `is_following`; derivable from `GET /users/:id/following` (self-scoped) — a backend attribute would be cleaner but isn't required |
 | 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
-| 59 | frontend-fixable | invitation link is frontend-constructible (backend already accepts `invitation_token`); the unset dev sender is **setup**, not a gap |
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
 | 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
@@ -131,10 +133,7 @@
 | 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
 | 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
 | 70 | open — degrading | public `event_dates` is unbounded and unfiltered (includes past dates) → a recurring series ships its entire history; the session rail/date step must discard it client-side |
-| 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
-| 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed in the seed 2026-10-15 |
-| 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
-| 1 | resolved 2026-09-30 | public `event_setting.config` is now `%w[public_guest_limit]` — the old "widen to 17 keys" ask is moot; the fields it held are covered by #53/#44 |
+| 36 | open — degrading | public payload lacks event participants/lineup — a backend **serializer** gap (no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`) |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
 | 33 | resolved 2026-09-30 | guest payment resolves via `order_access_token` (`ResolveGuestOrderAccess`) |
 | 34 | resolved 2026-09-30 | `Orders::EventDateEligibility` gates `BuildQuote` + `CreateCheckout` |
@@ -144,8 +143,7 @@
 | 41 | resolved 2026-09-30 | `idx_one_order_item_per_registration` is now `(registration_id, order_id)` |
 | 43 | resolved 2026-09-30 | `admission_selections` accepts `access_code` / `invitation_token` as `audience_proof` |
 | 45 | resolved 2026-09-30 | per-offer sold-out → `waitlist_available` + offer waitlist |
-| 8-deferred | deferred | no Google / check-account / password-reset auth |
-| 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) |
+| 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) — the dev tunnel/config is setup (`NOT_BACKEND_GAPS.md`) |
 | 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
 
 ---
@@ -261,24 +259,15 @@ and `EventDetailSerializer` carries no replacement attributes, so the
 previously-public config keys have no source in the public API (grep of `app/`
 confirms the strings are gone).
 
-**Re-scoped 2026-10-02 — split into two groups:**
+**Re-scoped 2026-10-02 — the genuinely lost non-admission data (real gap):**
+`age_restriction`, `seat_map`, `rating`, `answer_edit_window_hours`,
+`price_foreign_from_minor`. No substitute exists: the event-detail Age info card,
+the SeatMap step, and the discovery rating surface lose their data. `lineup` is
+tracked under #36 (needs a participants/artists surface, not just a config key).
 
-- **Superseded by the per-offer model (NOT a gap).** `event_type`, `access_mode`,
-  `invite_only_paid`, `on_guest_list`, `invite_waitlist_only`, `waitlist_ahead`,
-  `rsvp_going`, `rsvp_capacity`, `allows_plus_one`, `max_guests`,
-  `rsvp_requirements`. The real admission contract is per-offer
-  (`ticket_type.approval_mode` / `audience` / `waitlist_enabled` + `price_options`);
-  the frontend must source gating from the offer, not from event config (see #44).
-- **Genuinely lost non-admission data (real gap).** `age_restriction`, `seat_map`,
-  `rating`, `answer_edit_window_hours`, `price_foreign_from_minor`.
-  No substitute exists: the event-detail Age info card, the SeatMap step, and the
-  discovery rating surface lose their data. `lineup` is tracked under #36 (needs
-  a participants/artists surface, not just a config key).
-- **`featured` — RESOLVED by a dedicated surface (2026-10-15).** Discovery
-  Featured is no longer a config key: it is a paid, rotating placement served by
-  `GET /public/featured_events` (and `GET /public/events?featured=true`), now
-  consumed by `eventsModule.fetchAll`/`fetchFeatured`. Superseded, not restored
-  — see the Resolved archive.
+The other two groups are **not** gaps and live in `NOT_BACKEND_GAPS.md`: the
+`rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model
+(see #44), and `featured` is superseded by its own paid endpoint (2026-10-15).
 
 **Why it blocks:** those event-detail modules can only render absent. ADR-0002
 forbids fabricating them.
@@ -350,44 +339,6 @@ auth tokens. Refuse when the phone belongs to an unverified shadow (that case is
 the claim flow, #56).
 
 **Status: open — filed 2026-09-30 (route grep).**
-
-### #59. Invitation link — frontend contract done; the dev sender is SETUP, not a gap
-
-**Reclassified 2026-10-02 — this is NOT a backend code gap.**
-
-The app owns the deep-link contract and already implements it:
-`/events/:slug` reads `?invitation=<token>` (also `?invitation_token=`) and passes
-it as `invitation_token` to `POST /ticketing/audience_authorizations` and to
-`admission_selections` (`audience_proof.invitation_token`). The backend already
-**accepts** that token — `Orders::AdmissionSelectionEnvelope::PUBLIC_PROOF_FIELDS
-= %w[access_code invitation_token]` and the audience controller maps it
-(`Ticketing::Audience::Authorize#authorize_invitation`). Verified live:
-`origins-2?invitation=<token>` auto-unlocks.
-
-What was previously filed as "no link format" is really two non-gaps:
-1. **Link format** — the app defines it (`<app>/events/<slug>?invitation=<token>`).
-   Nothing for the backend to invent; whoever composes the invitation message
-   (the configurable sender) just appends the token to that URL.
-2. **Delivery in dev** — `Ticketing::DeliverInvitationJob` calls
-   `config.x.invitation_delivery_sender`, which is unset in dev (an initializer
-   installs a no-op default, `config/initializers/ticketing_outbox_handlers.rb:5`,
-   so it does not literally "return early" — it calls a no-op). Setting a dev
-   sender is **environment setup**, which the gap rules explicitly exclude.
-
-**Setup note (record in dev setup, NOT here):** a dev
-`invitation_delivery_sender` (e.g. log the composed link) makes the
-`audience=invitation` flow exercisable end-to-end. Production configures a real
-sender.
-
-**Evidence:** `app/services/ticketing/invitations/create.rb`;
-`app/jobs/ticketing/deliver_invitation_job.rb:14`;
-`config/initializers/ticketing_outbox_handlers.rb:5`; no `invitation_delivery_sender`
-in `config/environments/development.rb`. Frontend build note:
-`.scratch/invite-only-audience/issues/01-invitation-token-wiring.md`.
-
-**Status: frontend-fixable / setup — reclassified 2026-10-02 (filed 2026-10-01).**
-Removed from the open-gap count; the frontend half is built and the backend already
-accepts the token.
 
 ### #60. Chapa payment amount is sent 100× too large (minor units, not the provider's major unit)
 
@@ -680,23 +631,6 @@ discovery grid renders real **SOLD OUT** badges (`jubilation-africa`,
 `lib/eventAvailability` → `EventCard`). Original filing: 2026-09-30
 (`326f6a3`).
 
-### #55. `EventDetailSerializer` omits `price_from_minor` — FRONTEND-FIXABLE (not a backend gap)
-
-`EventListSerializer` computes `price_from_minor` (over active ticket products)
-but `EventDetailSerializer` does not
-(`app/serializers/events/public/event_detail_serializer.rb`). The detail page can
-already derive the "from" price from `GET /public/events/:slug/products`
-(`price_options[].amount_minor`, min) — a surface the detail page fetches anyway
-for the offers — or reuse the list payload's `price_from_minor`.
-
-**Fix (optional, convenience only):** mirror `price_from_minor` onto the detail
-serializer to save the second request. Not required.
-
-**Status: frontend-fixable — IMPLEMENTED 2026-10-03.** The detail page already
-derives it: `useTicketPricing` computes `minPrice` from the loaded products and
-`PurchaseBar` renders "From {minPrice}" when no tier is selected
-(`PurchaseBar.tsx:27,60`). No work remained; closed as done.
-
 ### #41. A released order permanently burns its registration — RESOLVED 2026-09-30
 
 `idx_one_order_item_per_registration` is `UNIQUE (registration_id) WHERE
@@ -908,24 +842,6 @@ remains is the event-date gate. Optionally auto-mark dates `completed` when
 enforced online; the event-date / `completed` gate is still absent, so a
 finished published event remains quotable and payable.
 
-### #1. Public `event_setting.config` projection truncated to 2 keys
-
-`Events::Public::EventSettingSerializer` whitelists only
-`%w[public_guest_limit]`
-(`app/serializers/events/public/event_setting_serializer.rb`). This is
-**re-scoped, not widened** (2026-09-30): the "widen to 17 keys" ask is moot. The
-frontend no longer reads `event_setting.config` for discovery at all — the
-adapter maps only what the public serializers actually serve, and the genuinely
-lost non-admission fields are tracked under **#53**. The superseded
-type/access/rsvp keys are per-offer now (#44), and discovery **Featured** has its
-own surface as of 2026-10-15 (the Featured endpoint — see the Resolved archive).
-
-**Status: resolved 2026-09-30 (re-scoped).** It had briefly been recorded
-resolved on the strength of a **local-only commit of ours** (`648d21d`, which
-widened the whitelist to 19 keys); that patch is not on the backend branch and
-was reverted. The gap as originally written is moot: `%w[public_guest_limit]`
-remains the whole public projection.
-
 ### #44. Event-level `event_setting.config` type/access keys are inert and unwritable
 
 `event_type`, `access_mode`, `invite_only_paid`, `rsvp_going`, `rsvp_capacity`,
@@ -937,17 +853,11 @@ whether a product has a zero-amount price. There is **no API to read or write**
 and the two keys the public serializer *does* expose (`allow_waitlist`,
 `public_guest_limit`) are themselves not enforced.
 
-**Seed note (not part of the gap):** these keys were only ever *written* by the
-dev seeds — and since the Composable Admission Selection release the mock-mirror
-has written a non-admission whitelist instead, so they never even reached the DB.
-`pazimo_seed.rb` still computed them until 2026-10-15; that dead computation is
-removed (a **seed cleanup**, recorded in `DATA_INTEGRITY_AUDIT.md` — a seed that
-writes inert keys is not a gap). The gap itself is entirely backend: the config is
-inert and unwritable.
-
 **Why it degrades:** the consumer frontend cannot distinguish `rsvp` /
 `inviteOnly` / `ticketed`, nor show going/capacity/plus-one — the event-level
-config is decorative. (See also #1: the public serializer strips it entirely.)
+config is decorative. (The seed-side note that used to sit here — the keys were
+only ever written by the dev seeds — is a **setup** matter; see
+`NOT_BACKEND_GAPS.md`.)
 
 **Not frontend-fixable (corrected 2026-10-02):** the frontend *already* ignores
 this dead config — `backendEventToEvent` (`src/lib/events-adapter.ts:85-148`) maps
@@ -1062,31 +972,6 @@ What remains genuinely missing:
   achievements have no backend surface at all (product decision).
 
 **Fix:** events-by-followable (#49); venue media/coords (#36); decide gamification.
-
-### #52. Venue/artist detail omit `is_following` — FRONTEND-FIXABLE (not a backend gap)
-
-`GET /venues/:id` (`app/serializers/events/public/venue_detail_serializer.rb:5-8`) and
-`GET /artists/:id` expose the profile (description, socials, media, coords,
-`follower_count`) but **not `is_following`** — only
-`Organizations::Public::OrganizationDetailSerializer` has it
-(`organization_detail_serializer.rb:13,24-26`). The follow write-path works for
-all three (`POST|DELETE /:type/:id/follow`, type `venues|artists|organizations`,
-`config/routes.rb:68-73`) and returns `{ following, follower_count }`.
-
-**Correction 2026-10-02:** this is **derivable from an existing surface** —
-`GET /users/:id/following` (`config/routes.rb:469`, `Core::FollowsController#following`,
-self-scoped) returns the current user's `Core::Follow` rows
-(`followable_type`/`followable_id`, `follow_serializer.rb`). The frontend can match
-the venue/artist id to read back follow state. Caveat: that list caps at 25 unless
-paginated (`follows_controller.rb:31`), so large follow sets need pagination.
-
-**Fix (optional, convenience only):** add
-`attribute :is_following { object.followed_by?(instance_options[:current_user]) }`
-to the venue + artist detail serializers (mirroring the organization one). Cleaner,
-but not required.
-
-**Status: frontend-fixable — reclassified 2026-10-02.** Removed from the open-gap
-count; the frontend can read follow state via `GET /users/:id/following`.
 
 ### #58. `active_checkout_exists` 409 carries no order id → the client can't resume or discard the open checkout
 
@@ -1244,79 +1129,6 @@ venue list serializer) would be needed for a counted location picker.
 
 ---
 
-## Informational
-
-Notes for backend correctness; no frontend impact (or frontend already honest).
-
-### #11. Slug namespace safety + redirects (PARTIALLY ADDRESSED)
-
-A `RESERVED_SLUGS` denylist exists on the short-link model
-(`app/models/links/short_link.rb:12`, validated at `short_link.rb:58`) guarding
-the branded-link space. What remains: an event-slug `slug_history` 301 table so
-renamed event slugs keep their old URLs. Frontend needs zero changes.
-
-### #16. Chapa v1 vs v2 (RESOLVED — V2 migrated 2026-09-15)
-
-Backend now implements **Chapa API V2 only** (`api.chapa.global`, `POST
-/v2/payments/hosted` + `/v2/payments/direct`). V1 `CHASECK_*` validation is
-removed; `ChapaClient`/`ChapaPayoutClient` require `CHAPA_TEST_`/`CHAPA_LIVE_`
-key prefixes matching `CHAPA_MODE` (`chapa_client.rb:388-394`,
-`chapa_payout_client.rb:174-175`). The `PaymentSerializer` shape is unchanged,
-so no consumer wiring was needed beyond the dev `.env.chapa` key-format fix.
-Direct charge and `cbebirr`/`mpesa`/`awashbirr` are adapter capabilities, but
-the domain `PAYMENT_METHODS` enum is still `%w[telebirr card bank]` (see #17).
-
-**Local-testing constraint (verified live 2026-09-15):** with a valid V2 test
-key, `POST /v2/payments/hosted` returns `400 invalid_format — "Callback URL must
-start with https:// and be a valid URL"` when `CHAPA_CALLBACK_URL`/`CHAPA_RETURN_URL`
-are `http://localhost`. Both must be **https**.
-
-**Local dev setup (2026-09-16) — environment config, NOT a backend gap.** Chapa
-needs a public HTTPS host, so the **backend** is exposed through a **stable ngrok
-dev domain** (Docker container `digis-tunnel-ngrok`: `ngrok/ngrok` →
-`http host.docker.internal:3000 --url=https://<dev-domain>`). Two pieces of
-**local dev config** (dev-only, uncommitted) make that work — they are setup
-chores, not gaps:
-- `config/environments/development.rb` → allow the tunnel hosts:
-  `config.hosts << ".ngrok-free.dev"` / `".ngrok-free.app"` /
-  `".trycloudflare.com"`. Without it Rails **403s** every tunnel request (the
-  response is Rails' Host Authorization HTML page), so Chapa's callback/webhook
-  never lands.
-- `config/recurring.yml` → a `development:` block running the checkout-lifecycle
-  jobs (see #40 *dev setup*). Without it `Orders::ExpireCheckout` never runs locally.
-
-Provider/dashboard setup lives with the setup too: the webhook endpoint
-(`POST https://<dev-domain>/payments/chapa/webhook`) and the **webhook secret
-hash** are registered in the Chapa dashboard, and `.env.chapa` holds the keys
-(`CHAPA_WEBHOOK_SECRET` is any random string you invent — the same value must be
-saved in the dashboard). Both `CHAPA_CALLBACK_URL` and `CHAPA_RETURN_URL` point at
-the tunnel host (V2 requires https on both).
-
-Frontend side: no tunnel needed any more (V2 ignores `return_url`); Vite still
-carries `server.host: true` + `allowedHosts` in `vite.config.ts`.
-
-**Verified end-to-end with a real Chapa test payment (2026-09-16):** Chapa
-delivered a signed `POST /payments/chapa/webhook` **from its own IP** →
-`payment.success` → `processed` → payment `succeeded` (`provider_reference` =
-Chapa's reference) → order `fulfilled` → **ticket issued**. Our side was also
-proven independently by re-sending a correctly HMAC-signed webhook.
-
-**Two caveats:**
-1. ~~Quick-tunnel hostnames are **ephemeral**~~ — **resolved 2026-09-16** by
-   moving to a **stable ngrok dev domain**, which survives restarts, so the
-   dashboard webhook URL is set once. (With the earlier cloudflared quick tunnels,
-   an expired hostname meant no webhook arrived — symptom: the payment succeeded
-   on Chapa but nothing fulfilled.)
-2. Chapa V2 does **not** return the buyer to the app — the API `return_url` is
-   ignored (verified: the browser stays on Chapa's receipt; there is no dashboard
-   redirect setting either). **Handled in the frontend:** the hosted checkout now
-   opens in a **new tab** (`window.open`), and the app tab stays open and confirms
-   the payment (`POST /payments/:id/refresh` + wallet poll) — once the webhook
-   fulfills, the app shows "You're going!", **closes the Chapa tab**
-   (`src/lib/checkout-popup.ts`, so the buyer is returned to Digis) and routes to
-   the ticket. Falls back to same-tab navigation if the popup is blocked.
-   (`e2e/checkout.spec.ts` accepts either a popup or a redirect.)
-
 ### #36. Public event payload lacks lineup/participants (lineup only)
 
 `EventDetailSerializer` / `EventListSerializer` expose only categories,
@@ -1329,13 +1141,9 @@ data present. This is the whole of #36 — a backend SERIALIZER gap.
 **Fix:** add `participants`/`artists` to the public event serializers (or a public
 participants endpoint). See the **#36 addendum** for the participant→date link.
 
-**History — the "venue media/coords" half was never a backend gap.** It was split
-out 2026-10-02 (public `GET /venues/:id` already serves `latitude`/`longitude` +
-ActiveStorage `profile`/`photos`, and `event_dates[].venue.id` is public), then
-found SEED-BLOCKED 2026-10-03 (every seed venue returned blank coords /
-`profile_url: null` / `gallery_urls: []`). It was a **seed task, not a gap** and is
-now **fixed in the seed (2026-10-15)** — see `docs/handoffs/DATA_INTEGRITY_AUDIT.md`
-→ "Seed-side fixes (2026-10-15)". Nothing about the venue is tracked as a gap.
+**Status: open — degrading.** (The venue-media/coords half split out of #36 was a
+**seed** task, not a gap — fixed in the seed 2026-10-15; see
+`NOT_BACKEND_GAPS.md`.)
 
 ### #36 addendum — expose the participant→date link when the lineup goes public
 
@@ -1354,55 +1162,7 @@ lands, it should carry each participant's `event_date_id` (or a per-date
 `participants` array) so the client can drop the round-robin and let
 event-level participants fall back to "all days".
 
-**Status: informational (filed 2026-10-15; broadens #36, no separate number).**
-
-### #37. No public waitlist-join or access-request endpoint
-
-The waitlist is an **authenticated, registration-based** flow
-(`POST /registrations/:id/enqueue_waitlist` + `.../accept_waitlist_offer` — not
-public). There is **no endpoint to request an invite** ("Request access"). The
-frontend `InviteOnlySection`'s "Join Waitlist"/"Request access" were local-only
-fakes; now display-only (no fake "joined"/"sent" state), fabricated
-`waitlistAhead` default removed. Note `InviteOnlySection` only renders when
-`event_type === "inviteOnly"`, which the backend never emits — dead for live
-data.
-
-**Fix (if wanted):** a public guest waitlist-join endpoint and/or an
-invite-request endpoint.
-
-### #38. `requires_ticket` is not enforced at quote/order time
-
-Product `metadata.requires_ticket` is projected on the public products payload
-(`requires_ticket`) and mapped by the frontend (`EventProduct.requiresTicket`),
-but **no gate enforces it** — `Orders::BuildQuote` accepts a non-ticket line
-regardless, and there is no order-level "buyer holds a ticket for this event"
-check. Extras-only orders are otherwise fully supported (verified live 2026-09-10:
-a guest extras-only quote → order for on-on "Reserved parking",
-`requires_ticket: true`, succeeded without any ticket). The UI only offers
-extras from a ticket's "Add extras" entry, so it's soft-gated there — but the
-API would accept a ticket-required extra standalone.
-
-**Fix (if wanted):** reject a quote/order line whose product `requires_ticket`
-when the buyer has no ticket (or no ticket in the order) for the event.
-
----
-
-## Deferred by design
-
-Product decisions, not bugs. Re-open only if requirements change.
-
-### #8-deferred. Auth: no Google / check-account / password-reset
-
-Phone-OTP verification now EXISTS (guest claim flow, #14); Google / check-account
-/ password-reset remain removed from the UI. Add only if the product spec
-demands these flows.
-
-### Consumer promos
-
-`/catalog/promotions` is organizer CRUD. `order_quotes` accepts `promotion_code`
-server-side (`Orders::BuildQuote` + `order_quotes_controller.rb`, verified
-2026-09-09) so the consumer path runs through the quote. Confirm and drop the
-standalone UI validate when wiring.
+**Status: open — degrading (filed 2026-10-15; broadens #36, no separate number).**
 
 ---
 
@@ -1455,36 +1215,6 @@ history). Every item below was re-verified against the pulled
 | 1 | **Re-scoped, not widened** — the public projection is now `%w[public_guest_limit]`; the "widen to 17 keys" fix is moot and the lost non-admission fields are tracked as #53 | code + live `GET /public/events/:slug` 2026-09-30 (`326f6a3`) |
 | 54 | Discovery availability — `EventListSerializer` serves `ticket_availability` + `event_lifecycle` per event; frontend already wired (`events-adapter` → `lib/eventAvailability` → `EventCard`) | live HTTP 2026-10-15 (SOLD OUT badges on `jubilation-africa` / `musical-karaoke`) |
 | 53 (`featured`) | Discovery Featured — superseded by the paid **Featured endpoint** (`GET /public/featured_events`, `GET /public/events?featured=true`), not the removed `event_setting.config.featured`. Wired: `events-adapter` maps `placement_label` → `Event.featured`; `eventsModule.fetchAll` overlays the Featured set on the list; `fetchFeatured` reads the endpoint | live HTTP + browser 2026-10-15 (HEADLINERS · 2 EVENTS) |
-
----
-
-## Seed-side review (2026-09-04)
-
-The dev seeds (`db/seeds_events.rb` — the frontend-owned mock-mirror;
-`db/seeds/preview.rb`) exist so the UI has data. **Seed-side issues are fixed in
-the seed, not tracked as backend gaps.** Past seed fixes: **#30** (parking
-`product_access` + `PARKING` zone per parking add-on) and **#35**
-(`max_packages_per_user: 10` on the free-RSVP fixture) — see the Resolved
-archive.
-
-Every open gap above is backend serializer/code-level, not a seed problem. The
-mock-mirror seed writes everything the backend can possibly consume (full
-`event_setting.config` JSONB, `price_from_minor` via `Catalog::ProductPrice`,
-`requires_ticket` via product metadata). **Venue geo/media was the one real seed
-omission — fixed 2026-10-15** (see `DATA_INTEGRITY_AUDIT.md`). The remaining
-seed-side TODO is populating `event_participants` once the backend exposes the
-lineup (#36) — a fixture with no public projection is invisible, so it waits.
-
-**Seed-side TODO (frontend-owned):** a genuinely **multi-day** event and a
-**recurring** series (the mock-mirror has neither — `festival.spec.ts` and
-`recurring.spec.ts` are route-mocked because of it). Design + status in
-`DATA_INTEGRITY_AUDIT.md` → "Seed-side fixes (2026-10-15)".
-
-**Seed-side TODO (frontend-owned, Phase 3):** ~~add a promotion + promo code
-fixture so `order_quotes.promotion_code` can be integration-tested.~~
-**DONE 2026-09-05** — active 10% promotion + `LAUNCH10` code on `on-on`;
-verified live (quote applies `discount_minor`, unknown codes →
-`invalid_promotion_code`).
 
 ---
 

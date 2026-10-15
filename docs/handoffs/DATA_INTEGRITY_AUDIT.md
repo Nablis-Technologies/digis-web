@@ -121,8 +121,9 @@ Verified: tsc · vitest **145/145** · build · Playwright **28/28**; no
 
 Both were seed problems that had been written up as (or alongside) backend gaps.
 Fixed in the seed — backend `chore(dev)` commit `ec36172d` — and removed from
-`BACKEND_GAPS.md`. **A seed omission is never a gap** (see the header of
-`BACKEND_GAPS.md`); it lives here.
+the gap list. **A seed omission is never a gap** (see the header of
+`docs/BACKEND_GAPS.md` and the setup section of `docs/NOT_BACKEND_GAPS.md`); it
+lives here.
 
 **1. Venue geo + media were never seeded (was #36's "venue half").**
 Public `GET /venues/:id` serves `latitude`/`longitude` and ActiveStorage

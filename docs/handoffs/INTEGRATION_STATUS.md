@@ -7,6 +7,48 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-16 — split non-backend items out of the gap list
+
+**Prompt:** "why are the frontend gaps in the backend gaps that should be left for
+just the backend, what are they."
+
+`docs/BACKEND_GAPS.md` had drifted into a *frontend-needs-vs-backend-provides*
+ledger: it advertised a `frontend-fixable` status ("**not a backend gap**") and
+carried setup, superseded, informational, and deferred sections. A backend gap is
+now strictly a **backend defect** — the backend dev's worklist.
+
+**New: `docs/NOT_BACKEND_GAPS.md`** — the non-gaps, each with the reason it is not
+a gap, so they are not re-filed:
+
+- **Reclassified (frontend-fixable):** #55 (detail `price_from_minor` — from
+  `/products`), #52 (`is_following` — from `GET /users/:id/following`), #59
+  (invitation link — app-constructed; the dev sender is setup).
+- **Setup:** #59's dev `invitation_delivery_sender`; #16's Chapa V2 tunnel /
+  `config.hosts` / `config/recurring.yml` / dashboard registration; the #36
+  venue-media/coords **seed** half (fixed 2026-10-15); the seed-side review + the
+  frontend-owned seed TODOs.
+- **Superseded / re-scoped:** #1 (config projection — the "widen to 17 keys" ask
+  is moot), #53's `rsvp_*`/`event_type`/`access_mode` group, #44's seed note.
+- **Informational:** #11 (slug history), #16 (Chapa v1→v2, resolved), #37 (a
+  public/guest waitlist-join is a feature ask, not a defect), #38
+  (`requires_ticket` unenforced — a hardening ask).
+- **Deferred:** #8-deferred (Google/check-account/password-reset), consumer promos.
+
+**`BACKEND_GAPS.md`** is now backend-only: status key (`blocking` / `degrading` /
+`superseded` / `resolved`), at-a-glance, open blocking + degrading, Resolved
+archive, Discovered endpoints. Retired the `frontend-fixable` status.
+
+**One reclassification while moving:** **#36** (public payload lacks
+event participants/lineup) was tagged `informational`, but the section itself says
+*"a backend SERIALIZER gap"* and the Lineup/artist sheet renders absent — so it
+moved to **open — degrading** (its addendum too). Nothing else changed status.
+
+**Docs updated:** `README.md` (both files listed), `AGENTS.md` (gap section points
+at `NOT_BACKEND_GAPS.md`; dropped the #52 mention), `docs/adr/0004` (its #1 ref now
+points at the re-scoped entry and records the 2026-09-30 supersession),
+`docs/handoffs/DATA_INTEGRITY_AUDIT.md` (seed-side pointer). The historical dated
+sweep logs in `BACKEND_GAPS.md` / `INTEGRATION_STATUS.md` are left as written.
+
 ## Session 2026-10-15f — backend pull (new Featured endpoint) + full gap status sweep
 
 **Prompt:** "pull the latest changes from the backend, re-check each gap in
