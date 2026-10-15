@@ -50,8 +50,8 @@ vocabulary) is gated on the *confirmed* wire shape.
    `SessionCarousel` → that session's `SessionGuests` → `SessionWaitlist` (when a
    session is sold out), and a series is never also rendered as a festival.
    Guarded by `resolveSeries`. **Per-session ticket scoping is deferred** — offers
-   are event-level until the products payload links an offer to a session; that is
-   a separate backend ask (not #68).
+   are event-level until the products payload carries `date_allocations`; that is
+   **#69** (a separate gap from #68).
 6. **Render the dormant vocabulary** — *todo.* `OccurrenceStrip` / `SessionPill`
    on cards once sessions exist (they are present but unrendered today).
 

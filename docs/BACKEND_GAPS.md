@@ -129,6 +129,8 @@
 | 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
 | 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
+| 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
+| 70 | open — degrading | public `event_dates` is unbounded and unfiltered (includes past dates) → a recurring series ships its entire history; the session rail/date step must discard it client-side |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
 | 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link; participants **do** model a per-date link — see #36 addendum). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
@@ -574,6 +576,67 @@ port + `lib/recurring` view-model + inert `EventDetailPage` wiring, guarded by
 step 1 exists against a **provisional** shape isolated to the adapter. Only
 step 6 (`OccurrenceStrip`/`SessionPill` on cards) remains, gated on the
 confirmed wire shape.
+
+
+### #69. Public product payload omits date allocations — a whole-festival pass is indistinguishable from a single-day offer
+
+The backend **models per-date offer scope**: `Catalog::ProductDateAllocation`
+(`app/models/catalog/product_date_allocation.rb`; table
+`catalog_product_date_allocations` — `event_product_id`, `event_date_id`,
+`allocation_basis_points`) ties a product to specific event dates, and
+`Catalog::ProductDateAllocationSerializer` already serializes it. The **public**
+product surface never exposes it:
+
+- `Catalog::PublicProductsController#index`
+  (`app/controllers/catalog/public_products_controller.rb:16-18`) eager-loads
+  `:ticket_type, :prices, :inventories, :product_accesses` — **not
+  `:date_allocations`**.
+- `Catalog::Public::EventProductSerializer`
+  (`app/serializers/catalog/public/event_product_serializer.rb:8-14`) exposes no
+  `date_allocations` / `event_date_id`.
+- `ticketing_ticket_types.date_selection` is only `fixed | choose_one` (check
+  constraint in `db/structure.sql`) — neither value states which dates an offer
+  covers; `choose_one` is the *buyer* picking a date at registration.
+
+**Why it degrades:** a multi-day event's offers are indistinguishable in the
+public payload, so the client guesses. `resolveFestivalSchedule`
+(`src/lib/festival.ts:153-157`) calls a tier a festival pass when its **name**
+contains `pass`/`full`/`weekend` (or `admissionsPerUnit > 1`), and renders every
+other tier as a single-day offer. A day pass not named "pass" — or a full pass
+named "Gold" — lands in the wrong group, so the "From …" pass price and the day
+tier list are wrong. That is an invented classification (ADR-0002).
+
+**Fix:** eager-load `:date_allocations` in the public products controller and add
+`date_allocations` (or a flattened `event_date_ids`) to
+`Catalog::Public::EventProductSerializer`. A product with no allocation covers
+every date (today's implicit behaviour).
+
+**Status: open — degrading (filed 2026-10-15; controller + serializer + `structure.sql` code read).**
+
+
+### #70. Public `event_dates` is unbounded and includes past dates — a recurring series ships its whole history
+
+`Events::Event` has an unscoped `has_many :event_dates`
+(`app/models/events/event.rb:32-33`) and the public show action includes every one
+of them (`app/controllers/events/public_events_controller.rb:38-56`): no
+upcoming-only window, no `limit`, no date pagination. `EventDateSerializer`
+serves them all.
+
+**Why it degrades:** a recurring event materialises a date per occurrence
+(`MaterializeRecurrenceJob`), so a weekly series running for a year returns ~52
+dates — past ones included — on every detail request. The recurring session rail
+then lists a year of ended sessions, the `choose_one` checkout date step offers
+them for selection, and the payload grows without bound. (Purchase is now gated
+by `Orders::EventDateEligibility`, so a past date cannot be *bought* — the harm is
+the listing/UX, not a sale.) The frontend can and does filter client-side
+(`isDatePast` in `src/lib/festival.ts`), but it receives data it must discard.
+
+**Fix:** scope the public projection to upcoming dates (`starts_at >= now` /
+`ends_at >= now`, with an organizer escape hatch), or add
+`GET /public/events/:slug/dates?from=&limit=`. Decide whether the count is capped
+independently of pagination.
+
+**Status: open — degrading (filed 2026-10-15; model + controller code read).**
 
 
 ### #54. Discovery availability has no backend source

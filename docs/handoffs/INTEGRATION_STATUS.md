@@ -49,6 +49,15 @@ shadow ring (ADR-0007), deduped the recurring rails' palette + centering effect,
 and documented that `ReminderToggle` is display-only until a backend reminder
 surface exists.
 
+**Backend gaps filed (same pass):** **#69** — the public products payload omits
+`date_allocations` (the model + serializer exist; the public controller/serializer
+never load or expose them), so a whole-festival pass can't be told from a
+single-day offer and `resolveFestivalSchedule` classifies tiers by **name**.
+**#70** — the public `event_dates` projection is unbounded and includes past
+dates, so a recurring series ships its whole history to the detail page and the
+`choose_one` date step. Both verified by code read; neither is workable around
+without inventing a classification.
+
 **Verified:** `tsc` clean · vitest **213/213** · build · Playwright **34/34**
 (incl. new `e2e/recurring.spec.ts` — 3 route-mocked tests).
 

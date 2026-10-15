@@ -206,6 +206,16 @@ sweep is the rule that prevents that.
   `lib/recurring.ts#resolveSeries` returns null without it). Broadens **#36**:
   `EventParticipant` already models a per-date link (`event_date_id`); expose it
   when the public lineup surface lands.
+- **#69** Public product payload omits `date_allocations`
+  (`Catalog::ProductDateAllocation` + its serializer exist, but the public
+  products controller/serializer never expose them) → a whole-festival pass
+  can't be told from a single-day offer, so `resolveFestivalSchedule` classifies
+  tiers by **name** (`pass`/`full`/`weekend`) — an invented classification
+  (ADR-0002).
+- **#70** Public `event_dates` is unbounded and includes past dates (no
+  upcoming window, no limit) → a recurring series returns its whole history on
+  every detail request; the frontend filters client-side (`isDatePast`) but the
+  session rail and the `choose_one` date step still receive it.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),
