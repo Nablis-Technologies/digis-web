@@ -64,6 +64,13 @@ export interface BackendEvent {
   price_from_minor?: number | null;
   event_lifecycle?: EventLifecycle;
   ticket_availability?: TicketAvailability;
+  /**
+   * Paid Featured placement label. Emitted **only** by the Featured serializer
+   * (`GET /public/featured_events`, and `GET /public/events?featured=true`); the
+   * plain list payload does not carry it, so a list-only read leaves `featured`
+   * absent — never inferred from `event_setting.config` (#53).
+   */
+  placement_label?: string;
   categories?: { id: string; name: string }[];
   event_dates?: BackendEventDate[];
   event_media?: BackendMedia[];
@@ -192,6 +199,10 @@ export function backendEventToEvent(be: BackendEvent): Event {
     // absent (ADR-0002) — never inferred client-side.
     ...(be.event_lifecycle ? { eventLifecycle: be.event_lifecycle } : {}),
     ...(be.ticket_availability ? { ticketAvailability: be.ticket_availability } : {}),
+    // Featured — a paid, rotating placement (its own public endpoint), not the
+    // removed `event_setting.config.featured` key (#53). The label is the
+    // backend's own statement; anything else stays absent.
+    ...(be.placement_label === "featured" ? { featured: true } : {}),
     // Co-organizers come from the live `event_organizations` association. The
     // event_setting.config projection no longer carries `organizers` (#53).
     ...(organizers.length > 0 ? { organizers } : {}),

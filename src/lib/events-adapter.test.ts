@@ -90,6 +90,15 @@ describe("backendEventToEvent", () => {
     expect(ev.ticketAvailability).toBeUndefined();
   });
 
+  it("maps the Featured placement label; absent on the plain list payload (#53)", () => {
+    // Only the Featured serializer emits `placement_label` (GET
+    // /public/featured_events, GET /public/events?featured=true).
+    expect(backendEventToEvent(wire({ placement_label: "featured" })).featured).toBe(true);
+
+    // The plain list serializer carries no label — absence stays absent.
+    expect(backendEventToEvent(wire()).featured).toBeUndefined();
+  });
+
   it("maps lineup from event_participants when served, absent when not", () => {
     const served = backendEventToEvent(
       wire({
