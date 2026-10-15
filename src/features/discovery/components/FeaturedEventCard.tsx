@@ -11,7 +11,7 @@ import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadge
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { AppButton } from '@/components/primitives/AppButton';
 import { eventActionLabel } from "@/lib/eventAction";
-import { cardFormat, cardDateRange } from "@/components/EventCard";
+import { cardFormat, cardDateRange, cardFormatLabel } from "@/components/EventCard";
 
 // Invite-only distinguisher accent — a fixed amber, matching the grid card so a
 // gated event reads the same everywhere in discovery.
@@ -98,7 +98,7 @@ export function FeaturedEventCard({
           )}
           {format !== "single" && (
             <div className="absolute top-5 right-5 translate-y-10">
-              <FormatTag format={format} label="MULTI-DAY" isDark size="md" />
+              <FormatTag format={format} label={cardFormatLabel(format)} isDark size="md" />
             </div>
           )}
           <div className="absolute bottom-3 left-5 right-5">

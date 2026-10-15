@@ -5,7 +5,7 @@ import { InfoStrip } from './InfoCards';
 import { LineupSection } from './LineupSection';
 import { OrganizerCard, OrganizerInline, resolveOrganizers } from './OrganizerSection';
 import { FormatTag } from '@/components/EventFormatBadges';
-import { cardFormat } from '@/components/EventCard';
+import { cardFormat, cardFormatLabel } from '@/components/EventCard';
 
 export function EventInfoRail({
   event,
@@ -27,7 +27,7 @@ export function EventInfoRail({
     >
       {format !== 'single' && (
         <div className="mb-4">
-          <FormatTag format={format} label="MULTI-DAY" isDark={isDark} size="md" />
+          <FormatTag format={format} label={cardFormatLabel(format)} isDark={isDark} size="md" />
         </div>
       )}
       <h1 className="tracking-[-1px] leading-[0.95]"

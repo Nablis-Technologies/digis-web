@@ -11,6 +11,7 @@ import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadge
 import { glassShadow } from "@/lib/ui/glass";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { eventEnded } from "@/lib/eventDates";
+import { isSeries } from "@/lib/recurring";
 import { eventActionLabel } from "@/lib/eventAction";
 import { availabilityMeta } from "@/lib/eventAvailability";
 
@@ -76,15 +77,27 @@ function monthDayOf(iso: string): { month: string; day: string } {
 }
 
 /**
- * Card format vocabulary. We only ever emit `single` or `multiDay` — the
- * backend surfaces no recurrence flag (ADR-0002: never invent), so `recurring`
- * is never produced here.
+ * Card format vocabulary. `recurring` is produced **only** when the backend
+ * serves a series signal (`isSeries` in `lib/recurring.ts`) — never inferred
+ * from the date count (ADR-0002: never invent).
  */
-export type CardFormat = "single" | "multiDay";
+export type CardFormat = "single" | "multiDay" | "recurring";
 
-/** Multi-day when the event has more than one scheduled date. */
-export function cardFormat(event: Pick<Event, "eventDates">): CardFormat {
+/** Series when the backend signals one, else multi-day when >1 date. */
+export function cardFormat(event: Pick<Event, "eventDates" | "recurrence" | "isRecurring">): CardFormat {
+  if (isSeries(event)) return "recurring";
   return (event.eventDates?.length ?? 0) > 1 ? "multiDay" : "single";
+}
+
+/**
+ * Uppercase label for a card format chip, e.g. "MULTI-DAY". A series reads
+ * "RECURRING" — the cadence word ("weekly") is not derivable from the public
+ * dates alone, so it is not claimed.
+ */
+export function cardFormatLabel(format: CardFormat): string {
+  if (format === "multiDay") return "MULTI-DAY";
+  if (format === "recurring") return "RECURRING";
+  return "";
 }
 
 /** Month/day range across an event's dates, e.g. { month: "AUG–SEP", range: "28–30" }. */
@@ -283,7 +296,7 @@ export function EventCard({
   const priceColor = isDark ? "#d6f905" : "#0a0a0a";
   const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
   const format = cardFormat(event);
-  const formatLabel = format === "multiDay" ? "MULTI-DAY" : "";
+  const formatLabel = cardFormatLabel(format);
   const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
   const showDayPasses = format === "multiDay";
 

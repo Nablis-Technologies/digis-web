@@ -9,7 +9,7 @@ import { AppButton } from '@/components/primitives/AppButton';
 import { Money } from '@/lib/money';
 import { glassEdgeReflection, glassReflection, type GlassReflectionSettings } from '@/lib/ui/glass';
 
-export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index, reflectionSettings }: { type: TicketTier; selected: boolean; onSelect: () => void; onJoinWaitlist?: () => void; index: number; reflectionSettings?: GlassReflectionSettings }) {
+export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index, reflectionSettings, savings }: { type: TicketTier; selected: boolean; onSelect: () => void; onJoinWaitlist?: () => void; index: number; reflectionSettings?: GlassReflectionSettings; savings?: { label: string } }) {
   const { isDark: pageIsDark } = useTheme();
   const isPremium = type.isPremium;
   const isElite = type.isElite;
@@ -183,6 +183,15 @@ export function TicketTypeCard({ type, selected, onSelect, onJoinWaitlist, index
               {isElite && <Crown className="w-2.5 h-2.5" strokeWidth={2} style={{ color: isDark ? '#e8c87a' : '#a9802a' }} />}
               {type.level}
             </span>
+            {/* Pass savings: bare text beside the level chip, in muted lime.
+                Suppressed when the early-bird `Save N%` chip already shows a
+                saving for the same tier — one savings chip per card. */}
+            {savings && savingsPct === 0 && (
+              <span className="text-[9px] tracking-[1.2px] uppercase tabular-nums whitespace-nowrap flex-shrink-0"
+                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? 'rgba(214,249,5,0.7)' : 'rgba(74,88,0,0.8)' }}>
+                {savings.label}
+              </span>
+            )}
             {isPremium && !isElite && (
               <Sparkle className="w-3 h-3" strokeWidth={1.5} style={{ color: accentColor, fill: `rgba(${accentRgb}, 0.3)` }} />
             )}
