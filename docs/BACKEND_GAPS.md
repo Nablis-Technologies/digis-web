@@ -564,6 +564,10 @@ can only flatten a series into a plain list of dates, and
 
 **Status: open — degrading (filed 2026-10-15; frontend renders multi-day as a flat day list — no invented series).**
 
+**Frontend follow-up (tracked):** `.scratch/recurring-ui/` — spec + ticket
+`01-recurring-session-wireup.md` (queued, `needs-triage`), to wire the session UI
+once this resolves.
+
 
 ### #54. Discovery availability has no backend source
 
