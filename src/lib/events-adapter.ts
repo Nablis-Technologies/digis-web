@@ -94,6 +94,15 @@ export interface BackendEvent {
     image?: string;
   }[];
   organization?: { id: string; name: string; slug?: string } | null;
+  /**
+   * Recurring-series signal (#68). The backend models + materialises recurrence
+   * (`Events::RecurrenceRule` + `MaterializeRecurrenceJob`) but the public
+   * payload carries **no series signal yet**, so this maps nothing today. The
+   * read is provisional and isolated here — when the backend fixes the wire
+   * location, only this adapter changes and the session UI lights up.
+   */
+  recurrence?: { rule_id?: string; rrule?: string; active?: boolean };
+  is_recurring?: boolean;
 }
 
 /**
@@ -188,6 +197,18 @@ export function backendEventToEvent(be: BackendEvent): Event {
     ...(organizers.length > 0 ? { organizers } : {}),
     // Lineup — only when the backend serves participants (#36).
     ...(lineup.length > 0 ? { lineup } : {}),
+    // Recurring-series signal (#68) — absent today; maps when the backend serves
+    // it so `lib/recurring.ts` mounts the session UI with no further change.
+    ...(be.recurrence
+      ? {
+          recurrence: {
+            ...(be.recurrence.rule_id ? { ruleId: be.recurrence.rule_id } : {}),
+            ...(be.recurrence.rrule ? { rrule: be.recurrence.rrule } : {}),
+            ...(typeof be.recurrence.active === "boolean" ? { active: be.recurrence.active } : {}),
+          },
+        }
+      : {}),
+    ...(typeof be.is_recurring === "boolean" ? { isRecurring: be.is_recurring } : {}),
   };
   // NOTE: `age_restriction` and `seat_map` have no public source after the
   // 2026-09-30 backend release and render absent (ADR-0002) — see #53.

@@ -206,6 +206,18 @@ export interface Event {
    *  event_date_id at registration). Display date/time derive from [0].
    *  `endsAt`/`status` drive the "event ended" purchase gate (eventEnded). */
   eventDates?: { id: string; startsAt: string; endsAt?: string; status?: string; name?: string }[];
+  /**
+   * Recurring-series signal (#68). The backend models + materialises recurrence
+   * (`Events::RecurrenceRule` + `MaterializeRecurrenceJob`) but the public
+   * payload carries **no series signal yet** — so this stays absent, and the
+   * recurring session UI (`lib/recurring.ts`) renders nothing (ADR-0002: never
+   * invent). The shape here is provisional and isolated to the adapter
+   * (`lib/events-adapter.ts`); when the backend fixes the wire location the
+   * adapter is the only place that changes.
+   */
+  recurrence?: { ruleId?: string; rrule?: string; active?: boolean };
+  /** Belt-and-braces series flag; `true` also marks an event as a series. */
+  isRecurring?: boolean;
   /** Purchasable event extras such as parking, merchandise, food, or digital access. */
   products?: EventProduct[];
   /** When set, buyers pick assigned seats during checkout. */
