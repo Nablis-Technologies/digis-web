@@ -7,6 +7,38 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-15c — seed issues pulled out of the gap list (seed-only)
+
+**Prompt:** "make sure we don't have seed issues reported as backend gaps."
+
+**Finding + fix (backend `chore(dev)` `ec36172d`, seed only — no product change):**
+
+- **#36 "venue half" was a seed task, not a gap.** Public `GET /venues/:id`
+  already serves `latitude`/`longitude` + ActiveStorage `profile`/`photos`; the
+  seed just never wrote them (all 23 venues → blank coords, `profile_url: null`,
+  `gallery_urls: []`). Fixed in `db/seeds_events.rb`: geo backfill (mirrors the
+  frontend's former `venueCoords.ts` for named venues, deterministic Addis
+  offset otherwise) + a profile and two gallery photos per venue. #36 is now
+  **lineup-only**; the venue history is recorded, not tracked as a gap.
+- **#44's seed evidence was stale.** `pazimo_seed.rb#attrs` still *computed* the
+  dead admission vocabulary (`event_type`, `rsvp_*`, `access_mode`, `invite_*`);
+  `seeds_events.rb` only ever wrote a non-admission whitelist, so none reached the
+  DB. Removed. #44 stays a backend gap (the config is inert + unwritable) — its
+  seed citation is gone.
+
+**Verified (live dev backend):** reseed clean; `GET /venues/:id` returns real
+coords + media; 23/23 venues with geo + profile + photos; the only distinct
+`event_setting.config` keys left are the non-admission mirror
+(`featured/rating/tickets_left/sold_out/seat_map/age_restriction/lineup/
+organizers/answer_edit_window_hours/price_foreign_from_minor/foreign_currency` +
+`public_guest_limit`); **no dead admission key anywhere**.
+
+**Filed as a seed task (not a gap):** the dev seed still has no genuinely
+multi-day or recurring event (`festival.spec.ts` / `recurring.spec.ts` are
+route-mocked because of it). Design + status in `DATA_INTEGRITY_AUDIT.md`.
+**Frontend follow-up (not done here):** switch `VenueMap` off the name→coords
+stopgap onto `GET /venues/:id` and render the photos.
+
 ## Session 2026-10-15b — recurring (weekly series) UI ported + wired (inert)
 
 **Wired (frontend only):** the recurring half of `ScheduleSections` is now ported

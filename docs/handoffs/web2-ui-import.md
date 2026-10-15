@@ -51,7 +51,11 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 
 - **FilterPanel** "Invite only" / "Free RSVP" chips — needs per-offer audience; the list
   payload currently exposes only free/paid.
-- **VenueMap** photos carousel (and venue image avatar) — needs images in `venue_summary`.
+
+_(Venue photos + a real map pin used to sit here. They were a **seed** omission, not a
+backend one: `GET /venues/:id` already served geo + media and the seed simply never
+populated them — fixed 2026-10-15 (see the readiness row). What remains is frontend
+wiring.)_
 
 ## Wire-up readiness (backend-blocked surfaces)
 
@@ -67,7 +71,7 @@ components first. The table is the whole remaining frontend cost per surface.
 | Recurring carousel / per-session view | same (#68) | `resolveSeries` (`lib/recurring.ts`) builds the whole view-model; `SessionCarousel`/`SessionSwitcher`/`SessionCalendarSheet`/`SessionWaitlist` ported and wired on `EventDetailPage` | **None** — lights up when the payload carries `recurrence` (or `is_recurring`). Per-session *ticket* scope is a separate gap (**#69**) |
 | Day-pass vs full-pass offers | `date_allocations` on the public products payload (**#69**) | `resolveFestivalSchedule` classifies a tier as a pass by **name** (`pass`/`full`/`weekend`) — invented (ADR-0002) | adapter reads the allocations; drop the name heuristic (small, once the field is served) |
 | Upcoming-only session dates | an upcoming window / pagination on the public `event_dates` (**#70**) | every date is served; `lib/festival.ts#isDatePast` filters client-side | **None** — the client already filters; the wire-up drops the discard |
-| Venue photos + real map pin | seed venue lat/lng + media (seed task, #36) | `VenueMap` takes a venue *name* only, uses the `venueCoords` stopgap, renders no photos | adapter must carry `venue.id` (already public on `event_dates[].venue`) + `VenueMap` hydrates via `GET /venues/:id` |
+| Venue photos + real map pin | nothing — `GET /venues/:id` serves geo + media, and the seed now populates them (fixed 2026-10-15) | `VenueMap` takes a venue *name* only, uses the `venueCoords` stopgap, renders no photos | **frontend only** now: carry `venue.id` (already public on `event_dates[].venue`) into `VenueMap`, hydrate via `GET /venues/:id`, drop `venueCoords.ts` |
 | `age_restriction` (Age card) | re-expose on the detail serializer (#53) | `EventInfoRail` + `EventDetailPage` already render `event.ageRestriction`; adapter maps nothing | 1 adapter line, **once the backend fixes the field location** (top-level vs `event_setting.config` is undecided) |
 | `featured` (discovery sort / pick) | re-expose (#53) | `useEventFilter` / `DiscoveryPage` / `lib/events.ts` read `event.featured`; adapter maps nothing | 1 adapter line, same location caveat |
 | `seat_map` (checkout step) | re-expose (#53) | `EventDetailPage` passes `event.seatMap` to checkout; adapter maps nothing | adapter line + confirm the wire shape matches `SeatMapConfig` |

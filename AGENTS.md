@@ -251,8 +251,11 @@ contract**. After ANY backend sync or change, sweep them before finishing:
 1. **New surface needs data to be exercisable?** Add a seed fixture — e.g. seller
    payouts need a verified destination + a positive ledger balance; gated offers
    need an `AccessCode`/`Invitation` row.
-2. **Removed/renamed a field the seeds still write?** Clean the seeds (the dead
-   `event_setting.config` `rsvp_*`/`event_type` keys are the current example).
+2. **Removed/renamed a field the seeds still write?** Clean the seeds. (The dead
+   `event_setting.config` `rsvp_*`/`event_type` keys were the example; the seeds no
+   longer write them — cleaned 2026-10-15, see `DATA_INTEGRITY_AUDIT.md`.) **Seed
+   omissions are fixed in the seed, never filed as backend gaps** — e.g. venue
+   geo/media (`GET /venues/:id` served them all along; the seed was empty).
 3. **Changed a slug/tier/account an e2e spec asserts?** Update the spec; prefer
    resolving data at runtime over hardcoding index-dependent pazimo slugs.
 4. **Does the dev seed delete the very fixtures a drill/test needs?** Reconcile

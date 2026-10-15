@@ -132,7 +132,7 @@
 | 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
 | 70 | open — degrading | public `event_dates` is unbounded and unfiltered (includes past dates) → a recurring series ships its entire history; the session rail/date step must discard it client-side |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
-| 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link; participants **do** model a per-date link — see #36 addendum). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
+| 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed in the seed 2026-10-15 |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
 | 1 | resolved 2026-09-30 | public `event_setting.config` is now `%w[public_guest_limit]` — the old "widen to 17 keys" ask is moot; the fields it held are covered by #53/#44 |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
@@ -913,14 +913,21 @@ that change has been reverted.
 ### #44. Event-level `event_setting.config` type/access keys are inert and unwritable
 
 `event_type`, `access_mode`, `invite_only_paid`, `rsvp_going`, `rsvp_capacity`,
-`allows_plus_one`, `max_guests`, `rsvp_requirements` are written only by dev seeds
-(`db/seeds_events.rb:587-599`, `db/pazimo_seed.rb:63,117-121`) and are **never read
-by any application code** — the only real gates are
+`allows_plus_one`, `max_guests`, `rsvp_requirements` are **never read by any
+application code** — the only real gates are
 `ticketing_ticket_types.audience` / `waitlist_enabled` / `approval_mode` and
 whether a product has a zero-amount price. There is **no API to read or write**
 `event_setting.config` (`Events::Create` writes `{}`; no EventSetting controller),
 and the two keys the public serializer *does* expose (`allow_waitlist`,
-`public_guest_limit`) are themselves never seeded or enforced.
+`public_guest_limit`) are themselves not enforced.
+
+**Seed note (not part of the gap):** these keys were only ever *written* by the
+dev seeds — and since the Composable Admission Selection release the mock-mirror
+has written a non-admission whitelist instead, so they never even reached the DB.
+`pazimo_seed.rb` still computed them until 2026-10-15; that dead computation is
+removed (a **seed cleanup**, recorded in `DATA_INTEGRITY_AUDIT.md` — a seed that
+writes inert keys is not a gap). The gap itself is entirely backend: the config is
+inert and unwritable.
 
 **Why it degrades:** the consumer frontend cannot distinguish `rsvp` /
 `inviteOnly` / `ticketed`, nor show going/capacity/plus-one — the event-level
@@ -1031,8 +1038,10 @@ What remains genuinely missing:
 - **event history per followable** — there is no `GET /organizations|venues|artists/:id/events`
   (see #49), so the organizer/venue/artist "upcoming/past" lists cannot be sourced;
   the fabricated lists were removed.
-- **venue stats/amenities** — `VenueSummarySerializer` has no media/coords (#36);
-  the venue sheet's followers/amenities/history were fabricated (still to remove).
+- **venue stats/amenities** — `VenueSummarySerializer` has no media/coords; the
+  venue is hydratable from public `GET /venues/:id` (the venue *media/coords* seed
+  task is done, 2026-10-15), but the summary itself carries neither and the venue
+  sheet's followers/amenities/history were fabricated (still to remove).
 - **profile gamification** — ProfilePage's tier/XP/events-attended/total-spent/
   achievements have no backend surface at all (product decision).
 
@@ -1292,40 +1301,25 @@ proven independently by re-sending a correctly HMAC-signed webhook.
    the ticket. Falls back to same-tab navigation if the popup is blocked.
    (`e2e/checkout.spec.ts` accepts either a popup or a redirect.)
 
-### #36. Public event payload lacks lineup/participants + venue media/coords
+### #36. Public event payload lacks lineup/participants (lineup only)
 
 `EventDetailSerializer` / `EventListSerializer` expose only categories,
 event_dates, event_media, event_organizations, event_setting, organization —
-**no event participants/artists**, and `venue_summary` is `{id,name,city}` only
-(**no photos or lat/lng**). This is a backend SERIALIZER gap: the frontend
-cannot source a lineup, venue photos, or a real map pin even with seed data
-present, so it renders **absent** (Lineup section hides, venue photos dropped,
-map falls back to a city-level default). **Seed side (frontend-owned):** the
-dev seeds do not yet populate `events_event_participants` / venue media — that
-is a seed task for when the backend exposes them, not a gap tracked here.
-
-**Correction 2026-10-02 — split:** the **venue media/coords half is
-frontend-fixable**: public `GET /venues/:id`
-(`app/controllers/events/venues_controller.rb:6-7`, `venue_detail_serializer.rb:5-8`)
-serves `latitude`/`longitude` and media, and `event_dates[].venue.id` is public,
-so the frontend can hydrate the venue. Only the **event participants/artists
-(lineup) half remains a backend gap** — there is no public event→artist link
+**no event participants/artists**. There is no public event→artist link
 (`events_event_participants` is auth-gated, `routes.rb:94`; `Events::Event` has no
-`artists` association).
+`artists` association), so the Lineup section renders **absent** even with seed
+data present. This is the whole of #36 — a backend SERIALIZER gap.
 
-**Correction 2026-10-03 — the venue half is now SEED-BLOCKED, not frontend-fixable.**
-Live verification (local `e6...`, authed `GET /venues` + `GET /venues/:id`): all 25
-seed venues return **blank `latitude`/`longitude`, `gallery_urls == []`,
-`profile_url == null`**. The API is correct; the seed never sets venue coords or
-attaches media (`rg latitude|longitude db/seeds` → 0 hits). So wiring the fetch
-cannot surface anything until the seed populates venue geo/media — a **seed task**,
-not frontend wiring. The frontend keeps its name→coords stopgap
-(`src/lib/utils/venueCoords.ts`) and should switch to `GET /venues/:id` once the
-seed carries the data.
+**Fix:** add `participants`/`artists` to the public event serializers (or a public
+participants endpoint). See the **#36 addendum** for the participant→date link.
 
-**Fix (backend, lineup only):** add `participants`/`artists` to the public event
-serializers (or a public participants endpoint). Venue media/coords: no backend
-change needed — **seed must populate coordinator lat/lng + photos**.
+**History — the "venue media/coords" half was never a backend gap.** It was split
+out 2026-10-02 (public `GET /venues/:id` already serves `latitude`/`longitude` +
+ActiveStorage `profile`/`photos`, and `event_dates[].venue.id` is public), then
+found SEED-BLOCKED 2026-10-03 (every seed venue returned blank coords /
+`profile_url: null` / `gallery_urls: []`). It was a **seed task, not a gap** and is
+now **fixed in the seed (2026-10-15)** — see `docs/handoffs/DATA_INTEGRITY_AUDIT.md`
+→ "Seed-side fixes (2026-10-15)". Nothing about the venue is tracked as a gap.
 
 ### #36 addendum — expose the participant→date link when the lineup goes public
 
@@ -1458,8 +1452,15 @@ archive.
 Every open gap above is backend serializer/code-level, not a seed problem. The
 mock-mirror seed writes everything the backend can possibly consume (full
 `event_setting.config` JSONB, `price_from_minor` via `Catalog::ProductPrice`,
-`requires_ticket` via product metadata); remaining seed-side TODO is populating
-`event_participants` + venue media once the backend exposes them (#36).
+`requires_ticket` via product metadata). **Venue geo/media was the one real seed
+omission — fixed 2026-10-15** (see `DATA_INTEGRITY_AUDIT.md`). The remaining
+seed-side TODO is populating `event_participants` once the backend exposes the
+lineup (#36) — a fixture with no public projection is invisible, so it waits.
+
+**Seed-side TODO (frontend-owned):** a genuinely **multi-day** event and a
+**recurring** series (the mock-mirror has neither — `festival.spec.ts` and
+`recurring.spec.ts` are route-mocked because of it). Design + status in
+`DATA_INTEGRITY_AUDIT.md` → "Seed-side fixes (2026-10-15)".
 
 **Seed-side TODO (frontend-owned, Phase 3):** ~~add a promotion + promo code
 fixture so `order_quotes.promotion_code` can be integration-tested.~~

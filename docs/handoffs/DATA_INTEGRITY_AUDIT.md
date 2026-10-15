@@ -116,3 +116,56 @@ Verified: tsc · vitest **145/145** · build · Playwright **28/28**; no
   not the shared buyer — no more parallel-login race with `checkout.spec`.
 - **Live drill:** `e2e/zz-live-seller-payout.spec.ts` (run `RUN_ZZ=1`) drives the
   real `/payouts` UI → real `pending` payout + balance drop.
+
+## Seed-side fixes (2026-10-15) — two deficiencies that sat *inside* gap entries
+
+Both were seed problems that had been written up as (or alongside) backend gaps.
+Fixed in the seed — backend `chore(dev)` commit `ec36172d` — and removed from
+`BACKEND_GAPS.md`. **A seed omission is never a gap** (see the header of
+`BACKEND_GAPS.md`); it lives here.
+
+**1. Venue geo + media were never seeded (was #36's "venue half").**
+Public `GET /venues/:id` serves `latitude`/`longitude` and ActiveStorage
+`profile`/`photos`, but no seed wrote any of them, so all 23 venues returned
+blank coords, `profile_url: null`, `gallery_urls: []` — every map pin and venue
+photo rendered absent. Fixed in `db/seeds_events.rb` (a backfill over all
+venues): coordinates mirror the frontend's former `venueCoords.ts` stopgap for the
+named venues, with a deterministic Addis-Ababa-area offset for the rest, plus a
+profile and two gallery photos per venue.
+Verified live: `GET /venues/:id` → real coords + media; 23/23 venues with geo +
+profile + photos.
+**Frontend follow-up:** switch `VenueMap`
+(`src/features/event-detail/components/VenueMap.tsx`) off the name→coords
+stopgap (`src/lib/utils/venueCoords.ts`) onto `GET /venues/:id`, and render the
+photos.
+
+**2. Dead admission vocabulary still computed in `pazimo_seed.rb#attrs` (cited by
+#44).** It computed `event_type`, `rsvp_*`, `access_mode`, `invite_*`,
+`allows_plus_one`, `max_guests`, but `seeds_events.rb` only ever wrote a
+non-admission whitelist, so none of them reached the DB. Removed (keeping the
+bookable-RSVP `tickets_left` and the product list, which do read `etype`).
+Verified: the only distinct `event_setting.config` keys left are
+`featured / rating / tickets_left / sold_out / seat_map / age_restriction /
+lineup / organizers / answer_edit_window_hours / price_foreign_from_minor /
+foreign_currency` (+ `public_guest_limit` on 2 events). No dead admission key
+remains anywhere.
+
+## Open seed task — no genuinely multi-day or recurring event (fixture, not a gap)
+
+`e2e/festival.spec.ts` and `e2e/recurring.spec.ts` are **route-mocked** because
+the dev seed has neither shape:
+
+- `resolveFestivalSchedule` (`src/lib/festival.ts`) needs **one** event with more
+  than one `EventDate`; every seed event has exactly one (multi-day is modelled as
+  separate "Day 2" events, e.g. `unity-in-beats-day-2`).
+- The recurring UI needs a `RecurrenceRule`; the engine exists (it is fully
+  modelled — see #68) but no event carries a rule in dev. `addis-music-fest-2026`
+  *did* carry a rule, but it is in `TEST_EVENT_SLUGS` and the mock-mirror deletes
+  it (deliberately — it polluted discovery).
+
+**Fix (dev setup):** add a fixture in `db/seeds/dev_demo.rb` — loaded last, so it
+is not purged — with a 3-date festival (per-day participants via `event_date_id`)
+and a weekly series whose rule is materialised. The **festival** half is visible
+immediately; the **recurring** half only renders once #68 lands (until then the
+seed is preparation, per the practice above).
+
