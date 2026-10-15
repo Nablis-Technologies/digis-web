@@ -116,6 +116,12 @@ export interface SelectedSeat {
 export interface EventArtist {
   name: string;
   handle?: string;
+  /**
+   * Backend `event_date_id` — pins a festival participant to one scheduled
+   * date; absent means event-level (shown on every day). Not yet in the public
+   * payload (#36) — the adapter maps it when the backend serves it.
+   */
+  eventDateId?: string;
   role?: string;
   time?: string;
   genre?: string;

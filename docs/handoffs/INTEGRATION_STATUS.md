@@ -28,7 +28,16 @@ route-mocked e2e coverage in `e2e/festival.spec.ts`.
   round-robins the roster across days (`resolveFestivalSchedule`) — an invented
   assignment (ADR-0002) to drop once #36 lands.
 
-**Verified:** `tsc` clean · vitest **192/192** · build · festival e2e **2/2**
+**Wire-up readiness prep.** The festival per-day path now prefers the backend
+participant→date link: the adapter carries `event_date_id` →
+`EventArtist.eventDateId`, and `resolveFestivalSchedule` groups by it
+(round-robin only as a fallback) — so the invented assignment disappears the
+moment the public lineup carries the link (a day the backend leaves empty now
+stays empty too, no roster resurrection). Every remaining backend-blocked
+surface and its exact wire-up step is tabulated in
+`docs/handoffs/web2-ui-import.md` → "Wire-up readiness".
+
+**Verified:** `tsc` clean · vitest **197/197** · build · festival e2e **2/2**
 (Playwright 31 deterministic).
 
 ## Session 2026-10-14 — G-14 (Profile Names) & G-47 (Avatar Management) wired

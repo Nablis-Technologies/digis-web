@@ -10,6 +10,8 @@ export type ScheduleArtist = {
   genre?: string;
   verified?: boolean;
   time?: string;
+  /** Backend `event_date_id` when the participant is pinned to one day (#36). */
+  eventDateId?: string;
 };
 
 export type CancelledDayAlertData = {
@@ -139,7 +141,13 @@ export function resolveFestivalSchedule(
     genre: a.genre,
     verified: a.verified,
     time: a.time,
+    eventDateId: a.eventDateId,
   }));
+
+  // When any participant carries a backend day link, distribute by that
+  // assignment; otherwise round-robin the roster across days (fallback).
+  const hasPinnedDays = artists.some((a) => a.eventDateId);
+  const knownDateIds = new Set(dates.map((d, i) => d.id || `day-${i + 1}`));
 
   const tiers = passedTiers ?? event.ticketTypes ?? [];
   const passTiers = tiers.filter((t) => {
@@ -209,13 +217,25 @@ export function resolveFestivalSchedule(
       inPass: !isCancelled && !isPast,
     });
 
-    // Distribute artists to days if artists have time or assign headliners
-    const dayArtists = artists.length > 0
-      ? artists.filter((_, idx) => (idx % dates.length) === i)
-      : [];
-    guestsByDay[dayId] = dayArtists.length > 0 ? dayArtists : artists;
+    // Per-day assignment (#36): pinned participants go to their day (event-level
+    // ones appear on every day); without a link, round-robin the roster.
+    const dayArtists = artists.length === 0
+      ? []
+      : hasPinnedDays
+        // A link that no longer resolves to a date on this event degrades to
+        // event-level rather than silently dropping the artist.
+        ? artists.filter((a) => !a.eventDateId || !knownDateIds.has(a.eventDateId) || a.eventDateId === dayId)
+        : artists.filter((_, idx) => (idx % dates.length) === i);
+    const dayRoster = dayArtists.length > 0
+      ? dayArtists
+      : hasPinnedDays
+        ? []
+        : artists;
+    guestsByDay[dayId] = dayRoster;
 
-    const headliner = dayArtists[0] ?? artists[i % Math.max(1, artists.length)];
+    const headliner = hasPinnedDays
+      ? dayArtists[0]
+      : dayArtists[0] ?? artists[i % Math.max(1, artists.length)];
 
     const dayTiers = (singleDayTiers.length > 0 ? singleDayTiers : tiers).map((t) => ({ tier: t }));
     tiersByDay[dayId] = dayTiers;
@@ -248,7 +268,7 @@ export function resolveFestivalSchedule(
             refundRows: [{ name: `Day ${i + 1} single-day ticket`, right: '100%' }],
           }
         : undefined,
-      lineup: dayArtists.length > 0 ? dayArtists : artists,
+      lineup: dayRoster,
     });
 
     agendaDays.push({
@@ -289,11 +309,13 @@ export function resolveFestivalSchedule(
 
 /**
  * The guests to surface for a picked day ("all" = everyone across the festival).
- * Falls back to the full roster when the day has no assigned guests, so the
- * strip never goes empty while the lineup still has people to show.
+ *
+ * `guestsByDay` already carries the resolved roster: for an unpinned event the
+ * resolver falls back to the full roster, and for a pinned one it leaves a day
+ * the backend assigned nobody to empty (ADR-0002 — absent stays absent). So an
+ * empty known day stays empty; only an *unknown* day id falls back to everyone.
  */
 export function guestsForDay(schedule: FestivalSchedule, dayId: string): ScheduleArtist[] {
   if (dayId === 'all') return schedule.allGuests;
-  const day = schedule.guestsByDay[dayId];
-  return day && day.length > 0 ? day : schedule.allGuests;
+  return schedule.guestsByDay[dayId] ?? schedule.allGuests;
 }

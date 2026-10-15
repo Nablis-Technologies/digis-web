@@ -106,4 +106,18 @@ describe("backendEventToEvent", () => {
     const absent = backendEventToEvent(wire());
     expect(absent.lineup).toBeUndefined();
   });
+
+  it("carries the per-date participant link when the backend serves it (#36)", () => {
+    const served = backendEventToEvent(
+      wire({
+        event_participants: [
+          { id: "p1", name: "Teddy Afro", role: "performer", event_date_id: "d2" },
+          { id: "p2", name: "Festival Host", role: "host" },
+        ],
+      }),
+    );
+    // A day-pinned participant carries its date id; an event-level one does not.
+    expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", eventDateId: "d2" });
+    expect(served.lineup?.[1]).not.toHaveProperty("eventDateId");
+  });
 });

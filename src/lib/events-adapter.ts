@@ -85,6 +85,8 @@ export interface BackendEvent {
     time?: string;
     genre?: string;
     verified?: boolean;
+    /** FK pinning the participant to one event date (#36) — not yet public. */
+    event_date_id?: string;
     followers?: number;
     eventsPlayed?: number;
     rating?: number;
@@ -135,6 +137,7 @@ export function backendEventToEvent(be: BackendEvent): Event {
   // the section then renders; absent stays absent (ADR-0002).
   const lineup: EventArtist[] = (be.event_participants ?? []).map((p) => ({
     name: p.name ?? "",
+    ...(p.event_date_id ? { eventDateId: p.event_date_id } : {}),
     ...(p.handle ? { handle: p.handle } : {}),
     ...(p.role ? { role: p.role } : {}),
     ...(p.time ? { time: p.time } : {}),

@@ -47,8 +47,8 @@ describe('resolveFestivalSchedule', () => {
 });
 
 describe('guestsForDay', () => {
-  // Minimal fixture: the adapter always fills guestsByDay, so build the shape
-  // by hand to pin the fallback rules precisely.
+  // Build the resolved shape by hand to pin the lookup rules precisely: `d2` is
+  // empty because the resolver emits [] for a day the backend assigned nobody to.
   const schedule = {
     allGuests: [{ name: 'All One' }, { name: 'All Two' }],
     guestsByDay: {
@@ -65,11 +65,65 @@ describe('guestsForDay', () => {
     expect(guestsForDay(schedule, 'd1')).toEqual([{ name: 'Day One' }]);
   });
 
-  it('falls back to everyone when the picked day has no guests', () => {
-    expect(guestsForDay(schedule, 'd2')).toEqual(schedule.allGuests);
+  it('keeps a known-but-empty day empty (no invented roster)', () => {
+    expect(guestsForDay(schedule, 'd2')).toEqual([]);
   });
 
   it('falls back to everyone for an unknown day id', () => {
     expect(guestsForDay(schedule, 'missing')).toEqual(schedule.allGuests);
+  });
+});
+
+describe('resolveFestivalSchedule — per-day participants', () => {
+  const base = {
+    category: 'Festivals',
+    eventDates: [
+      { id: 'd1', startsAt: '2026-12-10T14:00:00Z' },
+      { id: 'd2', startsAt: '2026-12-11T14:00:00Z' },
+    ],
+    ticketTypes: [],
+  };
+
+  it('round-robins the roster when participants carry no day link (fallback)', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      lineup: [{ name: 'A' }, { name: 'B' }],
+    });
+    expect(schedule!.guestsByDay['d1'].map((a) => a.name)).toEqual(['A']);
+    expect(schedule!.guestsByDay['d2'].map((a) => a.name)).toEqual(['B']);
+  });
+
+  it('honours the backend day assignment when participants carry eventDateId', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      lineup: [
+        { name: 'A', eventDateId: 'd1' },
+        { name: 'B', eventDateId: 'd2' },
+        { name: 'Host' }, // event-level → every day
+      ],
+    });
+    expect(schedule!.guestsByDay['d1'].map((a) => a.name).sort()).toEqual(['A', 'Host']);
+    expect(schedule!.guestsByDay['d2'].map((a) => a.name).sort()).toEqual(['B', 'Host']);
+  });
+
+  it('leaves a day empty when the backend assigns nobody to it', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      lineup: [{ name: 'A', eventDateId: 'd1' }],
+    });
+    expect(schedule!.guestsByDay['d1'].map((a) => a.name)).toEqual(['A']);
+    expect(schedule!.guestsByDay['d2']).toEqual([]);
+  });
+
+  it('treats a link to a date the event no longer carries as event-level', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      lineup: [
+        { name: 'A', eventDateId: 'gone' },
+        { name: 'B', eventDateId: 'd2' },
+      ],
+    });
+    expect(schedule!.guestsByDay['d1'].map((a) => a.name)).toEqual(['A']);
+    expect(schedule!.guestsByDay['d2'].map((a) => a.name).sort()).toEqual(['A', 'B']);
   });
 });
