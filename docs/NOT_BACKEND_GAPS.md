@@ -137,8 +137,9 @@ removed; `ChapaClient`/`ChapaPayoutClient` require `CHAPA_TEST_`/`CHAPA_LIVE_`
 key prefixes matching `CHAPA_MODE` (`chapa_client.rb:388-394`,
 `chapa_payout_client.rb:174-175`). The `PaymentSerializer` shape is unchanged,
 so no consumer wiring was needed beyond the dev `.env.chapa` key-format fix.
-Direct charge and `cbebirr`/`mpesa`/`awashbirr` are adapter capabilities, but
-the domain `PAYMENT_METHODS` enum is still `%w[telebirr card bank]` (see #17).
+Direct charge and `cbebirr`/`mpesa`/`awashbirr` are adapter capabilities; the
+domain `Orders::Payment::PAYMENT_METHODS` enum now includes `cbebirr` (resolved
+2026-10-16 — see `BACKEND_GAPS.md` #17).
 
 **Local-testing constraint (verified live 2026-09-15):** with a valid V2 test
 key, `POST /v2/payments/hosted` returns `400 invalid_format — "Callback URL must
@@ -324,11 +325,15 @@ when the buyer has no ticket (or no ticket in the order) for the event. A
 
 Product decisions, not bugs. Re-open only if requirements change.
 
-### #8-deferred. Auth: no Google / check-account / password-reset
+### Auth: no Google / check-account (deferred by design)
 
-Phone-OTP verification now EXISTS (guest claim flow, #14); Google / check-account
-/ password-reset remain removed from the UI. Add only if the product spec
-demands these flows.
+*(Formerly labelled `#8-deferred` — #8 itself is resolved 2026-10-16; `#57` now
+carries the missing password-reset endpoint.)*
+
+Phone-OTP verification now EXISTS (guest claim flow, #14; signup OTP, #56); Google
+and check-account remain removed from the UI. Add only if the product spec demands
+these flows. Password **reset** is a real gap (`BACKEND_GAPS.md` #57), not a
+product deferral.
 
 ### Consumer promos
 

@@ -92,6 +92,52 @@
 > too large). Local backend synced to `ed6309a` with dev setup preserved; the
 > stale organizer `attendee_export.request` grant from the old seed was removed.
 > No upstream change required new frontend wiring beyond #42.
+>
+> **Re-verified 2026-10-16 against `feat/launch-hardening-telemetry`** — the branch
+> behind backend **PR #37** (`origin` at `67e3a281`; local `HEAD` is origin + dev-only
+> `chore(dev)` seed commits, so every `app/` fix below is the backend dev's own
+> committed work). Every open item re-checked by code read **and** live HTTP against
+> the running `:3000`.
+>
+> **Newly resolved — 8 items (verified; most already frontend-wired):**
+> - **#17** `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`
+>   (`app/models/orders/payment.rb`); the CBE Birr option is enabled and sends
+>   `cbebirr` (`PaymentStep.tsx`). Residual: `Commercial::FeeComponent::PAYMENT_METHODS`
+>   is still `%w[telebirr card bank]`, so a fee component cannot be *scoped* to
+>   `cbebirr` (the default nil-scoped component applies) — no live impact.
+> - **#8** `Core::CurrentUserSerializer` serves `profile.first_name/last_name/full_name/
+>   avatar_url` (`aad3a903`); signup creates the profile. Frontend maps `full_name`.
+> - **#9** `resource :user, only: %i[show update]` → `GET`/`PATCH /user`
+>   (`config/routes.rb:11`). Frontend `me()`/`updateProfile()` wired.
+> - **#56** `Core::Signups::Complete` OTP-verifies the phone and **upgrades the shadow
+>   user** (`aad3a903`). Frontend `requestSignupOtp`/`verifySignupOtp`/`signUp` wired.
+> - **#47** gift purchase flow (`e5e3dc8d`, 2026-10-07): public
+>   `POST /public/gift_purchases/:id/resolve|claim`, `GET /orders/:order_id/gift_purchases`,
+>   resend, and a checkout gift intent. Frontend `gifts.ts`/`GiftTicketDialog`/`ClaimGiftPage`
+>   wired.
+> - **#58** the `active_checkout_exists` 409 now carries
+>   `meta.active_checkout { order_id, expires_at, payment, order_access_token }`
+>   (`Orders::ActiveCheckoutRecovery`, `b1d6e86f`).
+> - **#61** an **in-app `transfer_incoming`** notification now fires on transfer
+>   initiation for `to_user` (`Messaging::OutboxHandlers::PublishTransactionalNotification`
+>   `EVENT_TYPES` + `notification_types.rb:121`). Residual: no incoming-transfers list
+>   endpoint (the notification + the authenticated `POST /ticket_transfers/:id/accept`
+>   cover discovery).
+> - **#62** `Ticketing::TicketWalletSerializer` serves
+>   `pending_transfer { id, status, expires_at }`.
+>
+> **Still open:** blocking — #53, #57, #60, #65. Degrading — #36, #44, #46, #48, #49,
+> #50, #51, #67, #68, #69, #70.
+>
+> **Corrections to open entries:** **#49** pagination **is** served now
+> (`Core::Pagination`; `page`/`per_page` + `pagination` meta) — only search/filter/sort
+> and events-by-* are missing. **#46** follows to venues/artists/organizations **do**
+> exist (`config/routes.rb:81`) — only saved/feed/reviews are missing. **#50**
+> `GET /registrations/:id` exists (`resources :registrations, only: :show`).
+>
+> **Frontend-wiring sweep:** #17/#8/#9/#56/#47 are **already consumed** by the app
+> (no work owed). #58, #61 and #62 have a status change the frontend should consume →
+> tracked in `.scratch/gap-wiring-2026-10-16/`.
 
 ## Status key
 
@@ -104,37 +150,39 @@
 
 ## At a glance
 
+Open items are listed first; resolved items below (sections keep an in-place
+`— RESOLVED <date>` marker further down).
+
 | # | Status | Summary |
 |---|---|---|
-| 17 | open — blocking | persisted enum `PAYMENT_METHODS = %w[telebirr card bank]` rejects `cbe`/`cbebirr` (the Chapa adapter already advertises `cbebirr`) |
-| 56 | open — blocking | signup can't take over an existing (shadow) phone → a guest who bought a ticket can never create an account ("Phone has already been taken") |
-| 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
 | 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `rating`; lineup → #36). (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
-| 8 | open — blocking | no user `name` column / serializer field (signup now sends `name` — silently dropped) |
-| 9 | open — degrading | no self-service `PATCH /auth/me` |
-| 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
-| 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
-| 54 | resolved 2026-10-15 | discovery availability served — `GET /public/events` carries `ticket_availability` + `event_lifecycle` per event; frontend wired (`eventAvailability` → SOLD OUT badge, verified live) |
-| 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), reviews/ratings, or user social graph |
-| 47 | open — degrading | no gift-ticket endpoint (the UI fabricates a `#gift` link) |
-| 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change/reset |
-| 49 | open — degrading | `GET /public/events` has no search/filter/sort/pagination; no events-by-organizer/artist/venue |
-| 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/registration/transfer history, unread-count/mark-all-read |
-| 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
-| 58 | open — degrading | `active_checkout_exists` 409 carries no order id and there is no buyer-scoped order lookup → the client can't resume/discard the open checkout |
+| 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
 | 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
-| 61 | open — degrading | a pending ticket transfer is invisible in-app: no notification on initiation and no way to list incoming transfers (only the SMS/email claim link) |
-| 62 | open — degrading | a ticket with a pending (unaccepted) outgoing transfer is indistinguishable from a normal active ticket in the sender's wallet |
-| 63 | resolved 2026-10-05 | G-41 mixed ticket + add-on checkout implemented (backend commits `b157e36`, `d5a8320`); frontend wired in `admissionModule` & `useCheckoutFlow` |
-| 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
-| 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
+| 36 | open — degrading | public payload lacks event participants/lineup — a backend **serializer** gap (no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`) |
+| 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
+| 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), or reviews/ratings. Follows to **venues/artists/organizations** *do* exist (`config/routes.rb:81`, `GET /users/:id/following`) |
+| 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change (notification-channel prefs exist; account prefs do not) |
+| 49 | open — degrading | `GET /public/events` has **pagination** (`Core::Pagination`) but no search/filter/sort; no events-by-organizer/artist/venue; no city aggregation |
+| 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/transfer history, unread-count/mark-all-read (`GET /registrations/:id` **does** exist) |
+| 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
 | 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
 | 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
-| 70 | open — degrading | public `event_dates` is unbounded and unfiltered (includes past dates) → a recurring series ships its entire history; the session rail/date step must discard it client-side |
-| 36 | open — degrading | public payload lacks event participants/lineup — a backend **serializer** gap (no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`) |
-| 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
+| 70 | open — degrading | public `event_dates` is unbounded and unfiltered (no upcoming window/limit) → a recurring series ships its whole set; the session rail/date step must discard it client-side |
+| 17 | resolved 2026-10-16 | `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`; the CBE Birr option is enabled and sends `cbebirr`. (Residual: `Commercial::FeeComponent::PAYMENT_METHODS` still omits it — no live impact.) |
+| 8 | resolved 2026-10-16 | auth payload serves `profile.full_name` (`Core::CurrentUserSerializer`); signup creates the profile |
+| 9 | resolved 2026-10-16 | `GET/PATCH /user` self-service profile (`resource :user, only: %i[show update]`) |
+| 47 | resolved 2026-10-16 | gift purchase flow — `POST /public/gift_purchases/:id/resolve\|claim`, checkout gift intent, `GET /orders/:order_id/gift_purchases` + resend |
+| 56 | resolved 2026-10-16 | signup OTP-verifies the phone and **upgrades** an existing shadow user (`Core::Signups::Complete`) |
+| 58 | resolved 2026-10-16 | the `active_checkout_exists` 409 now carries `meta.active_checkout { order_id, expires_at, payment, order_access_token }` |
+| 61 | resolved 2026-10-16 | in-app `transfer_incoming` notification fires on initiation for `to_user` (carries `transfer_id`). (Residual: no incoming-transfers list endpoint.) |
+| 62 | resolved 2026-10-16 | wallet ticket serves `pending_transfer { id, status, expires_at }` |
+| 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
+| 54 | resolved 2026-10-15 | discovery availability served — `GET /public/events` carries `ticket_availability` + `event_lifecycle` per event; frontend wired (`eventAvailability` → SOLD OUT badge, verified live) |
+| 63 | resolved 2026-10-05 | G-41 mixed ticket + add-on checkout implemented (backend commits `b157e36`, `d5a8320`); frontend wired in `admissionModule` & `useCheckoutFlow` |
+| 64 | resolved 2026-10-01 | resale default now uses the served resale cap (exact for the standard 100% policy); the acquisition field isn't needed |
+| 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
 | 33 | resolved 2026-09-30 | guest payment resolves via `order_access_token` (`ResolveGuestOrderAccess`) |
 | 34 | resolved 2026-09-30 | `Orders::EventDateEligibility` gates `BuildQuote` + `CreateCheckout` |
 | 37 | resolved 2026-09-30 | offer-scoped public waitlist endpoint exists |
@@ -145,36 +193,44 @@
 | 45 | resolved 2026-09-30 | per-offer sold-out → `waitlist_available` + offer waitlist |
 | 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) — the dev tunnel/config is setup (`NOT_BACKEND_GAPS.md`) |
 | 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
+| 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
 
 ---
 
 ## Open — blocking
 
 These items block a frontend feature. Each entry: what's missing (file + fields),
-why it matters, and a concrete fix.
+why it matters, and a concrete fix. (Resolved entries are retained in place with a
+`— RESOLVED <date>` heading marker for history; the table above is authoritative.)
 
-### #17. `cbe` is not a valid backend payment method
+### #17. `cbe` is not a valid backend payment method — RESOLVED 2026-10-16
 
-Frontend `PaymentMethod = 'telebirr' | 'cbe' | 'card'`; the persisted enum
-`Commercial::FeeComponent::PAYMENT_METHODS = %w[telebirr card bank]`
-(`app/models/commercial/fee_component.rb:23`), inherited by `Orders::Payment`
-(`app/models/orders/payment.rb:13`, validated `:49`), rejects it at
-`app/services/orders/payment_attempt_support.rb:28`. Selecting CBE Birr →
-`422 invalid_payment_method`.
+Frontend `PaymentMethod = 'telebirr' | 'cbebirr' | 'card'`; the persisted enum
+`Orders::Payment::PAYMENT_METHODS` now reads `%w[telebirr card bank cbebirr]`
+(`app/models/orders/payment.rb`), so the payment-method gate at
+`app/services/orders/payment_attempt_support.rb:28`
+(`Payment::PAYMENT_METHODS.include?(payment_method)`) accepts `cbebirr`, which the
+Chapa adapter already advertises. The CBE Birr option is enabled in the UI and
+sends the canonical `cbebirr` (`PaymentStep.tsx:25`).
 
-**Correction 2026-10-02:** the earlier claim that the Chapa adapter capabilities
-are `%w[telebirr card bank]` is **stale** — `app/services/payments/providers/registration.rb:33`
-now advertises `%w[telebirr cbebirr mpesa awashbirr ebirr enat_bank card bank]`
-(direct charge: `telebirr cbebirr mpesa awashbirr`). The only blocker is the
-persisted enum, which rejects **both** `cbe` and `cbebirr` even though the
-adapter supports `cbebirr`. So the fix is a one-line enum widening, not an
-adapter change.
+**Residual (no live impact):** `Commercial::FeeComponent::PAYMENT_METHODS`
+(`app/models/commercial/fee_component.rb`) is still `%w[telebirr card bank]`, so a
+*fee component* cannot be scoped to `cbebirr` (the default `payment_method: nil`
+component applies to all methods).
 
-**Fix:** add `"cbe"`/`"cbebirr"` to `PAYMENT_METHODS` (and any organizer-facing
-`payment_method` enum). The frontend's CBE button is currently disabled as a
-workaround.
+**History:** the original filing cited the persisted enum
+`%w[telebirr card bank]` rejecting `cbe`/`cbebirr`.
 
-**Status: open — verified 2026-10-02 (enum confirmed; adapter evidence corrected).**
+**Correction 2026-10-02 (retained):** the earlier claim that the Chapa adapter
+capabilities are `%w[telebirr card bank]` was **stale** —
+`app/services/payments/providers/registration.rb:33` advertises
+`%w[telebirr cbebirr mpesa awashbirr ebirr enat_bank card bank]` (direct charge:
+`telebirr cbebirr mpesa awashbirr`). The fix was indeed a one-line enum widening,
+not an adapter change — now landed.
+
+**Status: resolved 2026-10-16** — `Orders::Payment::PAYMENT_METHODS` includes
+`cbebirr` and the frontend sends it (CBE Birr enabled). Original filing 2026-10-02
+(enum confirmed; adapter evidence corrected).
 
 ### #40. Abandoned checkouts never expire → `active_checkout_exists` blocks all later checkouts — RESOLVED 2026-09-30
 
@@ -228,7 +284,13 @@ elapsed-grace payment (`action: :reconcile_grace`) / releases the stale order
 instead of raising, so the sweep no longer aborts. The residual "the 409 carries
 no order id" ask (the optional fix above) is filed separately as **#58**.
 
-### #43. RSVP rejects `access_code` / `invitation_token` → audience-gated RSVP is impossible
+### #43. RSVP rejects `access_code` / `invitation_token` → audience-gated RSVP is impossible — RESOLVED 2026-09-30
+
+> **Resolved.** The `Ticketing::PublicRsvpsController` this entry describes was
+> **deleted** in the composable-admission release; free gated admission now goes
+> through `POST /public/events/:slug/admission_selections`, which accepts
+> `audience_proof { access_code, invitation_token }` (`config/routes.rb:148-149`,
+> `Orders::AdmissionSelections::Create`). Kept below as history.
 
 `Ticketing::PublicRsvpsController#create` permits only
 `ticket_type_id, phone, verification_token, package_quantity,
@@ -248,6 +310,9 @@ RSVP flow at all — the code/token is never accepted.
 
 **Fix:** permit and forward `access_code` / `invitation_token` on both RSVP
 endpoints and pass them through as `audience_proof` to `Registrations::Submit`.
+
+**Status: resolved 2026-09-30** — superseded by the composable admission selection;
+`admission_selections` accepts `audience_proof`. Original filing 2026-09-30.
 
 ---
 
@@ -282,7 +347,17 @@ Featured endpoint — see the Resolved archive) — filed 2026-09-30 (verified
 against `326f6a3` by code read + live `GET /public/events/:slug` →
 `event_setting.config == {}`).**
 
-### #56. Signup cannot take over an existing (shadow) phone
+### #56. Signup cannot take over an existing (shadow) phone — RESOLVED 2026-10-16
+
+**Resolved by `Core::Signups::Complete` (`aad3a903`, 2026-10-11).** Signup is now
+**phone-OTP-verified** (`POST /auth/signup/request_otp` →
+`POST /phone_verifications/:id/verify` → `POST /auth/signup` with
+`verification_token`) and, on a proven phone that already owns a **shadow** user,
+**upgrades it** ("Claims the phone identity proven by a signup-purpose OTP and
+upgrades its shadow user without changing the identity referenced by guest
+purchases") rather than failing uniqueness. The frontend is wired
+(`src/lib/auth.ts` `requestSignupOtp`/`verifySignupOtp`/`signUp`). The original
+description is kept below as history.
 
 A guest checkout creates a **shadow `Core::User`** bound to the buyer's phone
 (`Core::PhoneIdentity::ResolveGuest`; phone-confirmed, no password, unverified).
@@ -321,7 +396,9 @@ signup and claim disagree about what "the phone" means.
 This single change fixes "Phone has already been taken" after a guest purchase
 AND removes anonymous phone signup.
 
-**Status: open — filed 2026-09-30 (code read + reported UX).**
+**Status: resolved 2026-10-16** — signup OTP-verifies the phone and upgrades the
+shadow user (`Core::Signups::Complete`, `aad3a903`); frontend wired. Original
+filing 2026-09-30 (code read + reported UX).
 
 ### #57. No password reset / forgot-password
 
@@ -422,7 +499,7 @@ request-shaping test asserting the `/v2/payouts` payload.
 
 Work but suboptimal; the frontend mitigates. Fixing these improves correctness.
 
-### #66. Seller listing wire omits `ticket_id` — the wallet can't tell which tickets are already listed
+### #66. Seller listing wire omits `ticket_id` — the wallet can't tell which tickets are already listed — RESOLVED 2026-10-05
 
 `Marketplace::ResaleListingSerializer`
 (`app/serializers/marketplace/resale_listing_serializer.rb:10-16`) exposes `id,
@@ -577,32 +654,36 @@ every date (today's implicit behaviour).
 **Status: open — degrading (filed 2026-10-15; controller + serializer + `structure.sql` code read).**
 
 
-### #70. Public `event_dates` is unbounded and includes past dates — a recurring series ships its whole history
+### #70. Public `event_dates` is unbounded and unfiltered (no upcoming window) — a recurring series ships its whole set
 
 `Events::Event` has an unscoped `has_many :event_dates`
 (`app/models/events/event.rb:32-33`) and the public show action includes every one
 of them (`app/controllers/events/public_events_controller.rb:38-56`): no
-upcoming-only window, no `limit`, no date pagination. `EventDateSerializer`
-serves them all.
+upcoming-only window, no `limit`, no date pagination, no `from`/`to` param.
+`EventDateSerializer` serves them all.
 
 **Why it degrades:** a recurring event materialises a date per occurrence
-(`MaterializeRecurrenceJob`), so a weekly series running for a year returns ~52
-dates — past ones included — on every detail request. The recurring session rail
-then lists a year of ended sessions, the `choose_one` checkout date step offers
-them for selection, and the payload grows without bound. (Purchase is now gated
-by `Orders::EventDateEligibility`, so a past date cannot be *bought* — the harm is
-the listing/UX, not a sale.) The frontend can and does filter client-side
-(`isDatePast` in `src/lib/festival.ts`), but it receives data it must discard.
+(`MaterializeRecurrenceJob`), so a long-running weekly series returns every
+materialised date on every detail request — the payload grows without bound and
+the recurring session rail / `choose_one` date step must discard what they cannot
+show. Verified live 2026-10-16: `GET /public/events/thursday-jazz-sessions` → all
+**7** materialised dates, with no way to ask for a window. (Purchase is gated by
+`Orders::EventDateEligibility`, so a past date cannot be *bought* — the harm is
+the listing/UX, not a sale. The seeded series happens to be all-future, so the
+past-date half is inferred from the missing filter, not demonstrated on this
+fixture.) The frontend filters client-side (`isDatePast` in `src/lib/festival.ts`)
+but receives data it must discard.
 
 **Fix:** scope the public projection to upcoming dates (`starts_at >= now` /
 `ends_at >= now`, with an organizer escape hatch), or add
 `GET /public/events/:slug/dates?from=&limit=`. Decide whether the count is capped
 independently of pagination.
 
-**Status: open — degrading (filed 2026-10-15; model + controller code read).**
+**Status: open — degrading (filed 2026-10-15; model + controller code read;
+re-verified live 2026-10-16).**
 
 
-### #54. Discovery availability has no backend source
+### #54. Discovery availability has no backend source — RESOLVED 2026-10-15
 
 `EventListSerializer` (`app/serializers/events/public/event_list_serializer.rb`)
 exposes `price_from_minor` but **no availability**: the old `sold_out` /
@@ -685,7 +766,13 @@ paid tickets in the event currency). **Frontend wired:** `tickets.ts` maps it to
 amount for both fixed and percentage caps (falling back to the old percent-rule
 text only when the field is absent).
 
-### #39. No public endpoint exposing payout `bank_slug`s
+### #39. No public endpoint exposing payout `bank_slug`s — RESOLVED 2026-09-30
+
+**Resolved** — `GET /marketplace/seller/payout_accounts/destinations`
+(`config/routes.rb:348-349`, `get :destinations, on: :collection`) serves the
+provider's destinations, and `Marketplace::SellerPayoutAccount::TYPES` was widened
+to `%w[bank mobile_money]`. The frontend fetches the list instead of hardcoding
+slugs (`src/lib/payout.ts`). Kept below as history.
 
 Chapa V2 payout-registration requires a top-level `bank_slug`
 (`Marketplace::VerifyPayoutAccount` requires `bank_slug`, validates it against
@@ -720,13 +807,9 @@ against this backend/provider, and the sole working destination is Chapa's
 `link` rail. Two backend-side issues combine: the `TYPES` allow-list is narrower
 than the provider's own `type` values, and there is no discovery endpoint.
 
-**Status: open — verified 2026-09-18 (live 422/201 pair + serializer read).**
-This is a **backend product change** (new endpoint + widened `TYPES` + migration
-/ constraint), so the backend developer must make it — see the rule in
-`AGENTS.md`. A local, uncommitted implementation exists in `digis_backend`
-(`seller_payout_accounts_controller#banks`, `TYPES` widened, `config/routes.rb`,
-migration + `structure.sql`), but an uncommitted local patch does **not** resolve
-a gap; only the backend dev's committed change does.
+**Status: resolved 2026-09-30** — the `destinations` collection endpoint exists and
+`TYPES = %w[bank mobile_money]`; frontend wired. Original filing 2026-09-18 (live
+422/201 pair + serializer read).
 
 **Needed from the backend dev:**
 - `GET /marketplace/seller/payout_accounts/banks` (seller-scoped) returning the
@@ -739,7 +822,15 @@ a gap; only the backend dev's committed change does.
 the list instead of hardcoding slugs) — the payout-methods flow therefore depends
 on this gap landing.
 
-### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column
+### #8. `UserAuthSerializer` lacks `name`; no `Core::User.name` column — RESOLVED 2026-10-16
+
+**Resolved by `aad3a903` (2026-10-11).** `Core::UserAuthSerializer` was renamed to
+`Core::CurrentUserSerializer` and now embeds a profile:
+`has_one :profile, serializer: Core::UserProfileSerializer` exposing `first_name`,
+`last_name`, **`full_name`** and `avatar_url`; `Core::Signups::Complete` creates the
+`Core::UserProfile` from the signup names. The frontend maps `profile.full_name`
+(`src/lib/auth.ts`) and no longer fabricates a display name. The original
+description is kept below as history.
 
 `Core::UserAuthSerializer` returns `id, email, phone, verified_at, created_at,
 updated_at, permissions` only (`app/serializers/core/user_auth_serializer.rb:3`)
@@ -757,20 +848,30 @@ typed. Display name is then a fabricated email-local-part/phone derivative.
 **Fix:** add a `name` column to `core_users` and `name` to
 `Core::UserAuthSerializer`, and permit `:name` on signup (optionally require it).
 
-**Status: open — blocking (filed 2026-09-09; the signup form now sends `name`
-as of 2026-09-19, verified against `auth_controller.rb:141` + the serializer).**
+**Status: resolved 2026-10-16** — the auth payload serves `profile.full_name`
+(`Core::CurrentUserSerializer`) and signup creates the profile; frontend wired.
+Original filing 2026-09-09.
 
-### #9. No self-service `PATCH /auth/me` or `PATCH /users/me`
+### #9. No self-service `PATCH /auth/me` or `PATCH /users/me` — RESOLVED 2026-10-16
 
-Routes expose only `GET auth/me` (`config/routes.rb:10`) — no update endpoint.
-Settings profile-edit UI is display-only.
+**Resolved by `resource :user, only: %i[show update], controller: "users"`
+(`config/routes.rb:11`, `scope module: :core`)** → `GET /user` (read) and
+`PATCH /user` (update first_name/last_name), plus `PUT/DELETE /user/avatar`. Note
+`GET /auth/me` itself was **retired** (replaced by `GET /user`). The frontend is
+wired (`src/lib/auth.ts` `me()` → `GET /user`, `updateProfile()` → `PATCH /user`).
+The original text is kept below as history.
 
-**Fix:** add an auth-bounded update endpoint guarded by `Core::Authorizable`;
-needs the `name` column (#8) for the same payload.
+Original text (history): *"Routes expose only `GET auth/me` — no update endpoint."*
+That is stale — `GET /auth/me` has been retired and `GET`/`PATCH /user` now exist.
 
-**Status: open — verified 2026-09-09.**
+**Status: resolved 2026-10-16** — `GET/PATCH /user` exists; frontend wired.
+Original filing 2026-09-09.
 
-### #33. Guest payment-refresh re-validates the quote token even for accepted payments
+### #33. Guest payment-refresh re-validates the quote token even for accepted payments — RESOLVED 2026-09-30
+
+**Resolved** — `Orders::ResolveGuestOrderAccess` prefers an `order_access_token`
+(`GuestOrderAccessToken`, purpose `orders.guest_order_access`) and only falls back
+to the quote token. Kept below as history.
 
 `Orders::GuestPaymentRefreshController#create` re-decodes `GuestQuoteToken`
 (`guest_payment_refresh_controller.rb:19-21`) before reconciling. The token
@@ -799,9 +900,16 @@ remain the recovery path.
 durable proof); don't count `invalid_guest_quote` on accepted payments toward
 the guest throttle.
 
-**Status: open — verified 2026-09-09.**
+**Status: resolved 2026-09-30** — `ResolveGuestOrderAccess` accepts an
+`order_access_token`; the guest return screen correlates creds per payment.
+Original filing 2026-09-09.
 
-### #34. Past events remain purchasable — no date / sales-window enforcement
+### #34. Past events remain purchasable — no date / sales-window enforcement — RESOLVED 2026-09-30
+
+**Resolved** — `Orders::EventDateEligibility.error_for` now gates both
+`Orders::BuildQuote` (quote) and `Orders::CreateCheckout#validate_event_date_eligibility!`
+(order), and the product sales window is enforced at
+`Catalog::Inventory::Reserve#validate_sales_window!`. Kept below as history.
 
 The quote → order → payment path never checks the event date or the product
 sales window. `Orders::BuildQuote#normalize_item_request`
@@ -838,9 +946,9 @@ badge.
 remains is the event-date gate. Optionally auto-mark dates `completed` when
 `ends_at` passes and/or filter `publicly_visible` to events with a future date.
 
-**Status: open (partial) — re-verified 2026-09-21.** The product sales window is
-enforced online; the event-date / `completed` gate is still absent, so a
-finished published event remains quotable and payable.
+**Status: resolved 2026-09-30** — the event-date gate now runs in `BuildQuote` +
+`CreateCheckout` (`Orders::EventDateEligibility`); the product sales window is
+enforced online. Original filing 2026-09-09 (re-verified partial 2026-09-21).
 
 ### #44. Event-level `event_setting.config` type/access keys are inert and unwritable
 
@@ -871,7 +979,13 @@ and expose it (extend `PUBLIC_CONFIG_KEYS`, read it in the RSVP/invite gates) an
 make it organizer-writable. If no, drop the inert keys so they stop implying a
 contract.
 
-### #45. RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored
+### #45. RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored — RESOLVED 2026-09-30
+
+**Resolved** — a sold-out selection now returns
+`next_action.type: "waitlist_available"` (+ `event_product_ids`), and the
+offer-scoped public waitlist exists
+(`POST /public/events/:slug/admission_offers/:product_id/waitlist` +
+`/request_otp`, `config/routes.rb:150-153`). Kept below as history.
 
 RSVP capacity is enforced only implicitly by `Catalog::Inventory::Reserve`
 (`app/services/ticketing/registrations/support.rb:32-40`); a full RSVP surfaces as
@@ -887,15 +1001,18 @@ RSVP section currently renders "At capacity · Waitlist open" with no action.
 auto-enqueue (or expose capacity/going counts so the frontend can render
 honestly). Related: #37 (no public waitlist-join endpoint).
 
-### #46. No saved-events / favourites, home feed, reviews, or social graph
+### #46. No saved-events / favourites, home feed, or reviews/ratings
 
 `POST/DELETE /events/:id/save` + `GET /saved_events` do not exist (no
 saved/wishlist/favourite table). The **`GET /feed` route is declared but broken**:
-`config/routes.rb` points it at `core/feed#index`, yet there is **no
-`app/controllers/core/feed_controller.rb`**. There is no consumer review/rating
-endpoint (`core_reviews` is the organizer-verification workflow), and no
-user-to-user follow/friends/suggestions (follows are one-directional to
-`venues|artists|organizations` only).
+`config/routes.rb:527` points it at `feed#index`, yet there is **no
+`app/controllers/feed_controller.rb`**. There is no consumer review/rating
+endpoint (`core_reviews` is the organizer-verification workflow).
+
+**Correction 2026-10-16:** a user social graph **does** exist — follows target
+`venues|artists|organizations` (`config/routes.rb:81`) with
+`GET /users/:id/following`, consumed by `src/lib/follows.ts`. What is missing is
+only a *follows-based feed* (see `GET /feed` above) and a *user-to-user* graph.
 
 **Frontend today:** the event hero heart is local-only (`EventDetailPage.tsx`),
 and Profile/RSVP render fabricated "suggested friends" (now removed) — nothing
@@ -904,38 +1021,59 @@ persists.
 **Fix:** a saved-events table + routes; implement `Core::FeedController` (or drop
 the route); a consumer reviews endpoint; optional social graph.
 
-### #47. No gift-ticket endpoint
+### #47. No gift-ticket endpoint — RESOLVED 2026-10-16
 
-There is no `POST /tickets/:id/gift` or gift-claim flow anywhere in the backend.
-`GiftTicketDialog.tsx` fabricates a client-side `#gift/<id>` link and its `onSend`
-is never invoked — a re-skinned transfer with a dead link.
+**Resolved by `e5e3dc8d` (2026-10-07, "Implement gift purchase management").** A
+full gift flow exists:
 
-**Fix (if the product wants gifting):** a gift command + a public claim flow
-(like transfers), or remove the gift entry point.
+- buyer: a checkout **gift intent** (`Orders::CreateCheckout` →
+  `invalid_gift_intent` guard) creates a gift purchase, listed via
+  `GET /orders/:order_id/gift_purchases` with `POST .../:id/resend`;
+- recipient: `POST /public/gift_purchases/:id/resolve` (peek) and
+  `POST /public/gift_purchases/:id/claim` (bearer token in the body; every
+  response private/non-cacheable).
+
+The frontend is wired: `src/lib/gifts.ts`, `GiftTicketDialog.tsx`,
+`GiftTicketOptions.ts` and `ClaimGiftPage.tsx` consume those endpoints (the old
+fabricated `#gift/<id>` link is gone). The original text is kept below as history.
+
+**Status: resolved 2026-10-16** — gift purchase + claim flow served (`e5e3dc8d`,
+2026-10-07); frontend wired. Original filing 2026-09-30.
+
+
 
 ### #48. No consumer account preferences, 2FA, or password change/reset
 
 No user-preference surface (language/currency/region), no 2FA (enroll/verify/
-disable, recovery codes), and no password change/forgot/reset. `GET /auth/me` is
-read-only and `Core::User` has no name/photo/preferences columns (see #8, #9).
-Settings renders language/currency/region pickers, a "Public profile" toggle, a
-2FA sheet, and a disabled "Change password · Coming soon" row — all local-only.
+disable, recovery codes), and no password change/forgot/reset. `GET`/`PATCH /user`
+(#9, resolved) cover first/last name + avatar only — `Core::User` still has no
+language/currency/region/preferences columns. Settings renders language/currency/
+region pickers, a "Public profile" toggle, a 2FA sheet, and a disabled "Change
+password · Coming soon" row — the pickers/2FA/change-password are local-only.
 
-**Fix:** `PATCH /auth/me` (with name/photo/preferences — #9), password-change +
-reset endpoints, and a 2FA surface if required.
+**Fix:** a preferences surface (extend `PATCH /user` or a new endpoint with
+language/currency/region), password-change + reset endpoints (#57), and a 2FA
+surface if required.
 
-### #49. `GET /public/events` has no search/filter/sort/pagination
+### #49. `GET /public/events` has no search/filter/sort (pagination now exists)
 
-`Events::PublicEventsController#index` applies no query/category/city/date/price
-filters, no sort, and no `Core::Pagination` — it returns the full set ordered
-`published_at desc`. There is also no `GET /organizations/:id/events`,
-`/artists/:id/events`, or `/venues/:id/events`.
+**Correction 2026-10-16:** pagination **is** served — the index returns the
+`Core::Pagination` envelope (`page`/`per_page` params; `pagination` meta with
+`current_page`/`per_page`/`total_count`/`total_pages`/`links`). Verified live:
+`GET /public/events` → `total_count: 33`, 25/page, and `?per_page=5` honours it.
+
+What remains missing: `Events::PublicEventsController#index` applies **no**
+query/category/city/date/price filter and **no** sort — `?q=`, `?city=` and
+`?sort=` are silently ignored (verified live: `?q=jazz` → same `total_count`).
+There is also no `GET /organizations/:id/events`, `/artists/:id/events`, or
+`/venues/:id/events` (all 404).
 
 **Frontend today:** discovery search/filter/sort runs client-side over a single
-page (`useEventFilter.ts`), so it silently misses events beyond page one.
+page (`useEventFilter.ts`); it now pages via the meta but still cannot search
+server-side.
 
-**Fix:** server-side query/category/city/date/price/sort + pagination on the
-public events index; events-by-followable endpoints.
+**Fix:** server-side query/category/city/date/price/sort on the public events
+index; events-by-followable endpoints.
 
 ### #50. Wallet & history gaps
 
@@ -944,9 +1082,13 @@ window**, so `EditTicketAnswersDialog` can never open for a live ticket (the
 backend *does* expose `POST /registration_answers/:id/revise`, but the wallet
 carries no answer ids/window). It also has no per-ticket `can_transfer` /
 `can_resell` / `can_cancel`. Separately there is no `GET /orders`,
-`GET /registrations`, `GET /tickets/:id`, `GET /ticket_transfers` (incoming), or
-`GET /credential_claims` (pending), and no `GET /notifications/unread_count` /
-`POST /notifications/read_all`.
+`GET /registrations` (list), `GET /tickets/:id`, `GET /ticket_transfers`
+(incoming), or `GET /credential_claims` (pending), and no
+`GET /notifications/unread_count` / `POST /notifications/read_all`.
+
+**Correction 2026-10-16:** a single `GET /registrations/:id` **does** exist
+(`config/routes.rb:266`, `resources :registrations, only: :show`) — but a
+buyer-scoped *list* does not.
 
 **Fix:** project answers + `answers_editable_until` + capability flags on the
 wallet serializer; add buyer-scoped list endpoints; add unread-count/mark-all.
@@ -971,9 +1113,19 @@ What remains genuinely missing:
 - **profile gamification** — ProfilePage's tier/XP/events-attended/total-spent/
   achievements have no backend surface at all (product decision).
 
-**Fix:** events-by-followable (#49); venue media/coords (#36); decide gamification.
+**Fix:** events-by-followable (#49); hydrate venue media/coords from public
+`GET /venues/:id` (seed done 2026-10-15); decide gamification.
 
-### #58. `active_checkout_exists` 409 carries no order id → the client can't resume or discard the open checkout
+### #58. `active_checkout_exists` 409 carries no order id → the client can't resume or discard the open checkout — RESOLVED 2026-10-16
+
+**Resolved by `Orders::ActiveCheckoutRecovery` (`b1d6e86f`).** When
+`Orders::CreateCheckout#active_checkout_conflict!` fires, the 409 now includes
+`meta: { active_checkout: recovery }` where `recovery` is
+`{ order_id, expires_at, payment?, order_access_token? }` (the token only for a
+verified guest context) — enough for the client to offer **Continue checkout** /
+**Restart**. The original text is kept below as history. **Frontend follow-up:**
+`ConflictSheet.tsx` still only offers "View Tickets" — tracked in
+`.scratch/gap-wiring-2026-10-16/01-active-checkout-resume.md`.
 
 When `POST /public/events/:slug/admission_selections` finds an existing
 `draft`/`pending_payment` order for the same buyer+event,
@@ -1005,9 +1157,26 @@ hosted page) or **Restart**.
 `app/controllers/orders/admission_selections_controller.rb:64-83`;
 `config/routes.rb` (orders member-only).
 
-**Status: open — filed 2026-09-30 (frontend does not change backend code).**
+**Status: resolved 2026-10-16** — the 409 carries `meta.active_checkout`
+(`Orders::ActiveCheckoutRecovery`, `b1d6e86f`). Original filing 2026-09-30
+(frontend does not change backend code).
 
-### #61. A pending ticket transfer is invisible to the recipient in-app
+### #61. A pending ticket transfer is invisible to the recipient in-app — RESOLVED 2026-10-16
+
+**Resolved** — `ticketing.ticket_transfer.initiated` is now in
+`Messaging::OutboxHandlers::PublishTransactionalNotification::EVENT_TYPES`
+(→ `transfer_incoming`) and a definition exists in
+`app/services/messaging/notification_types.rb:121`:
+`channels: %w[in_app]`, `recipients: ->(source:, **) { source.to_user }`,
+projecting `transfer_id, ticket_id, event_id, event_title, ticket_label,
+expires_at`. So a pending transfer is now visible in-app to the recipient (the
+frontend already labels `transfer_incoming` — `src/lib/notifications.ts`).
+
+**Residual (non-blocking):** there is still no `GET /ticket_transfers` index
+scoped to `to_user`; discovery is via the notification, and the authenticated
+`POST /ticket_transfers/:id/accept` path exists. The original text is below as
+history. **Frontend follow-up:** offer the accept action straight from the
+notification — tracked in `.scratch/gap-wiring-2026-10-16/03-transfer-incoming-accept.md`.
 
 When a sender initiates a transfer, the recipient is identified (`transfer.to_user`)
 and the ticket is held `pending`, but there is **no in-app signal and no way to
@@ -1040,9 +1209,19 @@ ticket" in the app. Today they see nothing.
    (recipient = `to_user`) with an accept action, so the recipient is notified
    even when SMS/email isn't configured.
 
-**Status: open — filed 2026-10-01 (dev-DB audit).**
+**Status: resolved 2026-10-16** — the in-app `transfer_incoming` notification now
+fires on initiation for `to_user` (carries `transfer_id`). Original filing
+2026-10-01 (dev-DB audit).
 
-### #62. A pending (unaccepted) outgoing transfer is invisible on the sender's wallet ticket
+### #62. A pending (unaccepted) outgoing transfer is invisible on the sender's wallet ticket — RESOLVED 2026-10-16
+
+**Resolved** — `Ticketing::TicketWalletSerializer` now projects the pending
+transfer: `pending_transfer` returns
+`{ id: transfer.id, status: transfer.status, expires_at: transfer.expires_at }`
+(or `nil`), from `object.pending_ticket_transfer`. The original text is kept
+below as history. **Frontend follow-up:** `src/lib/tickets.ts` does not yet map
+`pending_transfer` to a "Transfer pending" badge / gate — tracked in
+`.scratch/gap-wiring-2026-10-16/02-wallet-pending-transfer.md`.
 
 `Ticketing::Transfers::Initiate` deliberately keeps the ticket owned and
 `active` until the recipient accepts ("Pending transfers do not change ownership
@@ -1061,9 +1240,11 @@ hint), and once the recipient accepts the credential is replaced under them.
 can render "Transfer pending" and gate transfer/resale/QR for that ticket. The
 data already exists (`ticket.ticket_transfers.pending`); it just isn't projected.
 
-**Status: open — filed 2026-10-01 (reported by the user; code read).**
+**Status: resolved 2026-10-16** — the wallet ticket serves
+`pending_transfer { id, status, expires_at }`. Original filing 2026-10-01
+(reported by the user; code read).
 
-### #63. `admission_selections` is ticket-only → a ticket + extra cart is rejected
+### #63. `admission_selections` is ticket-only → a ticket + extra cart is rejected — RESOLVED 2026-10-05
 
 `Orders::AdmissionSelections::Create#validate_selection!`
 (`app/services/orders/admission_selections/create.rb:195-197`) aborts with
@@ -1214,6 +1395,14 @@ history). Every item below was re-verified against the pulled
 | 27 | **Superseded** — the public RSVP routes (`/rsvps`, `/rsvps/request_otp`) were deleted; free admission is now a `$0` `admission_selections` (`next_action: confirmed` / `issuing`). Frontend `registrationModule.rsvpRequestOtp`/`rsvpSubmit` are dead code | `config/routes.rb` (no `rsvps`) 2026-09-30 (`326f6a3`) |
 | 1 | **Re-scoped, not widened** — the public projection is now `%w[public_guest_limit]`; the "widen to 17 keys" fix is moot and the lost non-admission fields are tracked as #53 | code + live `GET /public/events/:slug` 2026-09-30 (`326f6a3`) |
 | 54 | Discovery availability — `EventListSerializer` serves `ticket_availability` + `event_lifecycle` per event; frontend already wired (`events-adapter` → `lib/eventAvailability` → `EventCard`) | live HTTP 2026-10-15 (SOLD OUT badges on `jubilation-africa` / `musical-karaoke`) |
+| 17 | Payment method — `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`; the payment-method gate (`payment_attempt_support.rb:28`) accepts it. Frontend CBE Birr enabled + sends `cbebirr` | code read + route/live probe 2026-10-16 (residual: `Commercial::FeeComponent::PAYMENT_METHODS` still omits it) |
+| 8 | Display name — `Core::UserAuthSerializer` → `Core::CurrentUserSerializer` embeds `Core::UserProfileSerializer` (`first_name`/`last_name`/`full_name`/`avatar_url`); signup creates the profile. Frontend maps `profile.full_name` | code read 2026-10-16 (`aad3a903`) |
+| 9 | Self-service profile — `resource :user, only: %i[show update]` → `GET`/`PATCH /user` (`GET /auth/me` retired). Frontend `me()`/`updateProfile()` wired | route grep + frontend 2026-10-16 |
+| 47 | Gifting — public `POST /public/gift_purchases/:id/resolve\|claim`, buyer `GET /orders/:order_id/gift_purchases` + `resend`, checkout gift intent. Frontend `gifts.ts`/`GiftTicketDialog`/`ClaimGiftPage` wired | code read 2026-10-16 (`e5e3dc8d`, 2026-10-07) |
+| 56 | Shadow-phone signup — signup OTP-verifies the phone and **upgrades** an existing shadow user (`Core::Signups::Complete`). Frontend `requestSignupOtp`/`verifySignupOtp`/`signUp` wired | code read 2026-10-16 (`aad3a903`) |
+| 58 | Active-checkout recovery — the `active_checkout_exists` 409 now carries `meta.active_checkout { order_id, expires_at, payment, order_access_token }` (`Orders::ActiveCheckoutRecovery`) | code read 2026-10-16 (`b1d6e86f`) |
+| 61 | Incoming transfer signal — `ticketing.ticket_transfer.initiated` → `transfer_incoming` (in-app, recipient `to_user`, projects `transfer_id`) in the outbox notification handler + `notification_types.rb:121`. Frontend labels it | code read 2026-10-16 (residual: no incoming-list endpoint) |
+| 62 | Sender wallet pending transfer — `Ticketing::TicketWalletSerializer` serves `pending_transfer { id, status, expires_at }` | code read 2026-10-16 (frontend mapping owed) |
 | 53 (`featured`) | Discovery Featured — superseded by the paid **Featured endpoint** (`GET /public/featured_events`, `GET /public/events?featured=true`), not the removed `event_setting.config.featured`. Wired: `events-adapter` maps `placement_label` → `Event.featured`; `eventsModule.fetchAll` overlays the Featured set on the list; `fetchFeatured` reads the endpoint | live HTTP + browser 2026-10-15 (HEADLINERS · 2 EVENTS) |
 
 ---

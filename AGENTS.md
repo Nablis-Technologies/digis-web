@@ -164,61 +164,55 @@ unless every status change was swept and either wired or tracked. History: the
 missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
-- **#17** `cbe` payment method not in backend `PAYMENT_METHODS` (CBE option
-  is currently disabled in the UI; `cbebirr` is now a Chapa V2 adapter
-  capability but the domain enum is still `telebirr card bank`)
-- **#40** Abandoned checkouts never expire (`ExpireCheckout` aborts the whole
-  sweep on an elapsed-grace `processing` payment) → `active_checkout_exists`
-  blocks all later checkouts; the 409 carries no order id
-- **#41** A released order permanently burns its registration
-  (`idx_one_order_item_per_registration` ignores order status) → retries need a
-  brand-new registration
-- **#33** Guest payment-refresh re-validates the quote token even for accepted
-  payments (a guest can be told "payment failed" after paying; frontend now
-  correlates creds per payment + stops on terminal errors — see BACKEND_GAPS.md)
-- **#34** Past events remain purchasable — quote/order never checks the event
-  date (`EventDate` ends_at/status) or the product `sales_end_at` window; the
-  frontend disables buying on ended events (eventEnded) until the backend
-  enforces it
-- **#8** No `name` column/serializer — the signup form collects **Full name**
-  and sends it, but the backend `permit`s it away (silently dropped). Blocking.
-- **#9** No self-service profile update (`PATCH /auth/me`)
-- **#39** No endpoint exposing payout `bank_slug`s, and `TYPES` is narrower than
-  the provider's rails → no payout method can be added. Blocking. The frontend is
-  currently wired to a **local, uncommitted** backend change — that does not
-  resolve the gap (see BACKEND_GAPS.md).
-- **#1** *(moved — not a live gap)* Public `event_setting.config` is
-  `%w[public_guest_limit]` only; the old "widen to 17 keys" ask is moot. Re-scoped
-  in `docs/NOT_BACKEND_GAPS.md`; the lost non-admission fields are #53, and
-  discovery **featured** is now its own paid surface (`GET /public/featured_events`,
-  wired 2026-10-15).
-- **#43** RSVP rejects `access_code` / `invitation_token` → an audience-gated RSVP
-  event cannot be registered for. Blocking.
+**Open — blocking:** #53, #57, #60, #65. **Open — degrading:** #36, #44, #46,
+#48, #49, #50, #51, #67, #68, #69, #70. (Re-verified 2026-10-16 — see the sweep
+log at the top of `BACKEND_GAPS.md`; that file's at-a-glance table is
+authoritative.)
+
+- **#53** Public event payload drops the non-admission detail fields
+  (`age_restriction` / `seat_map` / `rating`; lineup → #36) → those detail modules
+  render absent (ADR-0002 forbids inventing them).
+- **#57** No password reset / forgot-password endpoint (phone-first reset would
+  reuse the existing OTP infra).
+- **#60** Chapa payment `amount` is sent in minor units (100× too large) → large
+  orders fail on Chapa's max-amount check.
+- **#65** Seller payout dispatch always ends in a provider rejection
+  (`invalid_format`); no payout has ever reached `succeeded`.
+- **#36** Public payload lacks event participants/lineup — a backend **serializer**
+  gap (no public event→artist link; participants *do* model a per-date link). The
+  venue media/coords half was a **seed** task, fixed 2026-10-15.
 - **#44** Event-level `event_type` / `access_mode` / `rsvp_*` config is inert and
   unwritable → the public payload can't say rsvp vs inviteOnly vs ticketed.
-- **#45** RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored.
-- **#46–#51** Consumer surfaces with no backend (all filed in BACKEND_GAPS.md):
-  saved-events / home feed (`GET /feed` has no controller) / reviews / social
-  graph (#46), gift tickets (#47), account preferences + 2FA + password (#48),
-  public-event search/filter/sort/pagination (#49), wallet answers + capability
-  flags + buyer history (#50), events-by-followable + profile stats (#51).
-- **#68** Public event payload exposes no recurrence/series signal (no
-  `recurrence`/`is_recurring`, `source_key` not in the public `event_dates[]`)
-  even though the backend models recurrence and materializes dates → the
-  recurring consumer UI is ported + wired but stays inert (no signal to render;
-  `lib/recurring.ts#resolveSeries` returns null without it). Broadens **#36**:
-  `EventParticipant` already models a per-date link (`event_date_id`); expose it
-  when the public lineup surface lands.
-- **#69** Public product payload omits `date_allocations`
-  (`Catalog::ProductDateAllocation` + its serializer exist, but the public
-  products controller/serializer never expose them) → a whole-festival pass
-  can't be told from a single-day offer, so `resolveFestivalSchedule` classifies
-  tiers by **name** (`pass`/`full`/`weekend`) — an invented classification
-  (ADR-0002).
-- **#70** Public `event_dates` is unbounded and includes past dates (no
-  upcoming window, no limit) → a recurring series returns its whole history on
-  every detail request; the frontend filters client-side (`isDatePast`) but the
-  session rail and the `choose_one` date step still receive it.
+- **#46** No saved-events/favourites, follows-based feed (`GET /feed` has no
+  controller), or reviews/ratings. (Follows to venues/artists/organizations *do*
+  exist.)
+- **#48** No consumer account preferences (language/currency/region), 2FA, or
+  password change. (Notification-channel prefs exist; account prefs do not.)
+- **#49** `GET /public/events` has **pagination** but no search/filter/sort, no
+  events-by-followable, and no city aggregation → discovery search is client-side.
+- **#50** Wallet/history gaps: registration answers + edit window, per-ticket
+  capability flags, order/transfer history, unread-count/mark-all-read.
+  (`GET /registrations/:id` does exist.)
+- **#51** No events-by-followable (organizer/venue/artist history); no profile
+  stats (gamification).
+- **#67** `Core::UserProfile` enforces mandatory `last_name` (`null: false`,
+  presence) → single-name signups need a client-side fallback (`splitFullName`).
+- **#68** Public event payload exposes no recurrence/series signal → the recurring
+  consumer UI is ported + wired but stays inert (`lib/recurring.ts#resolveSeries`
+  returns null without it). Broadens **#36**: `EventParticipant` already models a
+  per-date link (`event_date_id`).
+- **#69** Public product payload omits `date_allocations` → `resolveFestivalSchedule`
+  classifies tiers by **name** (`pass`/`full`/`weekend`) — invented (ADR-0002).
+- **#70** Public `event_dates` is unbounded and unfiltered (no upcoming window) →
+  a series ships its whole set; the frontend filters client-side (`isDatePast`).
+
+**Resolved 2026-10-16 (frontend-wiring sweep):** #17 (`cbebirr` in the payment
+enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH /user`
+— both already consumed), #56 (signup OTP-upgrades the shadow phone — wired), #47
+(gift flow — `lib/gifts.ts` wired), #58 (the 409 now carries `meta.active_checkout`
+— **wiring owed**), #61 (`transfer_incoming` notification — **wiring owed**), #62
+(wallet `pending_transfer` — **wiring owed**). The owed wiring is tracked in
+`.scratch/gap-wiring-2026-10-16/`.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),
@@ -246,7 +240,12 @@ succeeds — Chapa V2 direct transfer; frontend rewired to the flat
 `bank_slug`/`account_number`/`holder_name` payload), #54 (discovery availability —
 `ticket_availability` + `event_lifecycle` on the list; the grid shows real SOLD OUT
 badges), discovery **featured** (the paid Featured endpoint —
-`GET /public/featured_events`; wired in `eventsModule.fetchAll`/`fetchFeatured`).
+`GET /public/featured_events`; wired in `eventsModule.fetchAll`/`fetchFeatured`),
+#17 (`cbebirr` in the payment enum — CBE Birr enabled), #8/#9 (auth serves
+`profile.full_name`; `GET`/`PATCH /user` — `me`/`updateProfile` wired), #56 (signup
+OTP-upgrades a shadow phone), #47 (gift purchase flow — `lib/gifts.ts`), #33, #34,
+#39, #40, #41, #43, #45 (all 2026-09-30), #58/#61/#62 (2026-10-16 — backend surfaces
+landed; the small frontend wiring is tracked in `.scratch/gap-wiring-2026-10-16/`).
 
 ## Data integrity (seeds + e2e) — update after changing things
 

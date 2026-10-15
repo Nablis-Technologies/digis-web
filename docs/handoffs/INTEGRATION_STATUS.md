@@ -7,6 +7,45 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-16b — gap status re-verification against the running backend
+
+**Prompt:** "lets make sure the backend gaps is updated and we have gap status
+updated according to how its currently working."
+
+Re-verified **every** open entry in `docs/BACKEND_GAPS.md` against the backend
+branch behind PR #37 (`feat/launch-hardening-telemetry`, `origin` `67e3a281`) by
+code read **and** live HTTP on `:3000`. The list had drifted badly: 8 items were
+still marked open/blocking that the backend already serves.
+
+**Resolved (verified today):**
+
+| # | What changed | Frontend |
+|---|---|---|
+| 17 | `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr` | **already wired** (`PaymentStep.tsx`) |
+| 8 | `Core::CurrentUserSerializer` embeds `profile.full_name` (`aad3a903`) | **already wired** (`auth.ts`) |
+| 9 | `GET`/`PATCH /user` (`resource :user, only: %i[show update]`) | **already wired** (`me`/`updateProfile`) |
+| 56 | signup OTP-verifies + **upgrades** the shadow user (`aad3a903`) | **already wired** (`requestSignupOtp`/`verifySignupOtp`) |
+| 47 | gift purchase flow (`e5e3dc8d`, 2026-10-07) | **already wired** (`lib/gifts.ts`) |
+| 58 | the `active_checkout_exists` 409 carries `meta.active_checkout` | wiring owed → `.scratch/gap-wiring-2026-10-16/` |
+| 61 | in-app `transfer_incoming` notification on initiation | wiring owed (accept action) |
+| 62 | wallet ticket serves `pending_transfer` | wiring owed (badge + gate) |
+
+**Corrections to still-open entries:** **#49** *does* paginate now
+(`Core::Pagination`) — only search/filter/sort and events-by-* are missing;
+**#46** follows to venues/artists/organizations *do* exist — only
+saved/feed/reviews are missing; **#50** `GET /registrations/:id` exists. **#70**'s
+title/claim softened: the filter is absent (unbounded), but the seeded series is
+all-future, so "includes past dates" is inferred, not demonstrated.
+
+**Still open:** blocking — #53, #57, #60, #65. Degrading — #36, #44, #46, #48,
+#49, #50, #51, #67, #68, #69, #70.
+
+**Docs updated:** `BACKEND_GAPS.md` (new sweep log; at-a-glance table reordered —
+open first, resolved below; per-section `— RESOLVED <date>` markers on #17/#8/#9/
+#33/#34/#39/#43/#45/#47/#56/#58/#61/#62/#63/#66; archive rows added), `AGENTS.md`
+(open-gap list rewritten to the real 15, resolved list extended), and
+`.scratch/gap-wiring-2026-10-16/` (spec + 3 tickets for #58/#61/#62).
+
 ## Session 2026-10-16 — split non-backend items out of the gap list
 
 **Prompt:** "why are the frontend gaps in the backend gaps that should be left for
