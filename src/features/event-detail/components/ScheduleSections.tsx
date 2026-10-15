@@ -1,10 +1,18 @@
 import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, Users, BadgeCheck, Hourglass, Check, ArrowRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Users, X, BadgeCheck, Bell, BellRing, Hourglass, Check, ArrowRight } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassEdge } from '@/lib/ui/glass';
+import { centerInScroller } from '@/lib/utils/scroll';
+import { parseISODate, toISODate } from '@/lib/recurring';
 import { TicketTypeCard } from './TicketTypeCard';
+import type {
+  SessionRailDay,
+  SelectedSession,
+  SessionCalendarData,
+} from '@/lib/recurring';
 import type {
   DayState,
   ScheduleArtist,
@@ -401,14 +409,14 @@ function TimelineEntry({ artist, onOpen }: { artist: ScheduleArtist; onOpen: () 
   const headliner = /headliner|closing/i.test(artist.role ?? '');
   const ink = isDark ? '#fff' : '#0a0a0a';
   const muted = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.55)';
-  const [clock, ap] = (artist.time ?? '6:00 PM').split(' ');
+  const [clock, ap] = (artist.time ?? '').split(' ');
   const displayClock = /^\d:/.test(clock) ? `0${clock}` : clock;
 
   return (
     <div className="grid grid-cols-[48px_16px_minmax(0,1fr)] gap-x-3 min-w-0">
       <div className="flex flex-col items-center justify-center text-center">
         <span className="block text-[12px] leading-none tabular-nums" style={{ fontFamily: INTER, fontWeight: 700, color: headliner ? (isDark ? '#d6f905' : '#4a5800') : ink }}>{displayClock}</span>
-        <span className="block mt-1 text-[8px] tracking-[1.1px] uppercase" style={{ fontFamily: INTER, fontWeight: 700, color: muted }}>{ap || 'PM'}</span>
+        <span className="block mt-1 text-[8px] tracking-[1.1px] uppercase" style={{ fontFamily: INTER, fontWeight: 700, color: muted }}>{ap}</span>
       </div>
       <div className="relative flex items-center justify-center">
         <span aria-hidden className="relative z-10 w-[7px] h-[7px] rounded-full" style={{ background: headliner ? (isDark ? '#d6f905' : '#5a6b00') : isDark ? 'rgba(255,255,255,0.52)' : 'rgba(0,0,0,0.38)' }} />
@@ -790,13 +798,14 @@ export function FestivalTicketSelector({
           transition={{ duration: 0.22 }}
           className="mt-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
         >
-          {tiers.map(({ tier: t }, i) => (
+          {tiers.map(({ tier: t, savings }, i) => (
             <div key={t.name}>
               <TicketTypeCard
                 type={t}
                 index={i}
                 selected={selectedTicketType === t.name}
                 onSelect={() => onSelectTicketType(t.name)}
+                savings={savings}
               />
             </div>
           ))}
@@ -937,6 +946,453 @@ export function EventEndedNotice({ dateSpanLabel, isSeries, onBrowse }: EventEnd
           </motion.button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Recurring sessions ─────────────────────────── */
+
+/**
+ * Recurring ("weekly series") surface. A recurring event is one event whose rule
+ * materialises many dated sessions; the rail, the switch bar, the monthly sheet
+ * and the sold-out waitlist all render from the view-model `resolveSeries()`
+ * builds (`@/lib/recurring`). That resolver returns `null` until the backend
+ * exposes a public series signal (`BACKEND_GAPS.md` #68), so today these
+ * components stay unmounted — nothing is invented (ADR-0002).
+ */
+
+/** Recurring palette — lime ink on dark, olive on light; one source for the rails. */
+function sessionInk(isDark: boolean) {
+  return {
+    ink: isDark ? '#fff' : '#0a0a0a',
+    muted: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)',
+    limeInk: isDark ? '#d6f905' : '#4a5800',
+  };
+}
+
+/** Keep the selected date tile centred in a session rail as the selection moves. */
+function useCenterSelected(selectedDate?: string) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    centerInScroller(list, list?.querySelector<HTMLElement>('[aria-checked="true"]'));
+  }, [selectedDate]);
+  return listRef;
+}
+
+export interface SessionCarouselProps {
+  days: SessionRailDay[];
+  selected: SelectedSession | null;
+  value: string;
+  onChange: (id: string) => void;
+  footer?: ReactNode;
+  /** Reminder cadence, e.g. "every Thursday" (rendered "Reminding every Thursday"). */
+  reminderLabel: string;
+  calendar: SessionCalendarData;
+}
+
+/** "Choose a date": a compact, horizontally scrollable date rail. Four sessions stay visible
+ * at once; the remaining recurrence dates are a natural swipe or trackpad scroll away. */
+export function SessionCarousel({ days, selected, value, onChange, footer, reminderLabel, calendar }: SessionCarouselProps) {
+  const { isDark } = useTheme();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const listRef = useCenterSelected(selected?.date);
+  if (!days.length || !selected) return null;
+  const scrollable = days.length > 4;
+  const { ink, muted, limeInk } = sessionInk(isDark);
+  return (
+    <div>
+      <SectionHeading right={<ReminderToggle reminder={reminderLabel} />}>Choose a date</SectionHeading>
+      <div className="relative">
+        <div className="relative z-10 flex h-[72px] items-stretch gap-1.5">
+          <div
+            ref={listRef}
+            role="radiogroup"
+            aria-label="Session date"
+            className="min-w-0 flex-1 flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={scrollable ? { maskImage: 'linear-gradient(90deg, #000 0%, #000 calc(100% - 30px), transparent 100%)', WebkitMaskImage: 'linear-gradient(90deg, #000 0%, #000 calc(100% - 30px), transparent 100%)' } : undefined}
+          >
+            {days.map((day) => {
+              const iso = day.date;
+              const on = iso === selected.date;
+              const soldOut = day.soldOut;
+              return (
+                <motion.button
+                  key={iso}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => onChange(day.primarySessionId)}
+                  className={`group relative h-full min-w-[52px] flex-shrink-0 rounded-[16px] flex items-center justify-center cursor-pointer transition-[width,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d6f905]/60 ${on ? 'z-10 px-1' : isDark ? 'bg-white/[0.05] hover:bg-white/[0.1]' : 'bg-black/[0.035] hover:bg-black/[0.07]'}`}
+                  style={{ width: on ? 'calc((100% - 18px) / 4 + 48px)' : 'calc((100% - 18px) / 4 - 8px)', minWidth: on ? '112px' : undefined }}
+                >
+                  {on && <motion.span layoutId="session-date-pill" className="absolute inset-0 rounded-[16px]" style={{ background: '#d6f905' }} transition={{ type: 'spring', stiffness: 460, damping: 34 }} />}
+                  {on ? (
+                    <span className="relative min-w-0 text-left">
+                      <span className="block truncate text-[8.5px] leading-none" style={{ fontFamily: INTER, fontWeight: 700, color: 'rgba(10,10,10,0.58)' }}>{selected.timeLabel}</span>
+                      <span className="mt-1 block truncate text-[13px] leading-none" style={{ fontFamily: ZALANDO, fontWeight: 600, color: '#0a0a0a' }}>{selected.dateLabel}</span>
+                      {selected.doorsLabel && <span className="mt-1 block truncate text-[8px] leading-none" style={{ fontFamily: INTER, fontWeight: 600, color: 'rgba(10,10,10,0.58)' }}>{selected.doorsLabel}</span>}
+                    </span>
+                  ) : (
+                    <span className="relative flex flex-col items-center">
+                      <span className="text-[7.5px] tracking-[1.2px] uppercase leading-none" style={{ fontFamily: INTER, fontWeight: 700, color: muted }}>{day.monLabel}</span>
+                      <span className={`mt-[9px] text-[14px] leading-none tabular-nums tracking-[-0.2px] ${soldOut ? 'line-through opacity-50' : ''}`} style={{ fontFamily: ZALANDO, fontWeight: 500, color: ink }}>{day.dayLabel}</span>
+                      <span className="mt-[9px] text-[8px] tracking-[1.1px] uppercase leading-none" style={{ fontFamily: INTER, fontWeight: 800, color: soldOut ? RED(isDark) : isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)' }}>{day.dowLabel}</span>
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setCalendarOpen(true)}
+            className={`relative z-10 flex-shrink-0 w-[48px] overflow-hidden rounded-[16px] flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.08]' : 'hover:bg-black/[0.05]'}`}
+            aria-label="Open full session calendar"
+            style={{ background: isDark ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.62)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', ...glassEdge(isDark) }}
+          >
+            <GlassReflection isDark={isDark} />
+            <CalendarDays className="relative z-10 w-4 h-4" strokeWidth={1.75} style={{ color: limeInk }} />
+            <span className="relative z-10 text-[7px] tracking-[1px] uppercase leading-none" style={{ fontFamily: INTER, fontWeight: 800, color: muted }}>All</span>
+          </button>
+        </div>
+      </div>
+      {(() => { const day = days.find((d) => d.date === selected.date); return day && day.showtimes.length > 1 ? <ShowtimePicker showtimes={day.showtimes} selectedId={selected.id} onChange={onChange} /> : null; })()}
+      {footer}
+      <AnimatePresence>
+        {calendarOpen && (
+          <SessionCalendarSheet
+            {...calendar}
+            value={value}
+            onPick={(id) => { onChange(id); setCalendarOpen(false); }}
+            onClose={() => setCalendarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Under the date rail when a date has more than one showtime: pick the slot (Matinee / Main Show). */
+function ShowtimePicker({ showtimes, selectedId, onChange }: { showtimes: SessionRailDay['showtimes']; selectedId: string; onChange: (id: string) => void }) {
+  const { isDark } = useTheme();
+  const { ink, muted, limeInk } = sessionInk(isDark);
+  return (
+    <div role="radiogroup" aria-label="Showtime" className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${showtimes.length}, minmax(0, 1fr))` }}>
+      {showtimes.map((s) => {
+        const pick = s.id === selectedId;
+        const full = s.full;
+        const low = !!s.lowStockLabel;
+        return (
+          <motion.button
+            key={s.id}
+            type="button"
+            role="radio"
+            aria-checked={pick}
+            disabled={full}
+            onClick={() => onChange(s.id)}
+            whileTap={full ? undefined : { scale: 0.96 }}
+            className={`relative h-[44px] px-3.5 rounded-[14px] flex items-center justify-between gap-2 transition-colors ${full ? 'cursor-not-allowed' : 'cursor-pointer'} ${pick ? '' : isDark ? 'bg-white/[0.05] hover:bg-white/[0.1]' : 'bg-black/[0.035] hover:bg-black/[0.07]'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d6f905]/60`}
+          >
+            {pick && <motion.span layoutId="showtime-pill" className="absolute inset-0 rounded-[14px]" style={{ background: '#d6f905' }} transition={{ type: 'spring', stiffness: 460, damping: 34 }} />}
+            <span className={`relative text-[13px] tabular-nums ${full ? 'line-through opacity-50' : ''}`} style={{ fontFamily: ZALANDO, fontWeight: 500, color: pick ? '#0a0a0a' : ink }}>{s.timeLabel}</span>
+            <span className="relative text-[8.5px] tracking-[1.1px] uppercase truncate" style={{ fontFamily: INTER, fontWeight: 800, color: pick ? 'rgba(10,10,10,0.58)' : full ? RED(isDark) : low ? limeInk : muted }}>
+              {full ? 'Full' : s.lowStockLabel ?? s.showLabel}
+            </span>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+export interface SessionSwitcherProps {
+  days: SessionRailDay[];
+  selected: SelectedSession | null;
+  value: string;
+  onChange: (id: string) => void;
+  stuck?: boolean;
+  calendar: SessionCalendarData;
+}
+
+/** Pinned mini-bar over the tickets: every upcoming session night as a chip, sticky under the nav so the
+ *  date can change while browsing tiers. Same lime pill as the week strip. */
+export function SessionSwitcher({ days, selected, value, onChange, stuck, calendar }: SessionSwitcherProps) {
+  const { isDark } = useTheme();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const listRef = useCenterSelected(selected?.date);
+  if (!selected || !days.length) return null;
+  const { ink, muted, limeInk } = sessionInk(isDark);
+  return (
+    <>
+      <div
+        className="relative flex items-stretch gap-1.5 rounded-[22px] p-1.5 transition-shadow duration-300"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.7)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          ...(stuck ? { boxShadow: '0 14px 34px rgba(0,0,0,0.38)' } : glassEdge(isDark)),
+        }}
+      >
+        <GlassReflection isDark={isDark} />
+        <div
+          ref={listRef}
+          role="radiogroup"
+          aria-label="Session date"
+          className="relative z-10 min-w-0 flex-1 flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={days.length > 5 ? { maskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)', WebkitMaskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)' } : undefined}
+        >
+          {days.map((day) => {
+            const on = day.date === selected.date;
+            const soldOut = day.soldOut;
+            return (
+              <motion.button
+                key={day.date}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => onChange(day.primarySessionId)}
+                className={`relative flex-1 basis-0 min-w-[54px] h-[58px] rounded-[16px] flex flex-col items-center justify-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d6f905]/60 ${on ? '' : isDark ? 'bg-white/[0.05] hover:bg-white/[0.1]' : 'bg-black/[0.035] hover:bg-black/[0.07]'}`}
+              >
+                {on && <motion.span layoutId="session-switch-pill" className="absolute inset-0 rounded-[16px]" style={{ background: '#d6f905' }} transition={{ type: 'spring', stiffness: 460, damping: 34 }} />}
+                <span className="relative text-[7.5px] tracking-[1.2px] uppercase leading-none" style={{ fontFamily: INTER, fontWeight: 700, color: on ? 'rgba(10,10,10,0.5)' : muted }}>{day.monLabel}</span>
+                <span className={`relative mt-1 text-[14px] leading-none tabular-nums tracking-[-0.2px] ${soldOut && !on ? 'line-through opacity-50' : ''}`} style={{ fontFamily: ZALANDO, fontWeight: 500, color: on ? '#0a0a0a' : ink }}>{day.dayLabel}</span>
+                <span className="relative mt-1 text-[8px] tracking-[1.1px] uppercase leading-none" style={{ fontFamily: INTER, fontWeight: 800, color: on ? '#0a0a0a' : soldOut ? RED(isDark) : isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)' }}>{day.dowLabel}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.92 }}
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Open full calendar"
+          className={`relative z-10 flex-shrink-0 w-[52px] rounded-[16px] flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.08]' : 'hover:bg-black/[0.05]'}`}
+          style={glassEdge(isDark)}
+        >
+          <CalendarDays className="w-4 h-4" strokeWidth={1.75} style={{ color: limeInk }} />
+          <span className="text-[8px] tracking-[1.2px] uppercase leading-none" style={{ fontFamily: INTER, fontWeight: 700, color: muted }}>All</span>
+        </motion.button>
+      </div>
+      <AnimatePresence>
+        {calendarOpen && (
+          <SessionCalendarSheet
+            {...calendar}
+            value={value}
+            onPick={(id) => { onChange(id); setCalendarOpen(false); }}
+            onClose={() => setCalendarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/**
+ * "Remind me every Thursday" — a quiet bell toggle next to the section heading.
+ *
+ * Display-only for now: local state, because the backend exposes no reminder
+ * surface for a series (nothing to subscribe to). When one lands this must call
+ * it and only claim success after the server confirms (feedback rule).
+ */
+function ReminderToggle({ reminder }: { reminder: string }) {
+  const { isDark } = useTheme();
+  const [on, setOn] = useState(false);
+  const Icon = on ? BellRing : Bell;
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.95 }}
+      onClick={() => setOn((v) => !v)}
+      aria-pressed={on}
+      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full cursor-pointer"
+      style={{ background: on ? (isDark ? 'rgba(214,249,5,0.12)' : 'rgba(90,107,0,0.1)') : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+    >
+      <motion.span key={String(on)} initial={{ rotate: on ? -20 : 0 }} animate={{ rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 10 }}>
+        <Icon className="w-3.5 h-3.5" strokeWidth={2} style={{ color: on ? (isDark ? '#d6f905' : '#2b3200') : isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} />
+      </motion.span>
+      <span className="text-[11px]" style={{ fontFamily: INTER, fontWeight: 600, color: on ? (isDark ? '#d6f905' : '#2b3200') : isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
+        {on ? `Reminding ${reminder}` : `Remind me`}
+      </span>
+    </motion.button>
+  );
+}
+
+/** Monthly bottom-sheet picker with a preview of the tapped session before confirming. */
+function SessionCalendarSheet({ summaryLabel, sessions, value, onPick, onClose }: SessionCalendarData & { value: string; onPick: (id: string) => void; onClose: () => void }) {
+  const { isDark } = useTheme();
+  const byDate = useMemo(() => new Map(sessions.filter((s) => s.primary).map((s) => [s.date, s])), [sessions]);
+  const [preview, setPreview] = useState(value);
+  const previewSession = sessions.find((s) => s.id === preview) ?? sessions[0];
+  const first = parseISODate(previewSession?.date ?? toISODate(new Date()));
+  const [cursor, setCursor] = useState(new Date(first.getFullYear(), first.getMonth(), 1));
+  const lead = cursor.getDay();
+  const count = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: count }, (_, i) => new Date(cursor.getFullYear(), cursor.getMonth(), i + 1))];
+  const shift = (n: number) => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + n, 1));
+  const ink = isDark ? '#fff' : '#0a0a0a';
+  const muted = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+  const quiet = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+  const soldOutPreview = !!previewSession?.soldOut;
+
+  const sheet = (
+    <motion.div className="fixed inset-0 z-[100] flex items-end justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <button type="button" aria-label="Close calendar" className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        role="dialog"
+        aria-label="Choose a session"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+        className="relative w-full max-w-md rounded-t-[28px] px-5 pt-3 pb-8"
+        style={{ background: isDark ? '#111111' : '#ffffff' }}
+      >
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <p className="text-[10px] tracking-[1.6px] uppercase" style={{ fontFamily: INTER, fontWeight: 700, color: isDark ? '#d6f905' : '#4a5800' }}>{summaryLabel}</p>
+            <h3 className="mt-1 text-[20px]" style={{ fontFamily: ZALANDO, fontWeight: 300, color: ink }}>{cursor.toLocaleString('en-US', { month: 'long', year: 'numeric' })}</h3>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {[{ I: ChevronLeft, n: -1 }, { I: ChevronRight, n: 1 }].map(({ I, n }) => (
+              <button key={n} type="button" onClick={() => shift(n)} aria-label={n < 0 ? 'Previous month' : 'Next month'} className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer" style={{ background: quiet, color: ink }}>
+                <I className="w-4 h-4" />
+              </button>
+            ))}
+            <button type="button" onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer" style={{ background: quiet, color: ink }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+            <span key={i} className="text-[10px] pb-1" style={{ fontFamily: INTER, fontWeight: 700, color: muted }}>{d}</span>
+          ))}
+          {cells.map((d, i) => {
+            if (!d) return <span key={i} />;
+            const s = byDate.get(toISODate(d));
+            const active = s?.id === preview;
+            const soldOut = !!s?.soldOut;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={!s}
+                onClick={() => s && setPreview(s.id)}
+                className="relative aspect-square rounded-xl flex flex-col items-center justify-center text-[13px] tabular-nums disabled:cursor-default cursor-pointer"
+                style={{
+                  fontFamily: INTER,
+                  fontWeight: s ? 700 : 400,
+                  background: active ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : s ? (isDark ? 'rgba(214,249,5,0.08)' : 'rgba(90,107,0,0.08)') : 'transparent',
+                  color: active ? '#0a0a0a' : s ? (soldOut ? muted : ink) : isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)',
+                  textDecoration: soldOut && !active ? 'line-through' : undefined,
+                }}
+              >
+                {d.getDate()}
+                {s && !active && <span className="absolute bottom-1.5 w-1 h-1 rounded-full" style={{ background: soldOut ? muted : isDark ? '#d6f905' : '#5a6b00' }} />}
+              </button>
+            );
+          })}
+        </div>
+
+        {previewSession && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={previewSession.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="mt-5 rounded-2xl p-3.5 flex items-center gap-3"
+              style={{ background: quiet }}
+            >
+              <div className="flex">
+                {previewSession.avatars.slice(0, 3).map((g, i) => (
+                  g.image ? (
+                    <img key={g.name} src={g.image} alt="" className="w-8 h-8 rounded-full object-cover" style={{ marginLeft: i ? -8 : 0, boxShadow: `0 0 0 2px ${isDark ? '#111' : '#fff'}` }} />
+                  ) : (
+                    <span key={g.name} className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ marginLeft: i ? -8 : 0, boxShadow: `0 0 0 2px ${isDark ? '#111' : '#fff'}`, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', color: ink }}>
+                      {g.name.slice(0, 1)}
+                    </span>
+                  )
+                ))}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] truncate" style={{ fontFamily: INTER, fontWeight: 700, color: ink }}>{previewSession.dateLabel}</p>
+                <p className="text-[10.5px] truncate" style={{ fontFamily: INTER, color: muted }}>
+                  {previewSession.detailLabel}
+                </p>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        )}
+
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          onClick={() => previewSession && onPick(previewSession.id)}
+          className="mt-3 w-full h-12 rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+          style={{ background: 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)', color: '#0a0a0a', fontFamily: INTER, fontWeight: 600, fontSize: 14 }}
+        >
+          {soldOutPreview ? 'View waitlist for' : 'Choose'} {previewSession ? previewSession.dateLabel : ''}
+          <ArrowRight className="w-4 h-4" strokeWidth={2.25} />
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+
+  // Portal to the body so the sheet escapes the event page stacking context and sits above the fixed purchase bar.
+  return typeof document !== 'undefined' ? createPortal(sheet, document.body) : sheet;
+}
+
+export interface SessionWaitlistProps {
+  /** e.g. "Thu, Aug 28, 2026" (rendered "… is sold out"). */
+  dateLabel: string;
+  onPickNext?: () => void;
+  /** Optional: called when the user joins the waitlist. */
+  onJoin?: () => void;
+}
+
+/** Sold-out session: join the waitlist instead of hitting a wall. */
+export function SessionWaitlist({ dateLabel, onPickNext, onJoin }: SessionWaitlistProps) {
+  const { isDark } = useTheme();
+  const [joined, setJoined] = useState(false);
+  const ink = isDark ? '#fff' : '#0a0a0a';
+  const muted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)';
+  return (
+    <div
+      className="relative mx-auto max-w-md rounded-[24px] p-6 text-center overflow-hidden"
+      style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)', backdropFilter: 'blur(28px)', ...glassEdge(isDark) }}
+    >
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 mx-auto w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: isDark ? 'rgba(251,113,133,0.12)' : 'rgba(225,29,72,0.08)' }}>
+        <Hourglass className="w-5 h-5" strokeWidth={1.75} style={{ color: isDark ? '#fb7185' : '#be123c' }} />
+      </div>
+      <h3 className="relative z-10 mt-4 text-[17px]" style={{ fontFamily: ZALANDO, fontWeight: 400, color: ink }}>{dateLabel} is sold out</h3>
+      <p className="relative z-10 mt-1.5 text-[12.5px] leading-relaxed" style={{ fontFamily: INTER, color: muted }}>
+        Join the waitlist. If a ticket is released, you'll get a 15-minute hold to buy it before anyone else.
+      </p>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.98 }}
+        onClick={() => { setJoined(true); onJoin?.(); }}
+        disabled={joined}
+        className="relative z-10 mt-5 w-full h-12 rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-default"
+        style={joined
+          ? { background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: ink }
+          : { background: 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)', color: '#0a0a0a' }}
+      >
+        {joined && <span className="w-[18px] h-[18px] rounded-full bg-[#d6f905] flex items-center justify-center"><Check className="w-3 h-3 text-[#0a0a0a]" strokeWidth={3} /></span>}
+        <span className="text-[14px]" style={{ fontFamily: INTER, fontWeight: 600 }}>{joined ? "You're on the waitlist" : 'Join Waitlist'}</span>
+      </motion.button>
+      {onPickNext && (
+        <button type="button" onClick={onPickNext} className="relative z-10 mt-3 text-[12px] underline underline-offset-4 cursor-pointer" style={{ fontFamily: INTER, color: muted }}>
+          Or pick the next open session
+        </button>
+      )}
     </div>
   );
 }

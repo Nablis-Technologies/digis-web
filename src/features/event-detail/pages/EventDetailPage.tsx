@@ -19,11 +19,14 @@ import { AppButton } from '@/components/primitives/AppButton';
 import type { Event, TicketTier } from '@/types';
 import { LineupSection } from '@/features/event-detail/components/LineupSection';
 import { resolveFestivalSchedule, guestsForDay } from '@/lib/festival';
+import { resolveSeries } from '@/lib/recurring';
 import {
   FestivalDayBar,
   DayLineup,
   FestivalTicketSelector,
   SessionGuests,
+  SessionCarousel,
+  SessionWaitlist,
   EventEndedNotice,
 } from '@/features/event-detail/components/ScheduleSections';
 import { OrganizerCard, OrganizerInline, resolveOrganizers } from '@/features/event-detail/components/OrganizerSection';
@@ -116,9 +119,20 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const publicTicketTypes = displayTicketTypes.filter((t) => !t.audience || t.audience === 'public');
   const hasPublicTiers = publicTicketTypes.length > 0;
   const visibleTicketTypes = hasGatedTiers && !gatedUnlocked ? publicTicketTypes : displayTicketTypes;
+  // Recurring series (#68): one event, many dated sessions. `resolveSeries`
+  // returns null until the backend serves a public series signal, so a plain
+  // multi-date event still falls through to the festival path below.
+  const [pickedSessionId, setPickedSessionId] = useState<string>('');
+  const series = useMemo(
+    () => resolveSeries(event, displayTicketTypes, pickedSessionId || undefined),
+    [event, displayTicketTypes, pickedSessionId],
+  );
+  const sessionId = series?.selected?.id ?? '';
   const festivalSchedule = useMemo(() => {
+    // A recurring series owns its dates — never also render it as a festival.
+    if (series) return null;
     return resolveFestivalSchedule(event, displayTicketTypes);
-  }, [event, displayTicketTypes]);
+  }, [series, event, displayTicketTypes]);
   const [festivalDayId, setFestivalDayId] = useState<string>('all');
   // Guests for the picked day (everyone across the festival on "All days").
   const dayGuests = useMemo(
@@ -192,6 +206,26 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }} className="mb-10 empty:mb-0">
           <YourTicketAccess eventId={eventId} eventName={event.name} onNavigate={onNavigate} />
         </motion.div>
+
+        {/* Recurring: pick a session → that night's guests. Tickets below. */}
+        {series && (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }} className="mb-8">
+            <SessionCarousel
+              days={series.days}
+              selected={series.selected}
+              value={sessionId}
+              onChange={setPickedSessionId}
+              reminderLabel={series.reminderLabel}
+              calendar={series.calendar}
+            />
+          </motion.div>
+        )}
+
+        {series && series.selectedGuests.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }} className="mb-10">
+            <SessionGuests sessionId={sessionId} guests={series.selectedGuests} embedded />
+          </motion.div>
+        )}
 
         {/* Festival Day Bar — pinned day track for multi-day events */}
         {festivalSchedule && (
@@ -307,6 +341,14 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
                     }
                   : undefined
               }
+            />
+          ) : series?.selectedSoldOut ? (
+            <SessionWaitlist
+              dateLabel={series.selected?.dateLabel ?? ''}
+              onPickNext={() => {
+                const next = series.days.find((d) => !d.soldOut && d.primarySessionId !== sessionId);
+                if (next) setPickedSessionId(next.primarySessionId);
+              }}
             />
           ) : (
             <TicketSelector
