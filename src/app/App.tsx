@@ -3,6 +3,9 @@ import { Toaster } from 'sonner';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { AuthProvider } from '@/features/auth/context/AuthContext';
 import { AppRouterProvider } from './router';
+import { installCrossOriginEventGuard } from '@/lib/utils/crossOriginGuard';
+
+installCrossOriginEventGuard();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },

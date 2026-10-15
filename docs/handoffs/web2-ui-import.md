@@ -23,6 +23,8 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - `lib/auth` + `AuthModal` — phone-OTP signup flow via `POST /auth/signup/request_otp`, `/phone_verifications/:id/verify`, and `/auth/signup` with `verification_token`
 - `lib/admission` + `useCheckoutFlow` — G-41 mixed ticket + add-on admission selections with date-scoped add-on lines (closes BACKEND_GAPS #63)
 - `lib/gifts` + `ClaimGiftPage` — recipient gift resolution (`/public/gift_purchases/:id/resolve`), claim (`/claim`), and buyer redelivery (`/orders/:order_id/gift_purchases`)
+- `TicketsEmptyState` — animated colorful layered pass stack (violet, cyan, lime with Admit One, Gem, perforation notches, barcode, and feature badges)
+- `lib/utils/scroll.ts` + `lib/utils/crossOriginGuard.ts` — safe cross-origin iframe scroll helpers and Firefox parent-frame event guard
 
 ## Skipped as noise (no action)
 
@@ -33,13 +35,12 @@ merge. `DESIGN.md` is the design authority; boundaries follow
   `discovery/CountdownBadge`, `discovery/EmptyState` décor, `LineupSection`,
   `OrganizerSection`, `TicketSelector` (ours is a superset), `pages/EventDetailPage`
   (convention only), `TicketTypeCard` (ours is a backend-wired superset).
+- Resale unwired mockups (`ListingDetailSheet`, `SellerHub`, `WithdrawFundsSheet`) — `digis-web` uses backend-wired `BuyListingSheet`, `SellTicketSheet`, `PayoutMethodsSheet`, and live `src/lib/seller-payouts.ts`.
 
 ## Deferred / not ported
 
-- `FeaturedMagazine`, `TopBar` (layout-only)
-- Resale (`ListingDetailSheet`, `SellTicketSheet`), `ProfilePage`, `TicketsEmptyState`
-- `lib/utils/scroll.ts`, `lib/utils/crossOriginGuard.ts`
-- `TransferTicketDialog` Phone/Email toggle — transfers are phone-only by policy
+- `ProfilePage` — mock seller payouts deferred in favor of live backend seller payouts.
+- `TransferTicketDialog` Phone/Email toggle — transfers are phone-only by policy.
 
 ## Blocked on backend (frontend alone can't close)
 

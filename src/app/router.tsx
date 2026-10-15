@@ -28,6 +28,7 @@ import { AuthModal } from '@/features/auth/components/AuthModal';
 import { TopBar } from '@/components/TopBar';
 import { usePaymentReturnConfirmation, useGuestPaymentReturnConfirmation } from '@/lib/payment-return';
 import { closeCheckoutPopup } from '@/lib/checkout-popup';
+import { scrollWindowTo } from '@/lib/utils/scroll';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { Checkout } from '@/features/checkout/pages/CheckoutPage';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -221,7 +222,7 @@ function AppContent() {
     const input = heroSearchInputRef.current;
     const el = heroSearchRef.current;
     input?.focus({ preventScroll: true });
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollWindowTo(el);
   };
 
   useEffect(() => {
