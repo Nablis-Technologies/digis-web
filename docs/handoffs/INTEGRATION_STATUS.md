@@ -7,6 +7,50 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-15e — profile-sheet artwork environment + design-element audit
+
+**Prompt:** "we need to bring the background implementation for the artist and
+organizer pages, check for other design elements like that haven't been imported."
+
+**What landed (frontend only — no backend change):**
+
+- **`src/lib/ui/artworkPalette.ts`** (+ unit test) — the palette the export's profile
+  sheets "compute in the caller" and never shipped. `artworkPalette(rgb, isDark)`
+  derives the **hue** from the artwork's average colour and keeps the glass token
+  **theme-driven**, so contrast can never depend on the artwork. With no artwork it
+  returns the export's brand-hue fallback verbatim (hue 247). Ships only the tokens
+  the sheets consume (`bg0/bg1/glow/glass`).
+- **`SheetEnvironment`** (`features/event-detail/components/`) — the environment
+  block the export repeats inline at each profile sheet: tinted base gradient,
+  blurred/saturated artwork behind the header, radial colour glow. One component,
+  used by all three sheets; it holds the `artwork` guard, so the venue/organizer
+  sheets light up their artwork layer by passing a photo rather than by adding
+  markup.
+- **The environment** is now on all three profile sheets — `ArtistProfileSheet`
+  (`LineupSection.tsx`, artwork = the artist image), `OrganizerProfileSheet`
+  (`OrganizerSection.tsx`) and `VenueProfileSheet` (`VenueMap.tsx`). The lime
+  placeholder banners are gone (the tinted base is the banner now); the organizer
+  and venue sheets take the brand-hue fallback because neither payload carries an
+  artwork yet (venue: the wire-up issue; organizer: no logo field).
+- **Design-element audit** (`docs/handoffs/web2-ui-import.md` → "Design-element
+  audit"): the three sheets above were the only un-imported *atmosphere*. Discovery
+  `EmptyState` décor is intentionally plainer in the app; the tickets empty-state
+  card tint was migrated to the shared glass token deliberately; the export's
+  achievement detail sheet + glow is filed as
+  `.scratch/web2-ui-import/issues/02-achievement-detail-sheet.md` (needs a data
+  surface — no achievement backend).
+- **Found while in the file:** `ArtistProfileSheet` fabricates 3 upcoming + 3 past
+  events when the artist has none (ADR-0002 violation; the organizer sheet does it
+  correctly). Filed as
+  `.scratch/web2-ui-import/issues/03-artist-sheet-fabricated-events.md` — not fixed
+  here (out of scope for the background port).
+
+**Verified:** `npx tsc --noEmit` clean · `npx vitest run` **216/216** · `pnpm build`
+OK · `npx playwright test` **36/36**. Browser (ui-preview, since a live lineup needs
+#36): artist sheet light **and** dark, organizer sheet light **and** dark, venue
+sheet light — the artist sheet's hue tracks the artwork (warm amber from a concert
+photo) rather than the brand violet, in both themes.
+
 ## Session 2026-10-15d — multi-day + recurring dev fixtures (seed-only)
 
 **Prompt:** "yes" → the multi-day/recurring seed fixture (Session 2026-10-15c's

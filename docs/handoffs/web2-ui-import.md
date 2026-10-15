@@ -30,6 +30,7 @@ merge. `DESIGN.md` is the design authority; boundaries follow
 - `lib/gifts` + `ClaimGiftPage` — recipient gift resolution (`/public/gift_purchases/:id/resolve`), claim (`/claim`), and buyer redelivery (`/orders/:order_id/gift_purchases`)
 - `TicketsEmptyState` — animated colorful layered pass stack (violet, cyan, lime with Admit One, Gem, perforation notches, barcode, and feature badges)
 - `lib/utils/scroll.ts` + `lib/utils/crossOriginGuard.ts` — safe cross-origin iframe scroll helpers and Firefox parent-frame event guard
+- `lib/ui/artworkPalette.ts` + `SheetEnvironment` + the profile-sheet **artwork-driven environment** on `ArtistProfileSheet`, `OrganizerProfileSheet` and `VenueProfileSheet` — the export's sheet "background": a tinted base gradient (`bg0 → bg1`), the artwork blurred/desaturated behind the header (`blur(60px) saturate(1.6)`, `scale(1.4)`), and a radial colour glow. The export repeats this block inline at each sheet; here it is one component (`features/event-detail/components/SheetEnvironment.tsx`). The hue comes from the artwork's dominant colour (`useDominantColor`); the glass token follows the app theme, so contrast never depends on the artwork (a wild poster can't wreck legibility). No artwork → the export's brand-hue fallback verbatim, and no placeholder image (ADR-0002). The lime placeholder banners are gone — the tinted base is the banner now. `artworkPalette` currently ships only the environment tokens the sheets consume (`bg0/bg1/glow/glass`); the export's content tokens (`ink`/`muted`/`faint`/…) come back with the consumer that needs them. Unit-tested in `artworkPalette.test.ts` (2026-10-15)
 
 ## Skipped as noise (no action)
 
@@ -40,6 +41,8 @@ merge. `DESIGN.md` is the design authority; boundaries follow
   `discovery/CountdownBadge`, `discovery/EmptyState` décor, `LineupSection`,
   `OrganizerSection`, `TicketSelector` (ours is a superset), `pages/EventDetailPage`
   (convention only), `TicketTypeCard` (ours is a backend-wired superset).
+  _Exception: the artist/organizer profile-sheet **artwork environment** was skipped
+  with them but is now ported — see Ported above._
 - Resale unwired mockups (`ListingDetailSheet`, `SellerHub`, `WithdrawFundsSheet`) — `digis-web` uses backend-wired `BuyListingSheet`, `SellTicketSheet`, `PayoutMethodsSheet`, and live `src/lib/seller-payouts.ts`.
 
 ## Deferred / not ported
@@ -90,6 +93,31 @@ step instead of inventing a shape.
 - **Reserved (unwired) scaffolding — kept deliberately, not wired:** `DaySwitcher`, `FestivalDayStrip` (superseded by `FestivalDayBar`), and the recurring-only vocabulary (`OccurrenceStrip`, `SessionPill`, `FormatTag` recurring branch, and `SessionSwitcher` — unused in the web2 export too). Dead in the export too; they stay as reserved surface until a backend surface justifies them. Do NOT wire them to invented data.
 - **Wired this pass:** `SessionGuests` under the festival day bar (per-day guests / full roster on "All days" via `guestsForDay`) and `EventEndedNotice` for the ended state (`eventDateSpanLabel` + Browse CTA), plus the recurring session branch (`SessionCarousel` → that session's `SessionGuests` → `SessionWaitlist` when a session is sold out). Guarded by `e2e/festival.spec.ts` and `e2e/recurring.spec.ts` (both route-mocked — the festival spec asserts per-day rosters, blocked by #36; the series spec waits on #68). The live seed festival is covered separately by `e2e/festival-live.spec.ts`.
  
+## Design-element audit (2026-10-15)
+
+A full export→app comparison of *presentation/atmospheric* elements (backgrounds,
+palettes, glows, masks, reflections, scrims), not logic. Findings:
+
+- **Profile-sheet artwork environments** (artist / organizer / venue) — the same
+  `ArtworkPalette`-driven
+  environment in all three of the export's sheets; the app had none. **Ported** for
+  all three (see Ported above). The artist sheet keeps the app's compact header
+  rather than the export's 320 px hero band — the environment is the same either way.
+- **Discovery `EmptyState` scene** (export `features/discovery/components/EmptyState.tsx`)
+  — animated aurora blobs, a drifting starfield, a colour pass-stack and a
+  CTA shine-sweep. The app's version is deliberately plainer: its docstring states
+  "no aurora blobs, starfields, or glow shadows". **Left as-is** (intentional).
+- **Achievement detail sheet + radial glow** (export `features/profile/pages/ProfilePage.tsx`) —
+  each achievement opens a colour-themed bottom sheet with a halo glow; the app
+  renders achievements as static, non-interactive rows. **Not ported** — needs a
+  product decision (there is no achievement-detail data surface). Filed below.
+- **Tickets empty-state card tint** (export `features/tickets/components/TicketsEmptyState.tsx`) —
+  a warm sepia-tinted glass card vs the app's standard `glass()` surface. **Left
+  as-is** (the app migrated to the shared glass token; the animated pass stack IS ported).
+
+Everything else the export renders is either already ported, a superset in the app,
+or an ADR-0007 boundary divergence (`border` → `boxShadow` ring / `glassEdge`).
+
 ## Verification
- 
-`npx tsc --noEmit` clean · `npx vitest run` 213/213 · `npx playwright test` 36/36 · `pnpm build` OK.
+
+`npx tsc --noEmit` clean · `npx vitest run` 216/216 · `npx playwright test` 36/36 · `pnpm build` OK.
