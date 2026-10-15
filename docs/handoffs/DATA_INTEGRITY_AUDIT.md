@@ -150,22 +150,45 @@ lineup / organizers / answer_edit_window_hours / price_foreign_from_minor /
 foreign_currency` (+ `public_guest_limit` on 2 events). No dead admission key
 remains anywhere.
 
-## Open seed task — no genuinely multi-day or recurring event (fixture, not a gap)
+## Seed task DONE (2026-10-15) — genuinely multi-day + recurring fixtures
 
-`e2e/festival.spec.ts` and `e2e/recurring.spec.ts` are **route-mocked** because
-the dev seed has neither shape:
+`e2e/festival.spec.ts` and `e2e/recurring.spec.ts` were **route-mocked** because
+the dev seed had neither shape:
 
 - `resolveFestivalSchedule` (`src/lib/festival.ts`) needs **one** event with more
-  than one `EventDate`; every seed event has exactly one (multi-day is modelled as
-  separate "Day 2" events, e.g. `unity-in-beats-day-2`).
+  than one `EventDate`; every seed event had exactly one (multi-day was modelled
+  as separate "Day 2" events, e.g. `unity-in-beats-day-2`).
 - The recurring UI needs a `RecurrenceRule`; the engine exists (it is fully
-  modelled — see #68) but no event carries a rule in dev. `addis-music-fest-2026`
+  modelled — see #68) but no event carried a rule in dev. `addis-music-fest-2026`
   *did* carry a rule, but it is in `TEST_EVENT_SLUGS` and the mock-mirror deletes
   it (deliberately — it polluted discovery).
 
-**Fix (dev setup):** add a fixture in `db/seeds/dev_demo.rb` — loaded last, so it
-is not purged — with a 3-date festival (per-day participants via `event_date_id`)
-and a weekly series whose rule is materialised. The **festival** half is visible
-immediately; the **recurring** half only renders once #68 lands (until then the
-seed is preparation, per the practice above).
+Both now exist in `db/seeds/dev_demo.rb` — loaded last, so the mock-mirror does not
+purge them (the slugs are exempted from its stale sweep via `DEV_FIXTURE_SLUGS` in
+`db/seeds_events.rb`). They are destroyed and rebuilt on each run, like the events
+the mock-mirror owns, so a partial fixture self-heals.
+
+| Fixture | Shape | Live today |
+|---|---|---|
+| `addis-sound-festival-2026` | 3 consecutive nights, a per-day bill (`event_date_id`), a `Full Festival Pass` (3 admissions, allocated across all three dates) + one single-night ticket per date | ✅ day bar, all-days pass vs per-night tiers, per-day ticket scoping all render |
+| `thursday-jazz-sessions` | `FREQ=WEEKLY;BYDAY=TH` rule materialised to 7 Thursday sessions (bounded by `generated_until`), a guest pinned per session, one `choose_one` GA offer allocated across the run | ⏳ dates + rule exist; the surface stays inert until #68 gives the payload a series signal — it currently renders as a multi-day event (the documented fallback) |
+
+Dates are relative to the run (the mock-mirror's convention) so the fixture never
+rots into a past event. `e2e/festival-live.spec.ts` pins the live festival; the
+per-day roster stays absent while `event_participants` is not public (#36), pinned
+as a contract guard.
+
+**Two seed landmines found while building this** (both fixed in `seeds_events.rb`):
+
+1. `catalog_product_date_allocations` carries a **deferred constraint trigger**
+   (`trg_date_allocation_sum_check`, `DEFERRABLE INITIALLY DEFERRED`): a product's
+   allocations must cover every granted date and sum to exactly 10,000 **at
+   commit**. Inserting one date at a time commits each alone (sum 3,334) and the
+   commit is rejected — a multi-date product's rows must land in one transaction.
+   `seed_ticket_product!` now wraps them.
+2. `seed_ticket_product!` hardcoded `admissions_per_unit: 1`, a `fixed` date
+   selection and a single covered date, so it could not express a pass or a series
+   offer. It now takes `covered_dates` / `admissions_per_unit` / `date_selection`
+   (single-date callers unchanged), and the inline event deletion the mirror used
+   is extracted as `destroy_event!` for reuse.
 

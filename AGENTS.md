@@ -245,12 +245,16 @@ succeeds — Chapa V2 direct transfer; frontend rewired to the flat
 ## Data integrity (seeds + e2e) — update after changing things
 
 The dev seed chain (`digis_backend`: `db/seeds/base.rb` + `db/seeds/preview.rb`
-+ `db/seeds_events.rb`) and the e2e fixtures are **downstream of the backend
-contract**. After ANY backend sync or change, sweep them before finishing:
++ `db/seeds_events.rb`, then the dev-only fixtures in `db/seeds/dev_demo.rb` —
+loaded last, so the mock-mirror does not purge them) and the e2e fixtures are
+**downstream of the backend contract**. After ANY backend sync or change, sweep
+them before finishing:
 
-1. **New surface needs data to be exercisable?** Add a seed fixture — e.g. seller
-   payouts need a verified destination + a positive ledger balance; gated offers
-   need an `AccessCode`/`Invitation` row.
+1. **New surface needs data to be exercisable?** Add a seed fixture — `dev_demo.rb`
+   is the home for one-off dev fixtures (seller payouts need a verified
+   destination + a positive ledger balance; gated offers need an
+   `AccessCode`/`Invitation` row; a multi-day festival / recurring series needs
+   more than one `EventDate` / a `RecurrenceRule`).
 2. **Removed/renamed a field the seeds still write?** Clean the seeds. (The dead
    `event_setting.config` `rsvp_*`/`event_type` keys were the example; the seeds no
    longer write them — cleaned 2026-10-15, see `DATA_INTEGRITY_AUDIT.md`.) **Seed

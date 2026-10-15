@@ -560,7 +560,12 @@ without a series signal, so the detail page renders nothing rather than invent
 the series (ADR-0002). The adapter reads a **provisional** shape
 (`recurrence` / `is_recurring`, `src/lib/events-adapter.ts`) that the payload
 does not carry yet. The consumer can only flatten a series into a plain list of
-dates, and `EventCard.cardFormat()` never returns `recurring`.
+dates, and `EventCard.cardFormat()` never returns `recurring`. **Visible live now
+that the seed carries a real materialised series** (`thursday-jazz-sessions`,
+2026-10-15 — 7 materialised Thursday sessions): `GET /public/events/thursday-jazz-sessions`
+renders as a **7-day multi-day event** with an "All 7 days" ticket scope — the
+documented fallback — instead of a session rail, because nothing in the payload
+says the dates came from one rule.
 
 **Fix (backend):** expose a series signal on the public payload — e.g.
 `recurrence: { rule_id, rrule, active }` (or `is_recurring`) on

@@ -70,9 +70,11 @@ vocabulary) is gated on the *confirmed* wire shape.
   no series. *(done)*
 - Unit: `cardFormat` returns `recurring` only when the signal is present;
   `cardFormatLabel` maps each format. (`src/components/EventCard.test.ts`) *(done)*
-- E2E: `e2e/recurring.spec.ts` — a route-mocked recurring event (the seed has none):
-  the rail renders (not the festival track), picking a session swaps the guests, the
-  calendar sheet confirms a session. *(done)*
+- E2E: `e2e/recurring.spec.ts` — a route-mocked recurring event (the seed now
+  carries a real series — `thursday-jazz-sessions` — but the payload still sends no
+  series signal, so it cannot be driven live yet): the rail renders (not the
+  festival track), picking a session swaps the guests, the calendar sheet confirms
+  a session. *(done)*
 
 ## Comments
 
@@ -90,3 +92,11 @@ vocabulary) is gated on the *confirmed* wire shape.
   `ReminderToggle` is display-only until a backend reminder surface exists.
   Step 6 (`OccurrenceStrip`/`SessionPill`) is the only remaining item and stays
   gated on the shape, so the ticket keeps `needs-triage`.
+- 2026-10-15 (seed pass): the dev seed now carries a genuine multi-day festival
+  (`addis-sound-festival-2026` — its half renders live, pinned by
+  `e2e/festival-live.spec.ts`) **and** a real materialised series
+  (`thursday-jazz-sessions`: a `FREQ=WEEKLY;BYDAY=TH` rule expanded to 7 Thursday
+  sessions with a guest pinned per session). Nothing about this ticket changes —
+  the payload still carries no series signal — but when #68 resolves, the surface
+  is exercisable live against the seed with no further seed work. Until then the
+  series renders as a 7-day multi-day event, which is the gap made visible.

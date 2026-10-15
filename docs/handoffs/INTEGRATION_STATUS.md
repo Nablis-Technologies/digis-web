@@ -7,6 +7,56 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-15d — multi-day + recurring dev fixtures (seed-only)
+
+**Prompt:** "yes" → the multi-day/recurring seed fixture (Session 2026-10-15c's
+filed seed task).
+
+**What landed (backend `chore(dev)`, seed only — no product change, LOCAL by
+convention):**
+
+- **`db/seeds/dev_demo.rb`** now carries both fixtures, destroyed and rebuilt each
+  run:
+  - `addis-sound-festival-2026` — 3 consecutive nights, a per-day bill
+    (`event_date_id`), a `Full Festival Pass` (3 admissions, one allocation per
+    date) plus a single-night ticket per date.
+  - `thursday-jazz-sessions` — `FREQ=WEEKLY;BYDAY=TH` materialised to 7 Thursday
+    sessions (bounded by `generated_until`; unbounded would materialise ~500 and
+    the public payload would carry them all — #70), a guest pinned per session,
+    one `choose_one` GA offer allocated across the run.
+- **`db/seeds_events.rb`**: `DEV_FIXTURE_SLUGS` exempted from the stale sweep (they
+  are published/public/admin-created like the mirror, so it would otherwise
+  destroy them); `seed_ticket_product!` generalised to a multi-date offer
+  (`covered_dates` / `admissions_per_unit` / `date_selection`); the mirror's inline
+  event deletion extracted as `destroy_event!`.
+- **Deferred constraint trigger caught:** `trg_date_allocation_sum_check`
+  (`DEFERRABLE INITIALLY DEFERRED`) requires a product's allocations to cover every
+  granted date and sum to exactly 10,000 **at commit** — one-date-at-a-time inserts
+  commit alone (sum 3,334) and are rejected. The builder now inserts them in one
+  transaction.
+
+**Verified (live dev backend, after a full dev reseed):** totals move exactly as
+expected — products 56→61, ticket types 110→115, allocations/accesses 110→123 (the
+mirror's own rows unchanged); no product whose allocations don't sum to 10,000; no
+allocation without an access grant. `GET /public/events` lists both;
+`GET /public/events/addis-sound-festival-2026` returns 3 dates, the pass
+(`admissions_per_unit: 3`) and 3 day tickets; the series returns 7 dates and its
+`choose_one` offer. **In the browser:** the festival renders the day bar
+(`All days` / `AUG 1–3` / `DAY 1–3`), the pass-vs-day split (`All 3 days` → `From
+ETB 1,500` → `Full Festival Pass 1,500 / 3 · Admits 3`), and picking a day
+re-scopes the selector (`Day 2 · Aug 2`). The series renders as a **multi-day
+event** — the #68 fallback (no series signal in the payload), and `Special guests`
+is absent because `event_participants` is not public (#36) — so both gaps are now
+demonstrable live.
+
+**Frontend:** `e2e/festival-live.spec.ts` (2 tests) exercises the fixture end to
+end and pins the #36 contract guard. Checks: `tsc` clean · vitest **213/213** ·
+build OK · Playwright **36/36** (was 34).
+
+**Still blocked (unchanged):** the recurring surface renders only when the payload
+carries a series signal (#68); per-session ticket scoping waits on #69; the rosters
+wait on #36.
+
 ## Session 2026-10-15c — seed issues pulled out of the gap list (seed-only)
 
 **Prompt:** "make sure we don't have seed issues reported as backend gaps."
@@ -36,6 +86,7 @@ organizers/answer_edit_window_hours/price_foreign_from_minor/foreign_currency` +
 **Filed as a seed task (not a gap):** the dev seed still has no genuinely
 multi-day or recurring event (`festival.spec.ts` / `recurring.spec.ts` are
 route-mocked because of it). Design + status in `DATA_INTEGRITY_AUDIT.md`.
+→ **Done in Session 2026-10-15d.**
 **Frontend follow-up (not done here):** switch `VenueMap` off the name→coords
 stopgap onto `GET /venues/:id` and render the photos.
 
