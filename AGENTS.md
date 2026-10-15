@@ -199,6 +199,12 @@ sweep is the rule that prevents that.
   public-event search/filter/sort/pagination (#49), wallet answers + capability
   flags + buyer history (#50), events-by-followable + profile stats (#51),
   venue/artist detail omit `is_following` (#52).
+- **#68** Public event payload exposes no recurrence/series signal (no
+  `recurrence`/`is_recurring`, `source_key` not in the public `event_dates[]`)
+  even though the backend models recurrence and materializes dates → the
+  recurring consumer UI stays parked. Broadens **#36**: `EventParticipant`
+  already models a per-date link (`event_date_id`); expose it when the public
+  lineup surface lands.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),

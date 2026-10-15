@@ -7,6 +7,30 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-15 — web2 festival wiring + backend gap sweep
+
+**Wired (frontend only):** `SessionGuests` under the multi-day festival day bar
+(per-day guests via `guestsForDay`; full roster on "All days") and
+`EventEndedNotice` for ended events (date-span label + Browse CTA). Unit +
+route-mocked e2e coverage in `e2e/festival.spec.ts`.
+
+**Backend gaps refreshed (see `BACKEND_GAPS.md`):**
+- **#68 filed (open — degrading).** Public event payload exposes no recurrence /
+  series signal — no `recurrence`/`is_recurring`, and the date serializer's
+  `source_key` is absent from the public `event_dates[]` (live probe 2026-10-15).
+  The backend has a full recurrence engine (`Events::RecurrenceRule` +
+  `Recurrence::{Configure,Materialize,Activate,Deactivate}` +
+  `MaterializeRecurrenceJob`), so only the public projection is missing → the
+  recurring consumer UI stays parked.
+- **#36 addendum filed (informational).** `EventParticipant` **does** model a
+  per-date link (`event_date_id`, optional), so per-day festival bills are
+  derivable; only the public lineup projection is missing. The frontend currently
+  round-robins the roster across days (`resolveFestivalSchedule`) — an invented
+  assignment (ADR-0002) to drop once #36 lands.
+
+**Verified:** `tsc` clean · vitest **192/192** · build · festival e2e **2/2**
+(Playwright 31 deterministic).
+
 ## Session 2026-10-14 — G-14 (Profile Names) & G-47 (Avatar Management) wired
 
 **Backend alignment:**

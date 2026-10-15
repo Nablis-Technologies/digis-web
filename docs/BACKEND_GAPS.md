@@ -128,8 +128,9 @@
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
 | 66 | resolved 2026-10-05 | `ticket_id` added to `Marketplace::ResaleListingSerializer` and policy `SELLER_FIELDS` (commit `360f9c7`); frontend wired in `resaleModule` |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
+| 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
 | 11 | informational | event-slug `slug_history` 301 table missing (slug safety partial) |
-| 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
+| 36 | informational | public payload lacks event participants/lineup (real; no public event→artist link; participants **do** model a per-date link — see #36 addendum). Venue media/coords are **frontend-fixable** via `GET /venues/:id` |
 | 38 | informational | `requires_ticket` exposed but not enforced at quote/order time |
 | 1 | resolved 2026-09-30 | public `event_setting.config` is now `%w[public_guest_limit]` — the old "widen to 17 keys" ask is moot; the fields it held are covered by #53/#44 |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
@@ -521,6 +522,47 @@ In the Ethiopia market and globally, many users have only a single mononym or si
 3. `full_name`: Already uses `[ first_name, last_name ].compact.join(" ")` which naturally produces just `first_name` when `last_name` is `nil` or empty.
 
 **Status: open — degrading (filed 2026-10-14; frontend mitigates via `splitFullName` and `toAuthUser` display deduplication).**
+
+
+### #68. Public event payload exposes no recurrence / series signal — the recurring consumer UI is unbuildable
+
+The backend **models recurrence fully**: `Events::RecurrenceRule`
+(`app/models/events/recurrence_rule.rb`, table `events_recurrence_rules`),
+the `Events::Recurrence::{Configure,Materialize,Activate,Deactivate}` services
+(`app/services/events/recurrence/*.rb`, all four present), and
+`MaterializeRecurrenceJob` (`app/jobs/events/materialize_recurrence_job.rb`)
+expand an RRULE into concrete `events_event_dates` rows tagged
+`source_key LIKE "recurrence-<rule_id>-%"` (`recurrence_rule.rb:27-31`). An
+organizer-side API exists (`Events::RecurrenceRulesController`,
+`config/routes.rb:108` `resource :recurrence_rule`, only: show/create/update/
+destroy) with `Events::RecurrenceRuleSerializer` (`id, event_id, rrule,
+timezone, dtstart_local, duration_seconds, generated_until, active, exdates,
+rdates, …`).
+
+**But the consumer payload carries none of it.** Live probe (2026-10-15) of
+`GET /public/events/<slug>`:
+- top level: `id, title, slug, description, visibility, timezone, currency,
+  published_at, created_at, categories, event_dates, event_media,
+  event_organizations, event_setting, organization` — **no `recurrence` /
+  `is_recurring` / `series` field**;
+- `event_dates[]`: `id, name, doors_at, starts_at, ends_at, status, venue` — the
+  date serializer's `source_key`
+  (`app/serializers/events/event_date_serializer.rb:12`) is **not** in the
+  public projection, so materialized recurrence dates are indistinguishable
+  from hand-added ones.
+
+**Why it matters:** the ported web2 recurring UI (weekly series carousel,
+session grouping, per-session waitlists, the `recurring` `FormatTag`) cannot be
+wired without inventing the series (ADR-0002), so it stays parked. The consumer
+can only flatten a series into a plain list of dates, and
+`EventCard.cardFormat()` never returns `recurring`.
+
+**Fix (backend):** expose a series signal on the public payload — e.g.
+`recurrence: { rule_id, rrule, active }` (or `is_recurring`) on
+`EventListSerializer` / `EventDetailSerializer`, and surface `source_key` (or a
+`series_id`) on the public `event_dates[]` so the client can group sessions.
+
+**Status: open — degrading (filed 2026-10-15; frontend renders multi-day as a flat day list — no invented series).**
 
 
 ### #54. Discovery availability has no backend source
@@ -1210,6 +1252,25 @@ seed carries the data.
 **Fix (backend, lineup only):** add `participants`/`artists` to the public event
 serializers (or a public participants endpoint). Venue media/coords: no backend
 change needed — **seed must populate coordinator lat/lng + photos**.
+
+### #36 addendum — expose the participant→date link when the lineup goes public
+
+The backend **already models per-day participants**:
+`Events::EventParticipant` has `belongs_to :event_date, optional: true`
+(`app/models/events/event_participant.rb:11-12`, `event_date_id` in its ransack
+attrs) — a participant is either event-level (`event_date_id: null`) or pinned
+to one `event_date`. So a real per-day festival bill is derivable from the
+backend; only the public projection is missing.
+
+Today the frontend compensates with a **client-side distribution**:
+`resolveFestivalSchedule` round-robins the event roster across dates
+(`src/lib/festival.ts`), so the festival "day lineup" and per-day "Special
+guests" show an invented assignment (ADR-0002). When #36's public lineup surface
+lands, it should carry each participant's `event_date_id` (or a per-date
+`participants` array) so the client can drop the round-robin and let
+event-level participants fall back to "all days".
+
+**Status: informational (filed 2026-10-15; broadens #36, no separate number).**
 
 ### #37. No public waitlist-join or access-request endpoint
 
