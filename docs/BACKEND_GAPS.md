@@ -153,6 +153,18 @@
 > large). The **same adapter** has the real, opposite defect: the **response** fee
 > conversion (`minor_amount(...) * 100`, `chapa_client.rb:230`) inflates the real
 > minor-unit `service_fee`/`charge` by 100× → filed as **#71** (degrading).
+>
+> **Correction 2026-10-16d — false-positive re-check of every remaining open gap:
+> no additional whole-gap false positives; #53 re-scoped.** Every open item
+> (blocking **#53/#57/#65**; degrading **#36/#44/#46/#48/#49/#50/#51/#67/#68/#69/#70/#71**)
+> was re-tested by **direct live observation** (the discipline #60 taught): HTTP
+> probes on `:3000` for payload/param claims, route greps + live status codes for
+> endpoint claims, and code/DB reads where the claim is about code. **All reproduce
+> — none is a second #60.** The one correction is **#53**, whose "lost field" list
+> overcounted: re-scoped to **`age_restriction` + `seat_map`** (both consumed and
+> genuinely absent); `rating` / `answer_edit_window_hours` / `price_foreign_from_minor`
+> were dropped as **unconsumed** (`price_foreign` is additionally derivable from the
+> served per-currency `price_options`) → recorded in `NOT_BACKEND_GAPS.md`.
 
 ## Status key
 
@@ -171,7 +183,7 @@ Open items are listed first; resolved items below (sections keep an in-place
 
 | # | Status | Summary |
 |---|---|---|
-| 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `rating`; lineup → #36). (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
+| 53 | open — blocking | public detail payload drops **`age_restriction`** + **`seat_map`** (both consumed + genuinely absent; there is no `seat_map` model). Re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as **unconsumed** (`price_foreign` is derivable from served per-currency `price_options`); lineup → #36. (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
 | 36 | open — degrading | public payload lacks event participants/lineup — a backend **serializer** gap (no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`) |
@@ -341,28 +353,50 @@ and `EventDetailSerializer` carries no replacement attributes, so the
 previously-public config keys have no source in the public API (grep of `app/`
 confirms the strings are gone).
 
-**Re-scoped 2026-10-02 — the genuinely lost non-admission data (real gap):**
-`age_restriction`, `seat_map`, `rating`, `answer_edit_window_hours`,
-`price_foreign_from_minor`. No substitute exists: the event-detail Age info card,
-the SeatMap step, and the discovery rating surface lose their data. `lineup` is
-tracked under #36 (needs a participants/artists surface, not just a config key).
+**Re-scoped 2026-10-16 — the lost, *frontend-consumed* fields are
+`age_restriction` + `seat_map` only.** A live re-check of the five fields the
+2026-10-02 re-scope listed found the other three have **no frontend consumer**
+(the public payload exposes none of them — verified live 2026-10-16):
+
+- **`age_restriction`** — consumed by the event-detail Age card
+  (`EventDetailPage.tsx:200`, `EventInfoRail.tsx:50`); renders "Any Age" absent. **Real.**
+- **`seat_map`** — consumed by the checkout Seat step (`EventDetailPage.tsx:459`
+  → `CheckoutPage` → `useCheckoutFlow#sectionsForTier`); the step is skipped when
+  absent. **Real — but** there is **no `seat`/`seat_map` column or model** anywhere
+  in the backend (grep of `db/structure.sql` + `app/`), so this is a missing
+  *feature*, not merely a serializer projection.
+- **`rating`** — **unconsumed**. The only `.rating` reader is the *artist* rating
+  (`LineupSection.tsx:29`), which comes from the lineup and is **#36**'s gap; no
+  event-level rating surface exists (`EventCard`/discovery render none).
+- **`answer_edit_window_hours`** — **unconsumed**: threaded `EventDetailPage` →
+  `CheckoutPage` → `useCheckoutFlow`, but never read in the hook body. The backend's
+  real correction rule is per-ticket-type
+  (`Ticketing::Answers::Revise#correction_window_closed?` →
+  `ticket_type.transfer_cutoff_seconds_before_start`), not a per-event hours value.
+- **`price_foreign_from_minor`** — **unconsumed**, and **derivable**: the public
+  products payload already serves per-currency `price_options[]`
+  (`{ currency, amount_minor, … }`, `Catalog::Public::EventProductSerializer`), so a
+  foreign price is just a non-event-currency option.
+
+The three dropped fields are recorded in `NOT_BACKEND_GAPS.md` (2026-10-16).
+`lineup` is tracked under #36.
 
 The other two groups are **not** gaps and live in `NOT_BACKEND_GAPS.md`: the
 `rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model
 (see #44), and `featured` is superseded by its own paid endpoint (2026-10-15).
 
-**Why it blocks:** those event-detail modules can only render absent. ADR-0002
-forbids fabricating them.
+**Why it blocks:** the Age card and the SeatMap step can only render
+absent/fallback. ADR-0002 forbids fabricating them.
 
-**Fix:** expose the non-admission public-safe fields on the detail serializer —
-at minimum `age_restriction`, `seat_map` (and `lineup` via #36); decide explicitly
-whether `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` are
-part of the public contract (`featured` is now its own endpoint).
+**Fix:** expose `age_restriction` on the public detail serializer; add a real
+assigned-seating model for `seat_map` (none exists today) — or decide the SeatMap
+step is out of scope. `lineup` is #36.
 
-**Status: open (re-scoped 2026-10-02; `featured` superseded 2026-10-15 by the
-Featured endpoint — see the Resolved archive) — filed 2026-09-30 (verified
-against `326f6a3` by code read + live `GET /public/events/:slug` →
-`event_setting.config == {}`).**
+**Status: open — re-scoped 2026-10-16 to `age_restriction` + `seat_map`**
+(`rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as
+unconsumed; `featured` superseded 2026-10-15). Filed 2026-09-30 (verified against
+`326f6a3` by code read + live `GET /public/events/:slug` →
+`event_setting.config == {}`).
 
 ### #56. Signup cannot take over an existing (shadow) phone — RESOLVED 2026-10-16
 

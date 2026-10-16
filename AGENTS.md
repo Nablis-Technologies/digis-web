@@ -169,9 +169,11 @@ sweep is the rule that prevents that.
 log at the top of `BACKEND_GAPS.md`; that file's at-a-glance table is
 authoritative.)
 
-- **#53** Public event payload drops the non-admission detail fields
-  (`age_restriction` / `seat_map` / `rating`; lineup → #36) → those detail modules
-  render absent (ADR-0002 forbids inventing them).
+- **#53** Public detail payload drops **`age_restriction`** + **`seat_map`**
+  (re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` /
+  `price_foreign_from_minor` dropped as unconsumed; there is no `seat_map` model) →
+  the Age card + SeatMap step render absent (ADR-0002 forbids inventing them).
+  lineup → #36.
 - **#57** No password reset / forgot-password endpoint (phone-first reset would
   reuse the existing OTP infra).
 - **#60 (withdrawn 2026-10-16 — FALSE POSITIVE)** The claim that Chapa `amount` is
@@ -226,6 +228,12 @@ enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH /u
 positive** (Chapa V2 is minor-unit on both request and response; the request is
 correct) → moved to `NOT_BACKEND_GAPS.md`; the same adapter's genuine 100× defect
 (provider-fee response parsing) was filed as **#71**.
+
+**Re-checked 2026-10-16d:** every other open gap was re-verified by **direct live
+observation** (HTTP probes + route greps + code/DB reads) — **no additional
+whole-gap false positives**. The one correction is **#53**, re-scoped to
+`age_restriction` + `seat_map` (the other three listed fields are unconsumed →
+`NOT_BACKEND_GAPS.md`). See the 2026-10-16d note at the top of `BACKEND_GAPS.md`.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),

@@ -32,6 +32,7 @@
 | 60 | false positive | "Chapa `amount` sent 100× too large" — Chapa V2 is **minor-unit on both request and response**, so the request is correct (the real unit defect is `BACKEND_GAPS.md` **#71**) |
 | 1 | re-scoped | public config is `%w[public_guest_limit]`; the "widen to 17 keys" ask is moot (lost fields → #53) |
 | 53 (superseded half) | superseded | `event_type` / `access_mode` / `rsvp_*` are per-offer now (#44) |
+| 53 (unconsumed half) | reclassified / informational | `rating` (event-level) / `answer_edit_window_hours` / `price_foreign_from_minor` have **no frontend consumer**; `price_foreign` is derivable from served per-currency `price_options` — dropped from #53 2026-10-16 |
 | 44 (seed note) | setup | the inert keys were only ever written by the seeds — a seed cleanup, not the gap |
 | 36 (venue half) | setup/seed | venue geo/media was a **seed** omission — fixed in the seed 2026-10-15 |
 | 11 | informational | event-slug `slug_history` 301 table missing (no frontend impact) |
@@ -115,6 +116,31 @@ but not required.
 
 **Status: frontend-fixable — reclassified 2026-10-02.** Removed from the open-gap
 count; the frontend can read follow state via `GET /users/:id/following`.
+
+### #53 (unconsumed half) — `rating` / `answer_edit_window_hours` / `price_foreign_from_minor`
+
+**Not frontend needs (dropped from the `BACKEND_GAPS.md` #53 field list
+2026-10-16).** #53 was filed for the non-admission detail fields the public event
+payload stopped exposing. A live re-check of the five fields the 2026-10-02
+re-scope listed found only `age_restriction` + `seat_map` are actually consumed by
+the app; the rest are **not needs**:
+
+- **`rating` (event-level)** — **no consumer**. The only `.rating` reader is the
+  *artist* rating from the lineup (`LineupSection.tsx:29`), which is #36's gap; no
+  event-level rating surface exists (discovery/`EventCard` render none).
+- **`answer_edit_window_hours`** — **no consumer**: passed through the checkout
+  props into `useCheckoutFlow`, but never read in the hook body. The backend models
+  the correction window as the per-ticket-type
+  `transfer_cutoff_seconds_before_start` (`Ticketing::Answers::Revise`), not a
+  per-event hours value.
+- **`price_foreign_from_minor`** — **no consumer**, and **derivable**: the public
+  products payload already serves per-currency `price_options[]`
+  (`currency`, `amount_minor`, `active_from`, `active_to`,
+  `Catalog::Public::EventProductSerializer#price_options`), so an
+  international/foreign price is simply a non-event-currency price option.
+
+**Status: dropped from #53 2026-10-16 (no consumer / derivable).** #53's remaining,
+real part is `age_restriction` + `seat_map`.
 
 ### #59. Invitation link — frontend contract done; the dev sender is SETUP, not a gap
 

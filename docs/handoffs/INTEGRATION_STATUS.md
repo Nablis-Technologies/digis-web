@@ -7,6 +7,52 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-16d — every remaining open gap re-checked live: no new false positives; #53 re-scoped
+
+**Prompt:** "check the other gaps if they are false positives as well."
+
+Applied the #60 discipline (direct observation over inference) to **all 14 remaining
+open gaps** — blocking #53/#57/#65; degrading #36/#44/#46/#48/#49/#50/#51/#67/#68/#69/#70/#71.
+Method: live HTTP on `:3000` for payload/param claims, route greps + live status
+codes for endpoint claims, and code/DB reads where the claim is about code.
+
+**Result: no additional whole-gap false positives — every gap reproduces.** Highlights:
+
+| # | Decisive live/code evidence |
+|---|---|
+| 57 | no `password_reset`/`forgot` route in `config/routes.rb` (grep) |
+| 65 | DB: 0 `SellerPayout` rows, none `succeeded`; the claim rests on the 2026-10-02 live drill (`invalid_format`) |
+| 36 | `GET /public/events/:slug` has no `participants`/`artists`/`lineup`; no public event→artist link |
+| 44 | live `event_setting.config == {}`; no app code reads `access_mode`/`rsvp_*` |
+| 46 | no saved/favourites/reviews routes; **`GET /feed` → 500** (route declared, no controller) |
+| 48 | no preferences/2FA/change-password routes (only `notification_preferences`) |
+| 49 | `?q=`/`?search=`/`?city=`/`?sort=`/`?category=`/`?price_max=`/`?from=&to=` all return the same 33; `/public/cities` → 404 |
+| 50 | routes: orders `only: create`, registrations `only: :show`, tickets `only: :index`, ticket_transfers/credential_claims `only: []`; wallet serializer omits answers/edit-window/capability flags; notifications `only: index/show` + member `read` |
+| 51 | no nested `:events` under venues/artists/organizations; no profile stats |
+| 67 | `validates :first_name, :last_name, presence: true` (+ `null: false`) |
+| 68 | no `recurrence`/`is_recurring`/`series` in the detail payload; `event_dates[]` has no `source_key` |
+| 69 | public product payload has no `date_allocations` |
+| 70 | `GET /public/events/thursday-jazz-sessions` → 7 dates, no window/limit/param |
+| 71 | re-confirmed by the 2026-10-16 Chapa sandbox probe (`service_fee:3` → stored `300`) |
+
+**One correction — #53 re-scoped (`age_restriction` + `seat_map` only).** Of the five
+fields the 2026-10-02 re-scope listed, three have **no frontend consumer**:
+`rating` (event-level — the only `.rating` reader is the *artist* rating in
+`LineupSection`, i.e. #36); `answer_edit_window_hours` (threaded through checkout but
+never read; the backend's real rule is the per-ticket-type
+`transfer_cutoff_seconds_before_start`); and `price_foreign_from_minor` (unused, and
+derivable from the served per-currency `price_options`). Only `age_restriction` +
+`seat_map` are consumed and genuinely absent. Dropped the three →
+`NOT_BACKEND_GAPS.md`; note `seat_map` has **no backend model at all**, so it is a
+missing feature, not just a serializer projection.
+
+**Docs updated:** `BACKEND_GAPS.md` (2026-10-16d log note; #53 section re-scoped;
+at-a-glance row), `NOT_BACKEND_GAPS.md` (at-a-glance row + "#53 (unconsumed half)"
+section), `AGENTS.md` (#53 bullet + re-check note).
+
+**Still open:** blocking — #53 (`age_restriction`+`seat_map`), #57, #65. Degrading —
+#36, #44, #46, #48, #49, #50, #51, #67, #68, #69, #70, #71.
+
 ## Session 2026-10-16c — #60 re-checked live: FALSE POSITIVE; #71 filed
 
 **Prompt:** the backend dev said "#60 is a false positive — check it again, it works
