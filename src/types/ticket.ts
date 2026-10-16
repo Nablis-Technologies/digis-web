@@ -47,6 +47,11 @@ export interface UserTicket {
     cutoffSecondsBeforeStart: number;
     maxCompletedResales: number;
   };
+  /** A pending transfer on this ticket (owner view — backend `pending_transfer`,
+   *  #62 resolved 2026-10-16). Presence badges the ticket and gates transfer/resale. */
+  pendingTransfer?: { id: string; status: string; expiresAt: string | null };
+  /** Backend `registration_answers.url` — the answers read/revise endpoint (#50). */
+  registrationAnswersUrl?: string;
 }
 
 export interface TicketActionResult {

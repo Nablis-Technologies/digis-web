@@ -165,7 +165,22 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
                   <span className="relative z-10">{statusLabel}</span>
                 </span>
               )}
-              {!inactive && countdown && (
+              {!inactive && ticket.pendingTransfer && (
+                <span
+                  className="relative inline-flex items-center gap-1 overflow-hidden text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: 600,
+                    background: isDark ? 'rgba(251,191,36,0.16)' : 'rgba(217,119,6,0.12)',
+                    color: isDark ? '#fcd34d' : '#b45309',
+                    boxShadow: `0 0 0 1px ${isDark ? 'rgba(251,191,36,0.32)' : 'rgba(217,119,6,0.28)'}`,
+                  }}
+                >
+                  <GlassReflection isDark={isDark} />
+                  <span className="relative z-10">Transfer pending</span>
+                </span>
+              )}
+              {!inactive && !ticket.pendingTransfer && countdown && (
                 <span
                   className="relative inline-flex items-center gap-1 overflow-hidden text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
                   style={{

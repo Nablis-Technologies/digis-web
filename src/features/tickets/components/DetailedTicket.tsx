@@ -108,10 +108,13 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
   /** Custom call-to-action area rendered below the actions (e.g. "Sign in to add to My Tickets"). */
   footer?: React.ReactNode;
 }) {
+  const pendingTransfer = ticket.pendingTransfer;
   const secondaryActions = [
     onShare && { Icon: Share2, label: 'Share', action: onShare },
-    onTransfer && { Icon: Send, label: 'Transfer', action: onTransfer },
-    onResell && { Icon: Tag, label: 'Resell', action: onResell },
+    // #62: a pending transfer locks the transfer/resale actions until it is
+    // claimed or expires (the backend refuses them anyway — no optimistic UI).
+    !pendingTransfer && onTransfer && { Icon: Send, label: 'Transfer', action: onTransfer },
+    !pendingTransfer && onResell && { Icon: Tag, label: 'Resell', action: onResell },
   ].filter(Boolean) as { Icon: typeof Share2; label: string; action: () => void }[];
   const { rgb } = useImageColor(ticket.image || '');
   const { isDark } = useTheme();
@@ -259,6 +262,27 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 </p>
                 <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }}>
                   It can no longer be used at the gate.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending transfer (#62) — transfer/resale lock until it resolves */}
+        {!inactive && pendingTransfer && (
+          <div className="relative px-5 sm:px-7 pt-5">
+            <div className="rounded-2xl p-4 flex items-start gap-3"
+              style={{
+                background: isDark ? 'rgba(251,191,36,0.10)' : 'rgba(217,119,6,0.08)',
+                border: `1px solid ${isDark ? 'rgba(251,191,36,0.3)' : 'rgba(217,119,6,0.25)'}`,
+              }}>
+              <Send className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#fcd34d' : '#b45309' }} strokeWidth={2} />
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fcd34d' : '#b45309' }}>
+                  Transfer pending
+                </p>
+                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }}>
+                  This ticket is being transferred. Transfer and resale are locked until it is claimed or expires.
                 </p>
               </div>
             </div>

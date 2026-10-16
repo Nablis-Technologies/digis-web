@@ -67,6 +67,15 @@ export interface TicketWalletWire {
     quantity: number;
     unit_amount_minor: number;
   }[];
+  /** A pending transfer on this ticket (owner view, #62 resolved 2026-10-16). */
+  pending_transfer?: { id: string; status: string; expires_at: string | null } | null;
+  /** Registration answers context — present only for the registration respondent
+   *  (#50 resolved 2026-10-16). */
+  registration_answers?: {
+    registration_id: string;
+    url: string;
+    answers_editable_until: string | null;
+  } | null;
 }
 
 /** Map the wallet wire projection onto the UI's UserTicket shape. */
@@ -120,6 +129,27 @@ export function mapWalletTicket(w: TicketWalletWire): UserTicket {
             cutoffSecondsBeforeStart: tt.resale_cutoff_seconds_before_start ?? 0,
             maxCompletedResales: tt.max_completed_resales ?? 0,
           },
+        }
+      : {}),
+    // #62: a pending transfer on this ticket gates transfer/resale and drives
+    // the "Transfer pending" badge. Absence means no pending transfer.
+    ...(w.pending_transfer
+      ? {
+          pendingTransfer: {
+            id: w.pending_transfer.id,
+            status: w.pending_transfer.status,
+            expiresAt: w.pending_transfer.expires_at,
+          },
+        }
+      : {}),
+    // #50: the registration-answers context (respondent only) — the correction
+    // deadline is authoritative from the backend, never inferred.
+    ...(w.registration_answers
+      ? {
+          registrationAnswersUrl: w.registration_answers.url,
+          ...(w.registration_answers.answers_editable_until
+            ? { answersEditableUntil: w.registration_answers.answers_editable_until }
+            : {}),
         }
       : {}),
   };

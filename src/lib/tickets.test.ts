@@ -135,6 +135,32 @@ describe('mapWalletTicket — resale policy projection (#25)', () => {
   });
 });
 
+describe('mapWalletTicket — pending transfer (#62) + registration answers (#50)', () => {
+  it('maps a pending transfer so the ticket badges and gates transfer/resale', () => {
+    const w = wire({ id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr' });
+    w.pending_transfer = { id: 'tr-1', status: 'pending', expires_at: '2026-10-20T10:00:00.000Z' };
+    const t = mapWalletTicket(w);
+    expect(t.pendingTransfer).toEqual({ id: 'tr-1', status: 'pending', expiresAt: '2026-10-20T10:00:00.000Z' });
+  });
+
+  it('omits pendingTransfer when the backend serves none', () => {
+    const t = mapWalletTicket(wire({ id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr' }));
+    expect(t.pendingTransfer).toBeUndefined();
+  });
+
+  it('maps the registration-answers context and its correction deadline', () => {
+    const w = wire({ id: 'tt-1', admissions_per_unit: 1, entry_validation_mode: 'qr' });
+    w.registration_answers = {
+      registration_id: 'reg-1',
+      url: '/registrations/reg-1/answers',
+      answers_editable_until: '2026-10-18T10:00:00.000Z',
+    };
+    const t = mapWalletTicket(w);
+    expect(t.registrationAnswersUrl).toBe('/registrations/reg-1/answers');
+    expect(t.answersEditableUntil).toBe('2026-10-18T10:00:00.000Z');
+  });
+});
+
 describe('ticketStatusMeta — invalid tickets must not look valid', () => {
   it('flags non-active statuses with a badge label; active/absent stay normal', () => {
     expect(ticketStatusMeta('active')).toEqual({ inactive: false, label: null });
