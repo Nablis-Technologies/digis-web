@@ -129,4 +129,47 @@ describe("backendEventToEvent", () => {
     expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", eventDateId: "d2" });
     expect(served.lineup?.[1]).not.toHaveProperty("eventDateId");
   });
+
+  it("resolves dates from the 2026-10-16 list/detail fields (#70)", () => {
+    // List payload: a single `next_event_date`.
+    const list = backendEventToEvent(
+      wire({
+        next_event_date: {
+          id: "n1",
+          starts_at: "2026-11-05T19:00:00Z",
+          series_id: "rule-1",
+          venue: { id: "v1", name: "The Hub", city: "Addis Ababa" },
+        },
+      }),
+    );
+    expect(list.eventDates?.[0]).toMatchObject({ id: "n1", seriesId: "rule-1" });
+    expect(list.venue).toBe("The Hub");
+    expect(list.city).toBe("Addis Ababa");
+
+    // Detail payload: a bounded preview + the schedule link + the series flag.
+    const detail = backendEventToEvent(
+      wire({
+        event_dates_preview: [
+          { id: "p1", starts_at: "2026-11-05T19:00:00Z", doors_at: "2026-11-05T18:00:00Z" },
+          { id: "p2", starts_at: "2026-11-12T19:00:00Z" },
+        ],
+        event_dates_url: "/public/events/x/dates",
+        is_recurring: true,
+      }),
+    );
+    expect(detail.eventDates?.map((d) => d.id)).toEqual(["p1", "p2"]);
+    expect(detail.eventDates?.[0]?.doorsAt).toBe("2026-11-05T18:00:00Z");
+    expect(detail.eventDatesUrl).toBe("/public/events/x/dates");
+    expect(detail.isRecurring).toBe(true);
+  });
+
+  it("prefers the new date fields over the legacy event_dates array", () => {
+    const ev = backendEventToEvent(
+      wire({
+        event_dates: [{ id: "legacy", starts_at: "2020-01-01T00:00:00Z" }],
+        next_event_date: { id: "fresh", starts_at: "2026-11-05T19:00:00Z" },
+      }),
+    );
+    expect(ev.eventDates?.map((d) => d.id)).toEqual(["fresh"]);
+  });
 });

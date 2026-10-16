@@ -5,6 +5,7 @@ import { eventsModule } from "@/lib/events";
 import { fetchCategories, categoryKeys } from "@/lib/categories";
 import { eventEnded } from "@/lib/eventDates";
 import { eventSoldOut } from "@/lib/eventAvailability";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { useTheme } from "@/app/components/ThemeContext";
 import { FeaturedCarousel } from "@/features/discovery/components/FeaturedCarousel";
 import { FeaturedEventCard } from "@/features/discovery/components/FeaturedEventCard";
@@ -59,6 +60,20 @@ export function EventDiscovery({
   const [priceRange, setPriceRange] = useState<EventPriceFilter | null>(null);
   const { isDark } = useTheme();
 
+  // Server-side search (#49): the discovery search box drives the backend `q`
+  // filter (≥2 chars — the backend 422s below that). Debounced so typing does
+  // not fire a request per keystroke; below the threshold the client filter
+  // still narrows the already-loaded set so the box feels instant.
+  const debouncedSearch = useDebouncedValue(searchQuery, 250);
+  const trimmedServerSearch = debouncedSearch.trim();
+  const serverQuery = useMemo(
+    () => (trimmedServerSearch.length >= 2 ? { q: trimmedServerSearch } : {}),
+    [trimmedServerSearch],
+  );
+  // When the server owns the search, don't re-filter by the raw query
+  // client-side (the backend matches more fields — description, organizer …).
+  const clientSearchQuery = serverQuery.q ? "" : searchQuery;
+
   // Fetch events via service. No initialData/placeholderData — the mock must
   // never appear while loading. Pending (no cache yet) renders skeletons in
   // the real layouts; background refetches keep stale data on screen.
@@ -68,8 +83,8 @@ export function EventDiscovery({
     isError: eventsError,
     refetch: refetchEvents,
   } = useQuery({
-    queryKey: eventsModule.keys.all,
-    queryFn: eventsModule.fetchAll,
+    queryKey: eventsModule.keys.list(serverQuery),
+    queryFn: () => eventsModule.fetchAll(serverQuery),
   });
 
   // Category pills come from the backend taxonomy (GET /categories), limited to
@@ -85,7 +100,7 @@ export function EventDiscovery({
   }, [backendCategories, events]);
 
   const filteredEvents = useEventFilter(events, {
-    searchQuery,
+    searchQuery: clientSearchQuery,
     selectedCategory,
     sortBy,
     onlyAvailable,

@@ -48,6 +48,9 @@ export interface TicketTier {
   waitlistEnabled?: boolean;
   /** Admissions granted per unit (≥1) — drives quantity/seat math. */
   admissionsPerUnit?: number;
+  /** Event dates this ticket offer is valid for (backend `covered_event_date_ids`,
+   *  #69). Present on live ticket products; absent/empty = available any day. */
+  coveredEventDateIds?: string[];
   /** Order bounds from the product. */
   minPerOrder?: number;
   maxPerOrder?: number;
@@ -205,7 +208,17 @@ export interface Event {
   /** Backend event dates with ids (choose_one ticket types need a selected
    *  event_date_id at registration). Display date/time derive from [0].
    *  `endsAt`/`status` drive the "event ended" purchase gate (eventEnded). */
-  eventDates?: { id: string; startsAt: string; endsAt?: string; status?: string; name?: string }[];
+  eventDates?: {
+    id: string;
+    startsAt: string;
+    endsAt?: string;
+    /** Doors-open time when the backend serves it (session rail "Doors …"). */
+    doorsAt?: string;
+    status?: string;
+    name?: string;
+    /** Recurring-series rule id (#68) — present on materialised session dates. */
+    seriesId?: string;
+  }[];
   /**
    * Recurring-series signal (#68). The backend models + materialises recurrence
    * (`Events::RecurrenceRule` + `MaterializeRecurrenceJob`) but the public
@@ -220,6 +233,12 @@ export interface Event {
   isRecurring?: boolean;
   /** Purchasable event extras such as parking, merchandise, food, or digital access. */
   products?: EventProduct[];
+  /**
+   * Path to the event's full paginated schedule (`GET /public/events/:slug/dates`,
+   * #70). Present on the detail payload; the bounded `eventDates` preview is only
+   * the first few sessions.
+   */
+  eventDatesUrl?: string;
   /** When set, buyers pick assigned seats during checkout. */
   seatMap?: SeatMapConfig;
   /** Organizer-set answer edit window after purchase. Omit or set 0 to lock responses. */

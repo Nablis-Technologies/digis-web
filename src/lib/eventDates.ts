@@ -30,7 +30,10 @@ export function eventHasFutureDate(event: Pick<Event, 'eventDates'>): boolean {
 
 /** True when the event has no purchasable date remaining. Events with no
  *  eventDates (mock/legacy rows) are NOT treated as ended. */
-export function eventEnded(event: Pick<Event, 'eventDates'>): boolean {
+export function eventEnded(event: Pick<Event, 'eventDates' | 'eventLifecycle'>): boolean {
+  // The list now carries the server-evaluated lifecycle — prefer it. The
+  // date-based fallback still covers detail payloads / legacy rows.
+  if (event.eventLifecycle === 'ended') return true;
   if (!event.eventDates || event.eventDates.length === 0) return false;
   return !eventHasFutureDate(event);
 }

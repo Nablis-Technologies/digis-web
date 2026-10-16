@@ -6,10 +6,20 @@
  * Backend wire shapes (from the Rails serializers — both list and detail attach
  * the same EventSettingSerializer; detail adds only `created_at`):
  *   EventListSerializer:   id, slug, title, description, visibility, timezone,
- *                          currency, published_at, categories, event_dates,
- *                          event_media, event_organizations, event_setting, organization,
- *                          price_from_minor (computed over active ticket products
- *                          only — BACKEND_GAPS #13/#32 resolved).
+ *                          currency, published_at, price_from_minor, price_from_currency,
+ *                          event_lifecycle, ticket_availability, next_event_date,
+ *                          is_recurring, categories, event_media, event_organizations,
+ *                          event_setting, organization (price_from_minor is computed over
+ *                          active ticket products only — BACKEND_GAPS #13/#32 resolved).
+ *   EventDetailSerializer: id, slug, title, description, visibility, timezone,
+ *                          currency, published_at, created_at, is_recurring,
+ *                          event_dates_preview (≤7 upcoming), event_dates_url, categories, ...
+ *
+ * Date shape (2026-10-16 backend release — BACKEND_GAPS #70 resolved): the list no
+ * longer ships `event_dates`; it ships a single `next_event_date` (the soonest
+ * upcoming session) and the detail ships a bounded `event_dates_preview` plus
+ * `event_dates_url` for the full schedule. A legacy `event_dates` array is kept
+ * as a fallback for any payload that still serves it.
  *   event_setting.config:  after the 2026-09-30 composable-admission release the
  *                          PUBLIC_CONFIG_KEYS projection carries only
  *                          `public_guest_limit` (BACKEND_GAPS #53/#44). The
@@ -36,11 +46,18 @@ export interface BackendMedia {
 export interface BackendEventDate {
   id: string;
   name?: string | null;
+  doors_at?: string | null;
   starts_at: string;
   ends_at?: string;
   /** scheduled | postponed | cancelled | completed */
   status?: string;
   venue?: { id: string; name: string; city?: string } | null;
+  /**
+   * Recurring-series rule id (#68) — the backend derives it from the date's
+   * `source_key` (`recurrence-<rule uuid>-<n>`). Present on every materialised
+   * session date; null for a one-off date.
+   */
+  series_id?: string | null;
 }
 
 /** G-44 lifecycle + sellability states — served on every list card. */
@@ -72,7 +89,15 @@ export interface BackendEvent {
    */
   placement_label?: string;
   categories?: { id: string; name: string }[];
+  /** Legacy full date array — no longer sent by the 2026-10-16 serializers. */
   event_dates?: BackendEventDate[];
+  /** List serializer: the soonest upcoming session (#70). */
+  next_event_date?: BackendEventDate | null;
+  /** Detail serializer: bounded (≤7) upcoming sessions (#70). */
+  event_dates_preview?: BackendEventDate[];
+  /** Detail serializer: path to the full paginated schedule
+   *  (`GET /public/events/:slug/dates`) (#70). */
+  event_dates_url?: string;
   event_media?: BackendMedia[];
   event_setting?: {
     id?: string;
@@ -123,7 +148,14 @@ export interface BackendEvent {
  * defaults to 0 only when the wire omits `price_from_minor` entirely.
  */
 export function backendEventToEvent(be: BackendEvent): Event {
-  const date0 = be.event_dates?.[0];
+  // Resolve the session dates from whichever field the payload serves: the
+  // detail's bounded preview, the list's single next session, or the legacy
+  // array (ADR-0002 — absent stays absent; nothing is invented).
+  const beDates: BackendEventDate[] =
+    be.event_dates_preview ??
+    (be.next_event_date ? [be.next_event_date] : be.event_dates) ??
+    [];
+  const date0 = beDates[0];
   const startsAt = date0?.starts_at;
   const cover =
     (be.event_media ?? []).find((m) => m.type === "cover") ??
@@ -172,14 +204,16 @@ export function backendEventToEvent(be: BackendEvent): Event {
     name: be.title,
     date: startsAt ? isoToDisplayDate(startsAt) : "",
     time: startsAt ? isoToDisplayTime(startsAt) : "",
-    ...(be.event_dates && be.event_dates.length > 0
+    ...(beDates.length > 0
       ? {
-          eventDates: be.event_dates.map((d) => ({
+          eventDates: beDates.map((d) => ({
             id: d.id,
             startsAt: d.starts_at,
             ...(d.ends_at ? { endsAt: d.ends_at } : {}),
+            ...(d.doors_at ? { doorsAt: d.doors_at } : {}),
             ...(d.status ? { status: d.status } : {}),
             ...(d.name ? { name: d.name } : {}),
+            ...(d.series_id ? { seriesId: d.series_id } : {}),
           })),
         }
       : {}),
@@ -220,6 +254,7 @@ export function backendEventToEvent(be: BackendEvent): Event {
         }
       : {}),
     ...(typeof be.is_recurring === "boolean" ? { isRecurring: be.is_recurring } : {}),
+    ...(be.event_dates_url ? { eventDatesUrl: be.event_dates_url } : {}),
   };
   // NOTE: `age_restriction` and `seat_map` have no public source after the
   // 2026-09-30 backend release and render absent (ADR-0002) — see #53.
