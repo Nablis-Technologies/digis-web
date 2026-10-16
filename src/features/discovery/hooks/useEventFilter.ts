@@ -9,6 +9,24 @@ export type EventSortBy = "soonest" | "price-low" | "price-high" | "available";
 export type EventAccessFilter = "free" | "ticketed";
 export type EventPriceFilter = "free" | "under-1000" | "1000-3000" | "3000-plus";
 
+/** An integer-cents window; `Infinity` means unbounded on that side. */
+export interface PriceWindow {
+  min: number;
+  max: number;
+}
+
+/**
+ * The minor-unit window each price-range chip covers. Shared with the server
+ * query builder (`discoveryQuery.ts`) so a chip means the same thing whether it
+ * is applied client-side or sent to `GET /public/events` (#49).
+ */
+export const PRICE_RANGE_WINDOWS: Record<EventPriceFilter, PriceWindow> = {
+  free: { min: 0, max: 0 },
+  "under-1000": { min: 1, max: 99_999 },
+  "1000-3000": { min: 100_000, max: 300_000 },
+  "3000-plus": { min: 300_001, max: Infinity },
+};
+
 export interface EventFilterOptions {
   searchQuery: string;
   selectedCategory: string;
@@ -46,12 +64,10 @@ export function filterAndSortEvents(events: Event[], options: EventFilterOptions
         !onlyAvailable || (!eventEnded(event) && !eventSoldOut(event));
       const eventAccess: EventAccessFilter = event.priceFromMinor === 0 ? "free" : "ticketed";
       const matchesAccess = eventTypes.length === 0 || eventTypes.includes(eventAccess);
-      const matchesPrice = !priceRange || (
-        priceRange === "free" ? event.priceFromMinor === 0
-          : priceRange === "under-1000" ? event.priceFromMinor > 0 && event.priceFromMinor < 100000
-          : priceRange === "1000-3000" ? event.priceFromMinor >= 100000 && event.priceFromMinor <= 300000
-          : event.priceFromMinor > 300000
-      );
+      const matchesPrice = !priceRange || (() => {
+        const window = PRICE_RANGE_WINDOWS[priceRange];
+        return event.priceFromMinor >= window.min && event.priceFromMinor <= window.max;
+      })();
       return matchesSearch && matchesCategory && matchesAvailable && matchesAccess && matchesPrice;
     })
     .sort((a, b) => {

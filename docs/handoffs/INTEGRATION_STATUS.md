@@ -7,6 +7,40 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-16f — the remaining #49 discovery filters wired (follow-up closed)
+
+**Prompt:** the backend **Fixes.md** handoff (the 2026-10-16 PR #37 release notes)
+re-supplied to confirm/complete the frontend wiring.
+
+The substance was already wired on 2026-10-16e (#49 search, #50, #68, #69, #70). The
+one outstanding obligation from Fixes.md §2 was the **rest of the #49 server-side
+discovery filters** (`.scratch/gap-wiring-2026-10-16/issues/04-…`) — now done:
+
+- New pure module `src/features/discovery/hooks/discoveryQuery.ts`
+  (`discoveryServerQuery`) maps the discovery filter state onto the backend query:
+  `q` (≥2), `category` (pill display name → backend **slug** via `GET /categories`),
+  the price window from the access + price-range controls
+  (`min_price_minor`/`max_price_minor` + the mandatory `currency`), and `sort`
+  (`soonest` / `price_asc` / `price_desc`; `available` stays client-side).
+  Contradictory price controls (Free + ETB 3K+) return `null` → an honest empty grid,
+  never an inverted range the backend rejects with a 422.
+- `DiscoveryPage` keys the list query on that state; the **category rail** reads a
+  stable **unfiltered catalogue** read so a selection no longer collapses the pills.
+- The client pipeline (`useEventFilter`) keeps only what the backend does not model:
+  availability tiering (featured-first, sold-out/ended-last), `onlyAvailable`, the
+  `available` sort, and the sub-2-char search. Price/access adopt the backend's
+  "any active public ticket price within the window" shape.
+
+**Deliberately not wired (no UI models them — tracked as frontend work, not gaps):**
+`city` (the `LocationSelector` is a fabricated static list — see the web2 port audit),
+`date_from`/`date_to` (no date UI), `organization_id`/`venue_id`/`artist_id` (no
+followable-filter UI yet). The param plumbing (`eventsModule.fetchAll(query)`) already
+carries all of them.
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **250** (was 237); `pnpm build`
+green; `npx playwright test` **39/39** (3 new in `e2e/discovery-filters.spec.ts`); live
+browser verified (Sports → 1 event; Free → 2; Free + ETB 3K+ → honest empty state).
+
 ## Session 2026-10-16e — backend PR #37 pulled; the new fixes wired
 
 **Prompt:** "check the latest pull of the backend their are fixes wire them up."
@@ -34,7 +68,8 @@ so a fully past (publicly visible) event's detail can no longer gate purchase.
 **Still open:** blocking #53/#57/#65; degrading #36/#44/#46/#48/#67/#71/**#72**.
 **Tracked follow-ups (frontend-only):** #61 accept-from-notification; the remaining
 #49 server-side filters (`category`/price/date/org/venue/artist + server sort) —
-both in `.scratch/gap-wiring-2026-10-16/`.
+both in `.scratch/gap-wiring-2026-10-16/`. *(The #49 filters half was closed
+2026-10-16f; #61 remains.)*
 
 **Checks:** `npx tsc --noEmit` clean; `npx vitest run` **237** (was 220); `pnpm build`
 green; live browser verified (discovery dates/venues/33 events; `?q=jazz` → 1;

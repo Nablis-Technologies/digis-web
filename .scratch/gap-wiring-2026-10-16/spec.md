@@ -36,7 +36,7 @@ wired in that run.
 | # | Obligation | Ticket |
 |---|---|---|
 | 61 | accept an incoming transfer from the `transfer_incoming` notification in-app (no incoming-transfers list endpoint; the authenticated `POST /ticket_transfers/:id/accept` exists and `lib/transfer.ts` has `transferFromNotification`/`acceptAuthenticated`) | `issues/03-transfer-incoming-accept.md` |
-| #49 (filters) | consume the **remaining** server-side `GET /public/events` params in discovery — `category`/`city`/`date_from`/`date_to`/`min_price_minor`/`max_price_minor`/`organization_id`/`venue_id`/`artist_id` + server `sort` | `issues/04-server-side-discovery-filters.md` |
+| #49 (filters) | consume the **remaining** server-side `GET /public/events` params in discovery — `category`/`city`/`date_from`/`date_to`/`min_price_minor`/`max_price_minor`/`organization_id`/`venue_id`/`artist_id` + server `sort` | `issues/04-server-side-discovery-filters.md` — **DONE 2026-10-16f** (`category`/price/`sort` wired; `city`/`date_*`/followable ids have no UI yet) |
 
 Both are frontend-only (the backend surfaces already exist; the params are
 live-verified) — they are `ready-for-agent`, not blocked on the backend.

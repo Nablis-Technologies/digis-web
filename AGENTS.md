@@ -11,8 +11,8 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
-npx vitest run    # unit tests (220)
-npx playwright test  # e2e vs the live backend on :3000 (36 deterministic; zz-* manual)
+npx vitest run    # unit tests (250)
+npx playwright test  # e2e vs the live backend on :3000 (39 deterministic; zz-* manual)
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
@@ -224,6 +224,14 @@ search/filter/sort + events-by-followable — `eventsModule.fetchAll(query)` + `
 (`covered_event_date_ids` → real per-day festival tiers), #70 (`next_event_date` /
 `event_dates_preview` / `event_dates_url` + `GET /public/events/:slug/dates` — the
 adapter absorbed the removal of the full `event_dates` array). New gap: #72.
+
+**Closed 2026-10-16f — the rest of #49's server-side filters:** the discovery
+category rail / price chips / sort now drive `GET /public/events` too
+(`src/features/discovery/hooks/discoveryQuery.ts` → `eventsModule.fetchAll(query)`;
+name→slug via `GET /categories`; price window carries the mandatory `currency`; a
+contradictory combo renders an honest empty grid instead of an inverted 422 range).
+`city` / `date_*` / followable ids remain unwired — no UI drives them (tracked, not
+gaps).
 
 **Withdrawn 2026-10-16:** **#60** — re-probed live and found to be a **false
 positive** (Chapa V2 is minor-unit on both request and response; the request is

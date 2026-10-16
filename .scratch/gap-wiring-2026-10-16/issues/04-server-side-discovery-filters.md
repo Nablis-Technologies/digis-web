@@ -1,7 +1,14 @@
 # 04 — Consume the remaining server-side discovery filters (#49)
 
-**Status:** ready-for-agent (frontend-only)
+**Status:** DONE 2026-10-16f (frontend-only)
 **Depends on:** nothing (backend params live-verified 2026-10-16e)
+
+> **Done:** `discoveryServerQuery` (`src/features/discovery/hooks/discoveryQuery.ts`)
+> maps the discovery state (`q`, category slug, price window + currency, sort) onto
+> `eventsModule.fetchAll(query)`; the client pipeline keeps only the availability
+> tiering + `available` sort. Contradictory price controls → honest empty grid.
+> Covered by `discoveryQuery.test.ts` + `e2e/discovery-filters.spec.ts`. `city` /
+> `date_*` / followable ids have no UI to drive them yet (see the ticket notes).
 
 ## Context
 
@@ -38,3 +45,13 @@ set — correct today (33 events) but it does not scale past the backend's
 - Do **not** send `q` below 2 chars (422). Keep the sub-threshold client filter.
 - `currency` must accompany a `price_*` sort (send `ETB`).
 - `city` matches the lowercase exact value ("addis ababa", not "addis").
+- **Behaviour change (adopted from the backend):** the server price filter is
+  "the event has *any* **public**-audience active ticket price in the window", so
+  the old client min-tier heuristic is gone. Live effect: events with
+  `ticket_availability: "no_public_tickets"` (null `price_from_minor` — currently
+  `origins-2`, `event`, `psy-addis-saltland`) no longer match **Free**; they are
+  gate/access-code events, not free public ones. Deliberate — the backend is the
+  money/availability source of truth (AGENTS.md).
+- Work 1 also lists a **date** filter; the discovery UI has no date control, so it
+  is unwired (as are `city`/`organization_id`/`venue_id`/`artist_id` — no UI drives
+  them; the `eventsModule.fetchAll(query)` plumbing already carries all of them).
