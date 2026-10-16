@@ -21,7 +21,8 @@ const FESTIVAL_SLUG = 'addis-sound-festival-2026';
 type DetailPayload = {
   data?: {
     title?: string;
-    event_dates?: { id: string; name?: string }[];
+    /** Detail serves a bounded preview (#70); the full schedule is at `/dates`. */
+    event_dates_preview?: { id: string; name?: string }[];
     event_participants?: unknown[];
   };
 };
@@ -32,14 +33,24 @@ async function fetchDetail(page: import('@playwright/test').Page) {
   return (await res.json()) as DetailPayload;
 }
 
+/** The full paginated schedule (`GET /public/events/:slug/dates`, #70). */
+async function fetchSchedule(page: import('@playwright/test').Page) {
+  const res = await page.request.get(
+    `http://localhost:3000/public/events/${FESTIVAL_SLUG}/dates?per_page=100`,
+  );
+  expect(res.status()).toBe(200);
+  return (await res.json()) as { data?: { id: string }[] };
+}
+
 test.describe('live multi-day festival fixture', () => {
   test('day bar scopes the ticket selector to the picked night', async ({ page }) => {
-    const detail = await fetchDetail(page);
-    const dates = detail.data?.event_dates ?? [];
+    const schedule = await fetchSchedule(page);
+    const dates = schedule.data ?? [];
     // The fixture must stay multi-day — with one date the festival resolver
     // never fires and this spec would silently stop testing anything.
     expect(dates.length).toBeGreaterThan(1);
 
+    const detail = await fetchDetail(page);
     await page.goto(`/events/${FESTIVAL_SLUG}`);
     await expect(page.getByRole('heading', { name: detail.data!.title! })).toBeVisible({
       timeout: 15_000,

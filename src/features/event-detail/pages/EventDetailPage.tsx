@@ -78,9 +78,6 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const [waitlistOffer, setWaitlistOffer] = useState<TicketTier | null>(null);
   const carouselImages = event.images && event.images.length > 0 ? event.images : [event.image];
   const posterRgb = useDominantColor(carouselImages[0]);
-  // G-44: the server now evaluates lifecycle — prefer `ended` from it. Fall
-  // back to the local past-date gate (#34 mitigation) when the backend omits it.
-  const ended = useMemo(() => event.eventLifecycle === 'ended' || eventEnded(event), [event]);
   const { isDark } = useTheme();
   const { rgb } = useImageColor(event.image);
 
@@ -100,15 +97,28 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const displayTicketTypes = live?.tiers ?? [];
   const displayProducts = live?.extras ?? [];
 
-  // Full schedule (#70): the detail payload carries only a bounded preview
-  // (≤7 upcoming sessions). A multi-session or recurring event fetches the
-  // complete list from the dedicated schedule endpoint so the session rail and
-  // festival view show every date, not just the first few.
+  // Full schedule (#70) + ended probe (#72).
+  //
+  // The detail payload carries only a bounded preview (≤7 upcoming sessions), so
+  // a multi-session / recurring event fetches the complete list from the
+  // dedicated schedule endpoint for the session rail + festival view. The same
+  // endpoint also answers "is this event ended?": the detail payload omits
+  // `event_lifecycle` (only the list serves it — BACKEND_GAPS #72) and its
+  // preview is upcoming-only, so a fully past event shows an empty preview. In
+  // that case we probe with `from` = epoch — any date at all means nothing is
+  // purchasable (the empty preview already proved there is no upcoming session)
+  // → ended; zero dates means the event is simply unscheduled.
+  const previewEmpty = (event.eventDates?.length ?? 0) === 0;
   const wantsSchedule =
-    !!event.slug && ((event.eventDates?.length ?? 0) > 1 || event.isRecurring === true);
+    !!event.slug &&
+    ((event.eventDates?.length ?? 0) > 1 || event.isRecurring === true || previewEmpty);
   const scheduleQuery = useQuery({
-    queryKey: eventsModule.keys.dates(event.slug ?? ''),
-    queryFn: () => eventsModule.fetchDates(event.slug!),
+    queryKey: [...eventsModule.keys.dates(event.slug ?? ''), previewEmpty ? 'probe' : 'full'] as const,
+    queryFn: () =>
+      eventsModule.fetchDates(
+        event.slug!,
+        previewEmpty ? { from: '1970-01-01T00:00:00Z', perPage: 1 } : {},
+      ),
     enabled: wantsSchedule,
   });
   const scheduleEvent: Event = useMemo(
@@ -117,6 +127,13 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
         ? { ...event, eventDates: scheduleQuery.data }
         : event,
     [event, scheduleQuery.data],
+  );
+  // G-44: prefer the server-evaluated lifecycle; the local past-date gate (#34
+  // mitigation, backed by the schedule probe above) covers the detail payload,
+  // which does not carry `event_lifecycle` (#72).
+  const ended = useMemo(
+    () => event.eventLifecycle === 'ended' || eventEnded(scheduleEvent),
+    [event.eventLifecycle, scheduleEvent],
   );
   // Tier-level audience gate (BACKEND_GAPS #20): a live ticketed event whose
   // tiers are NOT public still lets buyers reach the ticket selector + checkout
