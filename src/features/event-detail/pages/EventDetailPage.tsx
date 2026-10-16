@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import type { AudienceProof } from '@/lib/audience';
 import { productsModule } from '@/lib/products';
+import { eventsModule } from '@/lib/events';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import { useTheme } from '@/app/components/ThemeContext';
@@ -98,6 +99,25 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   const live = productsQuery.data;
   const displayTicketTypes = live?.tiers ?? [];
   const displayProducts = live?.extras ?? [];
+
+  // Full schedule (#70): the detail payload carries only a bounded preview
+  // (≤7 upcoming sessions). A multi-session or recurring event fetches the
+  // complete list from the dedicated schedule endpoint so the session rail and
+  // festival view show every date, not just the first few.
+  const wantsSchedule =
+    !!event.slug && ((event.eventDates?.length ?? 0) > 1 || event.isRecurring === true);
+  const scheduleQuery = useQuery({
+    queryKey: eventsModule.keys.dates(event.slug ?? ''),
+    queryFn: () => eventsModule.fetchDates(event.slug!),
+    enabled: wantsSchedule,
+  });
+  const scheduleEvent: Event = useMemo(
+    () =>
+      scheduleQuery.data && scheduleQuery.data.length > 0
+        ? { ...event, eventDates: scheduleQuery.data }
+        : event,
+    [event, scheduleQuery.data],
+  );
   // Tier-level audience gate (BACKEND_GAPS #20): a live ticketed event whose
   // tiers are NOT public still lets buyers reach the ticket selector + checkout
   // without proving access. When any tier is gated, the selector is hidden
@@ -124,15 +144,15 @@ export function EventDetail({ event, onBack, onPurchase, onNavigate }: EventDeta
   // multi-date event still falls through to the festival path below.
   const [pickedSessionId, setPickedSessionId] = useState<string>('');
   const series = useMemo(
-    () => resolveSeries(event, displayTicketTypes, pickedSessionId || undefined),
-    [event, displayTicketTypes, pickedSessionId],
+    () => resolveSeries(scheduleEvent, displayTicketTypes, pickedSessionId || undefined),
+    [scheduleEvent, displayTicketTypes, pickedSessionId],
   );
   const sessionId = series?.selected?.id ?? '';
   const festivalSchedule = useMemo(() => {
     // A recurring series owns its dates — never also render it as a festival.
     if (series) return null;
-    return resolveFestivalSchedule(event, displayTicketTypes);
-  }, [series, event, displayTicketTypes]);
+    return resolveFestivalSchedule(scheduleEvent, displayTicketTypes);
+  }, [series, scheduleEvent, displayTicketTypes]);
   const [festivalDayId, setFestivalDayId] = useState<string>('all');
   // Guests for the picked day (everyone across the festival on "All days").
   const dayGuests = useMemo(

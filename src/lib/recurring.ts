@@ -6,14 +6,15 @@ import { Money } from '@/lib/money';
  *
  * A recurring event is one event whose rule materialises many dated sessions. The
  * backend models and materialises these (`Events::RecurrenceRule` +
- * `MaterializeRecurrenceJob`), but the **public payload carries no series signal
- * yet** — so `resolveSeries` returns `null` until the backend exposes one
- * (`BACKEND_GAPS.md` #68). Nothing here invents a series: with no signal, the
- * detail page falls back to the multi-day / single rendering (ADR-0002).
+ * `MaterializeRecurrenceJob`) and, since the 2026-10-16 release, the public
+ * payload carries the series signal (`is_recurring` on list + detail, plus a
+ * `series_id` on every materialised date) — so `resolveSeries` now lights up
+ * (BACKEND_GAPS #68 resolved). Nothing here invents a series: with no signal,
+ * the detail page still falls back to the multi-day / single rendering (ADR-0002).
  *
  * The whole surface is derived from data the payload already has (`eventDates`,
- * `lineup`); per-session sold-out / showtimes / stock are NOT derivable today, so
- * they stay `false` / single-showtime and light up when the backend serves them.
+ * `lineup`); per-session sold-out / stock are NOT derivable today, so they stay
+ * `false` and light up when the backend serves them.
  */
 
 export type SessionShowtime = {
@@ -185,7 +186,7 @@ export function resolveSeries(
     date: selectedDate.date,
     dateLabel: dateLabel(chosen.startsAt),
     timeLabel: timeLabel(chosen.startsAt),
-    doorsLabel: '',
+    doorsLabel: chosen.doorsAt ? `Doors ${timeLabel(chosen.doorsAt)}` : '',
   };
 
   const tiers = passedTiers ?? [];

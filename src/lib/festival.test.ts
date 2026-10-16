@@ -127,3 +127,57 @@ describe('resolveFestivalSchedule — per-day participants', () => {
     expect(schedule!.guestsByDay['d2'].map((a) => a.name).sort()).toEqual(['A', 'B']);
   });
 });
+
+describe('resolveFestivalSchedule — real per-day coverage (#69 resolved 2026-10-16)', () => {
+  const base = {
+    category: 'Festivals',
+    eventDates: [
+      { id: 'd1', startsAt: '2026-12-10T14:00:00Z' },
+      { id: 'd2', startsAt: '2026-12-11T14:00:00Z' },
+    ],
+    lineup: [],
+  };
+
+  const tier = (name: string, coveredEventDateIds?: string[]) => ({
+    name,
+    level: 'GA',
+    priceMinor: 60000,
+    available: 50,
+    features: [],
+    ...(coveredEventDateIds ? { coveredEventDateIds } : {}),
+  });
+
+  it('assigns each offer to the days the backend says it covers', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      ticketTypes: [
+        tier('Full Festival Pass', ['d1', 'd2']),
+        tier('Day One Ticket', ['d1']),
+        tier('Day Two Ticket', ['d2']),
+      ],
+    })!;
+    expect(schedule.tiersByDay['d1'].map((t) => t.tier.name).sort()).toEqual(['Day One Ticket', 'Full Festival Pass']);
+    expect(schedule.tiersByDay['d2'].map((t) => t.tier.name).sort()).toEqual(['Day Two Ticket', 'Full Festival Pass']);
+    // The multi-day offer is the "all days" pass, not the name heuristic.
+    expect(schedule.tiersByDay['all'].map((t) => t.tier.name)).toEqual(['Full Festival Pass']);
+  });
+
+  it('shows an offer with no coverage on every day (event-level)', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      ticketTypes: [tier('Full Festival Pass', ['d1', 'd2']), tier('Door')],
+    })!;
+    expect(schedule.tiersByDay['d1'].map((t) => t.tier.name).sort()).toEqual(['Door', 'Full Festival Pass']);
+    expect(schedule.tiersByDay['d2'].map((t) => t.tier.name).sort()).toEqual(['Door', 'Full Festival Pass']);
+  });
+
+  it('falls back to the name heuristic only when no coverage is served', () => {
+    const schedule = resolveFestivalSchedule({
+      ...base,
+      ticketTypes: [tier('Weekend Pass'), tier('Friday Only'), tier('Saturday Only')],
+    })!;
+    // No coverage → both days offer the single-day tiers (the legacy behaviour).
+    expect(schedule.tiersByDay['d1'].map((t) => t.tier.name).sort()).toEqual(['Friday Only', 'Saturday Only']);
+    expect(schedule.tiersByDay['all'].map((t) => t.tier.name)).toEqual(['Weekend Pass']);
+  });
+});

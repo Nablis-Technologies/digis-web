@@ -150,11 +150,33 @@ export function resolveFestivalSchedule(
   const knownDateIds = new Set(dates.map((d, i) => d.id || `day-${i + 1}`));
 
   const tiers = passedTiers ?? event.ticketTypes ?? [];
-  const passTiers = tiers.filter((t) => {
+  // Tier classification: when the backend serves real per-day coverage
+  // (`covered_event_date_ids`, #69 resolved 2026-10-16) that is authoritative —
+  // a tier covering more than one date is a pass, one covering a single date is
+  // a single-day offer. Only when coverage is absent do we fall back to the
+  // name heuristic (the previous, invented classification).
+  const hasCoverage = tiers.some((t) => (t.coveredEventDateIds?.length ?? 0) > 0);
+  const legacyPass = (t: TicketTier) => {
     const n = t.name.toLowerCase();
     return n.includes('pass') || n.includes('full') || n.includes('weekend') || (t.admissionsPerUnit ?? 1) > 1;
-  });
-  const singleDayTiers = tiers.filter((t) => !passTiers.includes(t));
+  };
+  const isPassTier = (t: TicketTier) => {
+    const covered = t.coveredEventDateIds?.length ?? 0;
+    if (!hasCoverage || covered === 0) return legacyPass(t);
+    return covered > 1;
+  };
+  const passTiers = tiers.filter(isPassTier);
+  const singleDayTiers = tiers.filter((t) => !isPassTier(t));
+  // Tiers offered on a given day: the covered dates gate the offer when known;
+  // an offer with no coverage (event-level) is available every day.
+  const tiersForDay = (dayId: string) => {
+    if (!hasCoverage) return singleDayTiers.length > 0 ? singleDayTiers : tiers;
+    return tiers.filter((t) => {
+      const ids = t.coveredEventDateIds;
+      if (!ids || ids.length === 0) return true;
+      return ids.includes(dayId);
+    });
+  };
 
   const showPass = passTiers.length > 0 || tiers.length > 0;
   const lowestPassPrice = (passTiers.length > 0 ? passTiers : tiers)
@@ -237,7 +259,7 @@ export function resolveFestivalSchedule(
       ? dayArtists[0]
       : dayArtists[0] ?? artists[i % Math.max(1, artists.length)];
 
-    const dayTiers = (singleDayTiers.length > 0 ? singleDayTiers : tiers).map((t) => ({ tier: t }));
+    const dayTiers = tiersForDay(dayId).map((t) => ({ tier: t }));
     tiersByDay[dayId] = dayTiers;
 
     const lowestDayPrice = dayTiers

@@ -146,6 +146,40 @@ describe('resolveSeries', () => {
   });
 });
 
+describe('resolveSeries — live backend series signal (#68 resolved 2026-10-16)', () => {
+  it('lights up from the bare `isRecurring` flag when no recurrence object is served', () => {
+    const view = resolveSeries(
+      base({
+        recurrence: undefined,
+        isRecurring: true,
+        eventDates: weekly(new Date(2099, 0, 5), 2).map((d, i) => ({ id: `s${i}`, startsAt: localIso(d) })),
+      }),
+    );
+    expect(view).not.toBeNull();
+    expect(view!.days).toHaveLength(2);
+  });
+
+  it('stays inert for a one-off event with no series signal', () => {
+    const view = resolveSeries(
+      base({
+        recurrence: undefined,
+        isRecurring: false,
+        eventDates: [{ id: 's1', startsAt: localIso(new Date(2099, 0, 5)) }],
+      }),
+    );
+    expect(view).toBeNull();
+  });
+
+  it('renders a doors label when a session carries a doorsAt time', () => {
+    const view = resolveSeries(
+      base({
+        eventDates: [{ id: 's1', startsAt: '2099-01-05T20:00:00', doorsAt: '2099-01-05T19:00:00' }],
+      }),
+    )!;
+    expect(view.selected?.doorsLabel).toMatch(/^Doors /);
+  });
+});
+
 describe('local date helpers', () => {
   it('round-trips without the UTC midnight shift', () => {
     const d = parseISODate('2099-01-05');

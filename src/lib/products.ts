@@ -49,6 +49,9 @@ export interface BackendProduct {
   price_options: BackendPriceOption[];
   available: boolean;
   requires_ticket?: boolean;
+  /** Event dates this ticket product is valid for (BACKEND_GAPS #69 resolved
+   *  2026-10-16). Absent on non-ticket products; empty/absent = event-level. */
+  covered_event_date_ids?: string[];
   ticket_type?: {
     id?: string;
     audience?: string | null;
@@ -122,6 +125,11 @@ function toTier(p: BackendProduct): TicketTier | null {
     admissionsPerUnit: p.ticket_type?.admissions_per_unit ?? 1,
     minPerOrder: p.min_per_order ?? 1,
     maxPerOrder: p.max_per_order ?? undefined,
+    // Real per-day coverage from the backend (#69) — drives the multi-day tier
+    // assignment. Absent/empty means the offer is available on any day.
+    ...(p.covered_event_date_ids?.length
+      ? { coveredEventDateIds: p.covered_event_date_ids }
+      : {}),
     name: p.name,
     level: "GENERAL",
     priceMinor,
