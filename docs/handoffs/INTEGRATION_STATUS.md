@@ -46,12 +46,21 @@ derivable from the served per-currency `price_options`). Only `age_restriction` 
 `NOT_BACKEND_GAPS.md`; note `seat_map` has **no backend model at all**, so it is a
 missing feature, not just a serializer projection.
 
+**#51 re-scoped out — merged into #49.** Of its three items, two are not backend
+gaps: **venue stats/amenities** are hydratable from public `GET /venues/:id` (media
++ coords; seed done 2026-10-15) → *reclassified*, and **profile gamification**
+(tier/XP/achievements) → *deferred (product decision)*. That leaves only
+**events-by-followable**, which was already tracked under **#49**, so **#51 merges
+into #49** (both moved to `NOT_BACKEND_GAPS.md`).
+
 **Docs updated:** `BACKEND_GAPS.md` (2026-10-16d log note; #53 section re-scoped;
-at-a-glance row), `NOT_BACKEND_GAPS.md` (at-a-glance row + "#53 (unconsumed half)"
-section), `AGENTS.md` (#53 bullet + re-check note).
+#51 merged into #49; at-a-glance rows), `NOT_BACKEND_GAPS.md` (at-a-glance rows +
+"#53 (unconsumed half)" / "#51 (venue stats half)" / "Profile gamification" sections),
+`AGENTS.md` (#53 + #51 bullets, open list, re-check note).
 
 **Still open:** blocking — #53 (`age_restriction`+`seat_map`), #57, #65. Degrading —
-#36, #44, #46, #48, #49, #50, #51, #67, #68, #69, #70, #71.
+#36, #44, #46, #48, #49, #50, #67, #68, #69, #70, #71. (#51 was re-scoped out —
+see below.)
 
 ## Session 2026-10-16c — #60 re-checked live: FALSE POSITIVE; #71 filed
 

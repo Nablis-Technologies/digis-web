@@ -156,7 +156,7 @@
 >
 > **Correction 2026-10-16d — false-positive re-check of every remaining open gap:
 > no additional whole-gap false positives; #53 re-scoped.** Every open item
-> (blocking **#53/#57/#65**; degrading **#36/#44/#46/#48/#49/#50/#51/#67/#68/#69/#70/#71**)
+> (blocking **#53/#57/#65**; degrading **#36/#44/#46/#48/#49/#50/#67/#68/#69/#70/#71**)
 > was re-tested by **direct live observation** (the discipline #60 taught): HTTP
 > probes on `:3000` for payload/param claims, route greps + live status codes for
 > endpoint claims, and code/DB reads where the claim is about code. **All reproduce
@@ -164,7 +164,11 @@
 > overcounted: re-scoped to **`age_restriction` + `seat_map`** (both consumed and
 > genuinely absent); `rating` / `answer_edit_window_hours` / `price_foreign_from_minor`
 > were dropped as **unconsumed** (`price_foreign` is additionally derivable from the
-> served per-currency `price_options`) → recorded in `NOT_BACKEND_GAPS.md`.
+> served per-currency `price_options`) → recorded in `NOT_BACKEND_GAPS.md`. **#51 was
+> also re-scoped:** venue stats are frontend-hydratable from public `GET /venues/:id`
+> and profile gamification is a product decision (both → `NOT_BACKEND_GAPS.md`),
+> leaving only events-by-followable, already tracked under **#49** — so **#51 merges
+> into #49.**
 
 ## Status key
 
@@ -192,7 +196,6 @@ Open items are listed first; resolved items below (sections keep an in-place
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change (notification-channel prefs exist; account prefs do not) |
 | 49 | open — degrading | `GET /public/events` has **pagination** (`Core::Pagination`) but no search/filter/sort; no events-by-organizer/artist/venue; no city aggregation |
 | 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/transfer history, unread-count/mark-all-read (`GET /registrations/:id` **does** exist) |
-| 51 | open — degrading | no events-by-followable (organizer/venue/artist history); no profile stats (gamification) |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
 | 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
 | 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
@@ -223,6 +226,7 @@ Open items are listed first; resolved items below (sections keep an in-place
 | 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) — the dev tunnel/config is setup (`NOT_BACKEND_GAPS.md`) |
 | 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
+| 51 | re-scoped 2026-10-16 → merged into #49 | events-by-followable is tracked under #49; **venue stats are hydratable** from public `GET /venues/:id` and **profile gamification is a product decision** — both → `NOT_BACKEND_GAPS.md` |
 
 ---
 
@@ -1189,7 +1193,7 @@ buyer-scoped *list* does not.
 **Fix:** project answers + `answers_editable_until` + capability flags on the
 wallet serializer; add buyer-scoped list endpoints; add unread-count/mark-all.
 
-### #51. No events-by-followable; no profile stats
+### #51. No events-by-followable; no profile stats — RE-SCOPED 2026-10-16 (merged into #49)
 
 **Corrected 2026-09-21.** The public DETAIL endpoints *do* carry stats/socials —
 `GET /organizations/:id` exposes `description`, `social_links`, `events_count`,
@@ -1198,19 +1202,22 @@ expose `is_following` too. The event payload's organization summary is minimal b
 design. The frontend now fetches the organization profile and wires follow/unfollow
 (`src/lib/organizations.ts`, `src/lib/follows.ts`).
 
-What remains genuinely missing:
-- **event history per followable** — there is no `GET /organizations|venues|artists/:id/events`
-  (see #49), so the organizer/venue/artist "upcoming/past" lists cannot be sourced;
-  the fabricated lists were removed.
-- **venue stats/amenities** — `VenueSummarySerializer` has no media/coords; the
-  venue is hydratable from public `GET /venues/:id` (the venue *media/coords* seed
-  task is done, 2026-10-15), but the summary itself carries neither and the venue
-  sheet's followers/amenities/history were fabricated (still to remove).
-- **profile gamification** — ProfilePage's tier/XP/events-attended/total-spent/
-  achievements have no backend surface at all (product decision).
+**Re-scoped 2026-10-16 — two of the three "missing" items are not backend gaps, and
+the third is already tracked under #49:**
+- **venue stats/amenities** → **reclassified (frontend-hydratable).** The venue is
+  fully hydratable from public `GET /venues/:id` (media + coords; the venue
+  *media/coords* seed task is done, 2026-10-15). `VenueSummarySerializer` carrying
+  media/coords would be a convenience, not a gap. See `NOT_BACKEND_GAPS.md`.
+- **profile gamification** → **deferred (product decision).** Tier / XP /
+  events-attended / total-spent / achievements were never a backend feature. See
+  `NOT_BACKEND_GAPS.md`.
+- **event history per followable** — the one genuine ask,
+  `GET /organizations|venues|artists/:id/events` — was **already tracked under #49**
+  (whose at-a-glance row names events-by-organizer/artist/venue). Nothing unique is
+  left here.
 
-**Fix:** events-by-followable (#49); hydrate venue media/coords from public
-`GET /venues/:id` (seed done 2026-10-15); decide gamification.
+**Status: re-scoped 2026-10-16 — merged into #49 (venue stats hydratable;
+gamification a product decision).** Original filing 2026-09-21.
 
 ### #58. `active_checkout_exists` 409 carries no order id → the client can't resume or discard the open checkout — RESOLVED 2026-10-16
 

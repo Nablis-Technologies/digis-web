@@ -33,6 +33,8 @@
 | 1 | re-scoped | public config is `%w[public_guest_limit]`; the "widen to 17 keys" ask is moot (lost fields → #53) |
 | 53 (superseded half) | superseded | `event_type` / `access_mode` / `rsvp_*` are per-offer now (#44) |
 | 53 (unconsumed half) | reclassified / informational | `rating` (event-level) / `answer_edit_window_hours` / `price_foreign_from_minor` have **no frontend consumer**; `price_foreign` is derivable from served per-currency `price_options` — dropped from #53 2026-10-16 |
+| 51 (venue stats) | reclassified | venue media/coords are hydratable from public `GET /venues/:id` (seed done 2026-10-15); `VenueSummarySerializer` carrying them is convenience only |
+| 51 (gamification) | deferred | profile tier/XP/events-attended/total-spent/achievements are a product decision, never a backend feature |
 | 44 (seed note) | setup | the inert keys were only ever written by the seeds — a seed cleanup, not the gap |
 | 36 (venue half) | setup/seed | venue geo/media was a **seed** omission — fixed in the seed 2026-10-15 |
 | 11 | informational | event-slug `slug_history` 301 table missing (no frontend impact) |
@@ -141,6 +143,21 @@ the app; the rest are **not needs**:
 
 **Status: dropped from #53 2026-10-16 (no consumer / derivable).** #53's remaining,
 real part is `age_restriction` + `seat_map`.
+
+### #51 (venue stats half) — venue media/coords are hydratable from `GET /venues/:id`
+
+**Reclassified 2026-10-16 (was bundled in `BACKEND_GAPS.md` #51).** The venue sheet
+needs media + coordinates; `VenueSummarySerializer` (the minimal nested summary on
+the event payload) carries neither. But the venue is **fully hydratable from the
+public detail endpoint** `GET /venues/:id` (serves `latitude`/`longitude` + the
+ActiveStorage `profile`/photos), and the venue *media/coords* **seed** task is done
+(2026-10-15). So the summary omitting them is a convenience gap, not a defect — the
+frontend can fetch the venue detail for the sheet and drop the fabricated
+followers/amenities.
+
+**Status: reclassified 2026-10-16 — hydrate from `GET /venues/:id`; no backend change
+owed.** (Venue geo/media was already recorded as the "#36 seed half" — fixed in the
+seed 2026-10-15.)
 
 ### #59. Invitation link — frontend contract done; the dev sender is SETUP, not a gap
 
@@ -397,3 +414,15 @@ product deferral.
 server-side (`Orders::BuildQuote` + `order_quotes_controller.rb`, verified
 2026-09-09) so the consumer path runs through the quote. Confirm and drop the
 standalone UI validate when wiring.
+
+### Profile gamification (deferred by design)
+
+**Reclassified 2026-10-16 (was bundled in `BACKEND_GAPS.md` #51).** ProfilePage's
+tier / XP / events-attended / total-spent / achievements have no backend surface at
+all — but that was never a backend *feature*, it's a product decision the backend
+hasn't made. Not a defect to fix; re-open only if the product spec demands
+gamification. (The backend does serve the organization/artist/venue profile stats it
+models: `events_count`, `follower_count`, `verified`.)
+
+**Status: deferred 2026-10-16 — product decision, not a gap.** Remove the fabricated
+profile widgets (frontend housekeeping) until/unless gamification is specified.

@@ -6,8 +6,10 @@
   it; the seed was empty. See `docs/handoffs/DATA_INTEGRITY_AUDIT.md` → "Seed-side
   fixes (2026-10-15)".
 - **Related:** `docs/handoffs/web2-ui-import.md` → "Wire-up readiness" (the
-  *Venue photos + real map pin* row); `docs/BACKEND_GAPS.md` **#51** (the venue
-  sheet's fabricated followers/amenities/history — recorded as "still to remove").
+  *Venue photos + real map pin* row); `docs/NOT_BACKEND_GAPS.md` **#51 (venue stats
+  half)** — the venue sheet's fabricated followers/amenities are frontend work to
+  remove (the backend serves the real data on `GET /venues/:id`); reclassified
+  2026-10-16, no longer a backend gap.
 
 ## Context
 

@@ -165,7 +165,7 @@ missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
 **Open — blocking:** #53, #57, #65. **Open — degrading:** #36, #44, #46,
-#48, #49, #50, #51, #67, #68, #69, #70, #71. (Re-verified 2026-10-16 — see the sweep
+#48, #49, #50, #67, #68, #69, #70, #71. (Re-verified 2026-10-16 — see the sweep
 log at the top of `BACKEND_GAPS.md`; that file's at-a-glance table is
 authoritative.)
 
@@ -198,8 +198,9 @@ authoritative.)
 - **#50** Wallet/history gaps: registration answers + edit window, per-ticket
   capability flags, order/transfer history, unread-count/mark-all-read.
   (`GET /registrations/:id` does exist.)
-- **#51** No events-by-followable (organizer/venue/artist history); no profile
-  stats (gamification).
+- **#51 (merged into #49, 2026-10-16)** — venue stats are hydratable from public
+  `GET /venues/:id` and profile gamification is a product decision (both →
+  `NOT_BACKEND_GAPS.md`); the only real part — events-by-followable — lives in #49.
 - **#67** `Core::UserProfile` enforces mandatory `last_name` (`null: false`,
   presence) → single-name signups need a client-side fallback (`splitFullName`).
 - **#68** Public event payload exposes no recurrence/series signal → the recurring
@@ -233,7 +234,9 @@ correct) → moved to `NOT_BACKEND_GAPS.md`; the same adapter's genuine 100× de
 observation** (HTTP probes + route greps + code/DB reads) — **no additional
 whole-gap false positives**. The one correction is **#53**, re-scoped to
 `age_restriction` + `seat_map` (the other three listed fields are unconsumed →
-`NOT_BACKEND_GAPS.md`). See the 2026-10-16d note at the top of `BACKEND_GAPS.md`.
+`NOT_BACKEND_GAPS.md`). **#51 was also re-scoped and merged into #49** (venue stats
+hydratable; gamification a product decision). See the 2026-10-16d note at the top of
+`BACKEND_GAPS.md`.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),
