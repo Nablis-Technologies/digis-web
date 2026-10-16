@@ -19,6 +19,7 @@
 | **setup** | seeds, dev-env config, provider/dashboard registration, keys, tunnels, deploys — excluded from the gap rules by definition |
 | **superseded / re-scoped** | it was a gap under an older contract; the ask is moot now |
 | **informational** | a note on backend correctness with no frontend impact (or the frontend is already honest) |
+| **false positive** | reported as a defect but the behaviour is correct (verified against the live provider/contract) — withdrawn |
 | **deferred** | a product decision, not a bug |
 
 ## At a glance
@@ -28,6 +29,7 @@
 | 55 | reclassified | detail `price_from_minor` — derivable from `GET /public/events/:slug/products`; done 2026-10-03 |
 | 52 | reclassified | venue/artist `is_following` — derivable from `GET /users/:id/following` (self-scoped) |
 | 59 | reclassified + setup | invitation link is frontend-constructible; the unset dev sender is **setup** |
+| 60 | false positive | "Chapa `amount` sent 100× too large" — Chapa V2 is **minor-unit on both request and response**, so the request is correct (the real unit defect is `BACKEND_GAPS.md` **#71**) |
 | 1 | re-scoped | public config is `%w[public_guest_limit]`; the "widen to 17 keys" ask is moot (lost fields → #53) |
 | 53 (superseded half) | superseded | `event_type` / `access_mode` / `rsvp_*` are per-offer now (#44) |
 | 44 (seed note) | setup | the inert keys were only ever written by the seeds — a seed cleanup, not the gap |
@@ -41,6 +43,34 @@
 | — | setup | seed-side review + the frontend-owned seed TODOs |
 
 ---
+
+## False positives — withdrawn
+
+Items filed as backend defects that turned out **not** to be defects. Each was
+re-checked against the **live** provider/contract; they must not be re-filed.
+
+### #60. Chapa payment amount is sent 100× too large — FALSE POSITIVE (withdrawn 2026-10-16)
+
+Filed 2026-10-01, arguing `integer_amount(request.fetch(:amount_minor))` posts the
+amount in minor units while "Chapa expects the major unit", i.e. every payment is
+100× too large and large orders fail Chapa's max-amount check. **The claim is the
+wrong way round.**
+
+Chapa V2 is **minor-unit on both sides**:
+
+- Live sandbox probe 2026-10-16: `POST /v2/payments/hosted { amount: 100, currency:
+  "ETB" }` → the hosted page rendered **“Amount to Pay 1.03 ETB”** (sub-total `1.00` +
+  `charge 0.03`); completing the payment (test phone `0900123456`) gave a receipt
+  **Sub Total 1.00 ETB / Charge 0.03 ETB / Total 1.03 ETB**; and
+  `GET /v2/payments/HC50DSRDqACO/verify` returned `"amount":100, "service_fee":3`.
+- So `amount_minor = 100` → **1.00 ETB** ✓. The original “153,750 ETB order → props
+  `amount: 15375000`” evidence actually *confirmed* correctness (15,375,000 minor =
+  153,750.00 ETB); the *"amount is greater than the maximum amount supported by the
+  currency"* error was Chapa's per-transaction cap on a large order — not a unit bug.
+
+No backend change is owed for the **request** the way #60 described. The genuine unit
+defect is on the **response** side (`minor_amount(...) × 100` inflating
+`provider_fee_minor`) — filed separately as **`BACKEND_GAPS.md` #71**.
 
 ## Reclassified — the frontend can satisfy this itself
 

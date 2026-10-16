@@ -7,6 +7,41 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-16c — #60 re-checked live: FALSE POSITIVE; #71 filed
+
+**Prompt:** the backend dev said "#60 is a false positive — check it again, it works
+fine and it's a minor amount."
+
+Re-verified #60 from scratch against **Chapa's live sandbox** (not inference):
+
+- Created a hosted payment with the dev test key — `POST /v2/payments/hosted
+  { amount: 100, currency: "ETB" }` → the checkout page rendered **“Amount to Pay
+  1.03 ETB”** (sub-total `1.00` + `charge 0.03`).
+- Completed the test payment (test phone `0900123456`) → receipt **Sub Total 1.00
+  ETB / Charge 0.03 ETB / Total 1.03 ETB** (`chapa_reference HC50DSRDqACO`).
+- `GET /v2/payments/HC50DSRDqACO/verify` → `"amount":100, "service_fee":3`.
+
+→ Chapa V2 is **minor-unit on both the request and the response**. The dev is right:
+`amount: integer_amount(amount_minor)` is **correct**. **#60 is a false positive**,
+withdrawn → `NOT_BACKEND_GAPS.md`. The original 2026-10-01 “153,750 ETB order → props
+`amount: 15375000`” evidence actually *confirmed* correctness; the max-amount error was
+Chapa's per-transaction cap on a large order, not a unit bug.
+
+**The probe also surfaced the real, opposite defect → new gap #71 (degrading):** the
+adapter's **response** fee conversion `minor_amount(data[:service_fee]) * 100`
+(`chapa_client.rb:230`) inflates the already-minor `service_fee`/`charge` by 100× — a
+real 0.03 ETB fee is stored as `provider_fee_minor = 300` (3.00 ETB). It flows into
+`Finance::PostPlatformBillingEntry` (a `-provider_fee_minor` cost) and
+`Commercial::Reconciliation::Run` (projected-vs-actual variance). No frontend impact.
+
+**Still open:** blocking — #53, #57, #65. Degrading — #36, #44, #46, #48, #49, #50,
+#51, #67, #68, #69, #70, **#71**.
+
+**Docs updated:** `BACKEND_GAPS.md` (correction log; #60 section marked false
+positive / withdrawn; new #71 section; at-a-glance table + status key; #65 hypothesis
+de-linked from #60), `NOT_BACKEND_GAPS.md` (new "false positive" kind + the #60
+entry), `AGENTS.md` (open lists + #60/#71 bullets).
+
 ## Session 2026-10-16b — gap status re-verification against the running backend
 
 **Prompt:** "lets make sure the backend gaps is updated and we have gap status

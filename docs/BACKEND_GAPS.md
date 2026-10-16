@@ -126,8 +126,8 @@
 > - **#62** `Ticketing::TicketWalletSerializer` serves
 >   `pending_transfer { id, status, expires_at }`.
 >
-> **Still open:** blocking — #53, #57, #60, #65. Degrading — #36, #44, #46, #48, #49,
-> #50, #51, #67, #68, #69, #70.
+> **Still open:** blocking — #53, #57, #65. Degrading — #36, #44, #46, #48, #49,
+> #50, #51, #67, #68, #69, #70, #71.
 >
 > **Corrections to open entries:** **#49** pagination **is** served now
 > (`Core::Pagination`; `page`/`per_page` + `pagination` meta) — only search/filter/sort
@@ -138,6 +138,21 @@
 > **Frontend-wiring sweep:** #17/#8/#9/#56/#47 are **already consumed** by the app
 > (no work owed). #58, #61 and #62 have a status change the frontend should consume →
 > tracked in `.scratch/gap-wiring-2026-10-16/`.
+>
+> **Correction 2026-10-16b (live Chapa sandbox probe) — #60 is a FALSE POSITIVE,
+> withdrawn; #71 filed.** #60 claimed the Chapa request `amount` is posted in minor
+> units and is therefore **100× too large**. That is **wrong**: Chapa V2 is
+> **minor-unit on both sides**. Decisive live probe (dev test key, `2026-10-16`):
+> `POST /v2/payments/hosted` with `amount: 100` made Chapa render **“Amount to Pay
+> 1.03 ETB”** (sub-total `1.00` + `charge 0.03`); completing the payment gave a
+> receipt **Sub Total 1.00 ETB / Charge 0.03 ETB / Total 1.03 ETB**, and
+> `GET /v2/payments/:ref/verify` returned `"amount":100, "service_fee":3`. So
+> `integer_amount(amount_minor)` is **correct**, and the original “153,750 ETB order →
+> props `amount: 15375000`” evidence actually *confirmed* it (15,375,000 minor =
+> 153,750.00 ETB; it tripped Chapa's **max-amount** check only because the order was
+> large). The **same adapter** has the real, opposite defect: the **response** fee
+> conversion (`minor_amount(...) * 100`, `chapa_client.rb:230`) inflates the real
+> minor-unit `service_fee`/`charge` by 100× → filed as **#71** (degrading).
 
 ## Status key
 
@@ -147,6 +162,7 @@
 | **open — degrading** | works but suboptimal; frontend has a mitigation |
 | **superseded** | it was a gap under an older contract; the ask is moot now (detail in `NOT_BACKEND_GAPS.md`) |
 | **resolved** | fixed; detail in the Resolved archive |
+| **false positive** | reported as a defect but the behaviour is correct — withdrawn (detail in `NOT_BACKEND_GAPS.md`) |
 
 ## At a glance
 
@@ -157,7 +173,6 @@ Open items are listed first; resolved items below (sections keep an in-place
 |---|---|---|
 | 53 | open — blocking | public event payload drops the non-admission detail fields (`age_restriction` / `seat_map` / `rating`; lineup → #36). (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
-| 60 | open — blocking | Chapa payment amount is sent in minor units (100× too large) → large orders fail with "amount is greater than the maximum amount supported by the currency" |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
 | 36 | open — degrading | public payload lacks event participants/lineup — a backend **serializer** gap (no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
@@ -170,6 +185,7 @@ Open items are listed first; resolved items below (sections keep an in-place
 | 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
 | 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
 | 70 | open — degrading | public `event_dates` is unbounded and unfiltered (no upcoming window/limit) → a recurring series ships its whole set; the session rail/date step must discard it client-side |
+| 71 | open — degrading | Chapa `provider_fee_minor` is inflated 100× — the adapter converts the provider's **minor-unit** `service_fee`/`charge` as if it were major (`minor_amount` × 100), so a real 0.03 ETB fee is recorded as 3.00 ETB → overstates platform provider cost and reconciliation variance |
 | 17 | resolved 2026-10-16 | `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`; the CBE Birr option is enabled and sends `cbebirr`. (Residual: `Commercial::FeeComponent::PAYMENT_METHODS` still omits it — no live impact.) |
 | 8 | resolved 2026-10-16 | auth payload serves `profile.full_name` (`Core::CurrentUserSerializer`); signup creates the profile |
 | 9 | resolved 2026-10-16 | `GET/PATCH /user` self-service profile (`resource :user, only: %i[show update]`) |
@@ -191,6 +207,7 @@ Open items are listed first; resolved items below (sections keep an in-place
 | 41 | resolved 2026-09-30 | `idx_one_order_item_per_registration` is now `(registration_id, order_id)` |
 | 43 | resolved 2026-09-30 | `admission_selections` accepts `access_code` / `invitation_token` as `audience_proof` |
 | 45 | resolved 2026-09-30 | per-offer sold-out → `waitlist_available` + offer waitlist |
+| 60 | false positive — withdrawn 2026-10-16 | "Chapa amount sent 100× too large" is **wrong**: Chapa V2 is minor-unit on both request and response (live probe: `amount: 100` → **1.00 ETB**), so `integer_amount(amount_minor)` is correct (the real defect is **#71**; see `NOT_BACKEND_GAPS.md`) |
 | 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) — the dev tunnel/config is setup (`NOT_BACKEND_GAPS.md`) |
 | 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
@@ -417,43 +434,37 @@ the claim flow, #56).
 
 **Status: open — filed 2026-09-30 (route grep).**
 
-### #60. Chapa payment amount is sent 100× too large (minor units, not the provider's major unit)
+### #60. Chapa payment amount is sent 100× too large — FALSE POSITIVE, WITHDRAWN 2026-10-16
 
-`Payments::Providers::ChapaClient#payment_payload` sends the amount as the raw
-minor value:
+**This claim is the wrong way round; there is no such defect.** `payment_payload`
+sends `amount: integer_amount(request.fetch(:amount_minor))` — the **raw minor
+integer** (`app/services/payments/providers/chapa_client.rb:142`) — and that is
+**correct**: Chapa V2 expresses `amount` in the currency's **minor** unit, matching
+the backend's `*_minor` convention. The mistaken half is the adapter's **response**
+parsing (`minor_amount` × 100 at `:230`/`:324-328`), tracked separately as **#71**.
 
-```ruby
-# app/services/payments/providers/chapa_client.rb:142
-amount: integer_amount(request.fetch(:amount_minor)),   # returns amount_minor unchanged (:307-312)
-```
+**Decisive live probe (2026-10-16, sandbox test key):**
+- `POST /v2/payments/hosted` `{ amount: 100, currency: "ETB" }` → the Chapa hosted
+  page rendered **“Amount to Pay 1.03 ETB”**; its `data-page` props read
+  `"amount":100, …, "payment_methods":{"test":{…,"charge":3,"amount":103}}`.
+- Completing the test payment (test phone `0900123456`) → receipt **Sub Total
+  1.00 ETB / Charge 0.03 ETB / Total 1.03 ETB** (`chapa_reference HC50DSRDqACO`).
+- `GET /v2/payments/HC50DSRDqACO/verify` → `"amount":100, "service_fee":3`.
 
-But Chapa's API expresses `amount` in the **currency's major unit** — the
-adapter's own response parsing proves it: `provider_fee_minor: minor_amount(...)`
-multiplies the provider's `charge`/`service_fee` by 100 (`chapa_client.rb:230`,
-`minor_amount` at `:324-328`). So every payment is posted 100× too large.
+So `100` = **1.00 ETB** and the fee `3` = **0.03 ETB** — both minor. Chapa is
+minor-unit on **both** the request and the response.
 
-**Evidence (live, 2026-10-01):** a guest payment for an order totalling
-**153,750.00 ETB** (`amount_minor = 15_375_000`) produced a Chapa hosted page whose
-`data-page` props contain `"amount":15375000,"currency":"ETB"` — i.e. Chapa reads
-**15,375,000 ETB**. Paying then fails with *"amount is greater than the maximum
-amount supported by the currency."*
+**The original 2026-10-01 evidence actually proved correctness.** A 153,750.00 ETB
+order (`amount_minor = 15_375_000`) posted `amount: 15375000` = **153,750.00 ETB**;
+the `data-page` props echoing `"amount":15375000` is exactly what a minor-unit
+provider returns for that order (the raw minor integer). The failure — *"amount is
+greater than the maximum amount supported by the currency"* — was Chapa's real
+**per-transaction maximum** being exceeded by a large order, **not** a unit bug.
+(The old test-mode claim — “small orders appear to work while still being inflated”
+— is also false: the sandbox rendered the correct 1.00 ETB for `amount: 100`.)
 
-**Why it matters:** every paid checkout sends 100× the order total to Chapa. In
-test mode the test bank ignores the amount, so small orders appear to work while
-still being inflated; in production this is a 100× overcharge. Only large orders
-surface it, via Chapa's max-amount check.
-
-**Fix:** convert minor → major before sending, in `payment_payload` (`:142`):
-
-```ruby
-amount: format("%.2f", BigDecimal(amount_minor) / 100)
-```
-
-Also check the refund path (`:64`) — confirm whether Chapa refunds expect major or
-minor before changing it. Add a request-shaping test asserting the initialize
-payload amount for a known `amount_minor`.
-
-**Status: open — filed 2026-10-01 (live repro on the Chapa hosted page).**
+**Status: false positive — withdrawn 2026-10-16 (live sandbox probe). Moved to
+`docs/NOT_BACKEND_GAPS.md`.**
 
 ### #65. Seller payout dispatch is rejected by the provider (`invalid_format`) — no payout ever succeeds
 
@@ -480,11 +491,12 @@ destination (`bank_slug: "test"`, "Test Bank" — the only rail the test provide
   through, so `invalid_format` is **Chapa's own error code**.
 - Balance is correctly released on failure (the reservation is dropped).
 
-**Hypothesis (needs backend/provider confirmation):** the same minor-vs-major family
-as **#60** (the amount is posted 100× / in the wrong unit), and/or the payout payload
-field names don't match Chapa's V2 payouts contract. It may also be a test-mode
-capability/funding limitation — the existing tracker note (G-26) already says
-test-mode payout *transfer* evidence was still outstanding.
+**Hypothesis (needs backend/provider confirmation):** the payout payload field names
+don't match Chapa's V2 payouts contract, and/or a test-mode capability/funding
+limitation — the existing tracker note (G-26) already says test-mode payout *transfer*
+evidence was still outstanding. (**Not** the “minor-vs-major” family: #60 is withdrawn
+— Chapa V2 is minor-unit on both sides, so the raw `amount_minor` the payout client
+sends is already the right unit; see **#71** for where a ×100 unit bug actually lives.)
 
 **Why it blocks:** the payout feature can create and track a payout but the money can
 never move; the frontend can only render the resulting `failed` state.
@@ -681,6 +693,56 @@ independently of pagination.
 
 **Status: open — degrading (filed 2026-10-15; model + controller code read;
 re-verified live 2026-10-16).**
+
+
+### #71. Chapa provider fee is recorded 100× too large (a minor-unit value converted as if it were major)
+
+`Payments::Providers::ChapaClient` converts the provider's fee major → minor:
+
+```ruby
+# app/services/payments/providers/chapa_client.rb:230
+provider_fee_minor: minor_amount(data[:service_fee].presence || data[:charge]),
+# :324-328
+def minor_amount(amount)
+  (BigDecimal(amount.to_s) * 100).round(0).to_i
+end
+```
+
+But Chapa V2 already reports `service_fee` (and `charge`) in the currency's **minor**
+unit — the **same unit as `amount`** — so the ×100 is spurious.
+
+**Evidence (live sandbox, 2026-10-16):** a completed payment of `amount: 100`
+(**1.00 ETB**) returned `GET /v2/payments/HC50DSRDqACO/verify` →
+`"amount":100, "service_fee":3`, and the Chapa receipt read **Charge 0.03 ETB**. The
+adapter computes `minor_amount(3) = 300` and stores `provider_fee_minor = 300`
+(**3.00 ETB**) for a real **0.03 ETB** fee — 100× too large. The in-repo test that
+“proves” the conversion uses a fixture Chapa never emits —
+`service_fee: "1.25"` (a major-unit decimal) → expects `125`
+(`test/services/payments/providers/chapa_client_test.rb:277-291`) — which is why the
+bug slipped through.
+
+**Why it matters:** `provider_fee_minor` is persisted on `Orders::Payment`
+(`orders_payments.provider_fee_minor`) and drives **platform provider cost** —
+`Finance::PostPlatformBillingEntry` books a `provider_fee` entry of
+`-payment.provider_fee_minor`
+(`app/services/finance/post_platform_billing_entry.rb:69-72`) — and the
+projected-vs-actual **payment-cost variance** in `Commercial::Reconciliation::Run`
+(`:100-109`). Every verified/paid Chapa payment records 100× the real gateway cost
+(the refund paths inherit it through `ApplyRefundResult`).
+
+**Fix:** stop converting — the provider's value is already minor:
+
+```ruby
+# service_fee / charge are ALREADY minor units — do NOT multiply by 100
+fee = data[:service_fee].presence || data[:charge]
+provider_fee_minor: fee && Integer(fee)
+```
+
+Replace the test fixture with a real minor-unit value (`service_fee: 3` →
+`provider_fee_minor: 3`), add a response-shaping test, and confirm the refund path
+(`refund`/`verify_refund`) uses the same unit.
+
+**Status: open — degrading (filed 2026-10-16; live sandbox verify + code read).**
 
 
 ### #54. Discovery availability has no backend source — RESOLVED 2026-10-15

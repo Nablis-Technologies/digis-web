@@ -164,8 +164,8 @@ unless every status change was swept and either wired or tracked. History: the
 missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
-**Open — blocking:** #53, #57, #60, #65. **Open — degrading:** #36, #44, #46,
-#48, #49, #50, #51, #67, #68, #69, #70. (Re-verified 2026-10-16 — see the sweep
+**Open — blocking:** #53, #57, #65. **Open — degrading:** #36, #44, #46,
+#48, #49, #50, #51, #67, #68, #69, #70, #71. (Re-verified 2026-10-16 — see the sweep
 log at the top of `BACKEND_GAPS.md`; that file's at-a-glance table is
 authoritative.)
 
@@ -174,8 +174,11 @@ authoritative.)
   render absent (ADR-0002 forbids inventing them).
 - **#57** No password reset / forgot-password endpoint (phone-first reset would
   reuse the existing OTP infra).
-- **#60** Chapa payment `amount` is sent in minor units (100× too large) → large
-  orders fail on Chapa's max-amount check.
+- **#60 (withdrawn 2026-10-16 — FALSE POSITIVE)** The claim that Chapa `amount` is
+  sent "100× too large" is wrong: Chapa V2 is **minor-unit on both request and
+  response** (live probe: `amount: 100` → **1.00 ETB**), so
+  `integer_amount(amount_minor)` is correct. Detail in `NOT_BACKEND_GAPS.md`. The
+  real unit defect is **#71**.
 - **#65** Seller payout dispatch always ends in a provider rejection
   (`invalid_format`); no payout has ever reached `succeeded`.
 - **#36** Public payload lacks event participants/lineup — a backend **serializer**
@@ -205,6 +208,11 @@ authoritative.)
   classifies tiers by **name** (`pass`/`full`/`weekend`) — invented (ADR-0002).
 - **#70** Public `event_dates` is unbounded and unfiltered (no upcoming window) →
   a series ships its whole set; the frontend filters client-side (`isDatePast`).
+- **#71** Chapa `provider_fee_minor` is recorded 100× too large — the adapter
+  converts the provider's **minor-unit** `service_fee`/`charge` as if it were major
+  (`minor_amount` × 100), so a real 0.03 ETB fee is stored as 3.00 ETB → overstates
+  platform provider cost + reconciliation variance (`Finance::PostPlatformBillingEntry`,
+  `Commercial::Reconciliation::Run`). No frontend impact.
 
 **Resolved 2026-10-16 (frontend-wiring sweep):** #17 (`cbebirr` in the payment
 enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH /user`
@@ -213,6 +221,11 @@ enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH /u
 — **wiring owed**), #61 (`transfer_incoming` notification — **wiring owed**), #62
 (wallet `pending_transfer` — **wiring owed**). The owed wiring is tracked in
 `.scratch/gap-wiring-2026-10-16/`.
+
+**Withdrawn 2026-10-16:** **#60** — re-probed live and found to be a **false
+positive** (Chapa V2 is minor-unit on both request and response; the request is
+correct) → moved to `NOT_BACKEND_GAPS.md`; the same adapter's genuine 100× defect
+(provider-fee response parsing) was filed as **#71**.
 
 Resolved (do NOT keep mocks against): #1b (detail-by-slug),
 #2 (venue/organizer nested), #3 (product `price_options` + `available`),
