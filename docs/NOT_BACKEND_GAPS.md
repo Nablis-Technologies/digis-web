@@ -159,6 +159,20 @@ followers/amenities.
 owed.** (Venue geo/media was already recorded as the "#36 seed half" — fixed in the
 seed 2026-10-15.)
 
+### #51 (events-by-followable half) — now served by the `GET /public/events` filters
+
+**Resolved as a frontend need 2026-10-16e (no separate backend surface needed).** The
+last real part of #51 was "events for the things you follow". The 2026-10-16 backend
+release resolved #49 by adding `organization_id` / `venue_id` / `artist_id` filters to
+`GET /public/events`, so the frontend hydrates a follow set via
+`GET /users/:id/following` (returns `followable_type` / `followable_id`) and queries
+per followable — no dedicated "events-by-followable" endpoint is required. #51 is now
+fully absorbed: venue stats hydrate from `GET /venues/:id`, gamification is a product
+decision, and events-by-followable is these filters. The consumed filter params are
+now live in `eventsModule.fetchAll(query)`.
+
+**Status: closed 2026-10-16e (absorbed into the resolved #49).**
+
 ### #59. Invitation link — frontend contract done; the dev sender is SETUP, not a gap
 
 **Reclassified 2026-10-02 — this is NOT a backend code gap.**

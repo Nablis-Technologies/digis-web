@@ -1,3 +1,5 @@
+**STATUS: DONE 2026-10-16e** — wired (see spec.md).
+
 # Render a "Transfer pending" state on the sender's wallet ticket
 
 - **Status:** `ready-for-agent` â€” frontend-only; the backend field already exists.

@@ -126,14 +126,15 @@
 > - **#62** `Ticketing::TicketWalletSerializer` serves
 >   `pending_transfer { id, status, expires_at }`.
 >
-> **Still open:** blocking — #53, #57, #65. Degrading — #36, #44, #46, #48, #49,
-> #50, #51, #67, #68, #69, #70, #71.
+> **Still open after the 2026-10-16d re-check:** blocking — #53, #57, #65.
+> Degrading — #36, #44, #46, #48, #49, #50, #68, #69, #70, #71. (Superseded by the
+> 2026-10-16e pull below: #49/#50/#68/#69/#70 are now resolved.)
 >
-> **Corrections to open entries:** **#49** pagination **is** served now
-> (`Core::Pagination`; `page`/`per_page` + `pagination` meta) — only search/filter/sort
-> and events-by-* are missing. **#46** follows to venues/artists/organizations **do**
-> exist (`config/routes.rb:81`) — only saved/feed/reviews are missing. **#50**
-> `GET /registrations/:id` exists (`resources :registrations, only: :show`).
+> **Corrections to open entries:** ~~**#49** pagination is served now …~~
+> (superseded — #49 is fully resolved by the 2026-10-16e pull). **#46** follows to
+> venues/artists/organizations **do** exist (`config/routes.rb:81`) — only
+> saved/feed/reviews are missing. **#50** `GET /registrations/:id` exists
+> (`resources :registrations, only: :show`).
 >
 > **Frontend-wiring sweep:** #17/#8/#9/#56/#47 are **already consumed** by the app
 > (no work owed). #58, #61 and #62 have a status change the frontend should consume →
@@ -169,6 +170,54 @@
 > and profile gamification is a product decision (both → `NOT_BACKEND_GAPS.md`),
 > leaving only events-by-followable, already tracked under **#49** — so **#51 merges
 > into #49.**
+>
+> **Re-verified 2026-10-16e against `feat/launch-hardening-telemetry` (merged 10
+> commits, base `67e3a281` → `0741c53b`, PR #37) — the "wire the fixes" pull.**
+> Live-verified on `:3000` by HTTP probes + serializer/route reads. **Newly
+> resolved and frontend-wired in this run:**
+> - **#49** — `GET /public/events` now supports `q` (min 2 chars), `category`
+>   (slug), `city`, `date_from`/`date_to`, `organization_id`/`venue_id`/`artist_id`,
+>   `sort` (`newest|soonest|price_asc|price_desc`), `currency` (required for price
+>   sorts), `min_price_minor`/`max_price_minor`; invalid → **422
+>   `invalid_public_event_filter`**. Probes: `?q=jazz`→1, `?category=music`→30,
+>   `?sort=soonest`→33, `?sort=price_asc&currency=ETB`→30, `?q=x`→422 (baseline 33).
+>   This also supplies **events-by-followable**. Frontend: `eventsModule.fetchAll`
+>   sends the params + drains every page; discovery drives `q` server-side.
+> - **#68** — `is_recurring` on list + detail; every materialised date carries
+>   `series_id` (from `source_key` `\Arecurrence-([0-9a-f-]{36})-\d+\z`). Frontend:
+>   adapter maps `is_recurring` → the recurring detail UI lights up (verified live:
+>   `thursday-jazz-sessions` renders the session rail).
+> - **#69** — `Catalog::Public::EventProductSerializer` serves
+>   `covered_event_date_ids` (ticket products only). Frontend: mapped to
+>   `TicketTier.coveredEventDateIds` → `resolveFestivalSchedule` assigns real days.
+> - **#70** — list serves a single `next_event_date`; detail serves
+>   `event_dates_preview` (≤7 upcoming, non-cancelled) + `event_dates_url`; new
+>   `GET /public/events/:slug/dates` (`from`/`to`, paginated; 7 for
+>   `thursday-jazz-sessions`). **Breaking**: the detail/list no longer ship the full
+>   `event_dates` array — the adapter now reads the new fields. Frontend also fetches
+>   the full schedule for multi-session events.
+> - **#50** — wallet serves `registration_answers` (respondent only) + `GET
+>   /registrations/:id/answers` (`EditableRegistrationAnswerSerializer.editable`).
+>   Frontend: mapped to `registrationAnswersUrl`/`answersEditableUntil`.
+> - **#58 / #61 / #62** — the three previously owed wiring items are now **wired**
+>   (resume-or-degrade conflict sheet; `pendingTransfer` banner + action gate; the
+>   registration-answers context). `.scratch/gap-wiring-2026-10-16/` is closed.
+>
+> **New gap filed: #72** — the **detail** serializer omits `event_lifecycle` +
+> `ticket_availability` (only the list carries them). Previously `eventEnded` used
+> the full `event_dates` array to detect an ended event on the detail page; the
+> 2026-10-16 reshape replaced it with an upcoming-only preview, so a fully past
+> (but publicly visible) event's detail can no longer gate purchase. 4 ended events
+> are live on `:3000`.
+>
+> **Still open after this pull:** blocking — #53, #57, #65. Degrading — **#72**,
+> #36, #44, #46, #48, #67, #71. (#49/#50/#68/#69/#70 resolved; #51 absorbed into #49.)
+>
+> **Tracked frontend follow-ups (not gaps):** server-side consumption of the
+> remaining #49 filters/sorts (category/price/date/org/venue/artist + server sort) —
+> the module already supports them and the params are verified live; today the
+> discovery pipeline still filters client-side over the fully-paged set. Tracked in
+> `.scratch/gap-wiring-2026-10-16/`.
 
 ## Status key
 
@@ -194,21 +243,22 @@ Open items are listed first; resolved items below (sections keep an in-place
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), or reviews/ratings. Follows to **venues/artists/organizations** *do* exist (`config/routes.rb:81`, `GET /users/:id/following`) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change (notification-channel prefs exist; account prefs do not) |
-| 49 | open — degrading | `GET /public/events` has **pagination** (`Core::Pagination`) but no search/filter/sort; no events-by-organizer/artist/venue; no city aggregation |
-| 50 | open — degrading | wallet/history gaps: registration answers + edit window, per-ticket capability flags, order/transfer history, unread-count/mark-all-read (`GET /registrations/:id` **does** exist) |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
-| 68 | open — degrading | public event payload exposes no recurrence/series signal (no `recurrence`/`is_recurring`, no public `source_key`) despite a full backend recurrence engine → the recurring consumer UI stays parked |
-| 69 | open — degrading | public product payload omits `date_allocations` (`Catalog::ProductDateAllocation` exists) → a whole-festival pass is indistinguishable from a single-day offer, so multi-day tiers are classified by name (invented) |
-| 70 | open — degrading | public `event_dates` is unbounded and unfiltered (no upcoming window/limit) → a recurring series ships its whole set; the session rail/date step must discard it client-side |
 | 71 | open — degrading | Chapa `provider_fee_minor` is inflated 100× — the adapter converts the provider's **minor-unit** `service_fee`/`charge` as if it were major (`minor_amount` × 100), so a real 0.03 ETB fee is recorded as 3.00 ETB → overstates platform provider cost and reconciliation variance |
+| 72 | open — degrading | public **detail** payload omits `event_lifecycle` + `ticket_availability` (only the **list** serves them) → an ended event's detail page can no longer gate purchase; `eventEnded` fell back to the full `event_dates` array, which the 2026-10-16 reshape replaced with an upcoming-only preview — regression from that reshape |
 | 17 | resolved 2026-10-16 | `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`; the CBE Birr option is enabled and sends `cbebirr`. (Residual: `Commercial::FeeComponent::PAYMENT_METHODS` still omits it — no live impact.) |
 | 8 | resolved 2026-10-16 | auth payload serves `profile.full_name` (`Core::CurrentUserSerializer`); signup creates the profile |
 | 9 | resolved 2026-10-16 | `GET/PATCH /user` self-service profile (`resource :user, only: %i[show update]`) |
 | 47 | resolved 2026-10-16 | gift purchase flow — `POST /public/gift_purchases/:id/resolve\|claim`, checkout gift intent, `GET /orders/:order_id/gift_purchases` + resend |
 | 56 | resolved 2026-10-16 | signup OTP-verifies the phone and **upgrades** an existing shadow user (`Core::Signups::Complete`) |
-| 58 | resolved 2026-10-16 | the `active_checkout_exists` 409 now carries `meta.active_checkout { order_id, expires_at, payment, order_access_token }` |
+| 49 | resolved 2026-10-16 | `GET /public/events` now supports `q`, `category`, `city`, `date_from`, `date_to`, `organization_id`, `venue_id`, `artist_id`, `sort`, `currency`, `min_price_minor`, `max_price_minor` (invalid → 422 `invalid_public_event_filter`); this also serves **events-by-followable** (organization/venue/artist filters). Frontend wired: `eventsModule.fetchAll(query)` + discovery search `?q=`. |
+| 50 | resolved 2026-10-16 | wallet serves `registration_answers { registration_id, url, answers_editable_until }` (respondent only) and `GET /registrations/:id/answers` (`EditableRegistrationAnswerSerializer.editable` = retained ∧ `Ticketing::Answers::CorrectionWindow` open). Frontend wired: `mapWalletTicket` → `registrationAnswersUrl`/`answersEditableUntil`. |
+| 58 | resolved 2026-10-16 | the `active_checkout_exists` 409 now carries `meta.active_checkout { order_id, expires_at, payment, order_access_token }` — frontend wired (resume hosted payment / honest degrade) |
 | 61 | resolved 2026-10-16 | in-app `transfer_incoming` notification fires on initiation for `to_user` (carries `transfer_id`). (Residual: no incoming-transfers list endpoint.) |
-| 62 | resolved 2026-10-16 | wallet ticket serves `pending_transfer { id, status, expires_at }` |
+| 62 | resolved 2026-10-16 | wallet ticket serves `pending_transfer { id, status, expires_at }` — frontend wired (`pendingTransfer` + banner/action gate) |
+| 68 | resolved 2026-10-16 | `is_recurring` on the list + detail serializers; every materialised date carries `series_id` (matched from `source_key`) → the recurring consumer UI lights up. Frontend wired: adapter maps `is_recurring`; detail rail fetches the full schedule. |
+| 69 | resolved 2026-10-16 | `Catalog::Public::EventProductSerializer` serves `covered_event_date_ids` (ticket products only) → multi-day tier assignment is real, not name-heuristic. Frontend wired: `TicketTier.coveredEventDateIds` → `resolveFestivalSchedule`. |
+| 70 | resolved 2026-10-16 | list serves a single `next_event_date`; detail serves `event_dates_preview` (bounded ≤7 upcoming, non-cancelled) + `event_dates_url`; new `GET /public/events/:slug/dates` (paginated). Frontend wired: adapter reads the new fields + `eventsModule.fetchDates`. |
 | 42 | resolved 2026-10-01 | wallet resale policy now serves `resale_price_cap_minor` (percentage resolved to an amount) |
 | 54 | resolved 2026-10-15 | discovery availability served — `GET /public/events` carries `ticket_availability` + `event_lifecycle` per event; frontend wired (`eventAvailability` → SOLD OUT badge, verified live) |
 | 63 | resolved 2026-10-05 | G-41 mixed ticket + add-on checkout implemented (backend commits `b157e36`, `d5a8320`); frontend wired in `admissionModule` & `useCheckoutFlow` |
@@ -611,7 +661,7 @@ In the Ethiopia market and globally, many users have only a single mononym or si
 **Status: open — degrading (filed 2026-10-14; frontend mitigates via `splitFullName` and `toAuthUser` display deduplication).**
 
 
-### #68. Public event payload exposes no recurrence / series signal — the recurring consumer UI is unbuildable
+### #68. Public event payload exposes no recurrence / series signal — the recurring consumer UI is unbuildable — RESOLVED 2026-10-16
 
 The backend **models recurrence fully**: `Events::RecurrenceRule`
 (`app/models/events/recurrence_rule.rb`, table `events_recurrence_rules`),
@@ -668,7 +718,7 @@ step 6 (`OccurrenceStrip`/`SessionPill` on cards) remains, gated on the
 confirmed wire shape.
 
 
-### #69. Public product payload omits date allocations — a whole-festival pass is indistinguishable from a single-day offer
+### #69. Public product payload omits date allocations — a whole-festival pass is indistinguishable from a single-day offer — RESOLVED 2026-10-16
 
 The backend **models per-date offer scope**: `Catalog::ProductDateAllocation`
 (`app/models/catalog/product_date_allocation.rb`; table
@@ -704,7 +754,7 @@ every date (today's implicit behaviour).
 **Status: open — degrading (filed 2026-10-15; controller + serializer + `structure.sql` code read).**
 
 
-### #70. Public `event_dates` is unbounded and unfiltered (no upcoming window) — a recurring series ships its whole set
+### #70. Public `event_dates` is unbounded and unfiltered (no upcoming window) — a recurring series ships its whole set — RESOLVED 2026-10-16
 
 `Events::Event` has an unscoped `has_many :event_dates`
 (`app/models/events/event.rb:32-33`) and the public show action includes every one
@@ -781,6 +831,38 @@ Replace the test fixture with a real minor-unit value (`service_fee: 3` →
 (`refund`/`verify_refund`) uses the same unit.
 
 **Status: open — degrading (filed 2026-10-16; live sandbox verify + code read).**
+
+### #72. Public **detail** payload omits `event_lifecycle` / `ticket_availability` — an ended event's detail page can no longer gate purchase
+
+The 2026-10-16 release (PR #37) moved `event_lifecycle` + `ticket_availability`
+onto the **list** serializer (`Events::Public::EventListSerializer`, #54 resolved)
+but the **detail** serializer does not carry them:
+
+```ruby
+# app/serializers/events/public/event_detail_serializer.rb
+attributes :id, :slug, :title, :description, :visibility,
+           :timezone, :currency, :published_at, :created_at,
+           :is_recurring, :event_dates_preview, :event_dates_url
+# no :event_lifecycle, no :ticket_availability
+```
+
+**Why it matters:** the frontend's ended-event gate (`eventEnded`, a #34
+mitigation) previously inspected the full `event_dates` array. The same release
+replaced the detail's `event_dates` with `event_dates_preview` — **upcoming
+sessions only** (`Events::Public::DatesQuery`, `starts_at >= now`) — so a fully
+past event's detail now has an **empty** preview and `eventEnded` returns `false`.
+`Events::Event.publicly_visible` (`where(status: "published", visibility: "public")`)
+does **not** exclude ended events, and **4 ended events are live** on `:3000`
+(list probe: `upcoming 29 / ended 4`, e.g. `origins`, whose detail returns
+`event_dates_preview: []`). On those detail pages the buy entry is no longer
+disabled and no "Ended" state renders — the exact failure #34 fixed for the list.
+
+**Fix:** add `:event_lifecycle` (and `:ticket_availability`, for consistency with
+the list) to `EventDetailSerializer`, sourced from the same
+availability-summary projection the list uses, so the frontend can gate the
+detail from a server-evaluated signal instead of a client heuristic.
+
+**Status: open — degrading (filed 2026-10-16; live probe + serializer read).**
 
 
 ### #54. Discovery availability has no backend source — RESOLVED 2026-10-15
@@ -1155,7 +1237,7 @@ password · Coming soon" row — the pickers/2FA/change-password are local-only.
 language/currency/region), password-change + reset endpoints (#57), and a 2FA
 surface if required.
 
-### #49. `GET /public/events` has no search/filter/sort (pagination now exists)
+### #49. `GET /public/events` has no search/filter/sort (pagination now exists) — RESOLVED 2026-10-16
 
 **Correction 2026-10-16:** pagination **is** served — the index returns the
 `Core::Pagination` envelope (`page`/`per_page` params; `pagination` meta with
@@ -1175,7 +1257,7 @@ server-side.
 **Fix:** server-side query/category/city/date/price/sort on the public events
 index; events-by-followable endpoints.
 
-### #50. Wallet & history gaps
+### #50. Wallet & history gaps — RESOLVED 2026-10-16 (registration answers + edit window)
 
 `TicketWalletSerializer` omits the ticket's **registration answers and edit
 window**, so `EditTicketAnswersDialog` can never open for a live ticket (the
@@ -1505,7 +1587,12 @@ history). Every item below was re-verified against the pulled
 | 56 | Shadow-phone signup — signup OTP-verifies the phone and **upgrades** an existing shadow user (`Core::Signups::Complete`). Frontend `requestSignupOtp`/`verifySignupOtp`/`signUp` wired | code read 2026-10-16 (`aad3a903`) |
 | 58 | Active-checkout recovery — the `active_checkout_exists` 409 now carries `meta.active_checkout { order_id, expires_at, payment, order_access_token }` (`Orders::ActiveCheckoutRecovery`) | code read 2026-10-16 (`b1d6e86f`) |
 | 61 | Incoming transfer signal — `ticketing.ticket_transfer.initiated` → `transfer_incoming` (in-app, recipient `to_user`, projects `transfer_id`) in the outbox notification handler + `notification_types.rb:121`. Frontend labels it | code read 2026-10-16 (residual: no incoming-list endpoint) |
-| 62 | Sender wallet pending transfer — `Ticketing::TicketWalletSerializer` serves `pending_transfer { id, status, expires_at }` | code read 2026-10-16 (frontend mapping owed) |
+| 62 | Sender wallet pending transfer — `Ticketing::TicketWalletSerializer` serves `pending_transfer { id, status, expires_at }` | code read 2026-10-16; **frontend wired 2026-10-16e** (badge + action gate) |
+| 49 | Discovery search/filter/sort — `Events::Public::Search` on `GET /public/events` (`q`≥2, `category`, `city`, `date_from`/`date_to`, `organization_id`/`venue_id`/`artist_id`, `sort`, `currency`, `min_price_minor`/`max_price_minor`; 422 `invalid_public_event_filter`). Also supplies events-by-followable. Frontend `eventsModule.fetchAll(query)` + discovery `?q=` wired | live HTTP 2026-10-16e (`?q=jazz`→1, `?category=music`→30, `?sort=soonest`→33, `?q=x`→422; baseline 33) |
+| 50 | Wallet registration answers — `registration_answers { registration_id, url, answers_editable_until }` on the wallet ticket + `GET /registrations/:id/answers` (`EditableRegistrationAnswerSerializer`, `editable` via `Ticketing::Answers::CorrectionWindow`). Frontend maps `registrationAnswersUrl`/`answersEditableUntil` | code read 2026-10-16e; mapped |
+| 68 | Recurrence signal — `is_recurring` on list + detail; every materialised date carries `series_id` (from `source_key`). Frontend recurring UI lights up (`resolveSeries`) | live HTTP + browser 2026-10-16e (`thursday-jazz-sessions` session rail) |
+| 69 | Product date coverage — `EventProductSerializer#covered_event_date_ids` (ticket products). Frontend `TicketTier.coveredEventDateIds` → `resolveFestivalSchedule` real day assignment | live HTTP 2026-10-16e (7 ids for the GA product) + unit |
+| 70 | Bounded dates — list `next_event_date`; detail `event_dates_preview` (≤7) + `event_dates_url`; new `GET /public/events/:slug/dates` (paginated). Frontend adapter + `fetchDates` wired | live HTTP 2026-10-16e (schedule total 7) |
 | 53 (`featured`) | Discovery Featured — superseded by the paid **Featured endpoint** (`GET /public/featured_events`, `GET /public/events?featured=true`), not the removed `event_setting.config.featured`. Wired: `events-adapter` maps `placement_label` → `Event.featured`; `eventsModule.fetchAll` overlays the Featured set on the list; `fetchFeatured` reads the endpoint | live HTTP + browser 2026-10-15 (HEADLINERS · 2 EVENTS) |
 
 ---

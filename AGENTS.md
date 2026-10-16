@@ -165,9 +165,10 @@ missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
 **Open — blocking:** #53, #57, #65. **Open — degrading:** #36, #44, #46,
-#48, #49, #50, #67, #68, #69, #70, #71. (Re-verified 2026-10-16 — see the sweep
-log at the top of `BACKEND_GAPS.md`; that file's at-a-glance table is
-authoritative.)
+#48, #67, #71, #72. (Re-verified 2026-10-16e after the backend PR #37 "wire the
+fixes" pull — see the sweep log at the top of `BACKEND_GAPS.md`; that file's
+at-a-glance table is authoritative. This pull resolved **#49, #50, #68, #69, #70**
+and wired #58/#61/#62.)
 
 - **#53** Public detail payload drops **`age_restriction`** + **`seat_map`**
   (re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` /
@@ -193,37 +194,36 @@ authoritative.)
   exist.)
 - **#48** No consumer account preferences (language/currency/region), 2FA, or
   password change. (Notification-channel prefs exist; account prefs do not.)
-- **#49** `GET /public/events` has **pagination** but no search/filter/sort, no
-  events-by-followable, and no city aggregation → discovery search is client-side.
-- **#50** Wallet/history gaps: registration answers + edit window, per-ticket
-  capability flags, order/transfer history, unread-count/mark-all-read.
-  (`GET /registrations/:id` does exist.)
 - **#51 (merged into #49, 2026-10-16)** — venue stats are hydratable from public
   `GET /venues/:id` and profile gamification is a product decision (both →
   `NOT_BACKEND_GAPS.md`); the only real part — events-by-followable — lives in #49.
 - **#67** `Core::UserProfile` enforces mandatory `last_name` (`null: false`,
   presence) → single-name signups need a client-side fallback (`splitFullName`).
-- **#68** Public event payload exposes no recurrence/series signal → the recurring
-  consumer UI is ported + wired but stays inert (`lib/recurring.ts#resolveSeries`
-  returns null without it). Broadens **#36**: `EventParticipant` already models a
-  per-date link (`event_date_id`).
-- **#69** Public product payload omits `date_allocations` → `resolveFestivalSchedule`
-  classifies tiers by **name** (`pass`/`full`/`weekend`) — invented (ADR-0002).
-- **#70** Public `event_dates` is unbounded and unfiltered (no upcoming window) →
-  a series ships its whole set; the frontend filters client-side (`isDatePast`).
+- **#72** Public **detail** payload omits `event_lifecycle` + `ticket_availability`
+  (only the list serves them) → an ended event's detail page can no longer gate
+  purchase (the 2026-10-16 date reshape replaced the full `event_dates` array with
+  an upcoming-only preview). 4 ended events are live; the fix is to serve the same
+  availability projection on the detail serializer.
 - **#71** Chapa `provider_fee_minor` is recorded 100× too large — the adapter
   converts the provider's **minor-unit** `service_fee`/`charge` as if it were major
   (`minor_amount` × 100), so a real 0.03 ETB fee is stored as 3.00 ETB → overstates
   platform provider cost + reconciliation variance (`Finance::PostPlatformBillingEntry`,
   `Commercial::Reconciliation::Run`). No frontend impact.
 
-**Resolved 2026-10-16 (frontend-wiring sweep):** #17 (`cbebirr` in the payment
-enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH /user`
-— both already consumed), #56 (signup OTP-upgrades the shadow phone — wired), #47
-(gift flow — `lib/gifts.ts` wired), #58 (the 409 now carries `meta.active_checkout`
-— **wiring owed**), #61 (`transfer_incoming` notification — **wiring owed**), #62
-(wallet `pending_transfer` — **wiring owed**). The owed wiring is tracked in
-`.scratch/gap-wiring-2026-10-16/`.
+**Resolved 2026-10-16 (frontend-wiring sweep) — all wired:** #17 (`cbebirr` in the
+payment enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH
+/user`), #56 (signup OTP-upgrades the shadow phone), #47 (gift flow — `lib/gifts.ts`),
+#58 (409 `meta.active_checkout` → `ConflictSheet` resumes the parked payment or
+degrades honestly), #61 (`transfer_incoming` notification), #62 (wallet
+`pending_transfer` → badge + action gate). `.scratch/gap-wiring-2026-10-16/` is closed.
+
+**Resolved 2026-10-16e (backend PR #37 pull) — all wired:** #49 (discovery
+search/filter/sort + events-by-followable — `eventsModule.fetchAll(query)` + `?q=`),
+#50 (wallet `registration_answers` + `GET /registrations/:id/answers`), #68
+(`is_recurring` + date `series_id` → the recurring detail UI lights up), #69
+(`covered_event_date_ids` → real per-day festival tiers), #70 (`next_event_date` /
+`event_dates_preview` / `event_dates_url` + `GET /public/events/:slug/dates` — the
+adapter absorbed the removal of the full `event_dates` array). New gap: #72.
 
 **Withdrawn 2026-10-16:** **#60** — re-probed live and found to be a **false
 positive** (Chapa V2 is minor-unit on both request and response; the request is
@@ -268,8 +268,9 @@ badges), discovery **featured** (the paid Featured endpoint —
 #17 (`cbebirr` in the payment enum — CBE Birr enabled), #8/#9 (auth serves
 `profile.full_name`; `GET`/`PATCH /user` — `me`/`updateProfile` wired), #56 (signup
 OTP-upgrades a shadow phone), #47 (gift purchase flow — `lib/gifts.ts`), #33, #34,
-#39, #40, #41, #43, #45 (all 2026-09-30), #58/#61/#62 (2026-10-16 — backend surfaces
-landed; the small frontend wiring is tracked in `.scratch/gap-wiring-2026-10-16/`).
+#39, #40, #41, #43, #45 (all 2026-09-30), #58/#61/#62 (2026-10-16 — backend
+surfaces landed; frontend wiring completed 2026-10-16e), #49/#50/#68/#69/#70
+(2026-10-16e — backend PR #37 "wire the fixes" pull; frontend wired in the same run).
 
 ## Data integrity (seeds + e2e) — update after changing things
 

@@ -7,6 +7,39 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-16e — backend PR #37 pulled; the new fixes wired
+
+**Prompt:** "check the latest pull of the backend their are fixes wire them up."
+
+Merged `origin/feat/launch-hardening-telemetry` (10 commits, base `67e3a281` →
+`0741c53b`, PR #37) into the local dev branch and live-verified the new contract on
+`:3000`. **Resolved + frontend-wired in this run:**
+
+| # | Backend change | Frontend wiring |
+|---|---|---|
+| 49 | `GET /public/events` gains `q`/`category`/`city`/`date_from`/`date_to`/`organization_id`/`venue_id`/`artist_id`/`sort`/`currency`/`min_price_minor`/`max_price_minor` (422 `invalid_public_event_filter`) — also serves events-by-**followable** | `eventsModule.fetchAll(query)` sends the params + drains every page; discovery drives `q` (debounced, ≥2 chars). Commit `2dfcd8e` |
+| 68 | `is_recurring` on list + detail; `series_id` on every materialised date | adapter maps `is_recurring`; the recurring detail UI lights up (live: `thursday-jazz-sessions` session rail). Commit `e8601b1` |
+| 69 | `covered_event_date_ids` on ticket products | `TicketTier.coveredEventDateIds` → `resolveFestivalSchedule` real per-day assignment. Commit `e8601b1` |
+| 70 | list `next_event_date`; detail `event_dates_preview` + `event_dates_url`; new `GET /public/events/:slug/dates` | adapter reads the new date fields (**the full `event_dates` array was removed** — a breaking change); detail fetches the full schedule. Commit `2dfcd8e`/`e8601b1` |
+| 50 | wallet `registration_answers` + `GET /registrations/:id/answers` | `mapWalletTicket` → `registrationAnswersUrl`/`answersEditableUntil`. Commit `6fabb41` |
+| 58 | 409 `meta.active_checkout` recovery | `ConflictSheet` resumes the parked payment or degrades honestly. Commit `cc856ae` |
+| 62 | wallet `pending_transfer` | `pendingTransfer` → banner + transfer/resale action gate. Commit `6fabb41` |
+
+**New gap filed: #72** — the **detail** serializer omits `event_lifecycle` +
+`ticket_availability` (only the list serves them). `eventEnded` previously used the
+full `event_dates` array; the #70 reshape replaced it with an upcoming-only preview,
+so a fully past (publicly visible) event's detail can no longer gate purchase.
+**4 ended events are live.**
+
+**Still open:** blocking #53/#57/#65; degrading #36/#44/#46/#48/#67/#71/**#72**.
+**Tracked follow-ups (frontend-only):** #61 accept-from-notification; the remaining
+#49 server-side filters (`category`/price/date/org/venue/artist + server sort) —
+both in `.scratch/gap-wiring-2026-10-16/`.
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **237** (was 220); `pnpm build`
+green; live browser verified (discovery dates/venues/33 events; `?q=jazz` → 1;
+recurring detail rail).
+
 ## Session 2026-10-16d — every remaining open gap re-checked live: no new false positives; #53 re-scoped
 
 **Prompt:** "check the other gaps if they are false positives as well."

@@ -1,3 +1,5 @@
+**STATUS: DONE 2026-10-16e** — wired (see spec.md).
+
 # Offer resume / restart from the `active_checkout_exists` conflict
 
 - **Status:** `ready-for-agent` â€” frontend-only; the backend signal already exists.
