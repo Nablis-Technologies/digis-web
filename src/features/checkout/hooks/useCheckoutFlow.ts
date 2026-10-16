@@ -7,6 +7,7 @@ import { registrationModule, type ConsentDocument } from '@/lib/registration';
 import { admissionModule, type AdmissionResult } from '@/lib/admission';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { ApiError, messageForCode } from '@/lib/errors';
+import { readActiveCheckout, type ActiveCheckoutRecovery } from '@/lib/checkoutConflict';
 import { randomUuid } from '@/lib/api';
 import type { AppliedPromo, CheckoutStep, ContactDetails, CustomQuestion, EventProduct, PaymentMethod, SeatMapConfig, SelectedEventProduct, SelectedSeat } from '@/types';
 
@@ -234,13 +235,24 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   /**
    * Notice state: the backend refused to supersede a checkout this buyer
    * already has open for the event (`active_checkout_exists` /
-   * `idempotency_conflict`). The 409 carries no order id and there is no
-   * buyer-scoped order lookup, so the sheet offers only "View Tickets" — a
-   * Continue/start-fresh action needs a backend release route (#40).
+   * `idempotency_conflict`). The 409 now carries `meta.active_checkout` (#58,
+   * resolved 2026-10-16): when it includes a hosted `checkout_url` the sheet
+   * offers to resume that payment; otherwise it degrades to "View Tickets".
    */
   const [conflict, setConflict] = useState(false);
-  const openConflictSheet = () => { setConflict(true); setStep('payment'); };
-  const closeConflictSheet = () => setConflict(false);
+  const [conflictRecovery, setConflictRecovery] = useState<ActiveCheckoutRecovery | null>(null);
+  const openConflictSheet = (recovery: ActiveCheckoutRecovery | null = null) => {
+    setConflictRecovery(recovery);
+    setConflict(true);
+    setStep('payment');
+  };
+  const closeConflictSheet = () => { setConflict(false); setConflictRecovery(null); };
+  /** Resume the open checkout's hosted payment page (only when it has a URL). */
+  const resumeActiveCheckout = () => {
+    const url = conflictRecovery?.payment?.checkoutUrl;
+    if (!conflictRecovery || !url) return;
+    openHostedCheckout(conflictRecovery.orderId, url);
+  };
 
   const promoCode = promoApplied?.code;
 
@@ -615,8 +627,9 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
       }
       if (e instanceof ApiError && (e.code === 'active_checkout_exists' || e.code === 'idempotency_conflict')) {
         // A previous checkout for this buyer+event is still open — offer the
-        // notice sheet (View Tickets), never a bare inline dead-end.
-        openConflictSheet();
+        // notice sheet, resuming its hosted payment when the 409's
+        // `meta.active_checkout` carries a checkout_url (#58).
+        openConflictSheet(readActiveCheckout(e.meta));
         return;
       }
       // A $0 guest selection needs the phone proved before the backend will
@@ -651,5 +664,5 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
   }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId]);
 
-  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, closeConflictSheet, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp, isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId };
+  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, conflictRecovery, closeConflictSheet, resumeActiveCheckout, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp, isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId };
 }

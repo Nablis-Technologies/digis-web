@@ -190,7 +190,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
     quoteLoading, quoteError, isLiveTicket, consents, consentsLoading, consentsError,
     reloadConsents, acceptedConsents, toggleConsent,
     consentError, registrationError, paymentError, pendingNotice,
-    conflict, closeConflictSheet,
+    conflict, conflictRecovery, closeConflictSheet, resumeActiveCheckout,
     guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp,
     eventDates: flowDates, selectedEventDateId, setSelectedEventDateId,
     isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId,
@@ -371,6 +371,8 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
 
       <ConflictSheet
         open={conflict}
+        recovery={conflictRecovery}
+        onContinuePayment={resumeActiveCheckout}
         onViewTickets={onComplete}
         onClose={closeConflictSheet}
       />

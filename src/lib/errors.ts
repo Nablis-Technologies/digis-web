@@ -13,13 +13,24 @@ export class ApiError extends Error {
   code?: string;
   /** Per-field messages from the backend (e.g. ["Phone has already been taken"]). */
   fieldErrors?: string[];
+  /** Machine-readable error context (backend `meta`) — e.g. the
+   *  `active_checkout` recovery on a 409 conflict (#58). Absent when the
+   *  backend sends none. */
+  meta?: Record<string, unknown>;
 
-  constructor(message: string, status: number, code?: string, fieldErrors?: string[]) {
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    fieldErrors?: string[],
+    meta?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.meta = meta;
   }
 }
 
@@ -238,17 +249,17 @@ export function toApiError(error: unknown): ApiError {
   if (anyError?.response) {
     const status = anyError.response.status ?? 0;
     const body = anyError.response.data as
-      | { error?: string | { error?: string; message?: string; code?: string; errors?: string[] }; message?: string; code?: string; errors?: string[] }
+      | { error?: string | { error?: string; message?: string; code?: string; errors?: string[]; meta?: Record<string, unknown> }; message?: string; code?: string; errors?: string[]; meta?: Record<string, unknown> }
       | string
       | undefined;
-    const data: { error?: string; message?: string; code?: string; errors?: string[] } =
+    const data: { error?: string; message?: string; code?: string; errors?: string[]; meta?: Record<string, unknown> } =
       body == null
         ? {}
         : typeof body === 'object' && typeof body.error === 'object' && body.error !== null
           ? body.error
-          : (body as { error?: string; message?: string; code?: string; errors?: string[] });
+          : (body as { error?: string; message?: string; code?: string; errors?: string[]; meta?: Record<string, unknown> });
     const message = (typeof data.error === 'string' && data.error) || data.message || `Request failed (${status})`;
-    return new ApiError(message, status, data.code, data.errors);
+    return new ApiError(message, status, data.code, data.errors, data.meta);
   }
 
   // network / timeout / no response
