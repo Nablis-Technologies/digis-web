@@ -32,3 +32,12 @@ export function initialsOf(name: string): string {
     .join('')
     .toUpperCase();
 }
+
+/**
+ * The halo that separates a profile avatar from the surface behind it (the
+ * profile sheets). A quiet spread shadow in the theme's glass pair — not a
+ * painted border (ADR-0007). Returns the `box-shadow` value for a 3px ring.
+ */
+export function avatarRing(isDark: boolean): string {
+  return isDark ? '0 0 0 3px rgba(255,255,255,0.08)' : '0 0 0 3px rgba(20,18,31,0.06)';
+}

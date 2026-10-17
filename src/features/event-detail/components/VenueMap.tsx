@@ -2,12 +2,10 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, MapPin, Navigation as NavigationIcon, Share2, UserPlus, X } from 'lucide-react';
 import { getVenueCoords } from '@/lib/utils/venueCoords';
-import { flatAvatarColor } from '@/lib/utils/avatarColor';
+import { flatAvatarColor, avatarRing } from '@/lib/utils/avatarColor';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, glassEdge, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { artworkPalette } from '@/lib/ui/artworkPalette';
-import { SheetEnvironment } from './SheetEnvironment';
 
 const ACCENT = '#d6f905';
 
@@ -194,9 +192,6 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
   venue: string; isDark: boolean; following: boolean; onToggleFollow: () => void; onClose: () => void;
 }) {
   const { venueName, address, initials, directionsUrl } = venueProfile(venue);
-  // The sheet shares the artwork environment; with no venue photo there is no
-  // artwork to tint from, so it keeps the brand-hue base.
-  const palette = artworkPalette(null, isDark);
 
   return (
     <motion.div
@@ -212,15 +207,10 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
-          background: palette.bg1,
+          background: 'var(--card)',
           maxHeight: '90vh',
-          transition: 'background 600ms ease',
         }}>
         <GlassReflection isDark={isDark} />
-
-        {/* No artwork layer yet (no venue photo to tint from) — pass `artwork`
-            when `GET /venues/:id` hydrates it. */}
-        <SheetEnvironment palette={palette} isDark={isDark} />
 
         <AppButton onClick={onClose}
           ariaLabel="Close"
@@ -234,13 +224,13 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
         </AppButton>
 
         <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {/* Profile — sits on the artwork environment (the tinted base is the
-              banner now; the export has no separate banner). */}
+          {/* Profile — the app surface is the banner; the sheet carries no
+              venue photo yet (ADR-0002: nothing invented to tint from). */}
           <div className="px-6 pb-6 pt-7">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 mb-4"
               style={{
                 background: venueName ? flatAvatarColor(venueName) : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                boxShadow: `0 0 0 3px ${palette.glass}`,
+                boxShadow: avatarRing(isDark),
               }}>
               <span className="text-[26px] uppercase"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: '#fff' }}>
