@@ -132,6 +132,41 @@ test.describe('event detail', () => {
     }
   });
 
+  test('venue sheet invents nothing — no fabricated stats, About, amenities or events', async ({ page }) => {
+    // `VenueProfileSheet` receives a venue **name** only; the venue-detail
+    // wire-up (`GET /venues/:id`) is tracked in
+    // `.scratch/web2-ui-import/issues/01-venue-detail-wireup.md`. Until it lands,
+    // anything beyond the name/address/coords the event payload carries would be
+    // fabricated (ADR-0002). Pin both halves: the honest content is present and
+    // the invented sections are gone.
+    await page.goto('/events/on-on');
+    await expect(page.getByRole('heading', { name: 'On & On' })).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: /The Venue Warehouse/ }).first().click();
+    const sheet = page.getByRole('dialog', { name: /The Venue Warehouse/ });
+    await expect(sheet).toBeVisible({ timeout: 10_000 });
+
+    // Honest content — what the sheet can source from the event payload.
+    await expect(sheet.getByRole('heading', { name: 'The Venue Warehouse' })).toBeVisible();
+    await expect(sheet.getByRole('link', { name: 'Directions' })).toBeVisible();
+    await expect(sheet.getByRole('button', { name: 'Follow Venue', exact: true })).toBeVisible();
+    await expect(sheet.getByRole('button', { name: 'Share', exact: true })).toBeVisible();
+
+    // Invented content — absent, not faked.
+    for (const fabricated of [
+      'Events',
+      'Followers',
+      'Capacity',
+      'About',
+      'Amenities',
+      'Socials',
+      'Addis Vibes Festival',
+      'Skyline Sessions Vol. 4',
+    ]) {
+      await expect(sheet.getByText(fabricated)).toHaveCount(0);
+    }
+  });
+
   test('unknown slug redirects back to discovery', async ({ page }) => {
     await page.goto('/events/does-not-exist');
     await page.waitForURL('http://localhost:5173/', { timeout: 15_000 });
