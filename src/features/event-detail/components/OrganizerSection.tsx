@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, BadgeCheck, Calendar, Check, ChevronRight, Clock, Loader2, MapPin, Share2, UserPlus, Users, X } from 'lucide-react';
-import { flatAvatarColor, avatarRing } from '@/lib/utils/avatarColor';
+import { placeholderSurface, placeholderInk, avatarRing } from '@/lib/utils/avatarAppearance';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -94,9 +94,9 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
                     style={{ boxShadow: `0 0 0 2px ${ring}` }} />
                 ) : (
                   <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ background: flatAvatarColor(o.name), boxShadow: `0 0 0 2px ${ring}` }}>
+                    style={{ background: placeholderSurface(isDark), boxShadow: `0 0 0 2px ${ring}` }}>
                     <span className="text-[10px]"
-                      style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
+                      style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
                       {initialsOf(o.name)}
                     </span>
                   </div>
@@ -190,9 +190,9 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
                 <img src={o.avatar} alt={o.name} className="w-9 h-9 rounded-full object-cover" />
               ) : (
                 <div className="w-9 h-9 rounded-full flex items-center justify-center"
-                  style={{ background: flatAvatarColor(o.name) }}>
+                  style={{ background: placeholderSurface(isDark) }}>
                   <span className="text-[11px]"
-                    style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
+                    style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
                     {initialsOf(o.name)}
                   </span>
                 </div>
@@ -311,8 +311,8 @@ export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark:
       <GlassReflection isDark={isDark} />
       <div className="relative z-10 flex items-center gap-3">
         <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: flatAvatarColor(organizer.name || 'Digis') }}>
-          <span className="text-[13px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>{initials}</span>
+          style={{ background: placeholderSurface(isDark) }}>
+          <span className="text-[13px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>{initials}</span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -443,9 +443,9 @@ function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleF
                     <img src={o.avatar} alt={o.name} className="w-11 h-11 rounded-full object-cover" />
                   ) : (
                     <div className="w-11 h-11 rounded-full flex items-center justify-center"
-                      style={{ background: flatAvatarColor(o.name) }}>
+                      style={{ background: placeholderSurface(isDark) }}>
                       <span className="text-[13px]"
-                        style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
+                        style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
                         {initialsOf(o.name)}
                       </span>
                     </div>
@@ -581,10 +581,10 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
           <div className="flex items-end gap-4 mb-4">
             <div className="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0"
               style={{
-                background: flatAvatarColor(organizer.name),
+                background: placeholderSurface(isDark),
                 boxShadow: avatarRing(isDark),
               }}>
-              <span className="text-[22px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: '#fff' }}>
+              <span className="text-[22px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
                 {initials}
               </span>
             </div>
@@ -764,18 +764,20 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
                       }}>
                       <GlassReflection isDark={isDark} />
                       <div className="relative z-10 w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
-                        style={{ background: ev.image ? undefined : ev.gradient, filter: isPast ? 'saturate(0.7)' : undefined }}>
+                        style={{ background: ev.image ? undefined : placeholderSurface(isDark), filter: isPast ? 'saturate(0.7)' : undefined }}>
                         {ev.image && <img src={ev.image} alt={ev.name} className="w-full h-full object-cover" />}
-                        <div className="absolute inset-0"
-                          style={{ background: isPast
-                            ? 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)'
-                            : 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%)' }} />
+                        {ev.image && (
+                          <div className="absolute inset-0"
+                            style={{ background: isPast
+                              ? 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)'
+                              : 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%)' }} />
+                        )}
                         <span className="relative text-[9px] tracking-[1px] uppercase leading-none"
-                          style={{ fontFamily: "'Inter', sans-serif", color: isPast ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                          style={{ fontFamily: "'Inter', sans-serif", color: ev.image ? (isPast ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)') : placeholderInk(isDark), fontWeight: 600 }}>
                           {ev.date.split(' ')[0]}
                         </span>
                         <span className="relative text-[13px] leading-none mt-0.5"
-                          style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isPast ? 'rgba(255,255,255,0.9)' : '#fff' }}>
+                          style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: ev.image ? (isPast ? 'rgba(255,255,255,0.9)' : '#fff') : placeholderInk(isDark) }}>
                           {ev.date.split(' ')[1]?.replace(',', '')}
                         </span>
                       </div>

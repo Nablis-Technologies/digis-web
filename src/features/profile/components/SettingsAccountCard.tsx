@@ -12,7 +12,6 @@ interface SettingsAccountCardProps {
   cardBg: string;
   value: string;
   heading: string;
-  avatarColor: string;
   isAuthenticated: boolean;
   user?: AuthUser | null;
   accentText: string;
@@ -26,7 +25,7 @@ interface SettingsAccountCardProps {
  */
 export function SettingsAccountCard(props: SettingsAccountCardProps) {
   const {
-    isDark, cardBorder, heading, avatarColor, isAuthenticated, user,
+    isDark, cardBorder, heading, isAuthenticated, user,
     accentText, subtle, onRequestAuth, onEditProfile,
   } = props;
   return (

@@ -9,7 +9,6 @@ import {
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
-import { flatAvatarColor } from '@/lib/utils/avatarColor';
 import {
   fetchNotificationPreferences, channelPreferences, updateChannelPreference,
   type NotificationChannel, type ChannelPreferences,
@@ -158,7 +157,6 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
     }
   };
 
-  const avatarColor = flatAvatarColor(user?.name || user?.email || 'Digis');
   const brand = '#d6f905';
   const cardBg = isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.7)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
@@ -196,7 +194,6 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         cardBg={cardBg}
         value={value}
         heading={heading}
-        avatarColor={avatarColor}
         isAuthenticated={isAuthenticated}
         user={user}
         accentText={accentText}

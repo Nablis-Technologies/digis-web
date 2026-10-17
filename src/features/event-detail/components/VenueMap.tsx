@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, MapPin, Navigation as NavigationIcon, Share2, UserPlus, X } from 'lucide-react';
 import { getVenueCoords } from '@/lib/utils/venueCoords';
-import { flatAvatarColor, avatarRing } from '@/lib/utils/avatarColor';
+import { placeholderSurface, placeholderInk, avatarRing } from '@/lib/utils/avatarAppearance';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, glassEdge, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
@@ -98,11 +98,11 @@ export function VenueMap({ venue, isDark, onOpenProfile, following, onToggleFoll
           style={{ background: 'transparent' }}>
           <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center"
             style={{
-              background: venueName ? flatAvatarColor(venueName) : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+              background: placeholderSurface(isDark),
               borderRadius: '32%',
             }}>
             <span className="text-[12.5px] uppercase"
-              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: '#fff' }}>
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: placeholderInk(isDark) }}>
               {initials}
             </span>
           </div>
@@ -229,11 +229,11 @@ export function VenueProfileSheet({ venue, isDark, following, onToggleFollow, on
           <div className="px-6 pb-6 pt-7">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 mb-4"
               style={{
-                background: venueName ? flatAvatarColor(venueName) : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+                background: placeholderSurface(isDark),
                 boxShadow: avatarRing(isDark),
               }}>
               <span className="text-[26px] uppercase"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: '#fff' }}>
+                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: placeholderInk(isDark) }}>
                 {initials}
               </span>
             </div>

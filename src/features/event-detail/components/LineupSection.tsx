@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, BadgeCheck, Calendar, Check, Clock, Crown, MapPin, Music2, Share2, UserPlus, Users, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { flatAvatarColor } from '@/lib/utils/avatarColor';
+import { placeholderSurface, placeholderInk } from '@/lib/utils/avatarAppearance';
 import { BrandAppleMusic, BrandInstagram, BrandSoundCloud, BrandSpotify, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -29,7 +29,6 @@ export function resolveLineup(lineup: any): any[] {
     rating: a.rating,
     bio: a.bio,
     image: a.image,
-    gradient: a.gradient,
   }));
 }
 
@@ -89,7 +88,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
               <div className={`relative w-full overflow-hidden ${compact ? 'rounded-[20px]' : 'rounded-[22px]'}`}
                 style={{
                   aspectRatio: '3/4',
-                  background: a.image ? undefined : flatAvatarColor(a.name),
+                  background: a.image ? undefined : placeholderSurface(isDark),
                   ...(isHeadliner ? {} : glassEdge(isDark)),
                 }}>
                 {a.image && (
@@ -104,7 +103,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
                       fontFamily: "'Zalando Sans Expanded', sans-serif",
                       fontSize: 72,
                       letterSpacing: '-3px',
-                      color: 'rgba(255,255,255,0.95)',
+                      color: placeholderInk(isDark),
                       textShadow: '0 4px 24px rgba(0,0,0,0.4)',
                     }}>
                       {initialsOf(a.name)}
@@ -227,7 +226,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
           <div className="flex items-center gap-4 pr-10 mb-5">
             <div className="relative w-[88px] h-[88px] rounded-full overflow-hidden flex-shrink-0"
               style={{
-                background: artist.image ? undefined : artist.gradient,
+                background: artist.image ? undefined : placeholderSurface(isDark),
                 boxShadow: isDark ? '0 8px 28px rgba(0,0,0,0.45)' : '0 8px 28px rgba(20,18,40,0.14)',
               }}>
               <GlassReflection isDark={isDark} />
@@ -239,7 +238,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                     fontFamily: "'Zalando Sans Expanded', sans-serif",
                     fontSize: 34,
                     letterSpacing: '-2px',
-                    color: 'rgba(255,255,255,0.95)',
+                    color: placeholderInk(isDark),
                     textShadow: '0 4px 18px rgba(0,0,0,0.35)',
                   }}>
                     {initials}
@@ -465,18 +464,20 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                       }}>
                       <GlassReflection isDark={isDark} />
                       <div className="relative z-10 w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
-                        style={{ background: ev.image ? undefined : ev.gradient, filter: isPast ? 'saturate(0.7)' : undefined }}>
+                        style={{ background: ev.image ? undefined : placeholderSurface(isDark), filter: isPast ? 'saturate(0.7)' : undefined }}>
                         {ev.image && <img src={ev.image} alt={ev.name} className="w-full h-full object-cover" />}
-                        <div className="absolute inset-0"
-                          style={{ background: isPast
-                            ? 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)'
-                            : 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%)' }} />
+                        {ev.image && (
+                          <div className="absolute inset-0"
+                            style={{ background: isPast
+                              ? 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)'
+                              : 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%)' }} />
+                        )}
                         <span className="relative text-[9px] tracking-[1px] uppercase leading-none"
-                          style={{ fontFamily: "'Inter', sans-serif", color: isPast ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                          style={{ fontFamily: "'Inter', sans-serif", color: ev.image ? (isPast ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)') : placeholderInk(isDark), fontWeight: 600 }}>
                           {ev.date.split(' ')[0]}
                         </span>
                         <span className="relative text-[13px] leading-none mt-0.5"
-                          style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isPast ? 'rgba(255,255,255,0.9)' : '#fff' }}>
+                          style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: ev.image ? (isPast ? 'rgba(255,255,255,0.9)' : '#fff') : placeholderInk(isDark) }}>
                           {ev.date.split(' ')[1]?.replace(',', '')}
                         </span>
                       </div>

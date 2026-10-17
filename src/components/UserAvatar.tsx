@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { flatAvatarColor, initialsOf } from '@/lib/utils/avatarColor';
+import { placeholderSurface, placeholderInk, initialsOf } from '@/lib/utils/avatarAppearance';
+import { useTheme } from '@/app/components/ThemeContext';
 import { authService } from '@/lib/auth';
 import type { AuthUser } from '@/types/auth';
 
@@ -9,7 +10,8 @@ const avatarBlobCache = new Map<string, { blobUrl: string; etag?: string }>();
 /**
  * Consistent profile avatar used across TopBar, UserProfile, and Settings.
  * Displays private user avatar photo via authenticated fetch (G-47), falling
- * back to initials on a hash-based color when no photo is attached or while loading.
+ * back to initials on the theme's own surface when no photo is attached or
+ * while loading — never an invented per-name colour.
  */
 export function UserAvatar({
   user,
@@ -22,6 +24,7 @@ export function UserAvatar({
   className?: string;
   style?: CSSProperties;
 }) {
+  const { isDark } = useTheme();
   const [photoUrl, setPhotoUrl] = useState<string | null>(() => {
     if (!user?.id || !user?.profile?.avatar_url) return null;
     return avatarBlobCache.get(user.id)?.blobUrl ?? null;
@@ -61,16 +64,12 @@ export function UserAvatar({
 
   if (!user) return null;
 
-  const color = flatAvatarColor(user.name || user.email || 'U');
   const initials = initialsOf(user.name || user.email?.split('@')[0] || 'U');
-  const lum = (() => {
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  })();
-  const textColor = lum > 0.55 ? '#0a0a0a' : '#ffffff';
+  const surface = placeholderSurface(isDark);
+  const textColor = placeholderInk(isDark);
+  const avatarShadow = isDark
+    ? '0 4px 14px -4px rgba(0,0,0,0.5)'
+    : '0 4px 14px -4px rgba(54,47,70,0.16)';
   const fontSize = Math.round(size * 0.38);
 
   const shared: CSSProperties = {
@@ -86,7 +85,7 @@ export function UserAvatar({
     return (
       <div
         className={`inline-flex items-center justify-center relative ${className}`}
-        style={{ ...shared, background: color, boxShadow: `0 4px 14px -4px ${color}88` }}
+        style={{ ...shared, background: surface, boxShadow: avatarShadow }}
       >
         <img
           src={photoUrl}
@@ -101,7 +100,7 @@ export function UserAvatar({
   return (
     <div
       className={`inline-flex items-center justify-center ${className}`}
-      style={{ ...shared, background: color, boxShadow: `0 4px 14px -4px ${color}88` }}
+      style={{ ...shared, background: surface, boxShadow: avatarShadow }}
     >
       <span style={{
         fontFamily: "'Zalando Sans Expanded', sans-serif",
