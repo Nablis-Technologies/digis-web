@@ -7,6 +7,43 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-17e — no-image placeholders: the hashed avatar palette → the theme surface
+
+**Prompt:** *"for the extracting hues from posters but only if an image is [available];
+[when an] image is not available lets not have drop a random color"* — the user's
+rule after the 2026-10-17d sheet fix and the audit in
+`.scratch/web2-ui-import/issues/04-derived-colour-audit.md`.
+
+**Decision.** Keep extracting a poster/portrait's hue **when an image exists** (group
+A is untouched — all 63 live events have a cover, so this half is live). When there
+is **no image**, never drop a generated/hashed colour — wear the app's dark/light
+surface. Groups C (category hues, a documented data-hue lane) and D (hand-picked
+gradients) were left alone; the rule was about image fallbacks.
+
+**Landed (frontend; no backend change).**
+
+- **`lib/utils/avatarAppearance.ts`** (renamed from `avatarColor.ts`) — the hashed
+  12-colour `flatAvatarColor` palette is **deleted**. Two theme helpers replace it:
+  `placeholderSurface(isDark)` (night `rgba(255,255,255,0.06)` / paper
+  `rgba(0,0,0,0.05)`) and `placeholderInk(isDark)`. Unit-tested.
+- Call sites updated: `VenueMap` (×2 — the sheet avatar is no longer the green
+  "TV" tile), `OrganizerSection` (×5), `LineupSection` (×2 portrait + 2 event
+  thumbnails), `UserAvatar`, and `SettingsPage` (its avatar had no image path).
+- Group A's no-image fallbacks (`artist.gradient` / `ev.gradient`, only ever set by
+  the `ui-preview` mock) now use `placeholderSurface`; the event-thumbnail tiles
+  drop their photo scrim and use theme ink when there is no image. `resolveLineup`
+  no longer maps the now-unread `gradient` field.
+- `SettingsAccountCard` lost its dead `avatarColor` prop.
+
+**Review fixes (two-axis):** `UserAvatar` called `useTheme()` *after* its
+`if (!user) return null` early return — a Rules-of-Hooks crash when auth resolves
+`null → user`; the hook now sits with the others. The two event-thumbnail tiles were
+caught still painting white ink on the now-light placeholder.
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **259** (31 files);
+`pnpm build` green; `npx playwright test` **42/42**; venue sheet eyeballed in both
+themes — a quiet surface with theme ink.
+
 ## Session 2026-10-17d — profile sheets: derived-hue environment → plain theme surface
 
 **Prompt:** *"why is the venue profile blue gradient background"* → *"lets just
