@@ -22,7 +22,7 @@ status change is not "done" until the frontend either consumes it or tracks it.
 |---|---|---|---|
 | 58 | the `active_checkout_exists` 409 now carries `meta.active_checkout` | `issues/01-active-checkout-resume.md` | **DONE 2026-10-16e** (`cc856ae`) |
 | 62 | the wallet ticket now serves `pending_transfer` | `issues/02-wallet-pending-transfer.md` | **DONE 2026-10-16e** (`6fabb41`) |
-| 61 | an in-app `transfer_incoming` notification now fires on initiation | `issues/03-transfer-incoming-accept.md` | still owed (see below) |
+| 61 | an in-app `transfer_incoming` notification now fires on initiation | `issues/03-transfer-incoming-accept.md` | **DONE 2026-10-17** |
 
 ## 2026-10-16e — the PR #37 "wire the fixes" pull
 
@@ -35,7 +35,7 @@ wired in that run.
 
 | # | Obligation | Ticket |
 |---|---|---|
-| 61 | accept an incoming transfer from the `transfer_incoming` notification in-app (no incoming-transfers list endpoint; the authenticated `POST /ticket_transfers/:id/accept` exists and `lib/transfer.ts` has `transferFromNotification`/`acceptAuthenticated`) | `issues/03-transfer-incoming-accept.md` |
+| 61 | accept an incoming transfer from the `transfer_incoming` notification in-app (no incoming-transfers list endpoint; the authenticated `POST /ticket_transfers/:id/accept` exists and `lib/transfer.ts` has `acceptAuthenticated`) | `issues/03-transfer-incoming-accept.md` — **DONE 2026-10-17** |
 | #49 (filters) | consume the **remaining** server-side `GET /public/events` params in discovery — `category`/`city`/`date_from`/`date_to`/`min_price_minor`/`max_price_minor`/`organization_id`/`venue_id`/`artist_id` + server `sort` | `issues/04-server-side-discovery-filters.md` — **DONE 2026-10-16f** (`category`/price/`sort` wired; `city`/`date_*`/followable ids have no UI yet) |
 
 Both are frontend-only (the backend surfaces already exist; the params are
@@ -55,4 +55,8 @@ The only frontend change that was *not* new wiring: the `festival-live.spec.ts`
 roster guard had a **stale locator** ("Special guests" is a `<p>`, not a heading) —
 fixed, plus it now asserts the first **served** participant's name.
 
-**Still tracked:** #61 (accept an incoming transfer) — `issues/03-transfer-incoming-accept.md`.
+**Still tracked:** nothing from this sweep — **#61** (accept an incoming transfer)
+was the last one and is **DONE 2026-10-17** (`issues/03-transfer-incoming-accept.md`;
+the `transfer_incoming` card's Accept action + `e2e/transfer-accept.spec.ts`). The
+only remaining unwired #49 params (`city`, `date_*`, followable ids) have no UI to
+drive them. This sweep directory is now **closed**.

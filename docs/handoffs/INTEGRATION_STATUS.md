@@ -7,6 +7,53 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-17b — #61 accept-an-incoming-transfer wired (the last owed sweep item)
+
+**Prompt:** "go" — continue the tracked frontend follow-up. The one item still owed
+from the 2026-10-16 gap-wiring sweep was **#61's accept action**
+(`.scratch/gap-wiring-2026-10-16/issues/03-transfer-incoming-accept.md`): the
+`transfer_incoming` notification was labelled, but "Accept it in Tickets." had
+nowhere to go.
+
+| # | Backend surface (already live) | Frontend wiring |
+|---|---|---|
+| 61 | `ticketing.ticket_transfer.initiated` → `transfer_incoming` (`channels: %w[in_app]`, recipient `to_user`) whose `data` carries `transfer_id, ticket_id, event_id, event_title, ticket_label, expires_at`; authenticated `POST /ticket_transfers/:id/accept` is **tokenless** (bearer proves identity; `transfers_controller.rb#accept`, `Ticketing::Transfers::Accept#find_transfer_for_acceptance` scopes by `to_user_id` when no token) | `mapNotification` exposes `acceptTransferId` **only** for `transfer_incoming` with a string `data.transfer_id`; the card's body names the action; the card deep-links to `/tickets` **only** when no action is offered (the spec's fallback). `TopBar` renders an accent **Accept** button beside the row (mark-read only on a confirmed accept) → `transferService.acceptAuthenticated(id)` (empty body; `Idempotency-Key` injected) → toast + `invalidateQueries(ticketKeys.userTickets)`; failure = toast only. New `CODE_MESSAGES`: `transfer_expired`, `transfer_not_pending`, `transfer_recipient_unverified` |
+
+**Verified live (wire read):** error codes for the accept path in
+`Ticketing::Transfers::Accept#validate` (`transfer_recipient_mismatch` 403,
+`transfer_recipient_unverified` 422, `transfer_expired` / `transfer_not_pending`
+409) and the `transfer_incoming` definition (`category: transactional`) in
+`app/services/messaging/notification_types.rb`.
+
+**Contract guard:** `e2e/transfer-accept.spec.ts` — a session-injected,
+route-mocked panel: opens the bell, asserts the action copy, clicks **Accept**,
+and asserts the confirmed "Accepted" state, the toast, `POST
+/ticket_transfers/tr-e2e-1/accept` with an **empty body** + `Idempotency-Key`, and
+the wallet refetch. Unit: `notifications.test.ts` (action exposure, no-action
+fallback + copy, non-`transfer_incoming` exclusion).
+
+**Two-axis review (Standards + Spec) run before committing.** Fixed: a new
+`disabled:opacity-50` (DESIGN.md forbids faking disabled states) → neutral
+`glassControl()` at full opacity + `rounded-2xl`/`min-h-9`; `hover:opacity-80` →
+`whileHover` scale; hand-rolled `accentSoft` + `glassEdge` → `glassControl(isDark,
+'accent')`; the duplicated `transfer_id` guard → one `transferIdFrom`; the
+single-variant `NotificationAction` union dropped for `acceptTransferId`; the card
+no longer marks read **before** the accept resolves; the e2e fixture's `category`
+corrected to `transactional` (it claimed exact wire shapes). Kept (deliberate, see
+the ticket): the backend's body copy after acceptance, and the `/tickets` fallback.
+
+**Doc updates:** the ticket marked **DONE**; `.scratch/gap-wiring-2026-10-16/`
+**closed** (`spec.md`); `BACKEND_GAPS.md` **#61 entry corrected** — the 2026-10-16e
+log had over-claimed #61 as wired and closed the sweep dir early; `AGENTS.md`
+(counts + #61 note); this file.
+
+**Still open:** unchanged — blocking **#53 (`seat_map` only)** / #57 / #65;
+degrading #44/#46/#48/#67/#71/#72.
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **258**; `pnpm build` green;
+`npx playwright test` **41/41**; dark + accepted states eyeballed in a browser
+screenshot (accent capsule → flat neutral "Accepted").
+
 ## Session 2026-10-17 — the age-restriction pull wired (+ #36 public participants)
 
 **Prompt:** the backend **Event Age Restriction.md** handoff — "pull the latest

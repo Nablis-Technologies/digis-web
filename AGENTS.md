@@ -11,8 +11,8 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
-npx vitest run    # unit tests (253)
-npx playwright test  # e2e vs the live backend on :3000 (40 deterministic; zz-* manual)
+npx vitest run    # unit tests (258)
+npx playwright test  # e2e vs the live backend on :3000 (41 deterministic; zz-* manual)
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
@@ -215,7 +215,9 @@ payment enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`
 /user`), #56 (signup OTP-upgrades the shadow phone), #47 (gift flow — `lib/gifts.ts`),
 #58 (409 `meta.active_checkout` → `ConflictSheet` resumes the parked payment or
 degrades honestly), #61 (`transfer_incoming` notification), #62 (wallet
-`pending_transfer` → badge + action gate). `.scratch/gap-wiring-2026-10-16/` is closed.
+`pending_transfer` → badge + action gate). `.scratch/gap-wiring-2026-10-16/` is closed
+as of **2026-10-17** — #61's notification shipped 2026-10-16 but its **accept action**
+was completed later (see below).
 
 **Resolved 2026-10-16e (backend PR #37 pull) — all wired:** #49 (discovery
 search/filter/sort + events-by-followable — `eventsModule.fetchAll(query)` + `?q=`),
@@ -285,7 +287,8 @@ badges), discovery **featured** (the paid Featured endpoint —
 `profile.full_name`; `GET`/`PATCH /user` — `me`/`updateProfile` wired), #56 (signup
 OTP-upgrades a shadow phone), #47 (gift purchase flow — `lib/gifts.ts`), #33, #34,
 #39, #40, #41, #43, #45 (all 2026-09-30), #58/#61/#62 (2026-10-16 — backend
-surfaces landed; frontend wiring completed 2026-10-16e), #49/#50/#68/#69/#70
+surfaces landed; **#61's `transfer_incoming` card accept action completed
+2026-10-17**, see `e2e/transfer-accept.spec.ts`), #49/#50/#68/#69/#70
 (2026-10-16e — backend PR #37 "wire the fixes" pull; frontend wired in the same run),
 #36 (2026-10-17 — public **detail** serves `event_participants`; adapter aligned to
 the real shape).

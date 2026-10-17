@@ -199,9 +199,13 @@
 > - **#50** — wallet serves `registration_answers` (respondent only) + `GET
 >   /registrations/:id/answers` (`EditableRegistrationAnswerSerializer.editable`).
 >   Frontend: mapped to `registrationAnswersUrl`/`answersEditableUntil`.
-> - **#58 / #61 / #62** — the three previously owed wiring items are now **wired**
->   (resume-or-degrade conflict sheet; `pendingTransfer` banner + action gate; the
->   registration-answers context). `.scratch/gap-wiring-2026-10-16/` is closed.
+> - **#58 / #62** — two of the three owed wiring items were wired in this run
+>   (resume-or-degrade conflict sheet; `pendingTransfer` banner + action gate).
+>   **Correction (2026-10-17):** the third, **#61**, was *not* fully wired here —
+>   only the notification's labelling shipped; the card's **accept action** was left
+>   tracked in `.scratch/gap-wiring-2026-10-16/issues/03-transfer-incoming-accept.md`
+>   and completed **2026-10-17** (so this sweep directory is closed only as of that
+>   date, not 2026-10-16e).
 >
 > **New gap filed: #72** — the **detail** serializer omits `event_lifecycle` +
 > `ticket_availability` (only the list carries them). Previously `eventEnded` used
@@ -1454,7 +1458,12 @@ ticket" in the app. Today they see nothing.
 
 **Status: resolved 2026-10-16** — the in-app `transfer_incoming` notification now
 fires on initiation for `to_user` (carries `transfer_id`). Original filing
-2026-10-01 (dev-DB audit).
+2026-10-01 (dev-DB audit). **Frontend wiring completed 2026-10-17:** the
+`transfer_incoming` card now offers an **Accept** action → tokenless
+`POST /ticket_transfers/:id/accept` with `data.transfer_id`, wallet refreshed on
+success (`e2e/transfer-accept.spec.ts`). Residual (unchanged): there is still no
+incoming-transfers **list** endpoint, so the notification is the only in-app
+accept surface — the wallet cannot show a *pending* incoming transfer.
 
 ### #62. A pending (unaccepted) outgoing transfer is invisible on the sender's wallet ticket — RESOLVED 2026-10-16
 
