@@ -120,9 +120,8 @@ export interface EventArtist {
   name: string;
   handle?: string;
   /**
-   * Backend `event_date_id` — pins a festival participant to one scheduled
-   * date; absent means event-level (shown on every day). Not yet in the public
-   * payload (#36) — the adapter maps it when the backend serves it.
+   * Backend `event_date_id` — pins a festival participant to one scheduled date
+   * (#36 served 2026-10-17); absent means event-level (shown on every day).
    */
   eventDateId?: string;
   role?: string;
@@ -244,9 +243,11 @@ export interface Event {
   /** Organizer-set answer edit window after purchase. Omit or set 0 to lock responses. */
   answerEditWindowHours?: number | null;
   featured?: boolean;
-  /** Organizer age policy. No public source yet — see BACKEND_GAPS #53. */
+  /** Organizer age policy, flattened for the Age card from the backend detail's
+   *  validated `event_setting.config.age_restriction` (#53). Absent renders the
+   *  card's own "Any Age" fallback. */
   ageRestriction?: string;
-  /** Event lineup. No public source yet — see BACKEND_GAPS #36. */
+  /** Event lineup, mapped from the public detail's `event_participants` (#36). */
   lineup?: EventArtist[];
   /**
    * Co-organizers, mapped from the backend `event_organizations` association.

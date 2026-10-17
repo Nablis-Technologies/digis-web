@@ -13,20 +13,23 @@
  *                          active ticket products only — BACKEND_GAPS #13/#32 resolved).
  *   EventDetailSerializer: id, slug, title, description, visibility, timezone,
  *                          currency, published_at, created_at, is_recurring,
- *                          event_dates_preview (≤7 upcoming), event_dates_url, categories, ...
+ *                          event_dates_preview (≤7 upcoming), event_dates_url,
+ *                          event_participants (public roster — #36), categories, ...
  *
  * Date shape (2026-10-16 backend release — BACKEND_GAPS #70 resolved): the list no
  * longer ships `event_dates`; it ships a single `next_event_date` (the soonest
  * upcoming session) and the detail ships a bounded `event_dates_preview` plus
  * `event_dates_url` for the full schedule. A legacy `event_dates` array is kept
  * as a fallback for any payload that still serves it.
- *   event_setting.config:  after the 2026-09-30 composable-admission release the
- *                          PUBLIC_CONFIG_KEYS projection carries only
- *                          `public_guest_limit` (BACKEND_GAPS #53/#44). The
- *                          event-level mode/rsvp/access keys are gone AND were
- *                          never read by the backend, so this adapter maps none
- *                          of them. Admission is sourced per-offer from
- *                          `GET /public/events/:slug/products` (`products.ts`).
+ *   event_setting.config:  the 2026-09-30 composable-admission release left the
+ *                          PUBLIC_CONFIG_KEYS projection carrying only
+ *                          `public_guest_limit` (#53/#44); the event-level
+ *                          mode/rsvp/access keys are gone AND were never read by
+ *                          the backend. The **detail** payload now also serves a
+ *                          validated `age_restriction` ({ has_restriction,
+ *                          min_age?, max_age? }) — mapped here to the Age card's
+ *                          display string (#53). Admission is sourced per-offer
+ *                          from `GET /public/events/:slug/products` (`products.ts`).
  *
  * Mock policy: the backend is the only source of truth. No mock event record
  * is merged in — absent backend data renders as absent.
@@ -58,6 +61,15 @@ export interface BackendEventDate {
    * session date; null for a one-off date.
    */
   series_id?: string | null;
+}
+
+/** Structured organizer age policy (#53). Detail payload only; validated
+ *  server-side before it is served (`has_restriction: true` guarantees at least
+ *  one bound). Absent when never configured. */
+export interface BackendAgeRestriction {
+  has_restriction?: boolean;
+  min_age?: number;
+  max_age?: number;
 }
 
 /** G-44 lifecycle + sellability states — served on every list card. */
@@ -99,31 +111,33 @@ export interface BackendEvent {
    *  (`GET /public/events/:slug/dates`) (#70). */
   event_dates_url?: string;
   event_media?: BackendMedia[];
+  /** Detail payload adds a validated `age_restriction` under `config` (#53);
+   *  the list projection carries only `public_guest_limit`. */
   event_setting?: {
     id?: string;
-    config?: Record<string, unknown>;
+    config?: Record<string, unknown> & { age_restriction?: BackendAgeRestriction };
   };
   /** Co-organizers — { id, type, role, status, organization: { id, name, slug } }. */
   event_organizations?: {
     role?: string;
     organization?: { id: string; name: string; slug?: string } | null;
   }[];
-  /** Lineup — public EventParticipantSerializer (artist profile per entry). */
+  /**
+   * Lineup — the public `EventParticipantSerializer` (#36, resolved 2026-10-17).
+   * The public projection is deliberately small: `name`, a machine `type`
+   * (performer / host / speaker / …), a free-text `description` that seeds use
+   * as the display role ("Headliner"), the optional `event_date_id` day pin, and
+   * `display_order` (the server already sorts by it). No artist-profile fields
+   * (image / handle / genre / followers / …) cross this boundary.
+   */
   event_participants?: {
     id?: string;
+    artist_id?: string | null;
+    event_date_id?: string | null;
     name?: string;
-    handle?: string;
-    role?: string;
-    time?: string;
-    genre?: string;
-    verified?: boolean;
-    /** FK pinning the participant to one event date (#36) — not yet public. */
-    event_date_id?: string;
-    followers?: number;
-    eventsPlayed?: number;
-    rating?: number;
-    bio?: string;
-    image?: string;
+    type?: string;
+    description?: string;
+    display_order?: number;
   }[];
   organization?: { id: string; name: string; slug?: string } | null;
   /**
@@ -135,6 +149,29 @@ export interface BackendEvent {
    */
   recurrence?: { rule_id?: string; rrule?: string; active?: boolean };
   is_recurring?: boolean;
+}
+
+/**
+ * Format the backend's structured age policy for the Age card. `has_restriction`
+ * must be an explicit `true` to render a bound — an absent or `false` policy
+ * stays absent so the card keeps its own "Any Age" fallback (ADR-0002). Each bound
+ * shape is handled: `{min,max} → "21–65"`, `{min} → "18+"`, `{max} → "Up to 65"`.
+ *
+ * `has_restriction: true` always carries ≥1 bound — the backend rejects the
+ * boundless form with 422 `invalid_age_restriction` (verified live 2026-10-17),
+ * so the fall-through below is unreachable unless that contract is violated.
+ */
+export function formatAgeRestriction(
+  restriction?: BackendAgeRestriction | null,
+): string | undefined {
+  if (restriction?.has_restriction !== true) return undefined;
+  const { min_age: min, max_age: max } = restriction;
+  const hasMin = typeof min === "number";
+  const hasMax = typeof max === "number";
+  if (hasMin && hasMax) return `${min}–${max}`;
+  if (hasMin) return `${min}+`;
+  if (hasMax) return `Up to ${max}`;
+  return undefined;
 }
 
 /**
@@ -180,23 +217,24 @@ export function backendEventToEvent(be: BackendEvent): Event {
     .filter((org): org is NonNullable<typeof org> => Boolean(org))
     .map((org) => ({ id: org.id, name: org.name }));
 
-  // Lineup from the public `event_participants` association. The backend does
-  // not expose it yet (BACKEND_GAPS #36), so this maps nothing until it does —
-  // the section then renders; absent stays absent (ADR-0002).
-  const lineup: EventArtist[] = (be.event_participants ?? []).map((p) => ({
-    name: p.name ?? "",
-    ...(p.event_date_id ? { eventDateId: p.event_date_id } : {}),
-    ...(p.handle ? { handle: p.handle } : {}),
-    ...(p.role ? { role: p.role } : {}),
-    ...(p.time ? { time: p.time } : {}),
-    ...(p.genre ? { genre: p.genre } : {}),
-    ...(typeof p.verified === "boolean" ? { verified: p.verified } : {}),
-    ...(typeof p.followers === "number" ? { followers: p.followers } : {}),
-    ...(typeof p.eventsPlayed === "number" ? { eventsPlayed: p.eventsPlayed } : {}),
-    ...(typeof p.rating === "number" ? { rating: p.rating } : {}),
-    ...(p.bio ? { bio: p.bio } : {}),
-    ...(p.image ? { image: p.image } : {}),
-  }));
+  // Lineup from the public `event_participants` association (#36 — resolved
+  // 2026-10-17). The serializer now serves the roster; this maps the fields it
+  // actually carries. Its free-text `description` is the display role the seeds
+  // write (e.g. "Headliner"), so it fills the lineup UI's `role` slot; a roster
+  // entry the backend served without a name is dropped rather than rendered as an
+  // empty card — never a fabricated profile (ADR-0002).
+  const lineup: EventArtist[] = (be.event_participants ?? [])
+    .filter((p): p is typeof p & { name: string } => Boolean(p.name?.trim()))
+    .map((p) => ({
+      name: p.name,
+      ...(p.event_date_id ? { eventDateId: p.event_date_id } : {}),
+      ...(p.description ? { role: p.description } : {}),
+    }));
+
+  // Age policy (#53) — the detail payload's validated structured value.
+  const ageRestriction = formatAgeRestriction(
+    be.event_setting?.config?.age_restriction,
+  );
 
   return {
     id: be.id,
@@ -255,9 +293,12 @@ export function backendEventToEvent(be: BackendEvent): Event {
       : {}),
     ...(typeof be.is_recurring === "boolean" ? { isRecurring: be.is_recurring } : {}),
     ...(be.event_dates_url ? { eventDatesUrl: be.event_dates_url } : {}),
+    // Organizer age policy (#53) — a validated structured value on the detail
+    // payload, flattened to the Age card's display string here. Absent stays
+    // absent (never "0+" or an invented bound).
+    ...(ageRestriction ? { ageRestriction } : {}),
   };
-  // NOTE: `age_restriction` and `seat_map` have no public source after the
-  // 2026-09-30 backend release and render absent (ADR-0002) — see #53.
-  // Per-offer admission (price, availability, audience, approval, waitlist)
-  // comes from `GET /public/events/:slug/products`.
+  // `seat_map` still has no public source (BACKEND_GAPS #53). Per-offer
+  // admission (price, availability, audience, approval, waitlist) comes from
+  // `GET /public/events/:slug/products`.
 }

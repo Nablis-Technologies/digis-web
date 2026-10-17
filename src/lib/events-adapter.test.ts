@@ -99,19 +99,21 @@ describe("backendEventToEvent", () => {
     expect(backendEventToEvent(wire()).featured).toBeUndefined();
   });
 
-  it("maps lineup from event_participants when served, absent when not", () => {
+  it("maps lineup from the public event_participants roster, absent when not (#36)", () => {
     const served = backendEventToEvent(
       wire({
         event_participants: [
-          { name: "Teddy Afro", role: "performer", handle: "@teddy", followers: 1200, verified: true },
+          { id: "p1", name: "Teddy Afro", type: "performer", description: "Headliner", display_order: 0 },
+          // A roster entry served without a name is dropped, not rendered blank.
+          { id: "p2", type: "host", display_order: 1 },
         ],
       }),
     );
     expect(served.lineup).toHaveLength(1);
-    expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", role: "performer", handle: "@teddy", followers: 1200, verified: true });
+    // The serializer's free-text `description` is the display role the UI shows.
+    expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", role: "Headliner" });
 
-    // The public payload does not expose participants yet (BACKEND_GAPS #36) —
-    // the adapter must not fabricate a lineup.
+    // Absent participants must not be fabricated into a lineup.
     const absent = backendEventToEvent(wire());
     expect(absent.lineup).toBeUndefined();
   });
@@ -120,13 +122,13 @@ describe("backendEventToEvent", () => {
     const served = backendEventToEvent(
       wire({
         event_participants: [
-          { id: "p1", name: "Teddy Afro", role: "performer", event_date_id: "d2" },
-          { id: "p2", name: "Festival Host", role: "host" },
+          { id: "p1", name: "Teddy Afro", type: "performer", description: "Headliner", event_date_id: "d2" },
+          { id: "p2", name: "Festival Host", type: "host", description: "Host" },
         ],
       }),
     );
     // A day-pinned participant carries its date id; an event-level one does not.
-    expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", eventDateId: "d2" });
+    expect(served.lineup?.[0]).toMatchObject({ name: "Teddy Afro", role: "Headliner", eventDateId: "d2" });
     expect(served.lineup?.[1]).not.toHaveProperty("eventDateId");
   });
 
@@ -171,5 +173,29 @@ describe("backendEventToEvent", () => {
       }),
     );
     expect(ev.eventDates?.map((d) => d.id)).toEqual(["fresh"]);
+  });
+
+  it("flattens the detail's structured age_restriction for the Age card (#53)", () => {
+    const restriction = (age_restriction: unknown) =>
+      backendEventToEvent(wire({ event_setting: { config: { age_restriction } } })).ageRestriction;
+
+    // min only, and a bounded window.
+    expect(restriction({ has_restriction: true, min_age: 18 })).toBe("18+");
+    expect(restriction({ has_restriction: true, min_age: 21, max_age: 65 })).toBe("21–65");
+    // max only (a valid backend shape, though the catalog does not use it yet).
+    expect(restriction({ has_restriction: true, max_age: 12 })).toBe("Up to 12");
+  });
+
+  it("leaves ageRestriction absent when there is no explicit restriction (#53)", () => {
+    const restriction = (age_restriction?: unknown) =>
+      backendEventToEvent(wire({ event_setting: { config: { age_restriction } } })).ageRestriction;
+
+    // The list payload never carries it; an explicit "no restriction" is not a
+    // bound; and a malformed/legacy value must not be invented into one.
+    expect(restriction(undefined)).toBeUndefined();
+    expect(restriction({ has_restriction: false })).toBeUndefined();
+    expect(restriction({ has_restriction: true })).toBeUndefined();
+    expect(restriction("21+")).toBeUndefined();
+    expect(backendEventToEvent(wire()).ageRestriction).toBeUndefined();
   });
 });
