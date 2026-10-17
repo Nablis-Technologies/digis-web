@@ -1,7 +1,9 @@
 # Wire the venue detail onto `GET /venues/:id` (drop the coords stopgap)
 
-- **Status:** `ready-for-agent` — the **seed** now carries venue geo + media
-  (fixed 2026-10-15, backend `chore(dev)` `ec36172d`), so this reads real data.
+- **Status:** `ready-for-agent` — **step 5's de-fabrication landed 2026-10-17**; the
+  wire-up (steps 1–4) is still owed, so this stays open. The **seed** already carries
+  venue geo + media (fixed 2026-10-15, backend `chore(dev)` `ec36172d`), so the
+  remaining steps read real data.
 - **Blocked by:** nothing. This is **not a backend gap** — the API always served
   it; the seed was empty. See `docs/handoffs/DATA_INTEGRITY_AUDIT.md` → "Seed-side
   fixes (2026-10-15)".
@@ -10,6 +12,26 @@
   half)** — the venue sheet's fabricated followers/amenities are frontend work to
   remove (the backend serves the real data on `GET /venues/:id`); reclassified
   2026-10-16, no longer a backend gap.
+
+## Done 2026-10-17 — step 5, the fabrication is gone
+
+`VenueProfileSheet` now renders only what the event payload's venue **name** can
+honestly support: the name, the stopgap address + coords/Directions link, the
+avatar initials, Follow and Share. Removed outright: the fake `BadgeCheck`
+"verified" tick, the invented stats (`47` events / `4200` followers / `1200`
+capacity), the canned About paragraph + Read more, the fixed amenities grid, the
+link-less social buttons, the photo-strip placeholder, and both invented event
+lists (6 events). Where they sat there is a comment naming what is absent and why.
+Shared derivation (name/initials/address/map+directions links) is now one
+`venueProfile()` helper; the sheet is `role="dialog"`-labelled and its close button
+is named. Guarded by `e2e/event-detail.spec.ts` → "venue sheet invents nothing"
+(scoped to the dialog: honest content present, fabricated labels absent).
+
+**Still owed (steps 1–4):** carry `venue.id` from `event_dates[].venue` through the
+adapter; a public `fetchVenue(id)` typed against `GET /venues/:id`; hydrate the
+sheet (description, `profile_url`, `gallery_urls`, `amenities`, `capacity`,
+`social_links`, `follower_count`); drop `src/lib/utils/venueCoords.ts` for the
+served coords (map absent when a venue has none — no city-centroid fallback).
 
 ## Context
 
@@ -38,15 +60,20 @@ public event payload.
    served coords. When a venue genuinely has no coords, render the map **absent**
    with the address (ADR-0002) — do not fall back to a city centroid.
 4. Render the served `profile_url` as the venue avatar and `gallery_urls` as the
-   photos strip; delete the "carries no images" placeholder comment at
-   `VenueMap.tsx:459`.
-5. **Remove the fabrication:** followers / capacity / events count / About / amenities
-   must come from the payload or not render. The per-venue event history needs
-   #49's followable-events endpoint — keep that list absent until then (file a gap
-   if it's wanted as a product surface).
+   photos strip. (The "carries no images" placeholder comment is already gone —
+   step 5 removed it 2026-10-17.)
+5. **Remove the fabrication — DONE 2026-10-17 (see above).** followers / capacity /
+   events count / About / amenities come from the payload or do not render. The
+   per-venue event history needs #49's followable-events endpoint — keep that list
+   absent until then (file a gap if it's wanted as a product surface).
 
 ## Verification
 
-- Unit: the adapter maps `venue.id` + coords; `VenueMap` renders the map from props.
-- e2e: `event-detail.spec.ts` asserts a real directions link + a venue photo for a
-  seeded event, and that **no mock/unsplash** venue image renders.
+- **Landed 2026-10-17 (de-fabrication):** `e2e/event-detail.spec.ts` → "venue sheet
+  invents nothing" — opens the sheet on a seeded event and asserts, scoped to the
+  dialog, that the honest content (name, Directions, Follow Venue, Share) renders
+  and the invented labels (Events / Followers / Capacity / About / Amenities /
+  Socials / the sample event names) are absent.
+- **Still owed (steps 1–4):** unit — the adapter maps `venue.id` + coords;
+  `VenueMap` renders the map from props. e2e — a real directions link + a served
+  venue photo for a seeded event, and no mock/unsplash venue image renders.

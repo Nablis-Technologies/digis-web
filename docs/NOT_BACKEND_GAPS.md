@@ -159,6 +159,14 @@ followers/amenities.
 owed.** (Venue geo/media was already recorded as the "#36 seed half" — fixed in the
 seed 2026-10-15.)
 
+**Frontend progress 2026-10-17:** the fabricated half is gone —
+`VenueProfileSheet` no longer invents followers/capacity/events/About/amenities/
+socials/photos/event lists and renders only the venue name, address, stopgap
+coords/Directions, Follow and Share (`e2e/event-detail.spec.ts` pins it). The
+`GET /venues/:id` hydration (description, `profile_url`, `gallery_urls`,
+`amenities`, `capacity`, `social_links`, `follower_count`, real coords) is the
+remaining work, tracked in `.scratch/web2-ui-import/issues/01-venue-detail-wireup.md`.
+
 ### #51 (events-by-followable half) — now served by the `GET /public/events` filters
 
 **Resolved as a frontend need 2026-10-16e (no separate backend surface needed).** The

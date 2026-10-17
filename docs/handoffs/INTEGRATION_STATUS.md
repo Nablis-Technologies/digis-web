@@ -7,6 +7,46 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-17c — the venue sheet's fabricated content removed (web2-import issue 01)
+
+**Prompt:** "go" → the user chose *de-fabricate the venue sheet* as the next slice.
+
+`VenueProfileSheet` (`src/features/event-detail/components/VenueMap.tsx`) receives a
+venue **name** only and was inventing a profile. Removed outright: the fake
+`BadgeCheck` "verified" tick, the stats row (`47` events / `4200` followers / `1200`
+capacity), the canned About paragraph + Read more, the fixed amenities grid, the
+link-less social buttons, the photo-strip placeholder, and both invented event
+lists (6 events). What remains is what the payload can honestly support: name,
+stopgap address + coords/Directions, avatar initials, Follow, Share — with a
+comment naming what is absent and why (ADR-0002).
+
+Also: the shared derivation (name / initials / address / map + directions links) is
+now one `venueProfile()` helper used by both `VenueMap` and the sheet; the `accent`
+constant collapsed to one module `ACCENT` (it had two identical branches); the sheet
+is a labelled `role="dialog"` and its icon-only close button is now named; the
+vestigial avatar wrapper div is gone.
+
+**Guarded:** `e2e/event-detail.spec.ts` → "venue sheet invents nothing" — opens the
+sheet on a seeded event and asserts, **scoped to the dialog**, that the honest
+content renders (name heading, Directions link, Follow Venue, Share) and the
+invented labels (Events / Followers / Capacity / About / Amenities / Socials / the
+sample event names) are absent. Two-axis review run: its findings (duplicated
+derivation + comments, the pointless `accent` ternary, the vestigial wrapper, the
+unnamed close button, and a negative-only guard that could pass on an empty shell)
+are all fixed; the reviewer's "hardcoded `on-on`" note is accepted as consistent with
+the two existing tests in that file.
+
+**Not a backend gap, and NOT the full wire-up.** Hydrating the sheet from public
+`GET /venues/:id` (description, `profile_url`, `gallery_urls`, `amenities`,
+`capacity`, `social_links`, `follower_count`, real coords, dropping
+`venueCoords.ts`) stays tracked in `.scratch/web2-ui-import/issues/01-venue-detail-wireup.md`
+(steps 1–4), and its status is updated to record this partial progress.
+`docs/NOT_BACKEND_GAPS.md` #51 (venue-stats half) carries the same note.
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **258**; `pnpm build` green;
+`npx playwright test` **42/42**; the sheet eyeballed live in the browser (venue →
+sheet: no fabricated sections).
+
 ## Session 2026-10-17b — #61 accept-an-incoming-transfer wired (the last owed sweep item)
 
 **Prompt:** "go" — continue the tracked frontend follow-up. The one item still owed
