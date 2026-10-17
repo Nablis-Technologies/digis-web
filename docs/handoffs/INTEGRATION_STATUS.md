@@ -7,6 +7,48 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-17 — the age-restriction pull wired (+ #36 public participants)
+
+**Prompt:** the backend **Event Age Restriction.md** handoff — "pull the latest
+backend and start wiring the changes".
+
+Merged `origin/feat/launch-hardening-telemetry` (6 commits, `0741c53b` →
+`8419aaaf`) into the local dev branch and live-verified the new contract on `:3000`.
+Split into two frontend-wiring items:
+
+| # | Backend change | Frontend wiring |
+|---|---|---|
+| 53 (partial) | public **detail** serves `event_setting.config.age_restriction { has_restriction, min_age?, max_age? }` (`Events::Public::EventDetailSettingSerializer` → `EventSetting#safe_age_restriction`); organizer write nests at `event.event_setting.config.age_restriction`; bad shapes → **422 `invalid_age_restriction`**; the **list** still omits it | new `BackendAgeRestriction` + pure `formatAgeRestriction` in `events-adapter.ts` (min+max → `"21–65"`, min-only → `"18+"`, max-only → `"Up to 12"`) → `Event.ageRestriction` → the Age card renders the real value; absent/malformed stays absent (ADR-0002) |
+| 36 (resolved) | `EventDetailSerializer` now `has_many :event_participants` (`EventParticipantSerializer`, ordered `[display_order, id]`) serving `{ id, artist_id, event_date_id, name, type, description, display_order }` — detail-only | the adapter (already mapping `event_participants`) was **aligned to the real wire shape**: `name`; `event_date_id` → `eventDateId`; `description` → the display `role`; the speculative profile fields (image/handle/genre/…) it never received were **dropped**. Drives `LineupSection` + the festival per-day bill (the `hasPinnedDays` path — the client round-robin is no longer the source) |
+
+**Verified live:** organizer `PATCH /events/:id` → public `GET /public/events/:slug`
+round-trip for min-only + bounded; **422 `invalid_age_restriction`** on a misplaced
+key, `has_restriction:true` with no bounds, bounds with `false`, `min_age > max_age`,
+and out-of-range. `GET /public/events/addis-sound-festival-2026` → 4 participants (3
+day-pinned performers + 1 event-level host).
+
+**Contract guard:** `e2e/event-detail.spec.ts` scans the live list for a bounded +
+an unrestricted event and asserts the Age card matches (`21+`); the previous
+`festival-live.spec.ts` guard was fixed — "Special guests" is a styled `<p>`, not a
+heading, so its positive branch now matches on text + asserts the first **served**
+participant's name.
+
+**Doc updates:** `BACKEND_GAPS.md` (#53 → `seat_map` only, `age_restriction` in the
+archive; #36 → resolved with the addendum; new 2026-10-17 sweep log), `AGENTS.md`
+(open list + counts), this file.
+
+**Dev-env (not a gap):** the `:3000` container ran **stale code** after the host-side
+merge (Windows→Docker bind mount) — `digis_backend-web-1` was restarted; the pazimo
+catalog seed (`preview_pazimo_catalog.rb`, now writing structured `age_restriction`)
+was re-run so the Age card has real data (`chore(dev)`).
+
+**Still open:** blocking **#53 (`seat_map` only)** / #57 / #65; degrading
+#44/#46/#48/#67/#71/#72.
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **253**; `pnpm build` green;
+`npx playwright test` **40/40**; live browser verified (festival roster + "Headliner"
+role; Age card `21+`).
+
 ## Session 2026-10-16f — the remaining #49 discovery filters wired (follow-up closed)
 
 **Prompt:** the backend **Fixes.md** handoff (the 2026-10-16 PR #37 release notes)

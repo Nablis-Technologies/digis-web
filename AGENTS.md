@@ -11,8 +11,8 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
-npx vitest run    # unit tests (250)
-npx playwright test  # e2e vs the live backend on :3000 (39 deterministic; zz-* manual)
+npx vitest run    # unit tests (253)
+npx playwright test  # e2e vs the live backend on :3000 (40 deterministic; zz-* manual)
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
@@ -164,17 +164,20 @@ unless every status change was swept and either wired or tracked. History: the
 missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
-**Open — blocking:** #53, #57, #65. **Open — degrading:** #36, #44, #46,
-#48, #67, #71, #72. (Re-verified 2026-10-16e after the backend PR #37 "wire the
-fixes" pull — see the sweep log at the top of `BACKEND_GAPS.md`; that file's
-at-a-glance table is authoritative. This pull resolved **#49, #50, #68, #69, #70**
-and wired #58/#61/#62.)
+**Open — blocking:** #53 (**`seat_map`** only), #57, #65. **Open — degrading:**
+#44, #46, #48, #67, #71, #72. (Re-verified 2026-10-17 after the age-restriction
+pull `0741c53b` → `8419aaaf` — see the sweep log at the top of `BACKEND_GAPS.md`;
+that file's at-a-glance table is authoritative. This pull resolved **#36** (public
+participants) and the **`age_restriction`** half of #53, both frontend-wired in the
+run.)
 
-- **#53** Public detail payload drops **`age_restriction`** + **`seat_map`**
-  (re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` /
-  `price_foreign_from_minor` dropped as unconsumed; there is no `seat_map` model) →
-  the Age card + SeatMap step render absent (ADR-0002 forbids inventing them).
-  lineup → #36.
+- **#53** Public detail payload drops **`seat_map`** (re-scoped 2026-10-16:
+  `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as
+  unconsumed; no `seat_map`/seating model exists) → the checkout SeatMap step
+  renders absent (ADR-0002 forbids inventing it). **The `age_restriction` half is
+  RESOLVED 2026-10-17** — the detail serves
+  `event_setting.config.age_restriction` and the adapter maps it to the Age card.
+  lineup → #36 (resolved).
 - **#57** No password reset / forgot-password endpoint (phone-first reset would
   reuse the existing OTP infra).
 - **#60 (withdrawn 2026-10-16 — FALSE POSITIVE)** The claim that Chapa `amount` is
@@ -184,9 +187,6 @@ and wired #58/#61/#62.)
   real unit defect is **#71**.
 - **#65** Seller payout dispatch always ends in a provider rejection
   (`invalid_format`); no payout has ever reached `succeeded`.
-- **#36** Public payload lacks event participants/lineup — a backend **serializer**
-  gap (no public event→artist link; participants *do* model a per-date link). The
-  venue media/coords half was a **seed** task, fixed 2026-10-15.
 - **#44** Event-level `event_type` / `access_mode` / `rsvp_*` config is inert and
   unwritable → the public payload can't say rsvp vs inviteOnly vs ticketed.
 - **#46** No saved-events/favourites, follows-based feed (`GET /feed` has no
@@ -233,6 +233,14 @@ contradictory combo renders an honest empty grid instead of an inverted 422 rang
 `city` / `date_*` / followable ids remain unwired — no UI drives them (tracked, not
 gaps).
 
+**Resolved 2026-10-17 (age-restriction pull `0741c53b` → `8419aaaf`) — all wired:**
+**#36** (public detail now serves `event_participants { id, artist_id,
+event_date_id, name, type, description, display_order }` → `LineupSection` + the
+festival per-day bill render it; the adapter was aligned to the real wire shape) and
+the **`age_restriction`** half of **#53** (detail serves
+`event_setting.config.age_restriction`; a new adapter helper `formatAgeRestriction`
+maps it to the Age card). `seat_map` remains the only open half of #53.
+
 **Withdrawn 2026-10-16:** **#60** — re-probed live and found to be a **false
 positive** (Chapa V2 is minor-unit on both request and response; the request is
 correct) → moved to `NOT_BACKEND_GAPS.md`; the same adapter's genuine 100× defect
@@ -278,7 +286,9 @@ badges), discovery **featured** (the paid Featured endpoint —
 OTP-upgrades a shadow phone), #47 (gift purchase flow — `lib/gifts.ts`), #33, #34,
 #39, #40, #41, #43, #45 (all 2026-09-30), #58/#61/#62 (2026-10-16 — backend
 surfaces landed; frontend wiring completed 2026-10-16e), #49/#50/#68/#69/#70
-(2026-10-16e — backend PR #37 "wire the fixes" pull; frontend wired in the same run).
+(2026-10-16e — backend PR #37 "wire the fixes" pull; frontend wired in the same run),
+#36 (2026-10-17 — public **detail** serves `event_participants`; adapter aligned to
+the real shape).
 
 ## Data integrity (seeds + e2e) — update after changing things
 

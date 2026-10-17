@@ -40,3 +40,19 @@ wired in that run.
 
 Both are frontend-only (the backend surfaces already exist; the params are
 live-verified) — they are `ready-for-agent`, not blocked on the backend.
+
+## 2026-10-17 — the age-restriction pull (nothing owed)
+
+The 6-commit pull (`0741c53b` → `8419aaaf`) changed two gap statuses. **Both were
+wired in the same run — no tickets owed:**
+
+| # | Backend status change | Frontend wiring |
+|---|---|---|
+| 53 (partial) | public **detail** now serves `event_setting.config.age_restriction { has_restriction, min_age?, max_age? }` | `events-adapter.ts` — new `BackendAgeRestriction` + `formatAgeRestriction` → `Event.ageRestriction` → the Age card. `seat_map` is the only remaining half. |
+| 36 (resolved) | public **detail** now serves `event_participants { id, artist_id, event_date_id, name, type, description, display_order }` | adapter aligned to the real wire shape (`description` → display `role`; speculative profile fields dropped) → `LineupSection` + the festival per-day bill. |
+
+The only frontend change that was *not* new wiring: the `festival-live.spec.ts`
+roster guard had a **stale locator** ("Special guests" is a `<p>`, not a heading) —
+fixed, plus it now asserts the first **served** participant's name.
+
+**Still tracked:** #61 (accept an incoming transfer) — `issues/03-transfer-incoming-accept.md`.

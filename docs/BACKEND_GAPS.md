@@ -218,6 +218,50 @@
 > the module already supports them and the params are verified live; today the
 > discovery pipeline still filters client-side over the fully-paged set. Tracked in
 > `.scratch/gap-wiring-2026-10-16/`.
+>
+> **Re-verified 2026-10-17 against `feat/launch-hardening-telemetry` (merged
+> `0741c53b` → `8419aaaf`, 6 commits — the **age-restriction** work: `0f41f883`
+> public event participants + `785be164`/`eeb17175`/`6f8e3e3c`/`f591ed80`/`8419aaaf`
+> age restriction). Live-verified on `:3000` by HTTP probes + serializer/model
+> reads. **Two status changes, both frontend-wired this run:**
+> - **#53 → partial (RESOLVED `age_restriction`; `seat_map` still open).** The public
+>   **detail** now serves `event_setting.config.age_restriction { has_restriction,
+>   min_age?, max_age? }` (`Events::Public::EventDetailSettingSerializer` →
+>   `EventSetting#safe_age_restriction`); the **list** still omits it. Live probe:
+>   organizer `PATCH /events/:id` nests the write at
+>   `event.event_setting.config.age_restriction`; the public detail echoes it back;
+>   a misplaced key, `has_restriction:true` with no bounds, bounds with `false`,
+>   `min_age > max_age`, and out-of-range → **422 `invalid_age_restriction`**.
+>   Frontend: `events-adapter` maps it via a new pure `formatAgeRestriction`
+>   (min+max → `"21–65"`, min-only → `"18+"`, max-only → `"Up to 12"`) into
+>   `Event.ageRestriction`, so the Age card renders the real value; absent/malformed
+>   stays absent (ADR-0002). `seat_map` unchanged — still no seating model.
+> - **#36 → RESOLVED (participants/lineup).** `EventDetailSerializer` now
+>   `has_many :event_participants` (`EventParticipantSerializer`, ordered by
+>   `[display_order, id]`) serving `{ id, artist_id, event_date_id, name, type,
+>   description, display_order }`. Live probe:
+>   `GET /public/events/addis-sound-festival-2026` → 4 participants (3 day-pinned
+>   performers + 1 event-level host). **Detail-only** — the list still omits them.
+>   Frontend: the adapter (which already mapped `event_participants`) was **aligned to
+>   the real wire shape** — `name`; `event_date_id` → `eventDateId`; `description` →
+>   the display `role`; the speculative profile fields (image/handle/genre/…) it
+>   never received were dropped. Drives `LineupSection` + the festival per-day bill
+>   (the `hasPinnedDays` path — no more client round-robin).
+>
+> **Still open after this pull:** blocking — **#53 (`seat_map` only)**, #57, #65.
+> Degrading — #36→resolved, **#72**, #44, #46, #48, #67, #71.
+>
+> **Dev-env note (not a gap):** the `:3000` container can run **stale code** after a
+> host-side merge (Windows→Docker bind mount) — `digis_backend-web-1` must be
+> restarted after a pull (it was serving pre-merge `EventSetting` here). The pazimo
+> catalog seed (`db/seeds/preview_pazimo_catalog.rb`, now writing structured
+> `age_restriction`) was re-run so the age card has real data (`chore(dev)`).
+>
+> **Out of scope of this sweep:** the handoff's organizer-side sections (the write
+> nesting, the `0..120` / `min ≤ max` validation rules, and organizer `GET /events/:id`
+> pre-population) are **backend + organizer-app** concerns — `digis-web` is the
+> consumer app with no organizer event editor, so only the two consumer-facing rows
+> (detail age card, public lineup) were wired.
 
 ## Status key
 
@@ -236,16 +280,16 @@ Open items are listed first; resolved items below (sections keep an in-place
 
 | # | Status | Summary |
 |---|---|---|
-| 53 | open — blocking | public detail payload drops **`age_restriction`** + **`seat_map`** (both consumed + genuinely absent; there is no `seat_map` model). Re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as **unconsumed** (`price_foreign` is derivable from served per-currency `price_options`); lineup → #36. (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
+| 53 | open — blocking (**`seat_map`** only) | **`age_restriction` resolved 2026-10-17** — the public **detail** now serves `event_setting.config.age_restriction { has_restriction, min_age?, max_age? }` (validated server-side; the **list** still omits it) and the frontend maps it to the Age card. **`seat_map` remains** — there is no `seat`/`seat_map` model at all, so the checkout Seat step stays skipped. Re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as **unconsumed**; lineup → #36. (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
 | 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
-| 36 | open — degrading | public payload lacks event participants/lineup — a backend **serializer** gap (no public event→artist link; participants **do** model a per-date link — see #36 addendum). The venue media/coords half was a **seed** task, not a gap — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`) |
 | 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), or reviews/ratings. Follows to **venues/artists/organizations** *do* exist (`config/routes.rb:81`, `GET /users/:id/following`) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change (notification-channel prefs exist; account prefs do not) |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
 | 71 | open — degrading | Chapa `provider_fee_minor` is inflated 100× — the adapter converts the provider's **minor-unit** `service_fee`/`charge` as if it were major (`minor_amount` × 100), so a real 0.03 ETB fee is recorded as 3.00 ETB → overstates platform provider cost and reconciliation variance |
 | 72 | open — degrading | public **detail** payload omits `event_lifecycle` + `ticket_availability` (only the **list** serves them) → an ended event's detail page can no longer gate purchase; `eventEnded` fell back to the full `event_dates` array, which the 2026-10-16 reshape replaced with an upcoming-only preview — regression from that reshape |
+| 36 | resolved 2026-10-17 | public **detail** now serves `event_participants` (`{ id, artist_id, event_date_id, name, type, description, display_order }`, server-ordered) → the Lineup section **and** the per-day festival bill render real data (no more round-robin). Frontend wired: adapter maps the roster (`name`; `event_date_id` → `eventDateId`; `description` → display `role`) and drops the never-served profile guesses. The venue media/coords half was a **seed** task — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`). |
 | 17 | resolved 2026-10-16 | `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`; the CBE Birr option is enabled and sends `cbebirr`. (Residual: `Commercial::FeeComponent::PAYMENT_METHODS` still omits it — no live impact.) |
 | 8 | resolved 2026-10-16 | auth payload serves `profile.full_name` (`Core::CurrentUserSerializer`); signup creates the profile |
 | 9 | resolved 2026-10-16 | `GET/PATCH /user` self-service profile (`resource :user, only: %i[show update]`) |
@@ -399,7 +443,7 @@ endpoints and pass them through as `audience_proof` to `Registrations::Submit`.
 
 ---
 
-### #53. Public event payload no longer exposes the non-admission detail fields
+### #53. Public event payload no longer exposes the non-admission detail fields — `age_restriction` RESOLVED 2026-10-17 (`seat_map` still open)
 
 `Events::Public::EventSettingSerializer` now whitelists **only**
 `%w[public_guest_limit]` (`app/serializers/events/public/event_setting_serializer.rb:8`),
@@ -413,7 +457,12 @@ confirms the strings are gone).
 (the public payload exposes none of them — verified live 2026-10-16):
 
 - **`age_restriction`** — consumed by the event-detail Age card
-  (`EventDetailPage.tsx:200`, `EventInfoRail.tsx:50`); renders "Any Age" absent. **Real.**
+  (`EventDetailPage.tsx:237`, `EventInfoRail.tsx:50`). **RESOLVED 2026-10-17**: the
+  public **detail** serves `event_setting.config.age_restriction`
+  (`Events::Public::EventDetailSettingSerializer` → `EventSetting#safe_age_restriction`;
+  validation in `app/models/events/event_setting.rb`), and the frontend maps it
+  (`events-adapter.ts` `formatAgeRestriction` → the Age card). The **list** still
+  omits it (the card settings projection is unchanged).
 - **`seat_map`** — consumed by the checkout Seat step (`EventDetailPage.tsx:459`
   → `CheckoutPage` → `useCheckoutFlow#sectionsForTier`); the step is skipped when
   absent. **Real — but** there is **no `seat`/`seat_map` column or model** anywhere
@@ -439,14 +488,23 @@ The other two groups are **not** gaps and live in `NOT_BACKEND_GAPS.md`: the
 `rsvp_*` / `event_type` / `access_mode` keys are superseded by the per-offer model
 (see #44), and `featured` is superseded by its own paid endpoint (2026-10-15).
 
-**Why it blocks:** the Age card and the SeatMap step can only render
-absent/fallback. ADR-0002 forbids fabricating them.
+**Why it blocks:** the SeatMap step can only render absent/fallback. ADR-0002
+forbids fabricating it. (The Age card is now served — see the `age_restriction`
+bullet above.)
 
-**Fix:** expose `age_restriction` on the public detail serializer; add a real
-assigned-seating model for `seat_map` (none exists today) — or decide the SeatMap
-step is out of scope. `lineup` is #36.
+**Fix:** add a real assigned-seating model for `seat_map` (none exists today) — or
+decide the SeatMap step is out of scope. `lineup` → #36 (resolved 2026-10-17).
 
-**Status: open — re-scoped 2026-10-16 to `age_restriction` + `seat_map`**
+**Status: `age_restriction` resolved 2026-10-17; `seat_map` still open — blocking.**
+`age_restriction`: the public detail serves
+`event_setting.config.age_restriction { has_restriction, min_age?, max_age? }`
+(`app/serializers/events/public/event_detail_setting_serializer.rb`), validated in
+`Events::EventSetting` (allowlisted keys, integer bounds 0..120, `min_age ≤
+max_age`, bounds stripped when `has_restriction: false`); the organizer create/update
+path nests it at `event.event_setting.config.age_restriction` (a key anywhere else →
+422 `invalid_age_restriction`). Verified live 2026-10-17 (organizer PATCH → public
+GET round-trip for min-only and bounded; 422 on misplaced / no-bound / bad-order /
+out-of-range). `seat_map`: still no seating model. Re-scoped 2026-10-16
 (`rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as
 unconsumed; `featured` superseded 2026-10-15). Filed 2026-09-30 (verified against
 `326f6a3` by code read + live `GET /public/events/:slug` →
@@ -1495,23 +1553,35 @@ venue list serializer) would be needed for a counted location picker.
 
 ---
 
-### #36. Public event payload lacks lineup/participants (lineup only)
+### #36. Public event payload lacks lineup/participants (lineup only) — RESOLVED 2026-10-17
 
-`EventDetailSerializer` / `EventListSerializer` expose only categories,
+`EventDetailSerializer` / `EventListSerializer` exposed only categories,
 event_dates, event_media, event_organizations, event_setting, organization —
-**no event participants/artists**. There is no public event→artist link
-(`events_event_participants` is auth-gated, `routes.rb:94`; `Events::Event` has no
-`artists` association), so the Lineup section renders **absent** even with seed
-data present. This is the whole of #36 — a backend SERIALIZER gap.
+**no event participants/artists** (`events_event_participants` was auth-gated),
+so the Lineup section rendered **absent** even with seed data present. This was a
+backend SERIALIZER gap.
 
-**Fix:** add `participants`/`artists` to the public event serializers (or a public
-participants endpoint). See the **#36 addendum** for the participant→date link.
+**Resolved 2026-10-17:** `EventDetailSerializer` now `has_many :event_participants`
+(`app/serializers/events/public/event_participant_serializer.rb`, ordered by
+`[display_order, id]`) serving `{ id, artist_id, event_date_id, name, type,
+description, display_order }`. Verified live:
+`GET /public/events/addis-sound-festival-2026` → 4 participants (3 day-pinned
+performers + 1 event-level host). It is **detail-only** — the list serializer still
+omits it (cards don't need it). Frontend wired: `events-adapter` maps the roster to
+`Event.lineup` (`name`; `event_date_id` → `eventDateId`; `description` → the display
+`role`), which drives `LineupSection` and the festival per-day bill; the adapter's
+previously speculative profile fields (image/handle/genre/…) were dropped as
+never-served. (`type` is the machine enum performer/host/…; the UI has no slot for
+it.)
 
-**Status: open — degrading.** (The venue-media/coords half split out of #36 was a
+**Fix (landed):** add `participants` to the public detail serializer. See the
+**#36 addendum** for the participant→date link (also landed).
+
+**Status: resolved 2026-10-17.** (The venue-media/coords half split out of #36 was a
 **seed** task, not a gap — fixed in the seed 2026-10-15; see
 `NOT_BACKEND_GAPS.md`.)
 
-### #36 addendum — expose the participant→date link when the lineup goes public
+### #36 addendum — expose the participant→date link when the lineup goes public — RESOLVED 2026-10-17
 
 The backend **already models per-day participants**:
 `Events::EventParticipant` has `belongs_to :event_date, optional: true`
@@ -1528,7 +1598,12 @@ lands, it should carry each participant's `event_date_id` (or a per-date
 `participants` array) so the client can drop the round-robin and let
 event-level participants fall back to "all days".
 
-**Status: open — degrading (filed 2026-10-15; broadens #36, no separate number).**
+**Status: resolved 2026-10-17 (filed 2026-10-15; broadened #36, no separate
+number).** The detail serializer now serves each participant's `event_date_id`, so
+`resolveFestivalSchedule` takes its `hasPinnedDays` path (a pinned roster is
+distributed by the backend link, not round-robin) and event-level participants fall
+back to every day. The round-robin remains only as the fallback for an unpinned
+roster.
 
 ---
 
