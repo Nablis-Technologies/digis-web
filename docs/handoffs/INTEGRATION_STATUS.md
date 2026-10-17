@@ -7,6 +7,47 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-10-17d — profile sheets: derived-hue environment → plain theme surface
+
+**Prompt:** *"why is the venue profile blue gradient background"* → *"lets just
+do dark/light background. find other areas using random colors like this."*
+
+**Root cause.** `VenueProfileSheet` calls `artworkPalette(null, isDark)` because a
+venue payload carries no artwork, so it took the no-artwork fallback. That
+fallback's `BRAND_HUE` is **247** — an indigo ported verbatim from the web2
+export's `FALLBACK_PALETTE` (`digis-web2/export/.../OrganizerSection.tsx:63`), not
+the Digis lime (`#d6f905` ≈ hue 69). So the sheet's tint was blue on a design
+system whose single accent is lime, and `DESIGN.md` names the pattern outright:
+*"Don't use purple-to-blue gradients or cyan-on-dark washes."* The same mechanism
+tinted all three profile sheets (venue + organizer took the indigo fallback;
+artist took the portrait's dominant hue).
+
+**Landed (frontend; no backend change).** All three profile sheets
+(`VenueProfileSheet` in `VenueMap.tsx`, `OrganizerProfileSheet` in
+`OrganizerSection.tsx`, `ArtistProfileSheet` in `LineupSection.tsx`) now render
+the plain app surface — `background: var(--card)` (night `#101115` / paper
+`#f8f7fa`), no hue gradient, no radial glow, no blurred-artwork layer. Deleted
+`src/lib/ui/artworkPalette.ts` (+ its test) and
+`src/features/event-detail/components/SheetEnvironment.tsx`; the sheets' avatar
+ring dropped `palette.glass` for the shared `avatarRing(isDark)` helper
+(`lib/utils/avatarColor.ts`). `useDominantColor` stays (still used by
+`ImmersiveBackdrop`).
+
+**Audit — "other areas using random colours like this"**: recorded in
+`.scratch/web2-ui-import/issues/04-derived-colour-audit.md`. Families: (A)
+image-extracted hues (`useImageColor`/`useProminentHue` → EventCard, Featured*,
+ShareCard, GlassTicketCard; `useDominantColor` → `ImmersiveBackdrop` + hero +
+info cards); (B) `flatAvatarColor`'s hashed 12-colour avatar palette; (C) the
+fixed `categoryColors.ts` category hues; (D) hand-picked gradients
+(`TicketsEmptyState`, `GiftTicketOptions`, green "success" gradients in
+`SuccessView`/`AuthModal`, the dead `lib/mock/events.ts`). Tier accents and lime
+stay (DESIGN.md-sanctioned).
+
+**Checks:** `npx tsc --noEmit` clean; `npx vitest run` **255** (the deleted
+palette test's 3 cases); `pnpm build` green; `npx playwright test
+e2e/event-detail.spec.ts` **7/7**; venue sheet eyeballed live — plain dark
+surface, no gradient.
+
 ## Session 2026-10-17c — the venue sheet's fabricated content removed (web2-import issue 01)
 
 **Prompt:** "go" → the user chose *de-fabricate the venue sheet* as the next slice.
@@ -442,6 +483,12 @@ placements · browser: discovery renders **HEADLINERS · 2 EVENTS**
 (`.openchamber/screenshots/featured-discovery-live-2026-10-15T20-40-02-783.jpg`).
 
 ## Session 2026-10-15e — profile-sheet artwork environment + design-element audit
+
+> **Superseded 2026-10-17d.** The artwork-driven environment described below was
+> removed — the three profile sheets now render the plain app surface
+> (`var(--card)`) and `artworkPalette.ts` / `SheetEnvironment.tsx` are deleted.
+> Kept here as history of what was ported and why it was reverted (the no-artwork
+> fallback was an off-brand indigo and DESIGN.md bans the gradient).
 
 **Prompt:** "we need to bring the background implementation for the artist and
 organizer pages, check for other design elements like that haven't been imported."

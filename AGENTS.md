@@ -11,8 +11,8 @@ pnpm install      # install deps
 pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
-npx vitest run    # unit tests (258)
-npx playwright test  # e2e vs the live backend on :3000 (41 deterministic; zz-* manual)
+npx vitest run    # unit tests (255)
+npx playwright test  # e2e vs the live backend on :3000 (42 deterministic; zz-* manual)
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
