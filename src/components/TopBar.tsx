@@ -8,11 +8,13 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { NAV_ITEMS } from '@/components/Navigation';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useNotifications, notificationsStore, fetchNotifications, markNotificationRead } from '@/lib/notifications';
-import { toastError } from '@/lib/feedback';
-import type { NotificationType } from '@/types/notification';
+import { transferService } from '@/lib/transfer';
+import { ticketKeys } from '@/lib/tickets';
+import { toastError, toastSuccess } from '@/lib/feedback';
+import type { AppNotification, NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassEdge, glassControl } from '@/lib/ui/glass';
 
 interface TopBarProps {
   currentView?: string;
@@ -35,6 +37,8 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   const [openMenu, setOpenMenu] = useState<'none' | 'notif' | 'profile'>('none');
   const [markingAll, setMarkingAll] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [acceptedTransfers, setAcceptedTransfers] = useState<ReadonlySet<string>>(new Set());
   const notifications = useNotifications();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -95,6 +99,27 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
     void markNotificationRead(id)
       .catch(() => toastError('Couldn’t mark that notification as read.'))
       .finally(() => queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] }));
+  };
+  /**
+   * Accept an incoming transfer straight from its notification (#61). The
+   * recipient owns the transfer, so the bearer alone authorizes it — no token,
+   * empty body, Idempotency-Key injected by `apiFetch` (a replay is a no-op).
+   */
+  const acceptTransfer = (n: AppNotification) => {
+    const transferId = n.acceptTransferId;
+    if (!transferId) return;
+    setAcceptingId(n.id);
+    void transferService
+      .acceptAuthenticated(transferId)
+      .then(() => {
+        // Read state follows the confirmed accept, never the attempt.
+        markRead(n.id);
+        setAcceptedTransfers((prev) => new Set(prev).add(transferId));
+        toastSuccess('Ticket accepted — it’s in your wallet.');
+        queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+      })
+      .catch((err) => toastError(err, 'Couldn’t accept that ticket — please try again.'))
+      .finally(() => setAcceptingId(null));
   };
   const markAllRead = () => {
     const unreadIds = notifications.filter((n) => n.unread).map((n) => n.id);
@@ -261,66 +286,89 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
               ) : null}
               {notifications.map((n) => {
                 const Icon = NOTIF_ICON[n.type];
+                const accepted = !!n.acceptTransferId && acceptedTransfers.has(n.acceptTransferId);
                 return (
-                  <AppButton
-                    key={n.id}
-                    onClick={() => {
-                      markRead(n.id);
-                      if (n.link) {
-                        setOpenMenu('none');
-                        navigate(n.link);
-                      }
-                    }}
-                    className="w-full flex items-start gap-3 px-4 py-3 transition-colors text-left"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{
-                        background: accentSoft,
-                        ...glassEdge(isDark),
+                  <div key={n.id}>
+                    <AppButton
+                      onClick={() => {
+                        markRead(n.id);
+                        if (n.link) {
+                          setOpenMenu('none');
+                          navigate(n.link);
+                        }
+                      }}
+                      className="w-full flex items-start gap-3 px-4 py-3 transition-colors text-left"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
                       }}
                     >
-                      <Icon className="w-[15px] h-[15px]" strokeWidth={1.75} style={{ color: accentFg }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span
-                          className="text-[12.5px] truncate"
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background: accentSoft,
+                          ...glassEdge(isDark),
+                        }}
+                      >
+                        <Icon className="w-[15px] h-[15px]" strokeWidth={1.75} style={{ color: accentFg }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span
+                            className="text-[12.5px] truncate"
+                            style={{
+                              fontFamily: "'Inter', sans-serif",
+                              color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
+                            }}
+                          >
+                            {n.title}
+                          </span>
+                          {n.unread && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: accentFg }} />}
+                        </div>
+                        <p
+                          className="text-[11.5px] leading-snug mb-1 line-clamp-2"
                           style={{
                             fontFamily: "'Inter', sans-serif",
-                            color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
+                            color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
                           }}
                         >
-                          {n.title}
+                          {n.body}
+                        </p>
+                        <span
+                          className="text-[10px] tracking-[0.5px] uppercase"
+                          style={{
+                            fontFamily: "'Inter', sans-serif",
+                            color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+                          }}
+                        >
+                          {n.time}
                         </span>
-                        {n.unread && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: accentFg }} />}
                       </div>
-                      <p
-                        className="text-[11.5px] leading-snug mb-1 line-clamp-2"
-                        style={{
-                          fontFamily: "'Inter', sans-serif",
-                          color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
-                        }}
-                      >
-                        {n.body}
-                      </p>
-                      <span
-                        className="text-[10px] tracking-[0.5px] uppercase"
-                        style={{
-                          fontFamily: "'Inter', sans-serif",
-                          color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
-                        }}
-                      >
-                        {n.time}
-                      </span>
-                    </div>
-                  </AppButton>
+                    </AppButton>
+                    {n.acceptTransferId && (
+                      <div className="flex justify-end px-4 pb-2 -mt-1">
+                        {/* DESIGN.md: disabled is a flat translucent surface at
+                            full opacity (the neutral glass), never `opacity-50`. */}
+                        <AppButton
+                          whileHover={accepted ? undefined : { scale: 1.03 }}
+                          whileTap={accepted ? undefined : { scale: 0.96 }}
+                          onClick={() => acceptTransfer(n)}
+                          disabled={accepted || acceptingId !== null}
+                          loading={acceptingId === n.id}
+                          className="min-h-9 px-3.5 rounded-2xl text-[11.5px] font-medium tracking-[0.3px]"
+                          style={{
+                            fontFamily: "'Inter', sans-serif",
+                            color: accepted ? (isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)') : accentFg,
+                            ...glassControl(isDark, accepted ? undefined : 'accent'),
+                          }}
+                        >
+                          {accepted ? 'Accepted' : 'Accept'}
+                        </AppButton>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

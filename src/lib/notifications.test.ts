@@ -66,6 +66,40 @@ describe('mapNotification (#7 live inbox)', () => {
   });
 });
 
+describe('mapNotification — incoming transfer accept action (#61)', () => {
+  const incoming = (data: Record<string, unknown>) =>
+    wire({ notification_type: 'transfer_incoming', data });
+
+  it('exposes the accept transfer id from the wire', () => {
+    const n = mapNotification(incoming({ transfer_id: 'tr-9', event_title: 'On & On', ticket_label: 'Early Bird' }));
+    expect(n.type).toBe('transfer');
+    expect(n.title).toBe('You received a ticket');
+    expect(n.acceptTransferId).toBe('tr-9');
+  });
+
+  it('omits the action and falls back to the wallet when the wire carries no usable transfer_id', () => {
+    const noAction = mapNotification(incoming({ event_title: 'On & On' }));
+    expect(noAction.acceptTransferId).toBeUndefined();
+    expect(noAction.link).toBe('/tickets');
+    expect(mapNotification(incoming({ transfer_id: 42 })).acceptTransferId).toBeUndefined();
+  });
+
+  it('only transfer_incoming carries an accept action', () => {
+    expect(mapNotification(wire({ data: { transfer_id: 'tr-9' } })).acceptTransferId).toBeUndefined();
+  });
+
+  it('names the action instead of deep-linking when it can be run in place', () => {
+    const n = mapNotification(incoming({ transfer_id: 'tr-9', event_title: 'On & On' }));
+    expect(n.link).toBeUndefined();
+    expect(n.body).toBe('On & On · Accept it to add it to your wallet.');
+  });
+
+  it('keeps the legacy fallback copy when no action is offered', () => {
+    expect(mapNotification(incoming({ event_title: 'On & On' })).body).toBe('On & On · Accept it in Tickets.');
+    expect(mapNotification(incoming({})).body).toBe('A ticket is waiting — accept it in Tickets.');
+  });
+});
+
 describe('notificationsStore.clear (no cross-session leak)', () => {
   it('empties the inbox so a signed-out session reads nothing', () => {
     notificationsStore.push({ type: 'ticket', title: 'x', body: 'y' });

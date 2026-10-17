@@ -67,6 +67,7 @@ export const notificationsStore = {
       title: input.title,
       body: input.body,
       link: input.link,
+      acceptTransferId: input.acceptTransferId,
     };
     notifications = [notif, ...notifications];
     emit();
@@ -176,7 +177,14 @@ function bodyFor(type: string, data: Record<string, unknown>): string {
   if (type === 'refund_succeeded') return event ?? 'Your refund has been issued.';
   if (type === 'refund_failed') return event ?? 'Your refund could not be processed.';
   if (type === 'transfer_received') return event ?? 'A ticket was transferred to you.';
-  if (type === 'transfer_incoming') return event ? `${event} · Accept it in Tickets.` : 'A ticket is waiting — accept it in Tickets.';
+  if (type === 'transfer_incoming') {
+    // With a transfer id the card offers the accept action in place; without
+    // one, fall back to pointing at the wallet (#61).
+    if (transferIdFrom(data)) {
+      return event ? `${event} · Accept it to add it to your wallet.` : 'A ticket is waiting — accept it to add it to your wallet.';
+    }
+    return event ? `${event} · Accept it in Tickets.` : 'A ticket is waiting — accept it in Tickets.';
+  }
   if (type === 'waitlist_offer_created') return 'A spot opened — claim it before it expires.';
   if (type === 'waitlist_offer_expired') return 'The waitlist offer has expired.';
   if (type === 'registration_rejected') return event ?? 'Your registration was not approved.';
@@ -185,8 +193,20 @@ function bodyFor(type: string, data: Record<string, unknown>): string {
   return event ?? '';
 }
 
+/**
+ * A `transfer_incoming` notification carries the id of the pending transfer it
+ * is about; anything else in `data` is recipient-safe context (#61). Returns
+ * undefined when the wire omits a usable id, so nothing is ever invented.
+ */
+function transferIdFrom(data: Record<string, unknown>): string | undefined {
+  return typeof data.transfer_id === 'string' ? data.transfer_id : undefined;
+}
+
 /** Map the backend wire onto the UI shape. Missing data renders as absent, never fabricated. */
 export function mapNotification(w: NotificationWire): AppNotification {
+  // An incoming transfer can be accepted straight from the card (#61).
+  const acceptTransferId =
+    w.notification_type === 'transfer_incoming' ? transferIdFrom(w.data) : undefined;
   return {
     id: w.id,
     type: TYPE_FROM_BACKEND[w.notification_type] ?? 'event',
@@ -194,6 +214,10 @@ export function mapNotification(w: NotificationWire): AppNotification {
     body: bodyFor(w.notification_type, w.data),
     time: formatRelativeTime(w.created_at),
     unread: !w.read_at,
+    // With an action to offer the card runs it; otherwise it deep-links to the
+    // wallet, where an accepted ticket appears.
+    link: w.notification_type === 'transfer_incoming' && !acceptTransferId ? '/tickets' : undefined,
+    acceptTransferId,
   };
 }
 

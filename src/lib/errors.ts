@@ -167,6 +167,9 @@ const CODE_MESSAGES: Record<string, string> = {
   transfer_phone_required: 'Enter the recipient’s phone number to continue.',
   transfer_acceptance_failed: 'We couldn’t complete this transfer — check the code and try again.',
   transfer_recipient_mismatch: 'This claim doesn’t match the recipient phone on the transfer.',
+  transfer_expired: 'This transfer has expired. Ask the sender to send it again.',
+  transfer_not_pending: 'This transfer is no longer pending — refresh your tickets to see its status.',
+  transfer_recipient_unverified: 'Verify your account before accepting this transfer.',
   // Phone verification (Core) — used by guest claim + transfer OTP.
   code_invalid: 'That code isn’t right — check it and try again.',
   attempts_exhausted: 'Too many wrong codes. Request a new one and try again.',
