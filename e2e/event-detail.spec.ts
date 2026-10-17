@@ -94,6 +94,44 @@ test.describe('event detail', () => {
     }
   });
 
+  test('age card reflects the backend age_restriction (contract guard, #53)', async ({ page }) => {
+    // The public list omits age_restriction (detail-only), and seed slugs drift,
+    // so resolve at runtime: probe details until we have one bounded ("N+")
+    // event and one explicit "no restriction" event.
+    const listRes = await page.request.get('http://localhost:3000/public/events?per_page=100');
+    const list = (await listRes.json()) as { data?: { slug: string }[] };
+    let bounded: { slug: string; label: string } | undefined;
+    let unrestricted: string | undefined;
+    for (const e of (list.data ?? []).slice(0, 40)) {
+      if (!e?.slug) continue;
+      const res = await page.request.get(`http://localhost:3000/public/events/${e.slug}`);
+      const ar = (await res.json())?.data?.event_setting?.config?.age_restriction as
+        | { has_restriction?: boolean; min_age?: number; max_age?: number }
+        | undefined;
+      if (!bounded && ar?.has_restriction === true && typeof ar.min_age === 'number' && ar.max_age === undefined) {
+        bounded = { slug: e.slug, label: `${ar.min_age}+` };
+      }
+      if (!unrestricted && ar?.has_restriction === false) unrestricted = e.slug;
+      if (bounded && unrestricted) break;
+    }
+    expect(bounded ?? unrestricted, 'seed carries no age policy to pin').toBeDefined();
+
+    if (bounded) {
+      await page.goto(`/events/${bounded.slug}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 });
+      // The Age card flattens the structured restriction to "N+".
+      await expect(page.getByText(bounded.label, { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
+    }
+    if (unrestricted) {
+      await page.goto(`/events/${unrestricted}`);
+      await expect(page.getByText('Any Age', { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
+    }
+  });
+
   test('unknown slug redirects back to discovery', async ({ page }) => {
     await page.goto('/events/does-not-exist');
     await page.waitForURL('http://localhost:5173/', { timeout: 15_000 });
