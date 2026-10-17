@@ -13,9 +13,12 @@ import { artworkPalette } from '@/lib/ui/artworkPalette';
 import { SheetEnvironment } from './SheetEnvironment';
 
 export function resolveLineup(lineup: any): any[] {
-  // Backend-sourced only — never fabricate a lineup or fill missing artist
-  // fields with invented values (no public endpoint exposes event participants
-  // yet; BACKEND_GAPS #36). Absent lineup → empty → the section hides.
+  // Backend-sourced only — never fabricate a lineup or fill missing artist fields
+  // with invented values. The roster now comes from the public detail's
+  // `event_participants` (#36 resolved 2026-10-17); the profile fields below stay
+  // because the `ui-preview` mock drives them (the public participant serializer
+  // serves only name / type / description / event_date_id). Absent lineup →
+  // empty → the section hides.
   const source = Array.isArray(lineup) ? lineup : [];
   return source.map((a: any) => ({
     name: a.name,
@@ -389,7 +392,11 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
             </AppButton>
           </div>
 
-          {/* Socials & Music */}
+          {/* Socials & Music. The platform list is unwired scaffolding — the
+              backend serves no per-artist social/music links yet, so these are
+              inert buttons, not the artist's real profiles (a data-bearing
+              surface would come with the artist endpoint; parked, per the
+              `web2-ui-import` scoping — not invented data). */}
           <div className="mb-5">
             <span className="text-[10px] tracking-[1.8px] uppercase block mb-2.5"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
@@ -424,22 +431,15 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
             </div>
           </div>
 
-          {/* Events with segmented control */}
+          {/* Events with segmented control. No backend endpoint serves a
+              per-artist event history, so this renders only what the artist
+              payload actually carries — the export's sample rows are gone
+              (ADR-0002; `.scratch/web2-ui-import/issues/03`). No events at all →
+              the whole block is omitted rather than shown empty. */}
           {(() => {
-            const upcoming = (Array.isArray(artist.upcomingEvents) && artist.upcomingEvents.length > 0)
-              ? artist.upcomingEvents
-              : [
-                  { name: 'Addis Vibes Festival', date: 'Mar 15, 2026', venue: 'Millennium Hall', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)' },
-                  { name: 'Skyline Sessions Vol. 4', date: 'Apr 02, 2026', venue: 'Sheraton Addis', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #d6f905 0%, #1a1a1a 100%)' },
-                  { name: 'Bahir Dar Lakeside', date: 'May 10, 2026', venue: 'Blue Nile Resort', city: 'Bahir Dar', gradient: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)' },
-                ];
-            const past = (Array.isArray(artist.pastEvents) && artist.pastEvents.length > 0)
-              ? artist.pastEvents
-              : [
-                  { name: 'Meskel Square Live', date: 'Sep 27, 2025', venue: 'Meskel Square', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #7c3aed 0%, #4338ca 100%)', attendees: 5800 },
-                  { name: 'Hager Fikir Acoustic', date: 'Jul 18, 2025', venue: 'Hager Fikir Theatre', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #be185d 0%, #831843 100%)', attendees: 900 },
-                  { name: 'Gondar Roots Festival', date: 'Mar 02, 2025', venue: 'Fasil Ghebbi', city: 'Gondar', gradient: 'linear-gradient(135deg, #b45309 0%, #78350f 100%)', attendees: 1600 },
-                ];
+            const upcoming = Array.isArray(artist.upcomingEvents) ? artist.upcomingEvents : [];
+            const past = Array.isArray(artist.pastEvents) ? artist.pastEvents : [];
+            if (upcoming.length === 0 && past.length === 0) return null;
             const active = eventsTab === 'upcoming' ? upcoming : past;
             const isPast = eventsTab === 'past';
             return (
@@ -461,6 +461,12 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   })}
                 />
                 <div className="space-y-2">
+                  {active.length === 0 && (
+                    <p className="py-2 text-[12px]"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+                      No {isPast ? 'past' : 'upcoming'} events to show.
+                    </p>
+                  )}
                   {active.map((ev: any, i: number) => (
                     <AppButton key={ev.name + i} whileTap={{ scale: 0.99 }}
                       className="relative w-full flex items-center gap-3 overflow-hidden p-2.5 rounded-2xl text-left cursor-pointer"

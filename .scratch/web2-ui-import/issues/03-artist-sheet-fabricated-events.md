@@ -1,13 +1,19 @@
 # Artist profile sheet fabricates 3 upcoming + 3 past events
 
-- **Status:** `needs-triage` — clear ADR-0002 violation, but the fix changes what the
-  sheet shows until a real per-artist event surface exists. Decide: remove now, or
-  keep as a labelled design placeholder.
+- **Status:** **DONE 2026-10-17** — fixed in the run that wired #36 (which made it
+  live). The two fallback arrays are gone; `upcoming`/`past` default to `[]` and the
+  whole events block is omitted when both are empty (with an honest
+  "No upcoming/past events to show." line for the one-tab-empty case). Verified live:
+  the festival's Teddy Afro sheet renders no events section.
 - **Not a backend gap:** the sheet is fabricating client-side; there is no field it
   should be reading instead. (A real "events featuring this artist" surface would
   need a backend endpoint — file that only if the product wants it, cf. #49/#51.)
 - **Found:** 2026-10-15, during the artwork-environment port
   (`docs/handoffs/web2-ui-import.md` → "Design-element audit").
+- **Remaining (not this issue):** the sheet's "Socials & Music" platform list and the
+  "Follow Artist" toggle are unwired affordances (no backend per-artist surface) —
+  parked scaffolding, not fabricated *data*. Left in place per the `web2-ui-import`
+  "park + keep" scoping; revisit if an artist-profile endpoint lands.
 
 ## Context
 
@@ -46,4 +52,9 @@ only renders from a route-mocked spec. It becomes live the moment #36 lands.
 
 - Unit: `resolveLineup` / the sheet renders no rows for an artist with no events and
   does not emit the sample names.
-- Grep: no `Addis Vibes Festival` / `Skyline Sessions` strings in `src/features`.
+- Grep: no `Addis Vibes Festival` / `Skyline Sessions` strings in `src/features` —
+  **partial**: `VenueProfileSheet` (`VenueMap.tsx:194-203`) keeps its own copies of the
+  same sample rows (tracked separately in
+  `issues/01-venue-detail-wireup.md`); the artist sheet is clean.
+- Runtime (2026-10-17): festival detail → click the "Teddy Afro" lineup card → sheet
+  shows no events section.
