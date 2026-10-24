@@ -1,6 +1,6 @@
 # Achievement detail sheet + radial glow (export) — not ported
 
-- **Status:** `needs-info` — needs a product decision before it is buildable.
+- **Status:** blocked on backend contract — `docs/BACKEND_GAPS.md` **#73** (2026-10-24).
 - **Found:** 2026-10-15, during the artwork-environment port
   (`docs/handoffs/web2-ui-import.md` → "Design-element audit").
 
@@ -31,3 +31,19 @@ means inventing its fields (ADR-0002), which is exactly what the export does.
 3. If no → close this as `wontfix` and keep the static rows; the radial glow alone
    is not worth porting (the app has one glow vocabulary — `ImmersiveBackdrop` +
    the artwork environment — and a third ad-hoc glow would be a token to maintain).
+
+## Ownership correction 2026-10-24
+
+The user confirmed that backend behavior and API decisions belong to the backend
+developer. Missing achievement support is filed as #73. The suggested steps
+above are historical; do not ask the frontend user to choose earning rules or
+implement a speculative contract. No attendance/purchase thresholds, XP, tiers
+or rewards have been approved. Resume frontend wiring after the backend
+developer supplies the committed contract.
+
+## Frontend cleanup 2026-10-24
+
+The hardcoded static achievement rows and other fabricated profile gamification
+widgets have been removed. Earlier references to retaining those rows describe
+the historical export. The detail sheet remains blocked by backend gap #73; no
+achievement rules or payloads were invented.
