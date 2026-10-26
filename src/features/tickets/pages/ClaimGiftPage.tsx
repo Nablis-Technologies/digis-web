@@ -1,55 +1,20 @@
-import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'motion/react';
-import confetti from 'canvas-confetti';
-import {
-  Gift,
-  Check,
-  Calendar,
-  AlertTriangle,
-  QrCode,
-  ArrowRight,
-  Sparkles,
-  Ticket,
-  HeartHandshake,
-} from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Gift, HeartHandshake } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
-import { giftService, type ResolvedGiftView } from '@/lib/gifts';
+import { giftService, type ClaimGiftInput } from '@/lib/gifts';
+import { giftAnswerError, giftAnswerPayload, giftConsentEntries, giftQuestionEntries, type GiftAnswer } from '@/lib/gift-recipient';
+import { randomUuid } from '@/lib/api';
+import { ApiError, mapApiError } from '@/lib/errors';
+import { ticketKeys } from '@/lib/tickets';
 import { AppButton } from '@/components/primitives/AppButton';
-import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glass, glassControl, glassField } from '@/lib/ui/glass';
+import { glassControl } from '@/lib/ui/glass';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { isoToDisplayDate } from '@/lib/mappers';
-import { ApiError } from '@/lib/errors';
-
-function giftErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    switch (err.code) {
-      case 'gift_invalid':
-        return 'This gift link is invalid or has expired.';
-      case 'gift_not_ready':
-        return 'This gift order is still awaiting payment confirmation.';
-      case 'idempotency_conflict':
-        return 'This claim is already being processed. Please refresh.';
-      case 'gift_expired':
-        return 'This gift ticket has expired.';
-      case 'gift_revoked':
-        return 'This gift purchase was refunded or cancelled by the purchaser.';
-      case 'gift_quantity_invalid':
-        return 'Gift tickets must be sent 1 per recipient.';
-      case 'recipient_phone_invalid':
-        return 'Please enter a valid recipient phone number.';
-      case 'gift_recipient_same_as_purchaser':
-        return 'You cannot send a gift ticket to your own phone number.';
-      default:
-        return err.message || fallback;
-    }
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
+import { GiftQuestionField } from '@/features/tickets/components/GiftQuestionField';
+import { TicketQRCode } from '@/features/tickets/components/TicketQRCode';
 
 interface ClaimGiftPageProps {
   id: string;
@@ -59,267 +24,135 @@ interface ClaimGiftPageProps {
   onNavigateTickets: () => void;
 }
 
-export function ClaimGiftPage({
-  id,
-  token,
-  onRequestAuth,
-  onNavigateHome,
-  onNavigateTickets,
-}: ClaimGiftPageProps) {
+export function ClaimGiftPage({ id, token, onRequestAuth, onNavigateHome, onNavigateTickets }: ClaimGiftPageProps) {
   const { isDark } = useTheme();
-  const { isAuthenticated } = useAuth();
-
-  const textPrimary = isDark ? '#fff' : '#1a1a1a';
-  const textMuted = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(26,26,46,0.6)';
-  const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
-  const accent = isDark ? '#d6f905' : '#0a0a0a';
-
-  const {
-    data: giftView,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['gift', id, token],
-    queryFn: () => giftService.resolveGift(id, token),
-    enabled: Boolean(id && token),
-    retry: false,
-    staleTime: 60_000,
-  });
-
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [acceptedConsents, setAcceptedConsents] = useState<Record<string, boolean>>({});
-  const [claimError, setClaimError] = useState<string>('');
-  const [claimedView, setClaimedView] = useState<ResolvedGiftView | null>(null);
-
-  const claimMutation = useMutation({
-    mutationFn: async () => {
-      setClaimError('');
-      const questionAnswers = Object.entries(answers).map(([question_key, value]) => ({
-        question_key,
-        value,
-      }));
-      const consentList = Object.entries(acceptedConsents)
-        .filter(([, accepted]) => accepted)
-        .map(([consent_document_version_id]) => {
-          const doc = giftView?.consents?.find((c) => c.id === consent_document_version_id);
-          return {
-            consent_document_version_id,
-            content_sha256: doc?.content_sha256 ?? '',
-          };
-        });
-
-      return giftService.claimGift(id, {
-        token,
-        answers: questionAnswers,
-        consents: consentList,
-      });
-    },
-    onSuccess: (data) => {
-      setClaimedView(data);
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch {
-        // Confetti fallback
-      }
-    },
-    onError: (err: any) => {
-      setClaimError(giftErrorMessage(err, 'Failed to claim gift. Please try again.'));
-    },
-  });
-
-  const currentView = claimedView || giftView;
-  const isClaimed = currentView?.gift?.status === 'claimed' || Boolean(currentView?.ticket);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div
-          className="relative overflow-hidden rounded-3xl p-8 max-w-md w-full text-center space-y-4"
-          style={glass(isDark)}
-        >
-          <GlassReflection isDark={isDark} />
-          <div className="w-16 h-16 mx-auto rounded-2xl animate-pulse" style={glassControl(isDark, 'accent')} />
-          <div className="h-5 w-48 mx-auto rounded-lg animate-pulse" style={glassControl(isDark)} />
-          <div className="h-4 w-32 mx-auto rounded-lg animate-pulse" style={glassControl(isDark)} />
-        </div>
-      </div>
-    );
-  }
-
-  if (isError || !giftView) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div
-          className="relative overflow-hidden rounded-3xl p-8 max-w-md w-full text-center space-y-4"
-          style={glass(isDark)}
-        >
-          <GlassReflection isDark={isDark} />
-          <div className="w-14 h-14 mx-auto rounded-2xl grid place-items-center" style={glassControl(isDark, 'danger')}>
-            <AlertTriangle className="w-7 h-7 text-red-400" />
-          </div>
-          <h2 className="text-[20px] font-medium" style={{ color: textPrimary, fontFamily: "'Zalando Sans Expanded', sans-serif" }}>
-            Gift Unavailable
-          </h2>
-          <p className="text-[13px] leading-relaxed" style={{ color: textMuted }}>
-            {giftErrorMessage(error, 'This gift link is invalid or has expired.')}
-          </p>
-          <div className="pt-2 flex justify-center gap-3">
-            <AppButton
-              onClick={onNavigateHome}
-              className="px-6 py-3 rounded-2xl text-[13px] font-semibold cursor-pointer"
-              style={{ background: accent, color: isDark ? '#000' : '#fff' }}
-            >
-              Browse Events
-            </AppButton>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 flex items-center justify-center">
-      <div className="max-w-lg w-full space-y-6">
-        {/* Header Kicker */}
-        <div className="text-center space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium tracking-wide uppercase" style={glassControl(isDark, 'accent')}>
-            <Sparkles className="w-3.5 h-3.5 text-lime-400" />
-            <span style={{ color: textPrimary }}>Ticket Gift</span>
-          </div>
-          <h1 className="text-[26px] sm:text-[30px] font-light tracking-tight" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-            {isClaimed ? 'Your Ticket is Ready' : 'You Received a Gift!'}
-          </h1>
-          <p className="text-[13px]" style={{ color: textMuted }}>
-            {isClaimed ? 'This ticket is safely registered in your name.' : 'Claim your ticket below to attend the event.'}
-          </p>
-        </div>
-
-        {/* Gift Card */}
-        <div className="relative overflow-hidden rounded-[28px] p-6 sm:p-8 space-y-6" style={glass(isDark)}>
-          <GlassReflection isDark={isDark} />
-
-          {/* Event & Product Details */}
-          <div className="space-y-2">
-            <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: isDark ? '#d6f905' : '#1a1a1a' }}>
-              {currentView.event.title}
-            </span>
-            <h3 className="text-[22px] font-medium leading-tight" style={{ color: textPrimary, fontFamily: "'Zalando Sans Expanded', sans-serif" }}>
-              {currentView.product.name}
-            </h3>
-            {currentView.product.description && (
-              <p className="text-[13px] leading-relaxed" style={{ color: textMuted }}>
-                {currentView.product.description}
-              </p>
-            )}
-          </div>
-
-          {/* Personal Note */}
-          {currentView.gift.note && (
-            <div
-              className="relative overflow-hidden rounded-2xl p-4 flex items-start gap-3"
-              style={{
-                background: isDark ? 'rgba(214, 249, 5, 0.06)' : 'rgba(214, 249, 5, 0.12)',
-                border: isDark ? '1px solid rgba(214, 249, 5, 0.2)' : '1px solid rgba(214, 249, 5, 0.3)',
-              }}
-            >
-              <HeartHandshake className="w-5 h-5 shrink-0 mt-0.5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
-              <div className="space-y-0.5 min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }}>
-                  Personal Note
-                </p>
-                <p className="text-[13px] italic leading-relaxed" style={{ color: textPrimary }}>
-                  &ldquo;{currentView.gift.note}&rdquo;
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Claimed View: Ticket Info */}
-          {isClaimed && currentView.ticket && (
-            <div className="relative overflow-hidden rounded-2xl p-5 space-y-4 text-center" style={glassControl(isDark, 'accent')}>
-              <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 text-emerald-400 grid place-items-center">
-                <Check className="w-7 h-7" strokeWidth={3} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[15px] font-semibold" style={{ color: textPrimary }}>
-                  Claim Complete
-                </p>
-                {currentView.ticket.lookup_code && (
-                  <p className="font-mono text-[14px] font-bold tracking-widest" style={{ color: accent }}>
-                    Code: {currentView.ticket.lookup_code}
-                  </p>
-                )}
-              </div>
-              <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
-                <AppButton
-                  onClick={onNavigateTickets}
-                  className="w-full py-3.5 rounded-2xl text-[13px] font-semibold flex items-center justify-center gap-2 cursor-pointer"
-                  style={{ background: accent, color: isDark ? '#000' : '#fff' }}
-                >
-                  <Ticket className="w-4 h-4" />
-                  <span>View in My Tickets</span>
-                </AppButton>
-              </div>
-            </div>
-          )}
-
-          {/* Unclaimed View: Action & Consents */}
-          {!isClaimed && (
-            <div className="space-y-4 pt-2">
-              {/* Optional Consents */}
-              {giftView.consents && giftView.consents.length > 0 && (
-                <div className="space-y-2">
-                  {giftView.consents.map((consent) => (
-                    <label key={consent.id} className="flex items-start gap-2.5 cursor-pointer text-[12px]" style={{ color: textMuted }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(acceptedConsents[consent.id])}
-                        onChange={(e) =>
-                          setAcceptedConsents((prev) => ({ ...prev, [consent.id]: e.target.checked }))
-                        }
-                        className="mt-0.5 rounded"
-                      />
-                      <span>I agree to {consent.title}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {claimError && (
-                <p className="text-[12px] text-red-400 font-medium text-center">
-                  {claimError}
-                </p>
-              )}
-
-              <AppButton
-                onClick={() => claimMutation.mutate()}
-                disabled={claimMutation.isPending}
-                className="w-full py-4 rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                style={{
-                  ...primaryButtonSurface(!claimMutation.isPending, isDark),
-                  fontFamily: "'Inter', sans-serif",
-                }}
-              >
-                {claimMutation.isPending ? (
-                  <span>Claiming ticket…</span>
-                ) : (
-                  <>
-                    <Gift className="w-4 h-4" />
-                    <span>Claim Ticket Now</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </AppButton>
-
-              <p className="text-[11px] text-center" style={{ color: textDim }}>
-                Expires {isoToDisplayDate(currentView.gift.expires_at)}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+  const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  // Capabilities never enter cache keys; recipient-only responses leave cache on unmount.
+  const queryKey = ['gift', id, user?.id];
+  const query = useQuery({ queryKey, queryFn: () => giftService.resolveGift(id, token),
+    enabled: !!id && !!token, retry: false, staleTime: 0, gcTime: 0 });
+  const view = query.data;
+  const [answers, setAnswers] = useState<Record<string, GiftAnswer>>({});
+  const [accepted, setAccepted] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Retry the exact uncertain request with the same command and consent identities.
+  const attempt = useRef<{ signature: string; key: string; input: ClaimGiftInput } | null>(null);
+  // CompleteGift preserves accepted answers on a consent-only continuation.
+  const questions = view && view.gift.status !== 'pending_recipient_consent' ? giftQuestionEntries(view) : [];
+  const consents = view ? giftConsentEntries(view) : [];
+  const missingConsentDocument = view?.gift.status === 'pending_recipient_consent' && view.pending_consents?.some(
+    requirement => !view.consents?.some(document => document.id === requirement.consent_document_version_id),
   );
+  const unsupportedQuestion = questions.some(({ question }) => !['short_text', 'long_text', 'single_choice', 'multiple_choice', 'checkbox', 'date'].includes(question.type));
+  const mutation = useMutation({
+    gcTime: 0,
+    mutationFn: () => giftService.claimGift(id, attempt.current!.input, attempt.current!.key),
+    onSuccess: data => {
+      queryClient.setQueryData(queryKey, data);
+      if (data.gift.status === 'claimed') void queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+      // A successful partial step is a new subsequent intent, even if inputs match.
+      attempt.current = null;
+    },
+  });
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!view || mutation.isPending || missingConsentDocument || unsupportedQuestion) return;
+    const nextErrors: Record<string, string> = {};
+    for (const entry of questions) {
+      const message = giftAnswerError(entry.question, answers[entry.key] ?? (entry.question.type === 'checkbox' ? false : undefined));
+      if (message) nextErrors[entry.key] = message;
+    }
+    for (const entry of consents) if (entry.required && !accepted[entry.key]) nextErrors[entry.key] = 'Accept this required consent to continue.';
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+    const submission = { answers: giftAnswerPayload(questions, answers), consents: consents.filter(entry => accepted[entry.key]).map(entry => ({
+      consent_document_version_id: entry.document.id, content_sha256: entry.document.content_sha256,
+      ...(entry.position ? { package_unit_number: 1, admission_position: entry.position } : {}),
+    })) };
+    const signature = JSON.stringify(submission);
+    if (attempt.current?.signature !== signature) attempt.current = {
+      signature, key: randomUuid(), input: { token, answers: submission.answers,
+        consents: submission.consents.map(consent => ({ ...consent, request_uuid: randomUuid(), idempotency_key: randomUuid(), acceptance_method: 'checkbox' })),
+      },
+    };
+    mutation.mutate();
+  }
+
+  const muted = isDark ? '#aaa9ae' : '#6d6976';
+  const buttonClass = 'min-h-11 px-5 py-3 rounded-2xl text-sm font-medium';
+  const authRequired = mutation.error instanceof ApiError && mutation.error.code === 'gift_recipient_authentication_required';
+  const claimed = view?.gift.status === 'claimed';
+  const qr = claimed && view?.ticket?.credential_status === 'active' ? view.ticket.qr_token : null;
+
+  return <main className="min-h-screen px-4 py-12 sm:px-6 flex justify-center" style={{ color: isDark ? '#f4f4f0' : '#17161c' }}>
+    <div className="w-full max-w-lg space-y-6">
+      {query.isLoading && <p role="status" className="text-center">Loading your gift…</p>}
+      {(!token || query.isError) && <section className="relative overflow-hidden rounded-3xl p-6" style={{ background: 'var(--card)' }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 space-y-4">
+          <h1 className="text-2xl" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif" }}>Gift unavailable</h1>
+          <p role="alert">{!token ? 'Open the original gift link to continue.' : mapApiError(query.error, 'Couldn’t load your gift. Please try again.')}</p>
+          {token && <AppButton onClick={() => void query.refetch()} disabled={query.isFetching} className={buttonClass} style={glassControl(isDark)}>Retry</AppButton>}
+          <AppButton onClick={onNavigateHome} className={buttonClass} style={glassControl(isDark)}>Browse events</AppButton>
+        </div>
+      </section>}
+      {view && token && !query.isError && <>
+        <header className="text-center space-y-3">
+          <Gift className="w-8 h-8 mx-auto" style={{ color: isDark ? '#d6f905' : '#17161c' }} />
+          <h1 className="text-2xl sm:text-3xl" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif" }}>{claimed ? 'Your ticket is ready' : 'You received a gift'}</h1>
+          <p className="text-sm" style={{ color: muted }}>{claimed ? 'Use your ticket at the event entrance.' : 'Complete your details and required consents to claim your ticket.'}</p>
+        </header>
+        <section className="relative overflow-hidden rounded-3xl p-6 sm:p-8" style={{ background: 'var(--card)' }}>
+          <GlassReflection isDark={isDark} />
+          <div className="relative z-10 space-y-6">
+            <div><h2 className="text-xl break-words">{view.event.title}</h2><p className="text-sm mt-1" style={{ color: muted }}>{view.product.name}</p>
+              {view.product.description && <p className="text-sm mt-2 break-words">{view.product.description}</p>}
+            </div>
+            {view.gift.note && <blockquote className="rounded-2xl p-4 flex gap-3 text-sm" style={glassControl(isDark, 'accent')}>
+              <HeartHandshake className="w-5 h-5 shrink-0" /><p className="whitespace-pre-wrap break-words">{view.gift.note}</p>
+            </blockquote>}
+            {claimed ? <div className="space-y-4 text-center">
+              {qr ? <div role="img" aria-label="Ticket QR code" className="mx-auto w-60 h-60 rounded-2xl bg-white p-5"><TicketQRCode code={qr} /></div>
+                : <><p role="status">Your entry code is not available yet.</p><AppButton onClick={() => void query.refetch()} disabled={query.isFetching} className={buttonClass} style={glassControl(isDark)}>Refresh ticket</AppButton></>}
+              {view.ticket?.lookup_code && <p className="text-sm">{view.ticket.lookup_code}</p>}
+              {isAuthenticated && <AppButton onClick={onNavigateTickets} className={buttonClass} style={glassControl(isDark)}>View in My Tickets</AppButton>}
+            </div> : <form onSubmit={submit} noValidate className="space-y-6">
+              <fieldset disabled={mutation.isPending} className="space-y-6">
+                {questions.map(entry => <div key={entry.key}>
+                  {entry.position && view.product.admissions_per_unit > 1 && <p className="text-sm mb-2" style={{ color: muted }}>Attendee {entry.position}</p>}
+                  <GiftQuestionField id={entry.key} question={entry.question} value={answers[entry.key]} error={errors[entry.key]} isDark={isDark}
+                    onChange={value => {
+                      setAnswers(previous => ({ ...previous, [entry.key]: value }));
+                      setErrors(previous => ({ ...previous, [entry.key]: '' }));
+                    }} />
+                </div>)}
+                {consents.map(entry => <div key={entry.key} className="space-y-2">
+                  <h3 className="font-medium">{entry.document.title}{entry.position && view.product.admissions_per_unit > 1 ? ` — attendee ${entry.position}` : ''}</h3>
+                  <p className="text-sm whitespace-pre-wrap break-words" style={{ color: muted }}>{entry.document.body}</p>
+                  <label className="min-h-11 flex items-start gap-3 py-2 text-sm">
+                    <input type="checkbox" checked={!!accepted[entry.key]} className="mt-1" style={{ accentColor: isDark ? '#d6f905' : '#17161c' }} aria-invalid={!!errors[entry.key]}
+                      aria-describedby={errors[entry.key] ? `${entry.key}-error` : undefined}
+                      onChange={event => {
+                        setAccepted(previous => ({ ...previous, [entry.key]: event.target.checked }));
+                        setErrors(previous => ({ ...previous, [entry.key]: '' }));
+                      }} />
+                    <span>I agree to {entry.document.title}{entry.required ? ' (required)' : ' (optional)'}</span>
+                  </label>
+                  {errors[entry.key] && <p id={`${entry.key}-error`} role="alert" className="text-sm text-red-400">{errors[entry.key]}</p>}
+                </div>)}
+                {(missingConsentDocument || unsupportedQuestion) && <p role="alert" className="text-sm">Some required gift details are unavailable. Refresh the gift before continuing.</p>}
+                {mutation.isError && <p role="alert" className="text-sm text-red-400">{mapApiError(mutation.error, 'Couldn’t claim your gift. Please try again.')}</p>}
+                {authRequired && onRequestAuth && <AppButton type="button" onClick={onRequestAuth} className={buttonClass} style={glassControl(isDark)}>Sign in to claim</AppButton>}
+                <AppButton type="submit" disabled={mutation.isPending || !!missingConsentDocument || unsupportedQuestion} className={`${buttonClass} w-full`}
+                  style={primaryButtonSurface(!mutation.isPending && !missingConsentDocument && !unsupportedQuestion, isDark)}>{mutation.isPending ? 'Claiming ticket…' : 'Claim my ticket'}</AppButton>
+              </fieldset>
+            </form>}
+            <p className="text-xs" style={{ color: muted }}>Expires {isoToDisplayDate(view.gift.expires_at)}</p>
+          </div>
+        </section>
+      </>}
+    </div>
+  </main>;
 }
