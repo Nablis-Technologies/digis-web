@@ -1,3 +1,4 @@
+import { apiRoute } from './support/api';
 import { test, expect, type Page } from '@playwright/test';
 
 /**
@@ -131,7 +132,7 @@ test.describe('auth', () => {
     const verificationToken = `ver-${Date.now()}`;
 
     // Mock OTP delivery & verification endpoints so the e2e test does not require live SMS
-    await page.route(`${API}/auth/signup/request_otp`, async (route) => {
+    await page.route(apiRoute(`/auth/signup/request_otp`), async (route) => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -146,7 +147,7 @@ test.describe('auth', () => {
       });
     });
 
-    await page.route(`${API}/phone_verifications/${challengeId}/verify`, async (route) => {
+    await page.route(apiRoute(`/phone_verifications/${challengeId}/verify`), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -160,7 +161,7 @@ test.describe('auth', () => {
       });
     });
 
-    await page.route(`${API}/auth/signup`, async (route) => {
+    await page.route(apiRoute(`/auth/signup`), async (route) => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -187,7 +188,7 @@ test.describe('auth', () => {
       });
     });
 
-    await page.route(`${API}/notifications**`, async (route) => {
+    await page.route(apiRoute(`/notifications**`), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -195,7 +196,7 @@ test.describe('auth', () => {
       });
     });
 
-    await page.route(`${API}/user**`, async (route) => {
+    await page.route(apiRoute(`/user**`), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -218,7 +219,7 @@ test.describe('auth', () => {
       });
     });
 
-    await page.route(`${API}/tickets**`, async (route) => {
+    await page.route(apiRoute(`/tickets**`), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -226,7 +227,7 @@ test.describe('auth', () => {
       });
     });
 
-    await page.route(`${API}/auth/refresh**`, async (route) => {
+    await page.route(apiRoute(`/auth/refresh**`), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -245,7 +246,8 @@ test.describe('auth', () => {
     await page.getByRole('button', { name: "Don't have an account? Create one" }).click();
     await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
 
-    await page.getByPlaceholder('Name', { exact: true }).fill('Test User');
+    await page.getByLabel('Given Name / ስም', { exact: true }).fill('Test');
+    await page.getByLabel("Father's Name / የአባት ስም", { exact: true }).fill('User');
     await page.getByPlaceholder('Phone number', { exact: true }).fill(phone);
     await page.getByPlaceholder('Create a password (min 8 chars)', { exact: true }).fill('Test1234!');
     await page.getByPlaceholder('Confirm your password', { exact: true }).fill('Test1234!');

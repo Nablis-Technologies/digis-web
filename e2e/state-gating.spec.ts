@@ -24,7 +24,14 @@ test('offer-driven: a free-ticket event renders its admission offer', async ({ p
 });
 
 test('discovery renders the event grid from the live list payload', async ({ page }) => {
+  const loaded = page.waitForResponse(r => new URL(r.url()).pathname.endsWith('/public/events') && r.request().method() === 'GET');
   await page.goto('/');
+  const response = await loaded;
+  expect(response.ok()).toBe(true);
+  const body = await response.json();
+  expect(body.success).toBe(true);
+  expect(body.data.length).toBeGreaterThan(0);
+  await expect(page.getByRole('heading', { name: body.data[0].title, exact: true }).first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Worth showing up for.' })).toBeVisible({ timeout: 15_000 });
   // The discovery controls render from the live list payload.
   await expect(page.getByPlaceholder(/Search events/).first()).toBeVisible({ timeout: 15_000 });

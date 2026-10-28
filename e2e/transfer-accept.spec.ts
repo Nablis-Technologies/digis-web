@@ -1,3 +1,6 @@
+import { ACTIVE_TICKET } from './support/wallet';
+import { decodeQr } from './support/qr';
+import { apiPath, apiRoute } from './support/api';
 import { test, expect, type Route } from '@playwright/test';
 
 /**
@@ -59,10 +62,11 @@ test('accepting an incoming transfer from the notification panel is tokenless', 
   let postKey: string | undefined;
   let acceptedPath: string | undefined;
   let walletFetches = 0;
+  let accepted = false;
 
-  await page.route(`${API}/**`, async (route) => {
+  await page.route(apiRoute(), async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(request.url());
     if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
 
     if (path === '/user' && request.method() === 'GET') return fulfillJson(route, 200, { success: true, data: USER });
@@ -74,15 +78,16 @@ test('accepting an incoming transfer from the notification panel is tokenless', 
     // trip the 401→refresh→sign-out interceptor before the panel is even opened.
     if (path === '/tickets' && request.method() === 'GET') {
       walletFetches += 1;
-      return fulfillJson(route, 200, { success: true, data: [], pagination: { current_page: 1, per_page: 20, total_count: 0, total_pages: 1 } });
+      return fulfillJson(route, 200, { success: true, data: accepted ? [ACTIVE_TICKET] : [], pagination: { current_page: 1, per_page: 20, total_count: accepted ? 1 : 0, total_pages: 1 } });
     }
     if (path === '/ticket_transfers/tr-e2e-1/accept') {
+      accepted = true;
       acceptedPath = path;
       postBody = request.postDataJSON();
       postKey = request.headers()['idempotency-key'];
       return fulfillJson(route, 200, { success: true, data: { id: 'tr-e2e-1', status: 'accepted' } });
     }
-    return route.fallback();
+    return fulfillJson(route, 200, { success: true, data: [] });
   });
 
   await page.addInitScript(
@@ -109,4 +114,9 @@ test('accepting an incoming transfer from the notification panel is tokenless', 
   expect(postKey).toBeTruthy();
   // The accept refreshes the wallet so the ticket shows up there.
   await expect.poll(() => walletFetches).toBeGreaterThan(walletFetchesBeforeAccept);
+  await page.getByRole('button', { name: 'Tickets', exact: true }).first().click();
+  await page.locator('[data-ticket-id="older-ticket"]').click();
+  await page.getByRole('button', { name: /Enlarge/ }).click();
+  const qr = page.getByRole('region', { name: 'Enlarged ticket entry code' }).getByRole('img', { name: 'Ticket entry QR' });
+  await expect.poll(() => decodeQr(qr)).toBe(ACTIVE_TICKET.credentials[0].qr_token);
 });
