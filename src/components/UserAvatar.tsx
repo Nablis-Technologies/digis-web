@@ -46,7 +46,7 @@ export function UserAvatar({
     }
 
     authService.getAvatarBlobUrl(cached?.etag).then((res) => {
-      if (!isMounted) return;
+      if (!isMounted) { if (res.url) URL.revokeObjectURL(res.url); return; }
       if (res.notModified && cached?.blobUrl) {
         setPhotoUrl(cached.blobUrl);
       } else if (res.url) {
@@ -60,7 +60,7 @@ export function UserAvatar({
     return () => {
       isMounted = false;
     };
-  }, [userId, avatarUrl]);
+  }, [userId, avatarUrl, user]);
 
   if (!user) return null;
 
@@ -81,7 +81,7 @@ export function UserAvatar({
     ...style,
   };
 
-  if (photoUrl) {
+  if (photoUrl && userId && avatarUrl) {
     return (
       <div
         className={`inline-flex items-center justify-center relative ${className}`}
