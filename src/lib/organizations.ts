@@ -9,6 +9,7 @@ export interface OrganizationProfile {
   id: string;
   name: string;
   slug: string;
+  profile_url?: string | null;
   description?: string | null;
   social_links?: Record<string, string> | null;
   organizer_type?: string | null;

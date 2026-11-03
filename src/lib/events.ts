@@ -36,6 +36,7 @@ export type EventListSort = "newest" | "soonest" | "price_asc" | "price_desc";
  * backend's snake_case params in `toQueryString`.
  */
 export interface PublicEventQuery {
+  featured?: boolean;
   /** Free-text search — the backend requires ≥2 chars (422 below that). */
   q?: string;
   /** Category **slug** (the backend filters by slug, not name). */
@@ -65,6 +66,7 @@ function toQueryString(query: PublicEventQuery): string {
     p.set(key, String(value));
   };
   set("q", query.q);
+  set("featured", query.featured ? "true" : undefined);
   set("category", query.category);
   set("city", query.city);
   set("date_from", query.dateFrom);

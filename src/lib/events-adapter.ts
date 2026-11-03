@@ -43,6 +43,7 @@ import { isoToDisplayDate, isoToDisplayTime } from "@/lib/mappers";
 export interface BackendMedia {
   id: string;
   type?: string;
+  position?: number;
   file?: { url?: string; thumbnail?: string; medium?: string };
 }
 
@@ -164,6 +165,7 @@ export interface BackendEvent {
 export function formatAgeRestriction(
   restriction?: BackendAgeRestriction | null,
 ): string | undefined {
+  if (restriction?.has_restriction === false) return 'Any Age';
   if (restriction?.has_restriction !== true) return undefined;
   const { min_age: min, max_age: max } = restriction;
   const hasMin = typeof min === "number";
@@ -207,14 +209,18 @@ export function backendEventToEvent(be: BackendEvent): Event {
     m?.file?.thumbnail ?? m?.file?.medium ?? m?.file?.url;
   const image = imageUrl(cover) ?? "";
   const imageThumb = thumbUrl(cover);
-  const gallery = (be.event_media ?? [])
-    .map(imageUrl)
-    .filter((u): u is string => Boolean(u));
+  const gallery = [...new Set([
+    image,
+    ...(be.event_media ?? [])
+      .filter((media) => media !== cover)
+      .sort((left, right) => (left.position ?? 0) - (right.position ?? 0))
+      .map(imageUrl),
+  ].filter((url): url is string => Boolean(url)))];
 
   // Co-organizers from the live association (summary = { id, name, slug }).
-  const organizers: EventOrganizer[] = (be.event_organizations ?? [])
-    .map((entry) => entry.organization)
+  const organizers: EventOrganizer[] = [be.organization, ...(be.event_organizations ?? []).map(entry => entry.organization)]
     .filter((org): org is NonNullable<typeof org> => Boolean(org))
+    .filter((org, index, all) => all.findIndex(candidate => candidate.id === org.id) === index)
     .map((org) => ({ id: org.id, name: org.name }));
 
   // Lineup from the public `event_participants` association (#36 — resolved
@@ -227,6 +233,7 @@ export function backendEventToEvent(be: BackendEvent): Event {
     .filter((p): p is typeof p & { name: string } => Boolean(p.name?.trim()))
     .map((p) => ({
       name: p.name,
+      ...(p.artist_id ? { artistId: p.artist_id } : {}),
       ...(p.event_date_id ? { eventDateId: p.event_date_id } : {}),
       ...(p.description ? { role: p.description } : {}),
     }));
@@ -256,6 +263,7 @@ export function backendEventToEvent(be: BackendEvent): Event {
         }
       : {}),
     venue: date0?.venue?.name ?? "",
+    venueId: date0?.venue?.id,
     city: date0?.venue?.city ?? "",
     organizer: be.organization?.name,
     organizerId: be.organization?.id,

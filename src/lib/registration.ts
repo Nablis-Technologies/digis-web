@@ -16,6 +16,7 @@
  */
 
 import { apiFetch } from "@/lib/api";
+import type { GiftFormQuestion } from "@/lib/gifts";
 
 /* ─── Wire types ─── */
 
@@ -30,14 +31,8 @@ export interface ConsentRequirementWire {
 }
 
 /** Published registration-form question (public schema, BACKEND_GAPS #19). */
-export interface SchemaQuestion {
-  id: string;
-  key: string;
-  type: string;
-  response_scope: "registration" | "package_unit_number" | "admission_position";
-  label: string;
-  required: boolean;
-  options?: unknown;
+export interface SchemaQuestion extends GiftFormQuestion {
+  response_scope: "registration" | "admission_slot";
 }
 
 /** A published form version plus its questions. */
@@ -163,11 +158,13 @@ export const registrationModule = {
       password: string;
       passwordConfirmation: string;
     },
+    idempotencyKey?: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const { data } = await apiFetch<{ access_token: string; refresh_token: string }>(
       `registrations/${registrationId}/claim_guest`,
       {
         method: "POST",
+        ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
         body: {
           phone: input.phone,
           verification_token: input.verificationToken,
