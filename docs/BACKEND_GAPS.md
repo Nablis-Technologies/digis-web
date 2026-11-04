@@ -1,5 +1,61 @@
 # Confirmed Backend Gaps (digis_backend)
 
+Local setup update 2026-11-01: user-authorized development reset ran the existing
+migrations from scratch. `orders_gift_purchases.client_line_id` now exists in this
+fresh local database. **#76 stays open for existing databases** because no forward
+migration was supplied; this setup action is not a backend fix or gift acceptance.
+
+## Targeted recheck 2026-11-01 — #71 and #72 still open
+
+Fresh `git fetch origin` found no newer launch-hardening commit than `c15d6ff3`.
+Compared fetched source with local `5c2890c7`: #71 still maps provider fees through
+`minor_amount`, which multiplies by 100; #72 detail serializer still omits
+`event_lifecycle` and `ticket_availability`. Neither fix has landed on the tracked
+backend branch. Existing frontend lifecycle mitigation remains; no backend edits.
+
+## Re-verification 2026-11-01 — latest backend pulled and wired
+
+Fetched remote `c15d6ff3` and merged six commits into local `5c2890c7`.
+Existing uncommitted seed/catalog changes preserved with autostash/reapply;
+no local backend product edits. Full gap/consumer sweep:
+`.scratch/backend-wireup-2026-11-01/gap-sweep.md`.
+
+**#75 resolved:** real sandbox payment acceptance passed after restarting old
+Rails/worker processes onto pulled code. **#74 partial:** committed line-ID batch
+contract is frontend-wired and tested; **new #76 blocks existing-database gift
+rollout** (no forward migration for client_line_id). No other incoming consumer
+contract changes; existing resolved/partial consumers checked and retained.
+
+Current open blocking: **#53 seat_map / #57 / #73 / #76**. Partial **#74**.
+Degrading unchanged: **#44 / #46 / #48 / #67 / #71 / #72**.
+55 frontend browser/API tests, 259 units, typecheck and build pass; live ordinary
+payment acceptance passes. Live gift checkout is not certified until #76 is fixed.
+Historical sweep sections below describe their respective dates.
+
+## Re-verification 2026-10-24 — fetched backend unchanged
+
+Fetched `origin`: tracked remote `feat/launch-hardening-telemetry` remains
+`8419aaaf`. Local HEAD `55f535dd` is ahead 10 / behind 0, with identical committed
+`app/`, routes and database structure. Existing backend setup changes preserved;
+no backend product edits or merge performed.
+
+All ten previously open entries rechecked. **No newly resolved backend contract**
+and no new frontend wiring owed. #44 narrowed to inert `public_guest_limit`;
+obsolete admission config is superseded. #65 reclassified to provider-recipient /
+settlement verification (NOT_BACKEND_GAPS), **not** declared fixed. #72 remains
+open with its existing frontend schedule mitigation now documented. #73 remains
+a requested backend contract dependency, not an existing broken achievement engine.
+
+Current open: blocking **#53 seat_map / #57 / #73 / #74 / #75**; degrading
+**#44 / #46 / #48 / #67 / #71 / #72**. All resolved/partial surfaces were checked
+for incoming contract changes; existing consumers remain wired. Unsupported
+Settings claims under #48 are tracked as a frontend follow-up.
+
+Evidence and per-gap wiring sweep:
+`.scratch/backend-gap-audit-2026-10-24/spec.md`.
+Source-only verification: Docker Desktop launched but engine remained unavailable;
+localhost:3000 refused connection. No new live/provider/settlement claims.
+
 > **Backend defects only — this is the backend dev's worklist.** Every confirmed
 > deficiency in the backend's **code / API / contract** that the backend dev must
 > fix, **verified against the actual backend code** (serializers, policies,
@@ -284,15 +340,22 @@ Open items are listed first; resolved items below (sections keep an in-place
 
 | # | Status | Summary |
 |---|---|---|
+| 38 | reopened 2026-11-02 — degrading | `requires_ticket:true` extras still receive quotes without admission entitlement; moved back from NOT_BACKEND_GAPS after a live no-charge probe |
 | 53 | open — blocking (**`seat_map`** only) | **`age_restriction` resolved 2026-10-17** — the public **detail** now serves `event_setting.config.age_restriction { has_restriction, min_age?, max_age? }` (validated server-side; the **list** still omits it) and the frontend maps it to the Age card. **`seat_map` remains** — there is no `seat`/`seat_map` model at all, so the checkout Seat step stays skipped. Re-scoped 2026-10-16: `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as **unconsumed**; lineup → #36. (`featured` and the `rsvp_*`/`event_type`/`access_mode` keys are superseded — see `NOT_BACKEND_GAPS.md`) |
 | 57 | open — blocking | no password reset / forgot-password endpoint (phone-first reset would reuse the existing OTP infra) |
-| 65 | open — blocking | seller payout dispatch fails at the provider — Chapa returns `invalid_format`; no payout has reached `succeeded` |
-| 44 | open — degrading | event-level `event_type` / `access_mode` / `rsvp_*` config is inert — now also unexposed (see #53); the real gates are per-offer |
+| 73 | open — blocking | consumer achievement detail sheet has no backend contract; backend developer owns the behavior and API design |
+| 74 | partial — frontend wired | unique gift-line contract available; existing database upgrades blocked by #76 |
+| 75 | resolved 2026-11-01 | new-purchase real sandbox acceptance passed after restarting pulled Rails/workers; historical expired orders not repaired |
+| 76 | open — blocking for existing databases | gift line column was added to a historical migration without a forward migration; fresh local reset has the column |
+| 77 | open — degrading | discovery list has no authoritative multi-day signal; only one next date is served, so genuine multi-day events cannot show their format badge |
+| 78 | open — degrading | a published parking product crashes the public products endpoint; its availability path dereferences a missing ticket type |
+| 79 | open — degrading | public event/date projections do not identify online or hybrid attendance, despite backend stream support |
+| 44 | open — degrading (narrowed 2026-10-24) | public `public_guest_limit` is exposed but unenforced; obsolete event-level RSVP/access-mode keys are superseded by offer-driven admission, not missing features |
 | 46 | open — degrading | no saved-events/favourites, home feed (`GET /feed` route has no controller), or reviews/ratings. Follows to **venues/artists/organizations** *do* exist (`config/routes.rb:81`, `GET /users/:id/following`) |
 | 48 | open — degrading | no consumer account preferences (language/currency/region), 2FA, or password change (notification-channel prefs exist; account prefs do not) |
 | 67 | open — degrading | `Core::UserProfile` enforces mandatory `last_name` (`null: false`, `validates :last_name, presence: true`) → single-name signups require client-side fallback/duplication |
 | 71 | open — degrading | Chapa `provider_fee_minor` is inflated 100× — the adapter converts the provider's **minor-unit** `service_fee`/`charge` as if it were major (`minor_amount` × 100), so a real 0.03 ETB fee is recorded as 3.00 ETB → overstates platform provider cost and reconciliation variance |
-| 72 | open — degrading | public **detail** payload omits `event_lifecycle` + `ticket_availability` (only the **list** serves them) → an ended event's detail page can no longer gate purchase; `eventEnded` fell back to the full `event_dates` array, which the 2026-10-16 reshape replaced with an upcoming-only preview — regression from that reshape |
+| 72 | open — degrading | detail still omits `event_lifecycle` / `ticket_availability`; the frontend already mitigates ended-event display via a schedule probe. Authoritative detail projection remains owed |
 | 36 | resolved 2026-10-17 | public **detail** now serves `event_participants` (`{ id, artist_id, event_date_id, name, type, description, display_order }`, server-ordered) → the Lineup section **and** the per-day festival bill render real data (no more round-robin). Frontend wired: adapter maps the roster (`name`; `event_date_id` → `eventDateId`; `description` → display `role`) and drops the never-served profile guesses. The venue media/coords half was a **seed** task — fixed 2026-10-15 (`NOT_BACKEND_GAPS.md`). |
 | 17 | resolved 2026-10-16 | `Orders::Payment::PAYMENT_METHODS` now includes `cbebirr`; the CBE Birr option is enabled and sends `cbebirr`. (Residual: `Commercial::FeeComponent::PAYMENT_METHODS` still omits it — no live impact.) |
 | 8 | resolved 2026-10-16 | auth payload serves `profile.full_name` (`Core::CurrentUserSerializer`); signup creates the profile |
@@ -324,7 +387,8 @@ Open items are listed first; resolved items below (sections keep an in-place
 | 16 | resolved | Chapa API V2 (`CHAPA_TEST_`/`CHAPA_LIVE_` keys, `api.chapa.global`) — the dev tunnel/config is setup (`NOT_BACKEND_GAPS.md`) |
 | 26 | resolved | payout destination create works (Chapa V2 direct-transfer registration) |
 | 27 | superseded 2026-09-30 | Public RSVP routes deleted → free admission now goes through `admission_selections` |
-| 51 | re-scoped 2026-10-16 → merged into #49 | events-by-followable is tracked under #49; **venue stats are hydratable** from public `GET /venues/:id` and **profile gamification is a product decision** — both → `NOT_BACKEND_GAPS.md` |
+| 51 | re-scoped 2026-10-16 → merged into #49 | events-by-followable is tracked under #49; **venue stats are hydratable** from public `GET /venues/:id` and **profile gamification was deferred** — historical context → `NOT_BACKEND_GAPS.md`; the newly requested achievement contract is tracked in **#73** |
+| 65 | superseded — reclassified 2026-10-24 | no confirmed payout request-shape defect; synthetic sandbox beneficiary was rejected. Successful provider settlement remains unverified → NOT_BACKEND_GAPS.md #65 |
 
 ---
 
@@ -333,6 +397,215 @@ Open items are listed first; resolved items below (sections keep an in-place
 These items block a frontend feature. Each entry: what's missing (file + fields),
 why it matters, and a concrete fix. (Resolved entries are retained in place with a
 `— RESOLVED <date>` heading marker for history; the table above is authoritative.)
+
+### #76. Batch gift line column has no upgrade migration for existing databases
+
+**Status:** open — blocking (gift checkout after latest pull).
+**Verified:** 2026-11-01, remote `c15d6ff3`, merged `5c2890c7`.
+`ca280c1b` adds `client_line_id` to the already-existing migration
+`20261005090000_create_orders_gift_purchases.rb`; no new migration adds it to
+existing installations. `Orders::GiftPurchase` now validates/accesses the column
+and `Orders::CreateCheckout` writes it. Read-only local runtime probe returns
+`Orders::GiftPurchase.column_names.include?("client_line_id") == false`.
+Previously migrated databases will not gain this field from ordinary migration
+runs. Fresh database behavior does not establish upgrade compatibility.
+
+**Impact:** real gift checkout and delivery status cannot be certified on the
+existing database. The frontend can wire the committed line-ID contract, but
+must not patch the database to make acceptance pass.
+
+**Backend engineer action:** provide a forward migration adding the nullable
+UUID column to existing databases and verify upgrade from the previous schema.
+No local backend migration/schema repair performed. Existing uncommitted seed /
+structure work was preserved during the pull.
+
+---
+
+### #75. Successful Chapa payment ignored as unmatched; paid Jazz order expires without ticket
+
+**Status:** resolved 2026-11-01 — committed payment matching fix, live sandbox
+payment → exact ticket → decoded QR → persisted wallet acceptance passed.
+
+**2026-11-01 resolution:** remote `efa245fa` / `2d69d63c` (merged as `5c2890c7`)
+verify an unmatched Chapa success by its provider reference, require complete
+merchant/reference/amount/currency evidence and match it to the immutable local
+attempt. Existing frontend POST refresh consumes the result; no frontend provider
+verification or success bypass added. After restarting Rails/background workers
+onto pulled code, `pnpm test:acceptance` passed in 30.2s with a separate seeded
+buyer. New-purchase behavior is verified; this does **not** claim the historical
+expired Jazz orders were recovered or refunded. No manual replay/issuance used.
+
+The first run used pre-pull worker processes and recorded
+`provider_verification_incomplete`; a fresh read-only verification had complete
+matching fields. Worker restart removed that runtime version mismatch. Keep the
+prior failure evidence below as historical incident context.
+**Verified:** 2026-10-26, committed backend `55f535dd`, live provider read-only
+verification, durable payment/event rows and scrubbed webhook diagnostics.
+
+**Reproduction/evidence:** user supplied receipt `HCGyXsbvSn5r` after paying for
+`thursday-jazz-sessions`. GET `/v2/payments/HCGyXsbvSn5r/verify` returns HTTP 200,
+`data.status=SUCCESS`, `amount=41000`, `currency=ETB`, and merchant reference
+`a56f9293bcda312e8c26`. That merchant reference exactly matches local payment
+`01a1788c-8c1d-7ee7-bd56-f08a0abb407f` for order
+`01a1788c-8b1f-7cd6-b552-073eab701011` (amount_minor=41000, ETB).
+
+- Payment created 2026-10-26 14:10:39 UTC. Its stored `provider_reference` is null.
+- Success webhook received/processed 14:11:28 UTC as event
+  `01a1788d-4b5a-72b5-a67e-3ddf5d46dd7e`: `event_type=payment.success`,
+  `status=ignored`, `payment_id=null`. Payload has `chapa_reference=HCGyXsbvSn5r`
+  and `merchant_reference=null`; provider signature was accepted and HTTP 200
+  acknowledged. No signature values or customer contacts copied here.
+- The webhook reports amount=42179 whereas the verify response/order principal
+  is 41000. Preserve this distinction; do not infer provider fee/acceptance rules
+  from these amounts in the frontend.
+- Local payment later became `failed`, failure_code=`not_found`,
+  raw_status=`provider_rejected` (14:25:39 UTC); order expired, no tickets.
+  Read-only verify with stored merchant reference returns `not_found`, while
+  verify with the actual Chapa receipt reference returns SUCCESS.
+
+**Second live reproduction — 2026-10-26 16:26 UTC (19:26 Nairobi):** fresh Jazz
+order `01a17908-cbd3-7330-a76c-32718d3759f5`, payment
+`01a17908-ccf4-75de-96c3-282ee9c02eda`, total_minor=41000 ETB. Success webhook
+`01a17908-eaf4-7b87-bef5-7eaec2d67801` arrived 16:26:30 UTC, eight seconds
+after order creation, but is ignored/payment_id null. Receipt `HCCePSUoB7pn`
+verify HTTP200 SUCCESS amount41000 ETB; returned merchant reference exactly
+matches this new payment. Local payment remains processing/order pending_payment.
+Both configured frontend return and public API callback-host health HTTP200;
+both managed tunnels running. This reproduction proves the success webhook
+crossed the tunnel; restarting tunnels will not repair the correlation defect.
+No payment/ticket/backend product changes performed.
+
+**Automated sandbox reproduction — 2026-10-28 08:08–08:13 UTC:**
+`pnpm test:acceptance` drove real UI login → On & On Regular checkout → hosted
+Chapa `/test/` bank payment. The test failed after 240 seconds waiting for the
+confirmed purchase screen; no ticket/QR outcome was accepted as success. Latest
+payment was `processing`, created 08:08:54 UTC. Durable inbox evidence:
+`payment.pending` at 08:08:57 was `processed`/matched; `payment.success` at
+08:09:02 was `ignored`/unmatched. Both managed payment tunnels and Rails were
+healthy before payment. This reproduces the known correlation failure through
+an automated browser acceptance test, beyond the earlier manual Jazz report.
+No force-issued tickets, simulated webhooks, payment mutations or backend
+product changes were used. Frontend test source: `e2e/live/paid-ticket.spec.ts`.
+
+**Code path:** `orders/process_payment_event.rb:53–75` only matches incoming
+reference values to stored merchant/provider/idempotency references; unmatched
+success calls `finish_ignored!`. `payments/providers/chapa_client.rb` hosted
+response mapping can leave provider_reference absent, and `verify` prioritizes
+that value then merchant reference. The observed webhook lacks the stored
+merchant reference, so it never associates the receipt reference with the order.
+Frontend POST refresh using the local attempt cannot discover this receipt.
+
+**Impact:** provider-confirmed paid order is never accepted/fulfilled; frontend
+correctly has no issued ticket to show. This is distinct from fixed frontend
+reload/timeout/ticket-opening bugs and restored local tunnel setup.
+
+**Broader audit:** current runtime settings match the env file; container payment
+source hashes match host/committed product files, and latest fetched origin has
+no newer product changes. Authenticated webhook processing/outbox completed in
+the same second, so no queue stall or pre-webhook expiry caused the ignored event.
+The September30 committed Render verification documents a previously successful
+checkout. Current reference extraction predates that success; a new code
+regression or Chapa response-format change is **not proved**. Current merchant
+lookup yields HTTP400/not_found, although official Chapa verification docs allow
+merchant references; receipt lookup succeeds and returns the expected merchant.
+The hosted URL suffix differs from final receipt reference, so do not prescribe
+suffix extraction as an evidenced fix. Compare earlier successful payloads and
+provider behavior as part of the backend engineer's investigation.
+Audit matrix: `.scratch/payment-return-diagnosis/spec.md`.
+Official source: https://docs.chapa.global/docs/v2/integrations/verify-payment.
+
+**Test coverage gap confirmed 2026-10-27:** passing frontend browser tests are
+not a live payment-to-ticket acceptance check. `e2e/checkout.spec.ts` returns
+success after reaching a hosted payment URL (or a handled initialization error/
+conflict); it does not settle payment or require an issued credential. Payment
+return tests mock `ready` plus tickets. Backend hosted-client tests permit
+checkout_url-only initialization; the webhook persistence test supplies the
+merchant reference that is null in both failed real purchases. Those tests do
+not catch this observed combination. Required regression: actual observed
+initialization + authenticated webhook shape + provider verification response
+must retain safe correlation and reach expected order/ticket outcome; a Chapa
+test-mode end-to-end acceptance must require success, fulfilled order and usable
+credential, not merely opening checkout. Backend engineer owns implementation
+and backend regression; no backend tests/code patched by frontend team.
+
+**Backend engineer action:** safely reconcile this specific paid order and
+provide a durable, verified correlation/reconciliation path for hosted responses
+and success webhooks with this shape. Backend owns the approach, amount/fee
+validation, expired-order/inventory handling and idempotency. Add regression
+coverage for missing merchant reference/provider reference and retry/replay.
+Do not correlate by amount/contact alone. No backend product patch, state
+mutation, webhook replay, refund or manual ticket issuance performed by frontend.
+
+### #74. Batch gifts cannot repeat a ticket product for different recipients
+
+**Status:** partial — committed batch contract available 2026-11-01; frontend
+wired. Existing-database rollout blocked by #76.
+
+**2026-11-01 update:** remote `c15d6ff3` adds unique UUID `line_id` per gift line,
+line-keyed registration/intent/quote mapping, aggregate per-product quantity
+limits and `line_id` on gift responses. Frontend now submits one quantity-one
+line per recipient, preserves line IDs across retries/reloads, and correlates
+per-gift delivery results. Browser/API regressions verify the new contract.
+Historical defect below is fixed in committed code; no live gift completion
+claim until the missing upgrade migration (#76) is supplied.
+**Verified:** 2026-10-26 against committed backend HEAD `55f535dd`; code evidence,
+not a live multi-recipient purchase.
+
+The attached `Gifting flow.md` requires three gifts to be three separate
+quantity-one items with independent recipients/notes. The API accepts an items
+array, but rejects repeated product IDs before preparing those gifts:
+
+- `app/services/orders/admission_selections/create.rb:107` returns
+  `duplicate_product` when `event_product_id` repeats; guest OTP preparation has
+  the same guard in `admission_selections/request_otp.rb:62`.
+- `app/services/orders/build_quote.rb:93` independently rejects repeated products.
+- `admission_selections/registration_assembler.rb:26–35` keys registration and gift
+  intents by product ID; `checkout_dispatcher.rb` and `create_checkout.rb` consume
+  those maps. Removing only the duplicate guard would not preserve each recipient.
+
+**Impact:** two recipients cannot each receive the same ticket product in one
+order. The current one-recipient frontend remains supported. Separate orders are
+not equivalent to the documented single-order batch and are not implemented as
+an automatic workaround. Different-product support does not close this gap.
+
+**Backend action:** provide and document support for distinct recipient gift
+lines of the same product through selection, guest proof, quote, order creation
+and replay. The backend engineer owns the line identity/API design. Preserve
+quantity one per gift, recipient association, server totals, inventory and
+idempotent replay. No backend implementation or API choice made by this audit.
+
+Frontend continuation: `.scratch/handoff-wireup-2026-10-26/issues/01-multi-recipient-gift-checkout.md`.
+
+### #73. Consumer achievements have no backend contract
+
+**Status:** open — blocking (achievement detail sheet only).
+**Verified:** 2026-10-24, checked-out backend code and Markdown documentation;
+no live API verification (local backend unavailable).
+
+**Evidence:** no achievement/gamification implementation or plan found in
+`digis_backend/app`, `config/routes.rb`, or the backend Markdown documents.
+`src/features/profile/pages/ProfilePage.tsx` previously defined achievement labels
+and unlocked flags locally (removed in the frontend cleanup on 2026-10-24). `.scratch/web2-ui-import/issues/02-achievement-detail-sheet.md`
+records an exported detail sheet whose progress, perks and earned-date content
+has no server source. The previous #51 gamification note deferred this feature;
+the user requested tracking the missing backend surface on 2026-10-24.
+
+**Impact:** the frontend cannot truthfully show earned status, progress, earned
+dates or rewards, or implement the achievement detail sheet from real data.
+Existing demo values are not a backend contract.
+
+**Backend developer action:** confirm the intended achievement behavior and
+publish the supported read contract and example payloads for the consumer
+profile/detail UI. Specify which status/progress/date/reward information is
+actually supported and its semantics. Earning rules, thresholds, eligibility,
+rewards, models, endpoint paths and payload design belong to the backend
+developer; no frontend proposal for them is approved by this entry.
+
+**Frontend follow-up:** consume the committed contract once available; omit
+unsupported fields and keep the new detail sheet unimplemented meanwhile.
+Do not derive achievements from wallet contents or hardcode earning rules.
+No backend code changes were made for this entry.
+
 
 ### #17. `cbe` is not a valid backend payment method — RESOLVED 2026-10-16
 
@@ -616,50 +889,135 @@ greater than the maximum amount supported by the currency"* — was Chapa's real
 **Status: false positive — withdrawn 2026-10-16 (live sandbox probe). Moved to
 `docs/NOT_BACKEND_GAPS.md`.**
 
-### #65. Seller payout dispatch is rejected by the provider (`invalid_format`) — no payout ever succeeds
+### #65. Seller payout — reclassified as provider verification (2026-10-24)
 
-The seller payout **API** works end-to-end (create → `pending`, list/show), but the
-**dispatch** (`Marketplace::DispatchSellerPayoutJob` → `Marketplace::DispatchSellerPayout`
-→ `Marketplace::PayoutProviders::ChapaAdapter#payout`) always ends in provider
-rejection. The payout reaches a terminal `failed` with `failure_code` from Chapa.
+**Status: superseded — reclassified, not resolved.** The earlier filing inferred
+that Chapa `invalid_format` proved a malformed backend payout payload. The
+backend's committed `docs/operations/frontend-backend-gap-tracker-2026-09-08.md`
+(G-03) records the more precise provider response: **Invalid account number for
+the selected bank**, using a synthetic local test recipient that was not a
+Chapa-published sandbox beneficiary. `ChapaPayoutClient#payout` already sends the
+documented top-level and nested-account fields. No request-shape defect is
+established by that response; changing fields or units by guess is unwarranted.
 
-**Live drill 2026-10-02 (real backend `f679e56`, `CHAPA_ENABLED=true` +
-`CHAPA_PAYOUT_ENABLED=true`, `CHAPA_MODE=test`):** a seller with a verified
-destination (`bank_slug: "test"`, "Test Bank" — the only rail the test provider
-`GET …/payout_accounts/destinations` returns) and a positive balance:
-`POST /marketplace/seller/payouts` → `pending` → (worker) `processing` → **`failed`,
-`failure_code: "invalid_format"`**, `provider_reference: null`. Reproduced twice
-(after correcting the rail from `cbe` → `test`, the code moved `invalid_value` →
-`invalid_format`). **No payout has ever reached `succeeded`.**
-
-**Evidence:**
-- Payload the client sends (`app/services/finance/payout_providers/chapa_payout_client.rb:21-38`):
-  `amount: integer_amount(request.fetch(:amount_minor))` — the **raw minor integer**,
-  unchanged (`:161-165`) — plus a nested `account: { account_number, account_name,
-  bank_slug }`.
-- `failure_code_for` (`:126-134`) passes the provider's `data.reason` / `error.code`
-  through, so `invalid_format` is **Chapa's own error code**.
-- Balance is correctly released on failure (the reservation is dropped).
-
-**Hypothesis (needs backend/provider confirmation):** the payout payload field names
-don't match Chapa's V2 payouts contract, and/or a test-mode capability/funding
-limitation — the existing tracker note (G-26) already says test-mode payout *transfer*
-evidence was still outstanding. (**Not** the “minor-vs-major” family: #60 is withdrawn
-— Chapa V2 is minor-unit on both sides, so the raw `amount_minor` the payout client
-sends is already the right unit; see **#71** for where a ×100 unit bug actually lives.)
-
-**Why it blocks:** the payout feature can create and track a payout but the money can
-never move; the frontend can only render the resulting `failed` state.
-
-**Fix:** align the Chapa V2 payout request with the provider contract (amount unit +
-field names) and obtain a `succeeded` test-mode payout as evidence; add a
-request-shaping test asserting the `/v2/payouts` payload.
-
-**Status: open — filed 2026-10-02 (live drill; provider returns `invalid_format`).**
+Successful end-to-end provider settlement is **still unverified**. Obtaining a
+provider-approved sandbox beneficiary and confirming settlement is provider
+setup/verification, not an established backend code deficiency. The evidence,
+remaining verification and re-entry condition now live in
+`docs/NOT_BACKEND_GAPS.md` #65. Do not equate this reclassification with a payout
+fix or successful transfer. No payout was attempted in the 2026-10-24 audit.
 
 ## Open — degrading
 
+### #38. Ticket-required extras are quoted without admission entitlement — REOPENED 2026-11-02
+
+Public products expose `requires_ticket:true`, and the attendee UI displays
+“Requires a ticket,” but `Orders::BuildQuote` does not check that requirement.
+A live authenticated extras-only quote for a supported digital add-on returned
+success and a quote token (10250 ETB minor total), with no ticket line or event
+ticket in the buyer's wallet. No order, hold, payment or charge was created.
+
+The earlier “informational/feature ask” classification hid an enforcement gap
+behind a served requirement flag. Backend engineer must define/enforce admission
+entitlement consistently at quote/checkout; frontend gating cannot enforce API
+invariants. No backend product changes made. This is distinct from parking #78.
+
+### #80. Ticket activation accepts empty admission coverage — OPEN, 2026-11-02
+
+**Availability reason.** Public discovery returns "unavailable" for incomplete admission coverage without a reason. Expose a machine-readable reason so clients can distinguish setup problems from scheduled sales. Reserve "coming_soon" for confirmed future sales. Until the API distinguishes the cause, discovery shows **Unavailable** with a **View** action.
+
+Also confirmed for non-recurring event `bbbbb`: one scheduled date, GA product
+`01a19c50-0d75-7b28-a0e8-94bd8f2102d1`, `available:false` and zero covered dates.
+This is a general ticket-readiness defect, not a recurring-event-only issue.
+
+Organizer implementation handoff: [O-01 — published tickets have no admission
+coverage](ORGANIZER_GAPS.md#o-01-published-tickets-have-no-admission-coverage).
+
+Bozo (`01a19acd-98b5-724b-996d-092a9f8f6edf`) and Mozooo
+(`01a19ac8-8557-7cbc-a584-a20dc6b7efff`) were created from the organizer UI.
+Authenticated product responses show active public ticket products, a current
+50000-minor ETB price and four per-date inventory pools, but product_accesses:[]
+and public covered_event_date_ids:[]. Public products return available:false;
+public discovery returns ticket_availability:unavailable.
+
+Primary frontend cause: organizer creation omitted access/date-allocation setup.
+Organizer flow changes were reverted at the user's direction: organizer product
+development is outside our scope. Organizer engineers need to wire the existing
+access/allocation contracts before activation and surface setup errors. The
+attendee Check Availability mapping correctly follows the server state and is
+unchanged. A read-only recheck after reversion confirms both offers remain
+unavailable with no covered dates; no operational data repair was performed.
+
+Backend defense remains absent: Catalog::Products::Activate validates stock,
+price, mappings for existing access rows and allocations for existing multi-date
+grants, but permits a credential-bearing ticket with no grants at all. Backend
+publication readiness also checks organization verification, categories, dates,
+media and streaming readiness without checking admission completeness of active
+ticket offers. The observed published/active invalid tickets therefore represent
+a backend guard gap as well as the organizer's omitted setup request. This does
+not imply every published event must sell tickets; readiness rules must respect
+the supported event/offer types.
+
+Backend engineer should own readiness enforcement and its validation/error contract.
+No backend product patch made. Active products cannot have access/allocation rows
+replaced and retirement is permanent, so repairing these existing offers requires
+the intended date coverage and a controlled operational replacement; neither
+product has sold or held inventory at diagnosis time.
+
 Work but suboptimal; the frontend mitigates. Fixing these improves correctness.
+
+### #79. Public event projections cannot identify online/hybrid attendance
+
+**Verified 2026-11-02:** backend `Events::EventStream` and ticket stream-session
+routes exist, but `Events::Public::EventDateSerializer` only exposes date/venue/
+series fields and public event serializers expose no attendance-format signal.
+A missing physical venue does not prove an event is online. The frontend cannot
+honestly label an online/hybrid event from the public catalog or display the
+appropriate attendance context. Frontend watch/session consumption is also not
+implemented and remains frontend follow-up, separate from this projection gap.
+
+Backend engineer owns a safe public attendance description/signal. This does
+not request public playback credentials. No stream/payment outcomes or invented
+format flags were seeded to simulate a working consumer experience.
+
+**Status: open — degrading.** Parking #78, multi-day discovery #77 and this gap
+are explicit limits of the public showcase, rather than missing seed rows.
+
+### #78. Public products endpoint crashes on a parking product
+
+**Verified 2026-11-01:** a valid model-level parking fixture in
+`addis-tech-forum` caused `GET /public/events/addis-tech-forum/products` to return
+500 `undefined method 'date_selection' for nil`, at
+`Catalog::Public::OfferAvailability#candidate_date_sets:54`.
+`EventProduct::CREDENTIAL_PRODUCT_TYPES` includes parking, while ticket-type
+presence validation permits ticket types only for ticket products. The public
+availability evaluator assumes every credential-bearing product has a ticket type.
+
+The generic add-on fulfillment service explicitly rejects parking pending its
+own workflow. The unsupported local showcase parking example was replaced with
+a supported digital add-on; no product-code patch, dummy ticket type or forced
+availability was added. Public seed verification now exercises real products HTTP
+responses and checks supported add-on fulfillment types.
+
+Backend engineer owns the projection/workflow handling for parking; published
+products should not crash the whole event product list. **Status: open — degrading.**
+
+### #77. Discovery cannot identify multi-day events from the list projection
+
+**Verified 2026-11-01** against current local backend `5c2890c7` / remote `c15d6ff3`.
+`GET /public/events` serves `next_event_date` plus `is_recurring`, but no complete
+date set or authoritative multi-day indicator. `addis-sound-festival-2026` and
+`camping-to-coast` each have three dates on detail/products, while their list
+projection maps to one frontend date. `EventCard.cardFormat` therefore cannot
+show MULTI-DAY without inventing information. Recurring badges work from the
+explicit `is_recurring` flag; detail day/pass selection works from served dates.
+
+Backend engineer should define/expose an authoritative list-level schedule-format
+signal. Frontend will consume that contract; no new backend field was added and
+no per-card schedule fan-out or title-based inference was introduced.
+
+**Status: open — degrading.** Seeded multi-day content exists; this is discovery
+projection/discoverability, not missing fixture data.
 
 ### #66. Seller listing wire omits `ticket_id` — the wallet can't tell which tickets are already listed — RESOLVED 2026-10-05
 
@@ -908,16 +1266,18 @@ attributes :id, :slug, :title, :description, :visibility,
 # no :event_lifecycle, no :ticket_availability
 ```
 
-**Why it matters:** the frontend's ended-event gate (`eventEnded`, a #34
-mitigation) previously inspected the full `event_dates` array. The same release
-replaced the detail's `event_dates` with `event_dates_preview` — **upcoming
-sessions only** (`Events::Public::DatesQuery`, `starts_at >= now`) — so a fully
-past event's detail now has an **empty** preview and `eventEnded` returns `false`.
-`Events::Event.publicly_visible` (`where(status: "published", visibility: "public")`)
-does **not** exclude ended events, and **4 ended events are live** on `:3000`
-(list probe: `upcoming 29 / ended 4`, e.g. `origins`, whose detail returns
-`event_dates_preview: []`). On those detail pages the buy entry is no longer
-disabled and no "Ended" state renders — the exact failure #34 fixed for the list.
+**Why it matters (corrected 2026-10-24):** the authoritative detail projection
+is still absent, but the frontend already mitigates it. `EventDetailPage.tsx:100-138`
+probes the full schedule from the epoch when the preview is empty and derives
+ended state. The old claim that every ended detail can no longer gate purchase
+is therefore stale. The adapter already supports both eventual server fields.
+
+The preview predicate is `ends_at > at`
+(`app/services/events/public/dates_query.rb:24-26`), covering ongoing as well as
+upcoming dates; `starts_at >= from` belongs to the separate schedule endpoint.
+The client probe is an extra request/heuristic rather than the missing
+server-evaluated lifecycle/availability contract. No new detail projection has
+landed in the fetched backend; retain the mitigation meanwhile.
 
 **Fix:** add `:event_lifecycle` (and `:ticket_availability`, for consistency with
 the list) to `EventDetailSerializer`, sourced from the same
@@ -1194,34 +1554,29 @@ remains is the event-date gate. Optionally auto-mark dates `completed` when
 `CreateCheckout` (`Orders::EventDateEligibility`); the product sales window is
 enforced online. Original filing 2026-09-09 (re-verified partial 2026-09-21).
 
-### #44. Event-level `event_setting.config` type/access keys are inert and unwritable
+### #44. Public `public_guest_limit` remains exposed but inert (narrowed 2026-10-24)
 
-`event_type`, `access_mode`, `invite_only_paid`, `rsvp_going`, `rsvp_capacity`,
-`allows_plus_one`, `max_guests`, `rsvp_requirements` are **never read by any
-application code** — the only real gates are
-`ticketing_ticket_types.audience` / `waitlist_enabled` / `approval_mode` and
-whether a product has a zero-amount price. There is **no API to read or write**
-`event_setting.config` (`Events::Create` writes `{}`; no EventSetting controller),
-and the two keys the public serializer *does* expose (`allow_waitlist`,
-`public_guest_limit`) are themselves not enforced.
+**Status: open — degrading.** `Events::Public::EventSettingSerializer` exposes
+`public_guest_limit` (`app/serializers/events/public/event_setting_serializer.rb:8`),
+but there is no application reader or enforcing rule for that value. Backend
+ownership is needed to define and enforce its intended semantics or remove it
+from the public contract. The frontend must not invent a guest-limit rule.
 
-**Why it degrades:** the consumer frontend cannot distinguish `rsvp` /
-`inviteOnly` / `ticketed`, nor show going/capacity/plus-one — the event-level
-config is decorative. (The seed-side note that used to sit here — the keys were
-only ever written by the dev seeds — is a **setup** matter; see
-`NOT_BACKEND_GAPS.md`.)
+The original event-level `event_type` / `access_mode` / `rsvp_*` / plus-one ask is
+superseded by the implemented **offer-scoped** `audience`, `approval_mode`,
+`waitlist_enabled` and served product prices. Seeds have stopped writing the dead
+vocabulary. Public serializer tests expressly exclude `event_type` and
+`allow_waitlist`. Restoring these old modes would be a new backend/product
+choice, not a missing frontend integration.
 
-**Not frontend-fixable (corrected 2026-10-02):** the frontend *already* ignores
-this dead config — `backendEventToEvent` (`src/lib/events-adapter.ts:85-148`) maps
-no config keys, and `eventActionLabel()` is a constant (`src/lib/eventAction.ts`);
-admission is sourced per-offer from `GET /public/events/:slug/products`. So there
-is no frontend fix to make. Only the backend can resolve it: wire the keys
-(read + enforce + make organizer-writable) or delete them.
+The old assertion that no config can be written is also stale: age restriction
+writes are supported by `app/controllers/events/events_controller.rb:147-170`
+and `app/services/events/create.rb:25-27`; that portion is already frontend-wired
+under #53. It does not revive obsolete admission keys.
 
-**Fix:** decide whether the event-level type/access model is real. If yes, compute
-and expose it (extend `PUBLIC_CONFIG_KEYS`, read it in the RSVP/invite gates) and
-make it organizer-writable. If no, drop the inert keys so they stop implying a
-contract.
+**Frontend:** existing offer-driven admission wiring remains correct. No new
+surface to wire. Historical superseded portion → `docs/NOT_BACKEND_GAPS.md` #44.
+Verification: source/tests/schema read on 2026-10-24; no live API claim.
 
 ### #45. RSVP has no sold-out signal or waitlist fallback; `rsvp_capacity` ignored — RESOLVED 2026-09-30
 
@@ -1277,9 +1632,12 @@ full gift flow exists:
   `POST /public/gift_purchases/:id/claim` (bearer token in the body; every
   response private/non-cacheable).
 
-The frontend is wired: `src/lib/gifts.ts`, `GiftTicketDialog.tsx`,
-`GiftTicketOptions.ts` and `ClaimGiftPage.tsx` consume those endpoints (the old
-fabricated `#gift/<id>` link is gone). The original text is kept below as history.
+**Frontend correction 2026-10-26:** the core single-recipient flow now consumes
+these endpoints: documented fragment links, scoped questions and consents, claimed
+active-ticket QR, payment confirmation, and purchaser delivery tracking/resend.
+Eleven browser/API tests cover it. Multi-recipient batch checkout remains frontend
+work in `.scratch/handoff-wireup-2026-10-26/issues/01-multi-recipient-gift-checkout.md`;
+this resolved backend gap does not mean the entire gifting document is complete.
 
 **Status: resolved 2026-10-16** — gift purchase + claim flow served (`e5e3dc8d`,
 2026-10-07); frontend wired. Original filing 2026-09-30.
@@ -1320,6 +1678,11 @@ server-side.
 index; events-by-followable endpoints.
 
 ### #50. Wallet & history gaps — RESOLVED 2026-10-16 (registration answers + edit window)
+
+**Frontend follow-up 2026-10-26:** served answer metadata is mapped, but wallet
+answer viewing/revision UI remains frontend work (handoff issue 02). The backend
+resolution does not establish that this UI is implemented.
+
 
 `TicketWalletSerializer` omits the ticket's **registration answers and edit
 window**, so `EditTicketAnswersDialog` can never open for a live ticket (the
@@ -1735,3 +2098,16 @@ Recorded for knowledge; most are now consumed (see the relevant gap/archive row)
 
 - `GET /feed` (`core/feed#index`) — follows-based social feed. Discovery is the browse surface.
 - `GET /categories`, `/venues`, `/artists` (+ `:id`) — public read endpoints backing the follow system.
+
+### Guest waitlist enrollment should accept a phone number without SMS verification
+
+The public offer waitlist currently requires guests to request and verify an SMS code before joining. Allow guests to submit their phone number and join without an OTP or verification token. Keep existing offer eligibility and any invitation or event access-code requirements. Once the endpoint accepts the phone-only request, the attendee app can remove the OTP step from guest waitlist enrollment.
+
+### Discovery cannot distinguish RSVP offers from other free admission
+
+The public event list exposes a starting price, but it does not identify which events have an RSVP admission offer. A zero starting price alone is insufficient for a dedicated RSVP filter. Expose a filter or list signal based on the current offer-driven admission model so discovery can match RSVP events without fetching every event's offers.
+
+
+### #81. Guest RSVP requires SMS verification — OPEN, 2026-11-04
+
+The admission checkout dispatcher rejects a signed-out guest's zero-total submission with `phone_verification_required` unless the guest has verified by SMS. A standard public RSVP should accept the guest's contact details and required answers without an SMS challenge. Confirm the policy for other zero-total flows separately, including discounted purchases. Keep ticket claiming and restricted-offer access checks separate. Once the admission endpoint accepts a standard public RSVP without proof, the attendee flow can complete without opening the OTP fallback.

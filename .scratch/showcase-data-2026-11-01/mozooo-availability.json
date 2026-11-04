@@ -1,0 +1,142 @@
+{
+  "slug": "mozooo",
+  "event": {
+    "id": "01a19ac8-8557-7cbc-a584-a20dc6b7efff",
+    "slug": "mozooo",
+    "title": "Mozooo",
+    "description": null,
+    "visibility": "public",
+    "timezone": "Africa/Addis_Ababa",
+    "currency": "ETB",
+    "published_at": "2026-11-02T05:43:19.352Z",
+    "created_at": "2026-11-02T05:43:15.031Z",
+    "is_recurring": false,
+    "event_dates_preview": [
+      {
+        "id": "01a19ac8-8a39-7ed5-b9b2-71d7a47bd392",
+        "name": "Main Event",
+        "doors_at": null,
+        "starts_at": "2026-11-03T13:00:00Z",
+        "ends_at": "2026-11-11T17:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19894-482a-718a-b517-bf425955a75c",
+          "name": "WeVenture Hub",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      },
+      {
+        "id": "01a19ac8-8c10-76e1-95bc-088a090cf7ea",
+        "name": "Session 2",
+        "doors_at": null,
+        "starts_at": "2026-11-09T16:00:00Z",
+        "ends_at": "2026-11-09T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19894-482a-718a-b517-bf425955a75c",
+          "name": "WeVenture Hub",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      },
+      {
+        "id": "01a19ac8-8cf5-7ffb-ac1e-977705532e4a",
+        "name": "Session 3",
+        "doors_at": null,
+        "starts_at": "2026-11-16T16:00:00Z",
+        "ends_at": "2026-11-16T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19894-482a-718a-b517-bf425955a75c",
+          "name": "WeVenture Hub",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      },
+      {
+        "id": "01a19ac8-8d8e-7044-9b19-8b92808d1d9e",
+        "name": "Session 4",
+        "doors_at": null,
+        "starts_at": "2026-11-23T16:00:00Z",
+        "ends_at": "2026-11-23T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19894-482a-718a-b517-bf425955a75c",
+          "name": "WeVenture Hub",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      }
+    ],
+    "event_dates_url": "/public/events/mozooo/dates",
+    "categories": [
+      {
+        "id": "01a19893-db89-7cce-90ae-271de069b52c",
+        "name": "Food & Drink",
+        "description": "Food festivals, tastings, and culinary events",
+        "slug": "food-drink"
+      }
+    ],
+    "event_media": [
+      {
+        "id": "01a19ac8-885f-70da-949f-633ef2e895d0",
+        "type": "cover",
+        "position": 0,
+        "alt_text": "Mozooo",
+        "caption": "",
+        "file": {
+          "thumbnail": "http://localhost:3000/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6ImMyODI3MzA4LTdkMTAtNGY4Ny04NjE3LTUwZTNlNGI1YjRkZCIsInB1ciI6ImJsb2JfaWQifX0=--0f258f0a1c7409b0e91b4ee85a44c7502d5474bd/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJwbmciLCJyZXNpemVfdG9fbGltaXQiOlsyMDAsMjAwXX0sInB1ciI6InZhcmlhdGlvbiJ9fQ==--271461a99c32fa18a3d46cceada0a4379660ca1c/vlcsnap-2026-08-31-21h38m23s094.png",
+          "medium": "http://localhost:3000/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6ImMyODI3MzA4LTdkMTAtNGY4Ny04NjE3LTUwZTNlNGI1YjRkZCIsInB1ciI6ImJsb2JfaWQifX0=--0f258f0a1c7409b0e91b4ee85a44c7502d5474bd/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJwbmciLCJyZXNpemVfdG9fbGltaXQiOls4MDAsODAwXX0sInB1ciI6InZhcmlhdGlvbiJ9fQ==--86e4fa361b1ae7d17aa9abe0564c30e7b2b990aa/vlcsnap-2026-08-31-21h38m23s094.png"
+        }
+      }
+    ],
+    "event_organizations": [],
+    "event_participants": [],
+    "event_setting": {
+      "id": "01a19ac8-8564-7d61-b132-482268c543e4",
+      "config": {}
+    },
+    "organization": {
+      "id": "01a19893-e2e1-74e7-8e5e-3497a9c3d16c",
+      "name": "Addis Music Fest",
+      "slug": "addis-music-fest"
+    }
+  },
+  "products": [
+    {
+      "id": "01a19ac8-8f91-7298-acf2-f6a0d65577f1",
+      "event_id": "01a19ac8-8557-7cbc-a584-a20dc6b7efff",
+      "name": "General Admission",
+      "description": null,
+      "type": "ticket",
+      "allow_custom_price": false,
+      "sales_start_at": null,
+      "sales_end_at": null,
+      "min_per_order": 1,
+      "max_per_order": 10,
+      "schedule_change_refund_policy": "full_or_partial",
+      "sort_order": 1,
+      "price_options": [
+        {
+          "currency": "ETB",
+          "amount_minor": 50000,
+          "active_from": "2026-11-02T05:43:17.286Z",
+          "active_to": null
+        }
+      ],
+      "available": false,
+      "covered_event_date_ids": [],
+      "requires_ticket": false,
+      "ticket_type": {
+        "id": "01a19ac8-8f97-7995-b8b7-c515424bf3af",
+        "event_product_id": "01a19ac8-8f91-7298-acf2-f6a0d65577f1",
+        "approval_mode": "automatic",
+        "audience": "public",
+        "date_selection": "fixed",
+        "admissions_per_unit": 1,
+        "waitlist_enabled": false
+      }
+    }
+  ]
+}

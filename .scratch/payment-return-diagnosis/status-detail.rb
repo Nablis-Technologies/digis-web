@@ -1,0 +1,3 @@
+event = Events::Event.find_by!(slug: "thursday-jazz-sessions")
+payment = Orders::Payment.joins(:order).where(orders_orders: {event_id: event.id}).order(created_at: :desc).first
+puts JSON.generate(payment: payment&.slice("id", "status", "failure_code", "raw_status", "accepted_at", "succeeded_at", "updated_at"), events: payment&.payment_events&.order(received_at: :desc)&.limit(5)&.map {|e| e.slice("event_type", "status", "received_at", "processed_at", "attempts_count")}, queue_adapter: Rails.application.config.active_job.queue_adapter)
