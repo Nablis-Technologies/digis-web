@@ -1,3 +1,4 @@
+import { apiPath } from './support/api';
 import { test, expect, type Page } from '@playwright/test';
 
 /**
@@ -20,10 +21,10 @@ function trackDiscovery(page: Page): DiscoveryTrace {
   let lastTotal: number | undefined;
   page.on('request', (r) => {
     const u = r.url();
-    if (u.includes(':3000/public/events')) listUrls.push(u);
+    if (apiPath(u) === '/public/events') listUrls.push(u);
   });
   page.on('response', async (r) => {
-    if (!r.url().includes(':3000/public/events')) return;
+    if (apiPath(r.url()) !== '/public/events') return;
     try {
       const body = await r.json();
       if (typeof body?.pagination?.total_count === 'number') {
@@ -57,12 +58,19 @@ test('selecting a category narrows the grid through the server', async ({ page }
   const sportsPill = page.getByRole('button', { name: 'Sports', exact: true });
   await expect(sportsPill).toBeVisible({ timeout: 15_000 });
   trace.listUrls.length = 0;
+  const filteredResponse = page.waitForResponse(response => apiPath(response.url()) === '/public/events' && new URL(response.url()).searchParams.get('category') === 'sports');
   await sportsPill.click();
 
   // The server owns the filter: a `category=<slug>` request goes out…
   await expect.poll(() => trace.listUrls.some((u) => /[?&]category=/.test(u))).toBe(true);
   // …and the server's result set narrows (fewer than the unfiltered catalogue).
-  await expect.poll(() => trace.lastTotal ?? before).toBeLessThan(before);
+  const response = await filteredResponse;
+  expect(response.ok()).toBe(true);
+  const body = await response.json();
+  expect(body.pagination.total_count).toBeLessThan(before);
+  expect(body.data.length).toBeGreaterThan(0);
+  for (const event of body.data) expect(event.categories.some((category: { name: string }) => category.name === 'Sports')).toBe(true);
+  await expect(page.getByRole('heading', { name: body.data[0].title, exact: true }).first()).toBeVisible();
 });
 
 test('the free price filter narrows through the server', async ({ page }) => {

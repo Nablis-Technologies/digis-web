@@ -12,13 +12,13 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
  *
  * Events (probed 2026-10-01):
  *   psy-addis-saltland → code_or_invitation   (works with a code OR a token)
- *   origins-2          → invitation           (token only; a code must fail)
+ *   origins-invitation → invitation           (token only; a code must fail)
  */
 
 const API = 'http://localhost:3000';
 const ORGANIZER = { identifier: '+251911000002', password: 'password123' };
 const CODE_OR_INVITE = 'psy-addis-saltland';
-const INVITE_ONLY = 'origins-2';
+const INVITE_ONLY = 'origins-invitation';
 
 interface Target { eventId: string; productId: string; ticketTypeId: string; audience: string }
 

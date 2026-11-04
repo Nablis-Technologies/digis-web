@@ -2,11 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 
 const BUYER = '+251900123456';
 const PASS = 'password123';
-// Seed-drift note (2026-10-02): there are TWO avenida events now. The first
-// (`avenida-desperados-pregame-edition`) is a past event selling only `Early
-// Bird`; the sellable one is the deduped `-2` with tier `Final Wave`. Verified
-// against GET /public/events + products before running; update if the seed changes.
-const EVENT_SLUG = 'avenida-desperados-pregame-edition-2';
+// The deterministic catalog seeds a single future
+// `avenida-desperados-pregame-edition` selling `Final Wave`; the old deduped
+// `-2` slug no longer exists.
+const EVENT_SLUG = 'avenida-desperados-pregame-edition';
 const TIER = 'Final Wave';
 
 async function login(page: Page) {

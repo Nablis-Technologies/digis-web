@@ -10,12 +10,12 @@ import { test, expect, type Page } from '@playwright/test';
  * box exists: acceptConsentIfPresent ticks it when one renders and moves
  * on when the event has no terms.
  *
- * With Chapa test keys the attempt returns a hosted checkout_url and the
- * browser navigates to chapa.co — the pass condition. Without keys the typed
- * "payments not configured" error shows. Either outcome proves the chain.
+ * Hosted initialization must succeed. Errors and conflicts fail this check.
+ * Full payment and ticket issuance are required by test:acceptance.
  *
- * Single worker: registrations are one-per-identity per ticket type, so a
- * parallel run would 409 on itself.
+ * Stateful: it buys a real registration and the backend allows one active
+ * registration per identity + ticket type. Re-run the seed before a repeat
+ * run, or a leftover registration surfaces `active_registration_conflict`.
  */
 
 const BUYER_IDENTIFIER = '+251900123456'; // seeded verified attendee (chapa.test@gmail.com)
@@ -58,76 +58,32 @@ async function acceptConsentIfPresent(page: Page) {
   }
 }
 
-test('full purchase chain reaches payment (Chapa hosted checkout or typed error)', async ({ page }) => {
+test('live purchase initializes a hosted payment', async ({ page }) => {
   test.setTimeout(90_000);
-
-  // Network witness: log every registration/quote/order/payment call so a
-  // failure pinpoints the exact step without backend log access.
-  const calls: string[] = [];
-  page.on('request', (req) => {
-    if (/registrations|order_quotes|orders\/|payment_attempts/.test(req.url()) && req.method() === 'POST') {
-      calls.push(`${req.method()} ${req.url()} :: ${req.postData()?.slice(0, 220) ?? ''}`);
-    }
-  });
-
   await loginThroughUi(page);
   await openCheckoutForTier(page, 'Regular');
-
-  // Logged-in buyers skip the Details step entirely.
-  await expect(page.getByText('Details', { exact: true })).toHaveCount(0);
-
-  // Terms consent is its own box on the review step, below the order summary.
   await acceptConsentIfPresent(page);
-
-  // Review → (extras) → payment. Extras exist only if the backend serves them.
   await page.getByRole('button', { name: /Continue/i }).click();
   const payNow = page.getByRole('button', { name: /^Pay .*/ });
-  if (await payNow.count() === 0) {
-    await page.getByRole('button', { name: /Continue/i }).click();
-  }
-  await expect(payNow).toBeEnabled({ timeout: 10_000 });
+  if (await payNow.count() === 0) await page.getByRole('button', { name: /Continue/i }).click();
+  await expect(payNow).toBeEnabled();
+  // Subscribe before the click: a fast popup/response must not be missed.
+  const initialized = page.waitForResponse(response => response.request().method() === 'POST' && /\/payment_attempts$/.test(new URL(response.url()).pathname));
+  const hosted = page.waitForEvent('popup');
   await payNow.click();
-
-  // Chapa V2 doesn't redirect back, so the hosted checkout opens in a NEW tab
-  // ("popup") and the app tab stays open to confirm. Either a popup OR a
-  // same-tab redirect proves the chain reached payment.
-  const popup = await page.waitForEvent('popup', { timeout: 30_000 }).catch(() => null);
-  if (popup) {
-    await popup.waitForURL(/chapa\.(co|global)/i, { timeout: 30_000 }).catch(() => {});
-    expect(popup.url()).toMatch(/chapa\.(co|global)/i);
-    return;
-  }
-  const redirected = await page
-    .waitForURL(/chapa\.(co|global)/i, { timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-
-  if (redirected) {
-    expect(page.url()).toMatch(/chapa\.(co|global)/i);
-    return;
-  }
-  // No redirect → either a typed error, or the conflict choice sheet (the
-  // seeded buyer holds fulfilled-but-still-active GA registrations — backend
-  // gaps #21/#22 — so a fresh context re-buy lands on the sheet, which must
-  // offer View Tickets, never a dead end).
-  const sheet = page.getByText(/you have an unfinished checkout/i).first();
-  if (await sheet.isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: /view tickets/i }).click();
-    await expect(page).toHaveURL(/tickets/, { timeout: 10_000 });
-    return;
-  }
-  // No redirect and no sheet → the attempt must have surfaced a typed error,
-  // OR the browser raced ahead of waitForURL: either way a live Chapa payment
-  // row is the source of truth, so check the orders state via the UI's
-  // last captured call instead of guessing.
-  console.log('CAPTURED CALLS:\n' + calls.join('\n'));
-  await expect(
-    page.getByText(/payment could not be started|not configured|unavailable|registration/i).first(),
-  ).toBeVisible({ timeout: 10_000 });
+  const response = await initialized;
+  expect(response.ok(), 'Payment initialization must succeed; an error or conflict is not a purchase').toBe(true);
+  const popup = await hosted;
+  await popup.waitForURL(/^https:\/\/checkout\.chapa\.(co|global)\//);
+  await popup.close();
 });
 
-test('guest is asked to log in before payment', async ({ page }) => {
+test('guest checkout blocks invalid contact details before payment', async ({ page }) => {
   test.setTimeout(60_000);
+  const paymentRequests: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes('/payment_attempts')) paymentRequests.push(request.url());
+  });
   await openCheckoutForTier(page, 'Regular');
 
   // Terms consent is its own box on the review step, below the order summary.
@@ -137,7 +93,7 @@ test('guest is asked to log in before payment', async ({ page }) => {
   // Details form. Keep clicking Continue; the Pay button appears at the end.
   for (let i = 0; i < 5; i++) {
     const payNow = page.getByRole('button', { name: /^Pay .*/ });
-    if (await payNow.count() > 0) break;
+    expect(await payNow.count(), 'Invalid guest details must not reach payment').toBe(0);
     // Details step: fill it once, it validates and blocks otherwise.
     // Fields are placeholder-addressed (AppInput): "Abebe" (name),
     // "you@example.com" (email), "+251 9 XX XXX XXX" (phone).
@@ -147,16 +103,16 @@ test('guest is asked to log in before payment', async ({ page }) => {
       const emailField = page.getByPlaceholder('you@example.com');
       if (await emailField.isVisible().catch(() => false)) await emailField.fill('guest@example.com');
       const phoneField = page.getByPlaceholder('+251 9 XX XXX XXX');
-      if (await phoneField.isVisible().catch(() => false)) await phoneField.fill('+251911000002');
+      if (await phoneField.isVisible().catch(() => false)) await phoneField.fill('123');
+      await page.getByRole('button', { name: /Continue/i }).click();
+      await expect(page.getByText('Enter a valid Ethiopian phone', { exact: true })).toBeVisible();
+      await expect(nameField).toBeVisible();
+      expect(paymentRequests).toHaveLength(0);
+      return;
     }
     await page.getByRole('button', { name: /Continue/i }).click();
     await page.waitForTimeout(400);
   }
 
-  await page.getByRole('button', { name: /^Pay .*/ }).click();
-  // The guest is stopped before payment: the hook's pre-check ("Log in with
-  // your phone number...") or the backend 401 ("Please log in to continue.").
-  await expect(
-    page.getByText(/log in/i).first(),
-  ).toBeVisible({ timeout: 15_000 });
+  throw new Error('Guest details form did not appear; validation was not exercised');
 });
