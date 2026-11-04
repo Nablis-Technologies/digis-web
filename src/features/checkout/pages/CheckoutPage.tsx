@@ -193,7 +193,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
     conflict, conflictRecovery, closeConflictSheet, resumeActiveCheckout,
     guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp,
     eventDates: flowDates, selectedEventDateId, setSelectedEventDateId,
-    isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId,
+    isGift, setIsGift, additionalRecipients, additionalGiftErrors, addGiftRecipient, updateGiftRecipient, removeGiftRecipient, giftRecipientPhone, setGiftRecipientPhone, giftRecipientEmail, setGiftRecipientEmail, giftNote, setGiftNote, giftErrors, giftPurchases, orderId,
   } = flow;
 
   // Post-Chapa confirmation lives in the router (AppContent): the return URL
@@ -249,7 +249,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
               </div>
             </div>
             <AppButton whileHover={{ scale: canContinue && !quoteLoading ? 1.01 : 1 }} whileTap={{ scale: canContinue && !quoteLoading ? 0.98 : 1 }} onClick={goNext} disabled={!canContinue || quoteLoading || (step === 'payment' && !isLiveTicket && !!eventId)} className="w-full py-4 rounded-2xl flex items-center justify-center gap-2.5 relative overflow-hidden" style={{ ...primaryButtonSurface(canContinue && !quoteLoading, isDark), boxShadow: 'none', fontFamily: "'Inter', sans-serif", fontSize: '14px', letterSpacing: '0.5px', fontWeight: 500 }}>
-              {step === 'payment' ? `Pay ${Money.fromMinor(total, "ETB").format()}` : 'Continue'}<ArrowRight className="w-4 h-4" strokeWidth={2} />
+              {step === 'payment' ? flow.isFreeRsvp ? 'Confirm RSVP' : `Pay ${Money.fromMinor(total, "ETB").format()}` : 'Continue'}<ArrowRight className="w-4 h-4" strokeWidth={2} />
             </AppButton>
           </div>
         ) : step === 'success' ? (
@@ -306,12 +306,20 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
                 hasSeats={hasSeats}
                 selectedSeats={selectedSeats}
                 isGift={isGift}
-                setIsGift={setIsGift}
+                setIsGift={basePrice > 0 ? setIsGift : undefined}
                 giftRecipientPhone={giftRecipientPhone}
+              giftRecipientCount={additionalRecipients.length + 1}
                 setGiftRecipientPhone={setGiftRecipientPhone}
+                giftRecipientEmail={giftRecipientEmail}
+                setGiftRecipientEmail={setGiftRecipientEmail}
                 giftNote={giftNote}
                 setGiftNote={setGiftNote}
                 giftErrors={giftErrors}
+                additionalRecipients={additionalRecipients}
+                additionalGiftErrors={additionalGiftErrors}
+                addGiftRecipient={addGiftRecipient}
+                updateGiftRecipient={updateGiftRecipient}
+                removeGiftRecipient={removeGiftRecipient}
               />
               {/* Terms consent — its own box, separate from the ticket review card. */}
               {(consents.length > 0 || consentsLoading || consentsError) && (
@@ -322,8 +330,11 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
         )}
         {step === 'extras' && <StepFrame key="extras"><ExtrasStep products={flowProducts} selected={selectedAddOns} onChange={setSelectedAddOns} includedProductIds={flowIncluded} isDark={isDark} /></StepFrame>}
         {step === 'details' && <StepFrame key="details"><DetailsStep name={contactDetails.name} setName={(name: string) => setContactDetails((prev) => ({ ...prev, name }))} email={contactDetails.email} setEmail={(email: string) => setContactDetails((prev) => ({ ...prev, email }))} phone={contactDetails.phone} setPhone={(phone: string) => setContactDetails((prev) => ({ ...prev, phone }))} contactMethod={contactDetails.contactMethod} setContactMethod={(contactMethod: 'email' | 'phone') => setContactDetails((prev) => ({ ...prev, contactMethod }))} errors={errors} setErrors={setErrors} isDark={isDark} /></StepFrame>}
-        {step === 'questions' && <StepFrame key="questions"><QuestionsStep questions={questions} answers={answers} setAnswers={setAnswers} questionErrors={questionErrors} setQuestionErrors={setQuestionErrors} isDark={isDark} /></StepFrame>}
-        {step === 'payment' && <StepFrame key="payment"><PaymentStep method={payMethod} setMethod={setPayMethod} cardNumber={cardNumber} setCardNumber={setCardNumber} cardExpiry={cardExpiry} setCardExpiry={setCardExpiry} cardCvc={cardCvc} setCardCvc={setCardCvc} subtotal={subtotal} discountTotal={discountTotal} promoCode={promoCode} serviceFee={serviceFee} total={total} isDark={isDark} promoApplied={promoApplied} promoCodeInput={promoCodeInput} setPromoCodeInput={setPromoCodeInput} promoExpanded={promoExpanded} setPromoExpanded={setPromoExpanded} promoError={promoError} setPromoError={setPromoError} promoLoading={promoLoading} validatePromo={validatePromo} removePromo={removePromo} discountAmount={discountAmount} /></StepFrame>}
+        {step === 'questions' && <StepFrame key="questions"><QuestionsStep questions={questions} answers={answers} setAnswers={setAnswers} questionErrors={questionErrors} setQuestionErrors={setQuestionErrors} isDark={isDark} loading={flow.schemaLoading} loadError={flow.schemaError} onRetry={flow.reloadSchema} /></StepFrame>}
+        {step === 'payment' && flow.isFreeRsvp && (
+          <StepFrame key="rsvp"><p className="py-4 text-sm text-muted-foreground">Your RSVP is free.</p></StepFrame>
+        )}
+        {step === 'payment' && !flow.isFreeRsvp && <StepFrame key="payment"><PaymentStep method={payMethod} setMethod={setPayMethod} cardNumber={cardNumber} setCardNumber={setCardNumber} cardExpiry={cardExpiry} setCardExpiry={setCardExpiry} cardCvc={cardCvc} setCardCvc={setCardCvc} subtotal={subtotal} discountTotal={discountTotal} promoCode={promoCode} serviceFee={serviceFee} total={total} isDark={isDark} promoApplied={promoApplied} promoCodeInput={promoCodeInput} setPromoCodeInput={setPromoCodeInput} promoExpanded={promoExpanded} setPromoExpanded={setPromoExpanded} promoError={promoError} setPromoError={setPromoError} promoLoading={promoLoading} validatePromo={validatePromo} removePromo={removePromo} discountAmount={discountAmount} /></StepFrame>}
         {step === 'otp' && guestOtp && (
           <StepFrame key="otp">
             <PhoneOtpStep
@@ -362,6 +373,7 @@ function CheckoutFlow({ event, eventSlug, ticketType, ticketLevel, ticketProduct
               isDark={isDark}
               isGift={isGift}
               giftRecipientPhone={giftRecipientPhone}
+              giftRecipientCount={additionalRecipients.length + 1}
               giftPurchases={giftPurchases}
               orderId={orderId}
             />

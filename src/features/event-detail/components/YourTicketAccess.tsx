@@ -31,7 +31,7 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
   onNavigate?: (view: string) => void;
 }) {
   const { isDark } = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [openTicket, setOpenTicket] = useState<UserTicket | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
@@ -40,9 +40,10 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
   // Shares the router's auth-aware wallet query (keyed on auth state, disabled
   // while signed out — a signed-out fetch would 401 on every event page).
   const { data: tickets = [], isPending, isError, refetch } = useQuery({
-    queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
+    queryKey: ticketKeys.forUser(user?.id),
     queryFn: ticketsService.fetchUserTickets,
     enabled: isAuthenticated,
+    gcTime: 0,
   });
   const showLoading = useShowSkeleton(isPending && isAuthenticated);
 

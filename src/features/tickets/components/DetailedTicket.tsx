@@ -130,6 +130,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
   // A non-active ticket (refunded/void/suspended) is not usable: show a banner
   // and hide the QR + every action.
   const { inactive, label: statusLabel } = ticketStatusMeta(ticket.status);
+  const canScan = ticket.status === 'active' && !!ticket.qrCode?.trim();
 
   // Countdown
   const countdown = (() => {
@@ -290,7 +291,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         )}
 
         {/* QR — always light so it stays scannable */}
-        {!inactive && (
+        {canScan && (
         <div className="relative px-5 sm:px-7 pt-5">
           <AppButton
             whileTap={{ scale: 0.99 }}
@@ -321,6 +322,11 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
 
         {/* Divider between the QR and the trip details */}
         <div className="relative mx-5 sm:mx-7 mt-5 h-px" style={{ background: t.panelBorder }} />
+
+        {!canScan && !inactive && <div className="px-5 sm:px-7 pt-5" role="status">
+          <p className="text-sm font-medium">Entry code unavailable</p>
+          <p className="text-sm mt-1" style={{ color: t.textSoft }}>This ticket is not ready to scan. Refresh Tickets to check its latest status.</p>
+        </div>}
 
         {/* Details — bare rows */}
         <div className="relative px-5 sm:px-7 pt-4 space-y-3.5">
@@ -409,6 +415,11 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         ) : null}
 
         {/* Responses — collapsed by default */}
+        {onEditAnswers && <section className="px-5 sm:px-7 mt-4">
+          <AppButton onClick={onEditAnswers} className="w-full min-h-11 flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm cursor-pointer" style={glassControl(isDark)}>
+            <span className="inline-flex items-center gap-2"><FilePenLine className="size-4" />View registration answers</span><ChevronRight className="size-4" />
+          </AppButton>
+        </section>}
         {ticket.customQuestions?.length ? (
           <section className="relative mx-5 sm:mx-7 mt-4 rounded-2xl overflow-hidden"
             style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
@@ -456,7 +467,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         ) : null}
 
         {/* Primary action: Download (hidden for a non-active ticket) */}
-        {!inactive && onDownload && (
+        {canScan && onDownload && (
         <div className="relative px-5 sm:px-7 pt-5">
           <AppButton
             whileTap={{ scale: downloading ? 1 : 0.98 }}
@@ -585,8 +596,9 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
 
       {/* Fullscreen QR zoom for entry scanning */}
       <AnimatePresence>
-        {zoomQR && (
+        {zoomQR && canScan && (
           <motion.div
+            role="region" aria-label="Enlarged ticket entry code"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

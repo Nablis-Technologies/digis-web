@@ -1,11 +1,13 @@
 import { ClipboardList } from 'lucide-react';
-import type { CustomQuestion } from '@/types';
+import type { CheckoutQuestion } from '../hooks/useCheckoutFlow';
+import { GiftQuestionField } from '@/features/tickets/components/GiftQuestionField';
+import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge } from '@/lib/ui/glass';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 import { QuestionField } from './QuestionField';
 
 export function QuestionsStep({
-  questions, answers, setAnswers, questionErrors, setQuestionErrors, isDark,
+  questions, answers, setAnswers, questionErrors, setQuestionErrors, isDark, loading, loadError, onRetry,
 }: any) {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
@@ -43,7 +45,13 @@ export function QuestionsStep({
         }}>
         <GlassReflection isDark={isDark} />
         <div className="relative z-10 space-y-4">
-        {questions.map((q: CustomQuestion) => (
+        {loading && <p role="status">Loading organizer questions…</p>}
+        {loadError && <div role="alert" className="space-y-3"><p>{loadError}</p><AppButton onClick={onRetry} className="px-4 py-3 rounded-xl" style={glassControl(isDark)}>Retry questions</AppButton></div>}
+        {!loading && !loadError && questions.length === 0 && <p>No additional questions are required.</p>}
+        {!loading && !loadError && questions.map((q: CheckoutQuestion) => q.published ? (
+          <GiftQuestionField key={q.id} id={q.id} question={q.published} value={answers[q.id]} error={questionErrors[q.id]} isDark={isDark}
+            onChange={value => { setAnswers((prev: Record<string, unknown>) => ({ ...prev, [q.id]: value })); clearQErr(q.id); }} />
+        ) : (
           <QuestionField
             key={q.id}
             question={q}

@@ -1,12 +1,13 @@
+import { createPortal } from 'react-dom';
+import { purchaseBarGlass } from './PurchaseBar';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, KeyRound, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Lock, KeyRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { glassEdge, glassField } from '@/lib/ui/glass';
+import { glassControl, glassField } from '@/lib/ui/glass';
 import { audienceModule, type AudienceProof } from '@/lib/audience';
 
 interface GatedTierGateProps {
@@ -20,6 +21,7 @@ interface GatedTierGateProps {
   /** When some tiers are public, keep them visible while the rest stay locked
    *  (the backend gates per ticket type, not per event). */
   hasPublicTiers?: boolean;
+  stickyTarget?: HTMLElement | null;
   /** True when at least one gated offer accepts an access code
    *  (`access_code`/`code_or_invitation`). When false the offers are
    *  `invitation`-only, so a code input could never succeed — show the
@@ -42,12 +44,12 @@ export function GatedTierGate({
   unlocked,
   invitationToken,
   hasPublicTiers = false,
+  stickyTarget,
   acceptsCode = true,
   onUnlocked,
   children,
 }: GatedTierGateProps) {
   const { isDark } = useTheme();
-  const accentRgb = '214,249,5';
   const accentText = isDark ? '#d6f905' : '#5a6b00';
 
   const [code, setCode] = useState('');
@@ -94,57 +96,75 @@ export function GatedTierGate({
 
   const invitationOnly = !acceptsCode;
   const panel = (
-    <div className="rounded-3xl overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.025)' : '#fff' }}>
+    <div className="relative rounded-2xl overflow-hidden" style={stickyTarget ? purchaseBarGlass(isDark) : { background: isDark ? 'rgba(255,255,255,0.025)' : '#fff' }}>
       <GlassReflection isDark={isDark} />
-      <div className="relative z-10 px-6 py-8 text-center">
-        <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-4"
-          style={{ background: isDark ? 'rgba(10,10,10,0.85)' : '#fff', boxShadow: `0 0 0 1.5px rgba(${accentRgb},0.35), ${glassEdge(isDark).boxShadow}` }}>
-          <Lock className="w-5 h-5" style={{ color: accentText }} strokeWidth={2} />
+      <div className={stickyTarget ? "relative z-10 px-4 py-3 sm:px-5" : "relative z-10 p-4"}>
+        {(!stickyTarget || invitationOnly) && <div className={invitationOnly ? "flex items-center gap-2.5" : "flex items-center gap-3"}>
+        <div className="relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl"
+          style={glassControl(isDark)}>
+          <GlassReflection isDark={isDark} />
+          <Lock aria-hidden="true" className="relative h-4 w-4 text-muted-foreground" />
         </div>
-        <h3 className="text-[18px] mb-1.5"
+        <div className="min-w-0">
+        <h3 className={invitationOnly ? "mb-1 text-[9px] uppercase leading-none tracking-[1.5px] text-muted-foreground" : "mb-0.5 text-sm"}
           style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? '#fff' : '#1a1a1a', fontWeight: 300 }}>
-          {hasPublicTiers ? 'Unlock more tickets' : invitationOnly ? 'Invite-only event' : 'This event requires access'}
+          {hasPublicTiers ? 'Unlock more tickets' : invitationOnly ? 'Invite only' : 'This event requires access'}
         </h3>
-        <p className="text-[12px] leading-relaxed mb-5"
-          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)' }}>
+        <p className={invitationOnly ? "text-xs leading-tight" : "text-xs leading-snug"}
+          style={{ fontFamily: invitationOnly ? "'Zalando Sans Expanded', sans-serif" : "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.7)' }}>
           {invitationOnly
-            ? 'This event is invitation-only. Open the invitation link you received to unlock tickets.'
-            : 'Enter the access code or open the invitation link you received to unlock these tickets.'}
+            ? 'Open your invitation link'
+            : 'Use your access code or invitation link.'}
         </p>
 
+        </div>
+        </div>}
+
         {acceptsCode && (
+          <div className={stickyTarget ? "flex items-center justify-between gap-3" : "mt-3"}>
+            {stickyTarget && (
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl" style={glassControl(isDark)}>
+                  <GlassReflection isDark={isDark} />
+                  <Lock aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+                </span>
+                <div className="hidden min-[380px]:block">
+                  <p className="mb-1.5 text-[9px] font-medium uppercase leading-none tracking-[1.8px] text-muted-foreground" style={{ fontFamily: "'Inter', sans-serif" }}>Locked</p>
+                  <p className="whitespace-nowrap text-[14px] font-light leading-none tracking-[-0.3px] text-foreground" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif" }}>Private event</p>
+                </div>
+              </div>
+            )}
           <motion.div
             animate={error ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
             transition={{ duration: 0.4 }}
-            className="relative overflow-hidden flex items-center gap-2 rounded-2xl p-1.5"
-            style={glassField(isDark, { error: !!error, focused })}>
-            <GlassReflection isDark={isDark} />
-            <div className="relative z-10 flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
-              style={{ background: `rgba(${accentRgb},0.1)` }}>
+            className={stickyTarget ? "relative flex h-11 min-w-0 max-w-[220px] flex-1 items-center overflow-hidden rounded-xl" : "relative flex h-11 min-w-0 items-center gap-2 overflow-hidden rounded-xl px-1"}
+            style={glassField(isDark, { error: !!error, focused, shadow: false })}>
+            {!stickyTarget && <GlassReflection isDark={isDark} />}
+            {!stickyTarget && <div className="relative z-10 flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+              style={glassControl(isDark)}>
+              <GlassReflection isDark={isDark} />
               <KeyRound className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
-            </div>
+            </div>}
             <AppInput
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
               onKeyDown={(e) => { if (e.key === 'Enter') tryCode(); }}
-              placeholder="Enter your code"
-              className="relative z-10 flex-1 min-w-0 bg-transparent outline-none text-[14px] tracking-[2px] uppercase"
+              aria-label="Enter your code"
+              placeholder={stickyTarget ? "Enter code" : "Enter your code"}
+              className={stickyTarget ? "relative z-10 h-full w-full min-w-0 bg-transparent pl-3 pr-12 text-sm outline-none" : "relative z-10 h-full min-w-0 flex-1 bg-transparent pr-12 text-sm outline-none"}
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }} />
             <AppButton whileTap={{ scale: 0.95 }}
               onClick={tryCode}
+              ariaLabel={checking ? "Checking access code" : "Unlock"}
+              aria-busy={checking}
               disabled={!code.trim() || checking}
-              className="flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-xl disabled:cursor-not-allowed"
-              style={
-                code.trim() && !checking
-                  ? { background: isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a', color: isDark ? '#0a0a0a' : '#fff' }
-                  : disabledSurface(isDark)
-              }>
-              <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                {checking ? 'Checking…' : 'Unlock'}
-              </span>
+              className="absolute right-1 z-20 grid h-8 w-8 place-items-center rounded-lg disabled:cursor-not-allowed"
+              style={glassControl(isDark)}>
+              <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </AppButton>
           </motion.div>
+          </div>
         )}
 
         {invitationOnly && checking && !error && (
@@ -164,14 +184,6 @@ export function GatedTierGate({
             </motion.p>
           )}
         </AnimatePresence>
-
-        <div className="flex items-center justify-center gap-1.5 mt-5">
-          <ShieldCheck className="w-3 h-3" style={{ color: accentText }} strokeWidth={2} />
-          <span className="text-[10px] tracking-[1.5px] uppercase"
-            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-            {invitationOnly ? 'Invitation required' : 'Access required'}
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -186,5 +198,5 @@ export function GatedTierGate({
     );
   }
 
-  return panel;
+  return stickyTarget ? createPortal(panel, stickyTarget) : panel;
 }

@@ -60,18 +60,12 @@ export function CountdownBadge({ event }: { event: Event }) {
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
           boxShadow: isLive
-            ? "0 0 0 1px rgba(255,255,255,0.3), 0 8px 20px rgba(220,38,38,0.3)"
+            ? "0 8px 20px rgba(220,38,38,0.3)"
             : "0 0 0 1px rgba(214,249,5,0.4), 0 8px 20px rgba(0,0,0,0.3)",
         }}
       >
         {isLive ? (
-          <motion.span
-            animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-            className="flex items-center"
-          >
-            <Radio className="w-2.5 h-2.5" strokeWidth={2.5} />
-          </motion.span>
+          <span className="flex items-center"><Radio className="w-2.5 h-2.5" strokeWidth={2.5} /></span>
         ) : (
           <motion.span
             animate={todayHot ? { scale: [1, 1.25, 1] } : { scale: 1 }}

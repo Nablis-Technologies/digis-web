@@ -165,7 +165,7 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
           color: 'rgba(255,255,255,0.35)',
           marginBottom: '14px',
         }}>
-          Scan at entry
+          {ticket.status === 'active' && ticket.qrCode ? 'Scan at entry' : 'Entry code unavailable'}
         </p>
         <div style={{
           background: '#fff',
@@ -173,7 +173,7 @@ export const DownloadableTicketCard = forwardRef<HTMLDivElement, { ticket: UserT
           padding: '20px',
           display: 'inline-block',
         }}>
-          <TicketQRCode code={ticket.qrCode} size={180} />
+          {ticket.status === 'active' && ticket.qrCode && <TicketQRCode code={ticket.qrCode} size={180} />}
         </div>
         <p style={{
           fontSize: '12px',

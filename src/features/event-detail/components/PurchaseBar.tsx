@@ -5,6 +5,20 @@ import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
+export function purchaseBarGlass(isDark: boolean) {
+  return {
+    // Translucent night/paper tint — blur alone over a transparent fill
+    // lets page text ghost through behind the price.
+    background: isDark ? 'rgba(8,9,11,0.62)' : 'rgba(255,255,255,0.72)',
+    backdropFilter: isDark
+      ? 'blur(60px) saturate(2) brightness(1.15)'
+      : 'blur(24px) saturate(1.8)',
+    WebkitBackdropFilter: isDark
+      ? 'blur(60px) saturate(2) brightness(1.15)'
+      : 'blur(24px) saturate(1.8)',
+  };
+}
+
 export function PurchaseBar({
   isDark,
   selectedTicket,
@@ -12,6 +26,7 @@ export function PurchaseBar({
   selectedTicketAccentReadable,
   totalPrice,
   minPrice,
+  rsvpOnly = false,
   onGift,
   onPurchase,
 }: {
@@ -21,6 +36,7 @@ export function PurchaseBar({
   selectedTicketAccentReadable: string;
   totalPrice: number;
   minPrice: number;
+  rsvpOnly?: boolean;
   onGift: () => void;
   onPurchase: () => void;
 }) {
@@ -29,21 +45,11 @@ export function PurchaseBar({
   const priceCurrency = "ETB";
   const isFree = shownMinor === 0;
   const isManual = selectedTicket?.approvalMode === 'manual';
-  const ctaLabel = selectedTicketType ? (isManual ? 'Apply' : 'Buy Now') : 'Get Tickets';
+  const ctaLabel = selectedTicketType ? (isManual ? 'Apply' : isFree ? 'RSVP' : 'Buy Now') : rsvpOnly ? 'RSVP' : 'Get Tickets';
 
   return (
     <div className="relative flex items-center gap-3 min-[380px]:gap-4 overflow-hidden px-4 min-[380px]:px-5 py-3 rounded-2xl"
-      style={{
-        // Translucent night/paper tint — blur alone over a transparent fill
-        // lets page text ghost through behind the price.
-        background: isDark ? 'rgba(8,9,11,0.62)' : 'rgba(255,255,255,0.72)',
-        backdropFilter: isDark
-          ? 'blur(60px) saturate(2) brightness(1.15)'
-          : 'blur(24px) saturate(1.8)',
-        WebkitBackdropFilter: isDark
-          ? 'blur(60px) saturate(2) brightness(1.15)'
-          : 'blur(24px) saturate(1.8)',
-      }}>
+      style={purchaseBarGlass(isDark)}>
       <GlassReflection isDark={isDark} />
       <div className="relative z-10 flex flex-col flex-shrink-0 overflow-hidden" style={{ width: 78 }}>
         <span className="text-[9px] tracking-[1.8px] uppercase leading-none mb-1.5"
@@ -79,6 +85,7 @@ export function PurchaseBar({
       </div>
       <div className="relative z-10 w-px self-stretch my-1"
         style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
+      {!(selectedTicket ? isFree : rsvpOnly) && (
       <AppButton whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}
         onClick={onGift}
         aria-label="Gift this ticket"
@@ -98,6 +105,7 @@ export function PurchaseBar({
           Gift
         </span>
       </AppButton>
+      )}
       <AppButton whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onPurchase}
         className="relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-pointer"
         style={{

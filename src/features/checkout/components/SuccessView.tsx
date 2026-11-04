@@ -1,13 +1,11 @@
-import { useState } from 'react';
+import { Link } from 'react-router';
 import { motion } from 'motion/react';
-import { Check, Mail, Gift, RefreshCw } from 'lucide-react';
+import { Check, Mail, Gift } from 'lucide-react';
 import { SummaryLine } from './OrderSummary';
 import { Money } from '@/lib/money';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassControl } from '@/lib/ui/glass';
-import { giftService } from '@/lib/gifts';
-import { toastSuccess, toastError } from '@/lib/feedback';
 
 export function SuccessView({
   event,
@@ -16,23 +14,10 @@ export function SuccessView({
   isDark,
   isGift,
   giftRecipientPhone,
+  giftRecipientCount = 1,
   giftPurchases = [],
   orderId,
 }: any) {
-  const [resending, setResending] = useState(false);
-
-  const handleResend = async (giftId: string) => {
-    if (!orderId || resending) return;
-    setResending(true);
-    try {
-      await giftService.resendGift(orderId, giftId);
-      toastSuccess('Claim link resent successfully via SMS!');
-    } catch {
-      toastError('Could not resend link. Please try again.');
-    } finally {
-      setResending(false);
-    }
-  };
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.4)';
@@ -87,16 +72,16 @@ export function SuccessView({
 
       <p className="text-[10px] tracking-[3px] uppercase mb-2"
         style={{ fontFamily: "'Inter', sans-serif", color: isGift ? '#d6f905' : '#34d399' }}>
-        {isGift ? 'Gift Ticket Sent' : 'Payment Confirmed'}
+        {isGift ? 'Gift purchase confirmed' : 'Payment Confirmed'}
       </p>
       <h3 className="text-[26px] font-light mb-2"
         style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-        {isGift ? 'Gift on its way!' : "You're going!"}
+        {isGift ? (giftRecipientCount > 1 ? `Gifts for ${giftRecipientCount} recipients` : 'A gift for your recipient') : "You're going!"}
       </h3>
       <p className="text-[13px] max-w-[320px] mb-7"
         style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
         {isGift
-          ? `We’ve delivered the claim link to ${giftRecipientPhone || 'your recipient'} via SMS.`
+          ? 'Check link delivery and request a resend from this order’s gift delivery page.'
           : <>Your ticket for <span style={{ color: textPrimary }}>{event.name}</span> is ready in your collection.</>}
       </p>
 
@@ -119,7 +104,7 @@ export function SuccessView({
           <SummaryLine label="When" value={`${event.date} · ${event.time}`} isDark={isDark} />
           {isGift && (
             <>
-              <SummaryLine label="Recipient" value={giftRecipientPhone || 'Gift Recipient'} isDark={isDark} />
+              <SummaryLine label={giftRecipientCount > 1 ? "Recipients" : "Recipient"} value={giftRecipientCount > 1 ? String(giftRecipientCount) : (giftRecipientPhone || 'Gift Recipient')} isDark={isDark} />
               <SummaryLine label="Delivery" value="SMS claim link" isDark={isDark} />
             </>
           )}
@@ -160,25 +145,16 @@ export function SuccessView({
         </div>
       </motion.div>
 
-      {isGift && orderId && giftPurchases?.[0]?.id && (
-        <div className="w-full mt-4">
-          <AppButton
-            whileTap={{ scale: 0.98 }}
-            disabled={resending}
-            onClick={() => handleResend(giftPurchases[0].id)}
-            className="w-full py-3 rounded-xl flex items-center justify-center gap-2 cursor-pointer text-[13px] font-medium"
-            style={glassControl(isDark)}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
-            {resending ? 'Resending Link...' : 'Resend Claim Link'}
-          </AppButton>
-        </div>
+      {isGift && orderId && (
+        <Link to={`/orders/${encodeURIComponent(orderId)}/gifts`} className="w-full mt-4 min-h-11 px-4 py-3 rounded-2xl inline-flex items-center justify-center text-sm" style={glassControl(isDark)}>
+          Track gift delivery
+        </Link>
       )}
 
       <div className="flex items-center gap-1.5 mt-5"
         style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}>
         <Mail className="w-3 h-3" strokeWidth={1.8} />
-        <span className="text-[10px] tracking-[1px] uppercase">Receipt sent to your email</span>
+        <span className="text-[10px] tracking-[1px] uppercase">Purchase confirmed</span>
       </div>
     </div>
   );

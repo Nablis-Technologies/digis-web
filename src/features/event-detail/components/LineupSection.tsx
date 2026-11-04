@@ -1,6 +1,7 @@
+import { SheetEnvironment } from './SheetEnvironment';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, BadgeCheck, Calendar, Check, Clock, Crown, MapPin, Music2, Share2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Calendar, Clock, Crown, MapPin, Music2, Share2, Users, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { placeholderSurface, placeholderInk } from '@/lib/utils/avatarAppearance';
 import { BrandAppleMusic, BrandInstagram, BrandSoundCloud, BrandSpotify, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
@@ -8,6 +9,7 @@ import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassEdge } from '@/lib/ui/glass';
+import { EntityFollowButton } from './EntityFollowButton';
 
 export function resolveLineup(lineup: any): any[] {
   // Backend-sourced only — never fabricate a lineup or fill missing artist fields
@@ -19,6 +21,7 @@ export function resolveLineup(lineup: any): any[] {
   const source = Array.isArray(lineup) ? lineup : [];
   return source.map((a: any) => ({
     name: a.name,
+    artistId: a.artistId,
     handle: a.handle,
     role: a.role,
     time: a.time,
@@ -39,14 +42,12 @@ export function resolveLineup(lineup: any): any[] {
  */
 export function LineupSection({ lineup, isDark, compact = false }: { lineup: any; isDark: boolean; compact?: boolean }) {
   const artists = resolveLineup(lineup);
+  const [profileTarget, setProfileTarget] = useState<any | null>(null);
   // No backend lineup → render nothing (never a fabricated one).
   if (artists.length === 0) return null;
   const accent = isDark ? '#d6f905' : '#d6f905';
   const accentRgb = isDark ? '214,249,5' : '214,249,5';
   const initialsOf = (name: string) => name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-  const [profileTarget, setProfileTarget] = useState<any | null>(null);
-  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
-  const toggleFollow = (handle: string) => setFollowingMap(prev => ({ ...prev, [handle]: !prev[handle] }));
 
   return (
     <div>
@@ -163,8 +164,6 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
       <AnimatePresence>
         {profileTarget && (
           <ArtistProfileSheet artist={profileTarget}
-            following={followingMap[profileTarget.handle] || false}
-            onToggleFollow={() => toggleFollow(profileTarget.handle)}
             onClose={() => setProfileTarget(null)} isDark={isDark} />
         )}
       </AnimatePresence>
@@ -172,8 +171,8 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
   );
 }
 
-function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark }: {
-  artist: any; following: boolean; onToggleFollow: () => void; onClose: () => void; isDark: boolean;
+export function ArtistProfileSheet({ artist, onClose, isDark }: {
+  artist: any; onClose: () => void; isDark: boolean;
 }) {
   const initials = artist.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
   const accent = isDark ? '#d6f905' : '#d6f905';
@@ -203,6 +202,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
           background: 'var(--card)',
           maxHeight: '90vh',
         }}>
+        <SheetEnvironment artwork={artist.image} isDark={isDark} />
         <GlassReflection isDark={isDark} />
 
         {/* Close — sticky top-right, always reachable */}
@@ -341,25 +341,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
 
           {/* Follow + Share */}
           <div className="flex items-stretch gap-2 mb-5">
-            <AppButton
-              whileTap={{ scale: 0.97 }}
-              onClick={onToggleFollow}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl cursor-pointer"
-              style={{
-                background: following
-                  ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
-                  : accent,
-                ...(following ? glassEdge(isDark) : {}),
-                color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
-              }}>
-              {following
-                ? <Check className="w-4 h-4" strokeWidth={2.5} />
-                : <UserPlus className="w-4 h-4" strokeWidth={2} />}
-              <span className="text-[12.5px] tracking-[0.3px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                {following ? 'Following' : 'Follow Artist'}
-              </span>
-            </AppButton>
+            <EntityFollowButton type="artists" id={artist.artistId} label="Follow Artist" isDark={isDark} />
             <AppButton
               whileTap={{ scale: 0.97 }}
               onClick={() => {
@@ -514,20 +496,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <AppButton whileTap={{ scale: 0.98 }} onClick={onToggleFollow}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer"
-              style={{
-                background: following
-                  ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
-                  : (isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a'),
-                color: following ? (isDark ? '#fff' : '#1a1a1a') : (isDark ? '#0a0a0a' : '#fff'),
-                ...(following ? glassEdge(isDark) : {}),
-              }}>
-              {following ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <UserPlus className="w-4 h-4" strokeWidth={2} />}
-              <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                {following ? 'Following' : 'Follow'}
-              </span>
-            </AppButton>
+            <EntityFollowButton type="artists" id={artist.artistId} label="Follow" isDark={isDark} />
           </div>
         </div>
         </div>

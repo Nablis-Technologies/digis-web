@@ -1,13 +1,14 @@
+import { PasswordField, OtpCodeField } from './AuthFormFields';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import {
-  X, Phone, Lock, User, ArrowRight, ArrowLeft, ShieldCheck, Eye, EyeOff,
+  X, Phone, User, ArrowRight, ArrowLeft, ShieldCheck,
   AlertCircle, Check, Loader2, Sparkles, ChevronDown, Search,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { mapFieldErrors } from '@/lib/errors';
-import { splitFullName } from '@/lib/utils/nameSplit';
+import { profileNameErrors } from '@/lib/profile-names';
 import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { glassEdge, glassField } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -17,34 +18,34 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 import type { CSSProperties } from 'react';
 
 /* â”€â”€â”€ Country data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-interface Country { code: string; name: string; dial: string; flag: string; }
+interface Country { code: string; name: string; dial: string; }
 
 const COUNTRIES: Country[] = [
-  { code: 'ET', name: 'Ethiopia',       dial: '251', flag: 'ðŸ‡ªðŸ‡¹' },
-  { code: 'KE', name: 'Kenya',          dial: '254', flag: 'ðŸ‡°ðŸ‡ª' },
-  { code: 'NG', name: 'Nigeria',        dial: '234', flag: 'ðŸ‡³ðŸ‡¬' },
-  { code: 'GH', name: 'Ghana',          dial: '233', flag: 'ðŸ‡¬ðŸ‡­' },
-  { code: 'TZ', name: 'Tanzania',       dial: '255', flag: 'ðŸ‡¹ðŸ‡¿' },
-  { code: 'UG', name: 'Uganda',         dial: '256', flag: 'ðŸ‡ºðŸ‡¬' },
-  { code: 'RW', name: 'Rwanda',         dial: '250', flag: 'ðŸ‡·ðŸ‡¼' },
-  { code: 'ER', name: 'Eritrea',        dial: '291', flag: 'ðŸ‡ªðŸ‡·' },
-  { code: 'SO', name: 'Somalia',        dial: '252', flag: 'ðŸ‡¸ðŸ‡´' },
-  { code: 'DJ', name: 'Djibouti',       dial: '253', flag: 'ðŸ‡©ðŸ‡¯' },
-  { code: 'SS', name: 'South Sudan',    dial: '211', flag: 'ðŸ‡¸ðŸ‡¸' },
-  { code: 'SD', name: 'Sudan',          dial: '249', flag: 'ðŸ‡¸ðŸ‡©' },
-  { code: 'ZA', name: 'South Africa',   dial: '27',  flag: 'ðŸ‡¿ðŸ‡¦' },
-  { code: 'EG', name: 'Egypt',          dial: '20',  flag: 'ðŸ‡ªðŸ‡¬' },
-  { code: 'MA', name: 'Morocco',        dial: '212', flag: 'ðŸ‡²ðŸ‡¦' },
-  { code: 'AE', name: 'UAE',            dial: '971', flag: 'ðŸ‡¦ðŸ‡ª' },
-  { code: 'SA', name: 'Saudi Arabia',   dial: '966', flag: 'ðŸ‡¸ðŸ‡¦' },
-  { code: 'US', name: 'United States',  dial: '1',   flag: 'ðŸ‡ºðŸ‡¸' },
-  { code: 'CA', name: 'Canada',         dial: '1',   flag: 'ðŸ‡¨ðŸ‡¦' },
-  { code: 'GB', name: 'United Kingdom', dial: '44',  flag: 'ðŸ‡¬ðŸ‡§' },
-  { code: 'DE', name: 'Germany',        dial: '49',  flag: 'ðŸ‡©ðŸ‡ª' },
-  { code: 'FR', name: 'France',         dial: '33',  flag: 'ðŸ‡«ðŸ‡·' },
-  { code: 'IN', name: 'India',          dial: '91',  flag: 'ðŸ‡®ðŸ‡³' },
-  { code: 'CN', name: 'China',          dial: '86',  flag: 'ðŸ‡¨ðŸ‡³' },
-  { code: 'AU', name: 'Australia',      dial: '61',  flag: 'ðŸ‡¦ðŸ‡º' },
+  { code: 'ET', name: 'Ethiopia',       dial: '251' },
+  { code: 'KE', name: 'Kenya',          dial: '254' },
+  { code: 'NG', name: 'Nigeria',        dial: '234' },
+  { code: 'GH', name: 'Ghana',          dial: '233' },
+  { code: 'TZ', name: 'Tanzania',       dial: '255' },
+  { code: 'UG', name: 'Uganda',         dial: '256' },
+  { code: 'RW', name: 'Rwanda',         dial: '250' },
+  { code: 'ER', name: 'Eritrea',        dial: '291' },
+  { code: 'SO', name: 'Somalia',        dial: '252' },
+  { code: 'DJ', name: 'Djibouti',       dial: '253' },
+  { code: 'SS', name: 'South Sudan',    dial: '211' },
+  { code: 'SD', name: 'Sudan',          dial: '249' },
+  { code: 'ZA', name: 'South Africa',   dial: '27' },
+  { code: 'EG', name: 'Egypt',          dial: '20' },
+  { code: 'MA', name: 'Morocco',        dial: '212' },
+  { code: 'AE', name: 'UAE',            dial: '971' },
+  { code: 'SA', name: 'Saudi Arabia',   dial: '966' },
+  { code: 'US', name: 'United States',  dial: '1' },
+  { code: 'CA', name: 'Canada',         dial: '1' },
+  { code: 'GB', name: 'United Kingdom', dial: '44' },
+  { code: 'DE', name: 'Germany',        dial: '49' },
+  { code: 'FR', name: 'France',         dial: '33' },
+  { code: 'IN', name: 'India',          dial: '91' },
+  { code: 'CN', name: 'China',          dial: '86' },
+  { code: 'AU', name: 'Australia',      dial: '61' },
 ];
 const DEFAULT_COUNTRY = COUNTRIES[0]; // Ethiopia
 
@@ -89,7 +90,8 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
   // form state
   const [identifier, setIdentifier] = useState(''); // sign-in phone
-  const [name, setName] = useState(''); // signup name (split into first/last on submit)
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -143,11 +145,9 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
   const handleRequestSignupOtp = async () => {
     clearAllErrors();
-    const trimmedName = name.trim();
     const e164 = buildPhone(phone, country.dial);
 
-    const next: Record<string, string> = {};
-    if (!trimmedName) next.name = 'Enter your name.';
+    const next = profileNameErrors(firstName, lastName);
     if (!/^\+[1-9]\d{6,14}$/.test(e164)) next.phone = 'Enter a valid mobile number for the selected country.';
     if (password.length < 8) next.password = 'Password must be at least 8 characters.';
     if (password !== confirmPassword) next.passwordConfirmation = 'Passwords do not match.';
@@ -176,7 +176,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
   const handleVerifyAndSignUp = async () => {
     clearAllErrors();
     const trimmedCode = otpCode.trim();
-    if (trimmedCode.length < 4) {
+    if (!/^\d{6}$/.test(trimmedCode)) {
       setErrors({ otp: 'Please enter the 6-digit verification code.' });
       return;
     }
@@ -189,11 +189,10 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
       return;
     }
 
-    const { firstName, lastName } = splitFullName(name);
     const e164 = buildPhone(phone, country.dial);
     const res = await auth.signUp({
-      firstName,
-      lastName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       phone: e164,
       password,
       passwordConfirmation: confirmPassword,
@@ -211,9 +210,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
     for (const key of ['firstName', 'lastName', 'name', 'phone', 'password', 'passwordConfirmation']) {
       if (fields[key]) mapped[key] = fields[key];
     }
-    if (mapped.firstName || mapped.lastName) {
-      mapped.name = mapped.firstName || mapped.lastName;
-    }
+    if (Object.keys(mapped).some(key => key !== 'otp')) setSignupStep('details');
     setErrors(mapped);
     setFormError(general.join(' ') || (Object.keys(mapped).length ? '' : res.error || 'Could not create account.'));
   };
@@ -361,10 +358,22 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                 {mode === 'signup' && signupStep === 'details' && (
                   <>
                     <NameField
-                      value={name}
-                      onChange={(v) => { setName(v); clearField('name'); clearField('firstName'); clearField('lastName'); }}
-                      error={errors.name || errors.firstName || errors.lastName}
-                      placeholder="Name"
+                      value={firstName}
+                      onChange={(v) => { setFirstName(v); clearField('firstName'); }}
+                      error={errors.firstName || errors.name}
+                      placeholder="Given name"
+                      label="Given Name / ስም"
+                      autoComplete="given-name"
+                      isDark={isDark}
+                      onEnter={handleRequestSignupOtp}
+                    />
+                    <NameField
+                      value={lastName}
+                      onChange={(v) => { setLastName(v); clearField('lastName'); }}
+                      error={errors.lastName}
+                      placeholder="Father's name"
+                      label="Father's Name / የአባት ስም"
+                      autoComplete="family-name"
                       isDark={isDark}
                       onEnter={handleRequestSignupOtp}
                     />
@@ -377,7 +386,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                     <PasswordField value={password} onChange={(v) => { setPassword(v); clearField('password'); }} error={errors.password} isDark={isDark} placeholder="Create a password (min 8 chars)" onEnter={handleRequestSignupOtp} />
                     <PasswordField value={confirmPassword} onChange={(v) => { setConfirmPassword(v); clearField('passwordConfirmation'); }} error={errors.passwordConfirmation} isDark={isDark} placeholder="Confirm your password" onEnter={handleRequestSignupOtp} />
                     <ErrorLine error={formError} />
-                    <PrimaryButton onClick={handleRequestSignupOtp} loading={loading} isDark={isDark} label="Continue" disabled={!name.trim() || !phone.trim() || !password || !confirmPassword} />
+                    <PrimaryButton onClick={handleRequestSignupOtp} loading={loading} isDark={isDark} label="Continue" disabled={!firstName.trim() || !lastName.trim() || !phone.trim() || !password || !confirmPassword} />
                     <p className="text-[10.5px] leading-relaxed text-center px-2" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
                       By continuing you agree to Digis’ Terms & Privacy Policy.
                     </p>
@@ -386,7 +395,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
 
                 {mode === 'signup' && signupStep === 'otp' && (
                   <div className="space-y-4">
-                    <OtpCodeField
+                    <OtpCodeField autoFocus
                       value={otpCode}
                       onChange={(v) => { setOtpCode(v); clearField('otp'); }}
                       error={errors.otp}
@@ -399,7 +408,7 @@ export function AuthModal({ onClose, onAuthed, initialMode = 'signin', onModeCha
                       loading={loading}
                       isDark={isDark}
                       label="Verify & create account"
-                      disabled={otpCode.trim().length < 4}
+                      disabled={otpCode.trim().length !== 6}
                     />
                     <div className="flex items-center justify-between pt-1 px-1 text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif" }}>
                       <button
@@ -500,7 +509,7 @@ function CountrySelector({ country, onChange, isDark }: {
         className="flex items-center gap-1.5 pr-3 cursor-pointer select-none"
         style={{ boxShadow: `inset -1px 0 0 ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,26,46,0.1)'}` }}
       >
-        <span className="text-[17px] leading-none">{country.flag}</span>
+        <img src={`/flags/${country.code.toLowerCase()}.png`} alt="" className="h-3.5 w-5 shrink-0 object-contain" />
         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: textMuted }}>+{country.dial}</span>
         <ChevronDown
           className="w-3 h-3 transition-transform duration-150"
@@ -550,7 +559,7 @@ function CountrySelector({ country, onChange, isDark }: {
                     onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.04)'; }}
                     onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                   >
-                    <span className="text-[16px] leading-none w-6 flex-shrink-0">{c.flag}</span>
+                    <img src={`/flags/${c.code.toLowerCase()}.png`} alt="" className="h-3.5 w-5 shrink-0 object-contain" />
                     <span className="flex-1 text-[12.5px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textPrimary }}>{c.name}</span>
                     <span className="text-[11px] tabular-nums flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>+{c.dial}</span>
                     {active && <Check className="w-3 h-3 flex-shrink-0 ml-1" strokeWidth={2.5} style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />}
@@ -603,6 +612,8 @@ function NameField({
   placeholder = "Name",
   onEnter,
   error,
+  label,
+  autoComplete,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -610,90 +621,26 @@ function NameField({
   placeholder?: string;
   onEnter?: () => void;
   error?: string;
+  label: string;
+  autoComplete: string;
 }) {
+  const id = useId();
   const [focused, setFocused] = useState(false);
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
   return (
     <div>
+      <label htmlFor={id} className="block text-sm mb-2">{label}</label>
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
         style={glassField(isDark, { error: !!error, focused })}>
         <GlassReflection isDark={isDark} />
         <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><User className="w-4 h-4" /></span>
-        <AppInput type="text" value={value} onChange={(e) => onChange(e.target.value)}
+        <AppInput id={id} autoComplete={autoComplete} required type="text" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
-          maxLength={100}
+          aria-describedby={error ? `${id}-error` : undefined}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
       </div>
-      <FieldError error={error} />
-    </div>
-  );
-}
-
-function PasswordField({ value, onChange, isDark, placeholder, onEnter, error }: { value: string; onChange: (v: string) => void; isDark: boolean; placeholder: string; onEnter?: () => void; error?: string }) {
-  const [show, setShow] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
-  return (
-    <div>
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}>
-        <GlassReflection isDark={isDark} />
-        <span style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim }}><Lock className="w-4 h-4" /></span>
-        <AppInput type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder} style={inputStyle(isDark)} aria-invalid={error ? true : undefined}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }} />
-        <AppButton type="button" onClick={() => setShow((s) => !s)} className="cursor-pointer flex-shrink-0" style={{ color: textDim }}>
-          {show ? <EyeOff className="w-4 h-4" strokeWidth={1.75} /> : <Eye className="w-4 h-4" strokeWidth={1.75} />}
-        </AppButton>
-      </div>
-      <FieldError error={error} />
-    </div>
-  );
-}
-
-function OtpCodeField({
-  value,
-  onChange,
-  isDark,
-  onEnter,
-  error,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  isDark: boolean;
-  onEnter?: () => void;
-  error?: string;
-}) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <div>
-      <div
-        className="flex items-center justify-center px-4 py-3 rounded-xl transition-all overflow-hidden"
-        style={glassField(isDark, { error: !!error, focused })}
-      >
-        <GlassReflection isDark={isDark} />
-        <AppInput
-          type="text"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          value={value}
-          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="••••••"
-          className="text-center font-mono text-[22px] tracking-[8px] outline-none w-full bg-transparent"
-          style={{ color: isDark ? '#fff' : '#111' }}
-          aria-invalid={error ? true : undefined}
-          aria-label="Verification code"
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && onEnter) onEnter();
-          }}
-        />
-      </div>
-      <FieldError error={error} />
+      <div id={`${id}-error`}><FieldError error={error} /></div>
     </div>
   );
 }

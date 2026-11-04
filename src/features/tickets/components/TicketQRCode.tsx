@@ -11,17 +11,19 @@ import QRCode from 'react-qr-code';
  * (no mono token strings under the QR — show the ticket type instead).
  */
 export function TicketQRCode({ code, size }: { code: string; size?: number }) {
+  if (!code?.trim()) return null;
   const common = {
-    value: code || 'DIGIS',
+    value: code,
+    'aria-hidden': true as const,
     level: 'M' as const,
-    bgColor: 'transparent',
+    bgColor: '#fff',
     fgColor: '#1a1a1a',
   };
 
-  if (size) return <QRCode {...common} size={size} />;
+  if (size) return <div role="img" aria-label="Ticket entry QR" style={{ display: 'inline-block', padding: 12, background: '#fff' }}><QRCode {...common} size={size} /></div>;
 
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div role="img" aria-label="Ticket entry QR" className="w-full h-full flex items-center justify-center p-3 bg-white">
       <QRCode {...common} style={{ width: '100%', height: '100%' }} />
     </div>
   );

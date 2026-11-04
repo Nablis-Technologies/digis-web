@@ -1,3 +1,4 @@
+import { FeaturedPlacementLabel } from '@/components/FeaturedPlacementLabel';
 import { motion } from "motion/react";
 import { ArrowUpRight, MapPin } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
@@ -35,7 +36,7 @@ export function FeaturedEventCard({
   const hued = useProminentHue(event.image, rgb, isDark);
 
   const isLarge = variant === "large" || large;
-  const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const priceLabel = event.priceFromMinor === 0 ? "Free" : Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
   const format = cardFormat(event);
   const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
 
@@ -102,6 +103,7 @@ export function FeaturedEventCard({
             </div>
           )}
           <div className="absolute bottom-3 left-5 right-5">
+            {event.featured && <FeaturedPlacementLabel />}
             <h3
               className="text-[42px] xl:text-[52px] font-light tracking-[-0.5px] leading-[1.02] text-white"
               style={{
@@ -237,7 +239,8 @@ export function FeaturedEventCard({
 
         {/* Title + venue over poster */}
         <div className="absolute bottom-0 left-4 right-4">
-          <h3
+          {event.featured && <FeaturedPlacementLabel />}
+            <h3
             className="text-[21px] font-light tracking-[-0.4px] leading-[1.05] line-clamp-2 text-[20px]"
             style={{
               fontFamily: "'Zalando Sans Expanded', sans-serif",
@@ -338,7 +341,7 @@ export function FeaturedEventCard({
                 fontWeight: 700,
               }}
             >
-              {eventActionLabel()}
+              {eventActionLabel(event)}
             </span>
             <span
               className="flex items-center justify-center w-7 h-7 rounded-full"

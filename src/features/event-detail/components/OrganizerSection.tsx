@@ -1,17 +1,16 @@
+import { SheetEnvironment } from './SheetEnvironment';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, BadgeCheck, Calendar, Check, ChevronRight, Clock, Loader2, MapPin, Share2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Calendar, ChevronRight, Clock, MapPin, Share2, Users, X } from 'lucide-react';
 import { placeholderSurface, placeholderInk, avatarRing } from '@/lib/utils/avatarAppearance';
 import { BrandInstagram, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
 import { glassEdgeReflection, glassReflection, glassEdge, type GlassReflectionSettings } from '@/lib/ui/glass';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
-import { useAuth } from '@/features/auth/context/AuthContext';
-import { followEntity, unfollowEntity } from '@/lib/follows';
 import { fetchOrganizationProfile, type OrganizationProfile } from '@/lib/organizations';
-import { toastError, toastWarning } from '@/lib/feedback';
+import { EntityFollowButton } from './EntityFollowButton';
 
 export function resolveOrganizers(event: any): any[] {
   // The backend nests a single organization summary `{ id, name, slug }`.
@@ -26,33 +25,11 @@ export function resolveOrganizers(event: any): any[] {
 }
 
 export function OrganizerCard({ organizers, isDark, compact = false, reflectionSettings }: { organizers: any[]; isDark: boolean; compact?: boolean; reflectionSettings?: GlassReflectionSettings }) {
-  const { isAuthenticated } = useAuth();
-  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
-  const [pendingFollow, setPendingFollow] = useState<string | null>(null);
   const [profileTarget, setProfileTarget] = useState<any | null>(null);
   const [listOpen, setListOpen] = useState(false);
 
   const accent = isDark ? '#d6f905' : '#d6f905';
   const initialsOf = (name: string) => name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-
-  // Follow is a real backend command (`POST|DELETE /organizations/:id/follow`),
-  // keyed by the organization id — never a local-only toggle.
-  const toggleFollow = async (id?: string) => {
-    if (!id) return;
-    if (!isAuthenticated) { toastWarning('Sign in to follow organizers.'); return; }
-    if (pendingFollow) return;
-    const next = !(followingMap[id] || false);
-    setPendingFollow(id);
-    try {
-      if (next) await followEntity('organizations', id);
-      else await unfollowEntity('organizations', id);
-      setFollowingMap((prev) => ({ ...prev, [id]: next }));
-    } catch (e) {
-      toastError(e, 'Couldn’t update your follow. Please try again.');
-    } finally {
-      setPendingFollow(null);
-    }
-  };
 
   if (organizers.length === 0) return null;
   const lead = organizers[0];
@@ -89,18 +66,21 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
             {stack.map((o, idx) => (
               <div key={o.id ?? o.name} className="relative"
                 style={{ marginLeft: idx === 0 ? 0 : -9, zIndex: stack.length - idx }}>
+                <div style={idx > 0 ? { maskImage: "radial-gradient(circle at -7px 50%, transparent 17.5px, #000 18px)" } : undefined}>
                 {o.avatar ? (
-                  <img src={o.avatar} alt={o.name} className="w-8 h-8 rounded-full object-cover"
-                    style={{ boxShadow: `0 0 0 2px ${ring}` }} />
+                  <img src={o.avatar} alt={o.name} className="w-8 h-8 rounded-full object-cover" />
                 ) : (
                   <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ background: placeholderSurface(isDark), boxShadow: `0 0 0 2px ${ring}` }}>
-                    <span className="text-[10px]"
-                      style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
-                      {initialsOf(o.name)}
-                    </span>
+                    style={{ background: organizerAvatarColor(o.id || o.name) }}>
+                    <svg aria-hidden="true" viewBox="0 0 32 32" className="h-full w-full">
+                      <text x="16" y="16" textAnchor="middle" dominantBaseline="central" fill="white"
+                        style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", fontSize: 10 }}>
+                        {initialsOf(o.name)}
+                      </text>
+                    </svg>
                   </div>
                 )}
+                </div>
                 {o.verified && (
                   <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full flex items-center justify-center"
                     style={{ background: isDark ? '#141414' : '#fff' }}>
@@ -139,22 +119,19 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
             style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }} />
         </AppButton>
 
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {listOpen && (
-            <OrganizerListSheet
+            <OrganizerListSheet key="organizer-list"
               organizers={organizers}
-              followingMap={followingMap}
-              pendingFollow={pendingFollow}
-              onToggleFollow={toggleFollow}
+
               onOpenProfile={(o) => { setListOpen(false); setProfileTarget(o); }}
               onClose={() => setListOpen(false)}
               isDark={isDark}
             />
           )}
           {profileTarget && (
-            <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.id] || false}
-              pending={pendingFollow === profileTarget.id}
-              onToggleFollow={() => toggleFollow(profileTarget.id)}
+            <OrganizerProfileSheet key="organizer-profile" organizer={profileTarget}
+
               onClose={() => setProfileTarget(null)} isDark={isDark} />
           )}
         </AnimatePresence>
@@ -190,9 +167,9 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
                 <img src={o.avatar} alt={o.name} className="w-9 h-9 rounded-full object-cover" />
               ) : (
                 <div className="w-9 h-9 rounded-full flex items-center justify-center"
-                  style={{ background: placeholderSurface(isDark) }}>
+                  style={{ background: organizerAvatarColor(o.id || o.name) }}>
                   <span className="text-[11px]"
-                    style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
+                    style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: "#fff" }}>
                     {initialsOf(o.name)}
                   </span>
                 </div>
@@ -214,30 +191,15 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
                 {o.handle}
               </p>
             </AppButton>
-            <AppButton whileTap={{ scale: 0.95 }}
-              onClick={() => toggleFollow(o.id)}
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
-              style={{
-                background: (followingMap[o.id] || false)
-                  ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
-                  : (isDark ? 'rgba(214,249,5,0.1)' : accent),
-                ...((followingMap[o.id] || false) ? glassEdge(isDark) : {}),
-              }}>
-              {(followingMap[o.id] || false) ? (
-                <Check className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
-              ) : (
-                <UserPlus className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
-              )}
-            </AppButton>
+            <EntityFollowButton type="organizations" id={o.id} label="Follow" isDark={isDark} />
           </div>
         ))}
       </motion.div>
 
       <AnimatePresence>
         {profileTarget && (
-          <OrganizerProfileSheet organizer={profileTarget} following={followingMap[profileTarget.id] || false}
-            pending={pendingFollow === profileTarget.id}
-            onToggleFollow={() => toggleFollow(profileTarget.id)}
+          <OrganizerProfileSheet key="organizer-profile" organizer={profileTarget}
+
             onClose={() => setProfileTarget(null)} isDark={isDark} />
         )}
       </AnimatePresence>
@@ -251,9 +213,6 @@ export function OrganizerCard({ organizers, isDark, compact = false, reflectionS
  * popup to open. Reuses the public profile fetch + the follow command.
  */
 export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark: boolean }) {
-  const { isAuthenticated } = useAuth();
-  const [following, setFollowing] = useState(false);
-  const [pending, setPending] = useState(false);
   const [profile, setProfile] = useState<OrganizationProfile | null>(null);
   const [profileError, setProfileError] = useState(false);
 
@@ -262,31 +221,13 @@ export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark:
     let alive = true;
     setProfileError(false);
     fetchOrganizationProfile(organizer.id)
-      .then((p) => { if (alive) { setProfile(p); setFollowing(!!p.is_following); } })
+      .then((p) => { if (alive) { setProfile(p); } })
       .catch(() => { if (alive) setProfileError(true); });
     return () => { alive = false; };
   }, [organizer?.id]);
 
-  const toggleFollow = async () => {
-    if (!organizer?.id) return;
-    if (!isAuthenticated) { toastWarning('Sign in to follow organizers.'); return; }
-    if (pending) return;
-    const next = !following;
-    setPending(true);
-    try {
-      if (next) await followEntity('organizations', organizer.id);
-      else await unfollowEntity('organizations', organizer.id);
-      setFollowing(next);
-    } catch (e) {
-      toastError(e, 'Couldn’t update your follow. Please try again.');
-    } finally {
-      setPending(false);
-    }
-  };
-
   const accent = isDark ? '#d6f905' : '#0a0a0a';
   const initials = (organizer.name || '?').split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-  const description: string | undefined = profile?.description ?? organizer.bio ?? undefined;
   const followerCount: number | undefined = profile?.follower_count;
   const followerLabel = followerCount != null
     ? (followerCount >= 1000 ? `${(followerCount / 1000).toFixed(1)}k` : `${followerCount}`)
@@ -311,8 +252,8 @@ export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark:
       <GlassReflection isDark={isDark} />
       <div className="relative z-10 flex items-center gap-3">
         <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: placeholderSurface(isDark) }}>
-          <span className="text-[13px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>{initials}</span>
+          style={{ background: organizerAvatarColor(organizer.id || organizer.name) }}>
+          <span className="text-[13px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: "#fff" }}>{initials}</span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -325,30 +266,8 @@ export function OrganizerInline({ organizer, isDark }: { organizer: any; isDark:
             </p>
           )}
         </div>
-        {/* Subtle outlined follow button — the quiet treatment used on the
-            venue / organizer rows, not a solid accent CTA. */}
-        <AppButton
-          whileTap={{ scale: 0.97 }}
-          onClick={() => void toggleFollow()}
-          disabled={pending}
-          className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer disabled:cursor-not-allowed"
-          style={{
-            background: 'transparent',
-            ...glassEdge(isDark),
-            color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)',
-          }}
-        >
-          {following ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} /> : <UserPlus className="w-3.5 h-3.5" strokeWidth={2} />}
-          <span className="text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>{following ? 'Following' : 'Follow'}</span>
-        </AppButton>
+        <EntityFollowButton type="organizations" id={organizer.id} label="Follow" isDark={isDark} secondary />
       </div>
-
-      {description && (
-        <p className="relative z-10 mt-3 text-[12.5px] leading-relaxed"
-          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>
-          {description}
-        </p>
-      )}
 
       {socials.length > 0 && (
         <div className="relative z-10 mt-3 flex flex-wrap gap-3">
@@ -386,8 +305,8 @@ function OrganizerStat({ label, value, isDark }: { label: string; value: string;
   );
 }
 
-function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleFollow, onOpenProfile, onClose, isDark }: {
-  organizers: any[]; followingMap: Record<string, boolean>; pendingFollow: string | null; onToggleFollow: (handle: string) => void;
+function OrganizerListSheet({ organizers, onOpenProfile, onClose, isDark }: {
+  organizers: any[];
   onOpenProfile: (o: any) => void; onClose: () => void; isDark: boolean;
 }) {
   const accent = isDark ? '#d6f905' : '#d6f905';
@@ -433,19 +352,17 @@ function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleF
 
         <div className="relative z-10 overflow-y-auto overscroll-contain p-3" style={{ WebkitOverflowScrolling: 'touch' }}>
           {organizers.map((o) => {
-            const following = followingMap[o.id] || false;
             return (
               <div key={o.id ?? o.name}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
-                style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+                className="flex items-center gap-3 px-3 py-2.5">
                 <AppButton onClick={() => onOpenProfile(o)} className="relative flex-shrink-0 cursor-pointer">
                   {o.avatar ? (
                     <img src={o.avatar} alt={o.name} className="w-11 h-11 rounded-full object-cover" />
                   ) : (
                     <div className="w-11 h-11 rounded-full flex items-center justify-center"
-                      style={{ background: placeholderSurface(isDark) }}>
+                      style={{ background: organizerAvatarColor(o.id || o.name) }}>
                       <span className="text-[13px]"
-                        style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
+                        style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: "#fff" }}>
                         {initialsOf(o.name)}
                       </span>
                     </div>
@@ -464,29 +381,10 @@ function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleF
                   </p>
                   <p className="text-[11px] truncate mt-0.5"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
-                    {o.role} · {o.handle}
+                    {[o.role, o.handle].filter(Boolean).join(' · ')}
                   </p>
                 </AppButton>
-                <AppButton whileTap={{ scale: 0.95 }}
-                  onClick={() => onToggleFollow(o.id)}
-                  disabled={pendingFollow === o.id}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    background: following
-                      ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
-                      : (isDark ? 'rgba(214,249,5,0.1)' : accent),
-                    ...(following ? glassEdge(isDark) : {}),
-                  }}>
-                  {pendingFollow === o.id
-                    ? <Loader2 className="w-3 h-3 animate-spin" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
-                    : following
-                      ? <Check className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }} strokeWidth={2.5} />
-                      : <UserPlus className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />}
-                  <span className="text-[11px]"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: following ? (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)') : (isDark ? accent : '#0a0a0a') }}>
-                    {following ? 'Following' : 'Follow'}
-                  </span>
-                </AppButton>
+                <EntityFollowButton type="organizations" id={o.id} label="Follow" isDark={isDark} compact />
               </div>
             );
           })}
@@ -500,8 +398,18 @@ function OrganizerListSheet({ organizers, followingMap, pendingFollow, onToggleF
   return typeof document !== 'undefined' ? createPortal(sheet, document.body) : sheet;
 }
 
-function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, onClose, isDark }: {
-  organizer: any; following: boolean; pending: boolean; onToggleFollow: () => void; onClose: () => void; isDark: boolean;
+const organizerAvatarColors = ['#973b48', '#92521f', '#286653', '#305b91', '#664493', '#843966'];
+
+function organizerAvatarColor(seed: string) {
+  let hash = 0;
+  for (const character of seed) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return organizerAvatarColors[hash % organizerAvatarColors.length];
+}
+
+function OrganizerProfileSheet({ organizer, onClose, isDark }: {
+  organizer: any; onClose: () => void; isDark: boolean;
 }) {
   const initials = organizer.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
   const accent = isDark ? '#d6f905' : '#d6f905';
@@ -558,6 +466,7 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
           background: 'var(--card)',
           maxHeight: '90vh',
         }}>
+        <SheetEnvironment artwork={profile?.profile_url} isDark={isDark} />
         <GlassReflection isDark={isDark} />
 
         {/* Close — sticky top-right, always reachable */}
@@ -575,16 +484,14 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
         {/* Scrollable content */}
         <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
 
-        {/* Profile — the app surface is the banner; the sheet carries no logo
-            yet (ADR-0002: nothing invented to tint from). */}
         <div className="px-6 pb-6 pt-7">
           <div className="flex items-end gap-4 mb-4">
             <div className="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0"
               style={{
-                background: placeholderSurface(isDark),
+                background: organizerAvatarColor(organizer.id || organizer.name),
                 boxShadow: avatarRing(isDark),
               }}>
-              <span className="text-[22px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: placeholderInk(isDark) }}>
+              <span className="text-[22px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: "#fff" }}>
                 {initials}
               </span>
             </div>
@@ -650,28 +557,7 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
 
           {/* Follow + Share */}
           <div className="flex items-stretch gap-2 mb-5">
-            <AppButton
-              whileTap={{ scale: 0.97 }}
-              onClick={onToggleFollow}
-              disabled={pending}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                background: following
-                  ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
-                  : accent,
-                ...(following ? glassEdge(isDark) : {}),
-                color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
-              }}>
-              {pending
-                ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
-                : following
-                  ? <Check className="w-4 h-4" strokeWidth={2.5} />
-                  : <UserPlus className="w-4 h-4" strokeWidth={2} />}
-              <span className="text-[12.5px] tracking-[0.3px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                {following ? 'Following' : 'Follow Organizer'}
-              </span>
-            </AppButton>
+            <EntityFollowButton type="organizations" id={organizer.id} label="Follow" isDark={isDark} compact />
             <AppButton
               whileTap={{ scale: 0.97 }}
               onClick={() => {
@@ -812,25 +698,9 @@ function OrganizerProfileSheet({ organizer, following, pending, onToggleFollow, 
             );
           })()}
 
-
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <AppButton whileTap={{ scale: 0.98 }} onClick={onToggleFollow} disabled={pending}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                background: following
-                  ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
-                  : (isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a'),
-                color: following ? (isDark ? '#fff' : '#1a1a1a') : (isDark ? '#0a0a0a' : '#fff'),
-                ...(following ? glassEdge(isDark) : {}),
-              }}>
-              {pending
-                ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
-                : following ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <UserPlus className="w-4 h-4" strokeWidth={2} />}
-              <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                {following ? 'Following' : 'Follow'}
-              </span>
-            </AppButton>
+            <EntityFollowButton type="organizations" id={organizer.id} label="Follow" isDark={isDark} compact />
           </div>
         </div>
         </div>

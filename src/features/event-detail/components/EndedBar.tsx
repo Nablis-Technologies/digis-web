@@ -1,51 +1,32 @@
-import { CalendarX } from 'lucide-react';
+import { Hourglass } from 'lucide-react';
+import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
+import { purchaseBarGlass } from './PurchaseBar';
 
-/** Docked purchase-bar state for an event whose dates have all ended
- *  (BACKEND_GAPS #34 frontend mitigation — the backend still accepts orders
- *  for past events, so the frontend disables the buy entry). */
-export function EndedBar({ isDark }: { isDark: boolean }) {
+export function EndedBar({ isDark, onBrowse }: { isDark: boolean; onBrowse?: () => void }) {
   return (
-    <div
-      className="relative flex items-center gap-3 min-[380px]:gap-4 overflow-hidden px-4 min-[380px]:px-5 py-3 rounded-2xl"
-      style={{
-        background: isDark ? 'transparent' : 'rgba(255,255,255,0.72)',
-        backdropFilter: isDark ? 'blur(60px) saturate(2) brightness(1.15)' : 'blur(24px) saturate(1.8)',
-        WebkitBackdropFilter: isDark ? 'blur(60px) saturate(2) brightness(1.15)' : 'blur(24px) saturate(1.8)',
-        border: 'none',
-      }}
-    >
+    <div className="relative grid items-center gap-3 overflow-hidden rounded-2xl px-4 py-3"
+      style={{ ...purchaseBarGlass(isDark), gridTemplateColumns: onBrowse ? "minmax(0, 1fr) auto minmax(0, 1fr)" : "minmax(0, 1fr)" }}>
       <GlassReflection isDark={isDark} />
-      <div className="relative z-10 flex flex-col flex-shrink-0 gap-1" style={{ width: 78 }}>
-        <span
-          className="text-[9px] tracking-[1.8px] uppercase leading-none"
-          style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(214,249,5,0.7)' : 'rgba(0,0,0,0.55)', fontWeight: 600 }}
-        >
-          Event ended
+      <div role="status" className="relative flex min-w-0 items-center gap-2.5">
+        <span className="relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl" style={glassControl(isDark)}>
+          <GlassReflection isDark={isDark} />
+          <Hourglass aria-hidden="true" className="relative h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: isDark ? '#d6f905' : '#0a0a0a' }} />
-          <span
-            className="text-[10px] leading-none"
-            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
-          >
-            No tickets
-          </span>
+        <div>
+          <p className="text-[9px] uppercase tracking-[1.5px] text-muted-foreground">Tickets</p>
+          <p className="text-xs text-foreground" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif" }}>Event ended</p>
         </div>
       </div>
-      <div className="relative z-10 w-px self-stretch my-1" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
-      <div
-        className="relative z-10 flex flex-1 items-center justify-center gap-2 rounded-xl py-3 cursor-not-allowed opacity-50"
-        style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
-      >
-        <CalendarX className="w-4 h-4" strokeWidth={1.75} style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} />
-        <span
-          className="text-[14px] tracking-[0.3px]"
-          style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}
-        >
-          Event ended
-        </span>
-      </div>
+      {onBrowse && (<>
+        <span aria-hidden="true" className="relative h-6 w-px self-center bg-current/10" />
+        <AppButton onClick={onBrowse} className="relative inline-flex h-10 shrink-0 items-center justify-self-end rounded-full px-5 sm:px-6 text-xs font-semibold"
+          style={{ ...glassEdge(isDark), background: isDark ? 'rgba(214,249,5,0.12)' : '#d6f905', color: isDark ? '#d6f905' : '#0a0a0a' }}>
+          Browse events
+        </AppButton>
+        </>
+      )}
     </div>
   );
 }

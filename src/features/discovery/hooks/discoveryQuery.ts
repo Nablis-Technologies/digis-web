@@ -77,6 +77,7 @@ const SORT_MAP: Record<EventSortBy, EventListSort | undefined> = {
 };
 
 export interface DiscoveryFilterState {
+  onlyFeatured?: boolean;
   /** Free-text search as typed (only ≥2 chars reach the server). */
   q: string;
   /** Backend category **slug** for the selected pill (`undefined` for "All"). */
@@ -98,6 +99,7 @@ export function discoveryServerQuery(
   state: DiscoveryFilterState,
 ): PublicEventQuery | null {
   const query: PublicEventQuery = {};
+  if (state.onlyFeatured) query.featured = true;
 
   const search = state.q.trim();
   if (search.length >= 2) query.q = search;
