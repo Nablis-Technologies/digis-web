@@ -2,32 +2,33 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, BadgeCheck, Calendar, Check, Clock, Crown, MapPin, Music2, Share2, UserPlus, Users, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { flatAvatarColor } from '@/lib/utils/avatarColor';
+import { placeholderSurface, placeholderInk } from '@/lib/utils/avatarAppearance';
 import { BrandAppleMusic, BrandInstagram, BrandSoundCloud, BrandSpotify, BrandTikTok, BrandYouTube, BrandWebsite } from './BrandIcons';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 
 export function resolveLineup(lineup: any): any[] {
-  const defaults = [
-    { name: 'Rophnan', handle: '@rophnan', role: 'Headliner', time: '11:00 PM', genre: 'Electronic', verified: true, followers: 184000, eventsPlayed: 72, rating: 4.9, bio: 'Pioneer of Ethio-electronic. Blending Habesha roots with global club sound.', image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 60%, #ec4899 100%)' },
-    { name: 'Mikaya Behailu', handle: '@mikayabehailu', role: 'Support', time: '9:30 PM', genre: 'Soul', verified: true, followers: 62000, eventsPlayed: 38, rating: 4.7, bio: 'Soulful vocals meet contemporary Ethiopian songwriting.', image: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)' },
-    { name: 'DJ Henok', handle: '@djhenok', role: 'Opening Set', time: '8:00 PM', genre: 'House', verified: false, followers: 24000, eventsPlayed: 110, rating: 4.6, bio: 'Resident DJ behind Addis\'s loudest dancefloors.', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #06b6d4 0%, #d6f905 100%)' },
-    { name: 'Liyou', handle: '@liyou', role: 'Special Guest', time: '12:30 AM', genre: 'Afro Pop', verified: true, followers: 91000, eventsPlayed: 45, rating: 4.8, bio: 'Afro-pop rising star with chart-topping releases.', image: 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=80&w=600&h=720', gradient: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)' },
-  ];
-  const source = Array.isArray(lineup) && lineup.length > 0 ? lineup : defaults;
-  return source.map((a: any, i: number) => ({
+  // Backend-sourced only — never fabricate a lineup or fill missing artist fields
+  // with invented values. The roster now comes from the public detail's
+  // `event_participants` (#36 resolved 2026-10-17); the profile fields below stay
+  // because the `ui-preview` mock drives them (the public participant serializer
+  // serves only name / type / description / event_date_id). Absent lineup →
+  // empty → the section hides.
+  const source = Array.isArray(lineup) ? lineup : [];
+  return source.map((a: any) => ({
     name: a.name,
-    handle: a.handle ?? defaults[i % defaults.length].handle,
-    role: a.role ?? 'Performer',
-    time: a.time ?? '—',
-    genre: a.genre ?? '',
-    verified: a.verified ?? false,
-    followers: a.followers ?? 12000,
-    eventsPlayed: a.eventsPlayed ?? 20,
-    rating: a.rating ?? 4.5,
-    bio: a.bio ?? 'Artist bio coming soon.',
+    handle: a.handle,
+    role: a.role,
+    time: a.time,
+    genre: a.genre,
+    verified: a.verified === true,
+    followers: a.followers,
+    eventsPlayed: a.eventsPlayed,
+    rating: a.rating,
+    bio: a.bio,
     image: a.image,
-    gradient: a.gradient ?? defaults[i % defaults.length].gradient,
   }));
 }
 
@@ -38,6 +39,8 @@ export function resolveLineup(lineup: any): any[] {
  */
 export function LineupSection({ lineup, isDark, compact = false }: { lineup: any; isDark: boolean; compact?: boolean }) {
   const artists = resolveLineup(lineup);
+  // No backend lineup → render nothing (never a fabricated one).
+  if (artists.length === 0) return null;
   const accent = isDark ? '#d6f905' : '#d6f905';
   const accentRgb = isDark ? '214,249,5' : '214,249,5';
   const initialsOf = (name: string) => name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
@@ -59,7 +62,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
           style={{
             fontFamily: "'Inter', sans-serif",
             background: isDark ? 'rgba(214,249,5,0.08)' : 'transparent',
-            border: `1px solid ${isDark ? `rgba(${accentRgb},0.18)` : 'rgba(0,0,0,0.1)'}`,
+            ...glassEdge(isDark),
             color: isDark ? accent : '#0a0a0a',
           }}>
           {artists.length} artists
@@ -85,10 +88,8 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
               <div className={`relative w-full overflow-hidden ${compact ? 'rounded-[20px]' : 'rounded-[22px]'}`}
                 style={{
                   aspectRatio: '3/4',
-                  background: a.image ? undefined : flatAvatarColor(a.name),
-                  border: isHeadliner
-                    ? 'none'
-                    : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                  background: a.image ? undefined : placeholderSurface(isDark),
+                  ...(isHeadliner ? {} : glassEdge(isDark)),
                 }}>
                 {a.image && (
                   <img src={a.image} alt={a.name}
@@ -102,7 +103,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
                       fontFamily: "'Zalando Sans Expanded', sans-serif",
                       fontSize: 72,
                       letterSpacing: '-3px',
-                      color: 'rgba(255,255,255,0.95)',
+                      color: placeholderInk(isDark),
                       textShadow: '0 4px 24px rgba(0,0,0,0.4)',
                     }}>
                       {initialsOf(a.name)}
@@ -149,7 +150,7 @@ export function LineupSection({ lineup, isDark, compact = false }: { lineup: any
                     <Clock className="w-2.5 h-2.5" style={{ color: 'rgba(255,255,255,0.85)' }} strokeWidth={2} />
                     <span className="text-[10px] tracking-[0.6px]"
                       style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
-                      {a.time}
+                      {a.time ?? a.role ?? 'Performer'}
                     </span>
                   </div>
                 </div>
@@ -199,24 +200,25 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col"
         style={{
-          background: isDark ? '#101010' : '#fff',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+          background: 'var(--card)',
           maxHeight: '90vh',
         }}>
+        <GlassReflection isDark={isDark} />
+
         {/* Close — sticky top-right, always reachable */}
         <AppButton onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
           style={{
             background: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.85)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
           }}>
-          <X className="w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
+          <GlassReflection isDark={isDark} />
+          <X className="relative z-10 w-4 h-4" style={{ color: isDark ? '#fff' : 'rgba(0,0,0,0.8)' }} strokeWidth={2.25} />
         </AppButton>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="relative z-10 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* Profile */}
         <div className="px-6 pb-6 pt-7">
@@ -224,10 +226,10 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
           <div className="flex items-center gap-4 pr-10 mb-5">
             <div className="relative w-[88px] h-[88px] rounded-full overflow-hidden flex-shrink-0"
               style={{
-                background: artist.image ? undefined : artist.gradient,
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
+                background: artist.image ? undefined : placeholderSurface(isDark),
                 boxShadow: isDark ? '0 8px 28px rgba(0,0,0,0.45)' : '0 8px 28px rgba(20,18,40,0.14)',
               }}>
+              <GlassReflection isDark={isDark} />
               {artist.image ? (
                 <img src={artist.image} alt={artist.name} className="w-full h-full object-cover" />
               ) : (
@@ -236,7 +238,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                     fontFamily: "'Zalando Sans Expanded', sans-serif",
                     fontSize: 34,
                     letterSpacing: '-2px',
-                    color: 'rgba(255,255,255,0.95)',
+                    color: placeholderInk(isDark),
                     textShadow: '0 4px 18px rgba(0,0,0,0.35)',
                   }}>
                     {initials}
@@ -265,10 +267,12 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                 )}
               </div>
               <div className="flex items-center gap-2 mt-1.5 min-w-0">
-                <span className="text-[12px] truncate"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.48)' }}>
-                  {artist.handle}
-                </span>
+                {artist.handle && (
+                  <span className="text-[12px] truncate"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.48)' }}>
+                    {artist.handle}
+                  </span>
+                )}
                 {artist.genre && (
                   <>
                     <span className="w-0.5 h-0.5 rounded-full flex-shrink-0" style={{ background: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.25)' }} />
@@ -279,32 +283,36 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-2">
-                <Clock className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
-                <span className="text-[10.5px] tracking-[0.25px] truncate"
-                  style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.67)' : 'rgba(0,0,0,0.62)', fontWeight: 500 }}>
-                  {artist.role} · {artist.time}
-                </span>
-              </div>
+              {[artist.role, artist.time].filter(Boolean).length > 0 && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Clock className="w-3 h-3" style={{ color: isDark ? accent : '#0a0a0a' }} strokeWidth={2} />
+                  <span className="text-[10.5px] tracking-[0.25px] truncate"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.67)' : 'rgba(0,0,0,0.62)', fontWeight: 500 }}>
+                    {[artist.role, artist.time].filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          <p className="text-[13px] leading-relaxed font-light mb-4"
-            style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
-            {artist.bio}
-          </p>
+          {artist.bio && (
+            <p className="text-[13px] leading-relaxed font-light mb-4"
+              style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)' }}>
+              {artist.bio}
+            </p>
+          )}
 
           {/* Stats */}
-          <div className="flex items-stretch py-3.5 mb-5 rounded-2xl"
+          <div className="relative flex items-stretch overflow-hidden py-3.5 mb-5 rounded-2xl"
             style={{
               background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
             }}>
+            <GlassReflection isDark={isDark} />
             {[
-              { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(artist.followers) },
-              { icon: <Music2 className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Shows', value: `${artist.eventsPlayed}` },
-            ].map((s, i) => (
-              <div key={s.label} className="flex-1 flex items-stretch">
+              artist.followers != null && { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Followers', value: formatCount(artist.followers) },
+              artist.eventsPlayed != null && { icon: <Music2 className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Shows', value: `${artist.eventsPlayed}` },
+            ].filter(Boolean).map((s: any, i: number) => (
+              <div key={s.label} className="relative z-10 flex-1 flex items-stretch">
                 {i > 0 && (
                   <div className="w-px self-stretch my-1"
                     style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
@@ -341,9 +349,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                 background: following
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)')
                   : accent,
-                border: `1px solid ${following
-                  ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
-                  : 'transparent'}`,
+                ...(following ? glassEdge(isDark) : {}),
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : '#0a0a0a',
               }}>
               {following
@@ -361,21 +367,25 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   (navigator as any).share({ title: artist.name, text: artist.bio || artist.name }).catch(() => {});
                 }
               }}
-              className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl cursor-pointer"
+              className="relative flex-shrink-0 flex items-center justify-center gap-2 overflow-hidden px-4 py-3 rounded-2xl cursor-pointer"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                 color: isDark ? '#fff' : '#1a1a1a',
               }}>
-              <Share2 className="w-4 h-4" strokeWidth={2} />
-              <span className="text-[12.5px] tracking-[0.3px]"
+              <GlassReflection isDark={isDark} />
+              <Share2 className="relative z-10 w-4 h-4" strokeWidth={2} />
+              <span className="relative z-10 text-[12.5px] tracking-[0.3px]"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                 Share
               </span>
             </AppButton>
           </div>
 
-          {/* Socials & Music */}
+          {/* Socials & Music. The platform list is unwired scaffolding — the
+              backend serves no per-artist social/music links yet, so these are
+              inert buttons, not the artist's real profiles (a data-bearing
+              surface would come with the artist endpoint; parked, per the
+              `web2-ui-import` scoping — not invented data). */}
           <div className="mb-5">
             <span className="text-[10px] tracking-[1.8px] uppercase block mb-2.5"
               style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
@@ -393,13 +403,13 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
               ].map((s) => (
                 <AppButton key={s.label} whileTap={{ scale: 0.95 }}
                   className="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer">
-                  <div className="w-[60px] h-[60px] rounded-2xl flex items-center justify-center"
+                  <div className="relative w-[60px] h-[60px] rounded-2xl overflow-hidden flex items-center justify-center"
                     style={{
                       background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
                       color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(20,18,40,0.85)',
                     }}>
-                    {s.icon}
+                    <GlassReflection isDark={isDark} />
+                    <span className="relative z-10 flex items-center justify-center">{s.icon}</span>
                   </div>
                   <span className="text-[10px] tracking-[0.2px]"
                     style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)' }}>
@@ -410,22 +420,15 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
             </div>
           </div>
 
-          {/* Events with segmented control */}
+          {/* Events with segmented control. No backend endpoint serves a
+              per-artist event history, so this renders only what the artist
+              payload actually carries — the export's sample rows are gone
+              (ADR-0002; `.scratch/web2-ui-import/issues/03`). No events at all →
+              the whole block is omitted rather than shown empty. */}
           {(() => {
-            const upcoming = (Array.isArray(artist.upcomingEvents) && artist.upcomingEvents.length > 0)
-              ? artist.upcomingEvents
-              : [
-                  { name: 'Addis Vibes Festival', date: 'Mar 15, 2026', venue: 'Millennium Hall', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)' },
-                  { name: 'Skyline Sessions Vol. 4', date: 'Apr 02, 2026', venue: 'Sheraton Addis', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #d6f905 0%, #1a1a1a 100%)' },
-                  { name: 'Bahir Dar Lakeside', date: 'May 10, 2026', venue: 'Blue Nile Resort', city: 'Bahir Dar', gradient: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)' },
-                ];
-            const past = (Array.isArray(artist.pastEvents) && artist.pastEvents.length > 0)
-              ? artist.pastEvents
-              : [
-                  { name: 'Meskel Square Live', date: 'Sep 27, 2025', venue: 'Meskel Square', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #7c3aed 0%, #4338ca 100%)', attendees: 5800 },
-                  { name: 'Hager Fikir Acoustic', date: 'Jul 18, 2025', venue: 'Hager Fikir Theatre', city: 'Addis Ababa', gradient: 'linear-gradient(135deg, #be185d 0%, #831843 100%)', attendees: 900 },
-                  { name: 'Gondar Roots Festival', date: 'Mar 02, 2025', venue: 'Fasil Ghebbi', city: 'Gondar', gradient: 'linear-gradient(135deg, #b45309 0%, #78350f 100%)', attendees: 1600 },
-                ];
+            const upcoming = Array.isArray(artist.upcomingEvents) ? artist.upcomingEvents : [];
+            const past = Array.isArray(artist.pastEvents) ? artist.pastEvents : [];
+            if (upcoming.length === 0 && past.length === 0) return null;
             const active = eventsTab === 'upcoming' ? upcoming : past;
             const isPast = eventsTab === 'past';
             return (
@@ -434,7 +437,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                 <SegmentedToggle
                   className="mb-3"
                   value={eventsTab}
-                  onValueChange={setEventsTab}
+                  onValueChange={(v) => setEventsTab(v as 'upcoming' | 'past')}
                   isDark={isDark}
                   ariaLabel="Artist event history"
                   options={(['upcoming', 'past'] as const).map((tab) => {
@@ -447,30 +450,38 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   })}
                 />
                 <div className="space-y-2">
+                  {active.length === 0 && (
+                    <p className="py-2 text-[12px]"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+                      No {isPast ? 'past' : 'upcoming'} events to show.
+                    </p>
+                  )}
                   {active.map((ev: any, i: number) => (
                     <AppButton key={ev.name + i} whileTap={{ scale: 0.99 }}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-2xl text-left cursor-pointer"
+                      className="relative w-full flex items-center gap-3 overflow-hidden p-2.5 rounded-2xl text-left cursor-pointer"
                       style={{
                         background: isDark ? (isPast ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.03)') : (isPast ? 'rgba(0,0,0,0.015)' : 'rgba(0,0,0,0.02)'),
-                        border: `1px solid ${isDark ? (isPast ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.06)') : (isPast ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.05)')}`,
                       }}>
-                      <div className="relative w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
-                        style={{ background: ev.image ? undefined : ev.gradient, filter: isPast ? 'saturate(0.7)' : undefined }}>
+                      <GlassReflection isDark={isDark} />
+                      <div className="relative z-10 w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden flex flex-col items-center justify-center"
+                        style={{ background: ev.image ? undefined : placeholderSurface(isDark), filter: isPast ? 'saturate(0.7)' : undefined }}>
                         {ev.image && <img src={ev.image} alt={ev.name} className="w-full h-full object-cover" />}
-                        <div className="absolute inset-0"
-                          style={{ background: isPast
-                            ? 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)'
-                            : 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%)' }} />
+                        {ev.image && (
+                          <div className="absolute inset-0"
+                            style={{ background: isPast
+                              ? 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)'
+                              : 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.45) 100%)' }} />
+                        )}
                         <span className="relative text-[9px] tracking-[1px] uppercase leading-none"
-                          style={{ fontFamily: "'Inter', sans-serif", color: isPast ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                          style={{ fontFamily: "'Inter', sans-serif", color: ev.image ? (isPast ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)') : placeholderInk(isDark), fontWeight: 600 }}>
                           {ev.date.split(' ')[0]}
                         </span>
                         <span className="relative text-[13px] leading-none mt-0.5"
-                          style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isPast ? 'rgba(255,255,255,0.9)' : '#fff' }}>
+                          style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: ev.image ? (isPast ? 'rgba(255,255,255,0.9)' : '#fff') : placeholderInk(isDark) }}>
                           {ev.date.split(' ')[1]?.replace(',', '')}
                         </span>
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="relative z-10 flex-1 min-w-0">
                         <p className="text-[13px] truncate leading-tight"
                           style={{ fontFamily: "'Inter', sans-serif", color: isDark ? (isPast ? 'rgba(255,255,255,0.85)' : '#fff') : (isPast ? 'rgba(0,0,0,0.8)' : '#1a1a1a'), fontWeight: 500 }}>
                           {ev.name}
@@ -492,7 +503,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                           )}
                         </div>
                       </div>
-                      <ArrowRight className="w-3.5 h-3.5 flex-shrink-0"
+                      <ArrowRight className="relative z-10 w-3.5 h-3.5 flex-shrink-0"
                         style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)' }} strokeWidth={2} />
                     </AppButton>
                   ))}
@@ -510,7 +521,7 @@ function ArtistProfileSheet({ artist, following, onToggleFollow, onClose, isDark
                   ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
                   : (isDark ? 'linear-gradient(135deg, #d6f905 0%, #d9ff00 100%)' : '#0a0a0a'),
                 color: following ? (isDark ? '#fff' : '#1a1a1a') : (isDark ? '#0a0a0a' : '#fff'),
-                border: following ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none',
+                ...(following ? glassEdge(isDark) : {}),
               }}>
               {following ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <UserPlus className="w-4 h-4" strokeWidth={2} />}
               <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>

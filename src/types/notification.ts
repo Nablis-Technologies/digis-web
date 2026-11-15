@@ -12,4 +12,10 @@ export interface AppNotification {
    * When present the notification is clickable and navigates here.
    */
   link?: string;
+  /**
+   * Set only for an incoming transfer whose wire carries `data.transfer_id`:
+   * the recipient can accept it in place (#61). Absent for every other
+   * notification — they are informational.
+   */
+  acceptTransferId?: string;
 }

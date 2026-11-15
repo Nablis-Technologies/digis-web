@@ -26,19 +26,18 @@ const previewEvent: Event = {
   city: "Addis Ababa",
   image: "",
   category: "Music",
-  priceFrom: 850,
+  priceFromMinor: 85000,
   currency: "ETB",
   ticketsLeft: 143,
   ageRestriction: "18+",
-  eventType: "ticketed",
   organizers: [
     { name: "Digis Events Co.", handle: "@digisevents", verified: true, followers: 12400, eventsHosted: 47, rating: 4.8, bio: "Curating memorable cultural and music experiences." },
     { name: "Habesha Sound", handle: "@habeshasound", verified: true, followers: 8200, eventsHosted: 31, rating: 4.7, bio: "Live music collective amplifying East African artists." },
   ],
   ticketTypes: [
-    { name: "Early Bird", level: "LIMITED OFFER", price: 850, originalPrice: 1200, available: 35, isEarlyBird: true, totalCapacity: 100, features: [{ text: "Digital event ticket" }, { text: "Priority entry lane" }] },
-    { name: "Standard Access", level: "ENTRY LEVEL", price: 1200, available: 150, features: [{ text: "Digital event ticket" }, { text: "General admission" }] },
-    { name: "VIP Gold Access", level: "PREMIUM", price: 2500, available: 45, isPremium: true, features: [{ text: "Fast-track entry" }, { text: "Lounge access" }] },
+    { name: "Early Bird", level: "LIMITED OFFER", priceMinor: 85000, originalPriceMinor: 120000, available: 35, isEarlyBird: true, totalCapacity: 100, features: [{ text: "Digital event ticket" }, { text: "Priority entry lane" }] },
+    { name: "Standard Access", level: "ENTRY LEVEL", priceMinor: 120000, available: 150, features: [{ text: "Digital event ticket" }, { text: "General admission" }] },
+    { name: "VIP Gold Access", level: "PREMIUM", priceMinor: 250000, available: 45, isPremium: true, features: [{ text: "Fast-track entry" }, { text: "Lounge access" }] },
   ],
 };
 
@@ -85,8 +84,16 @@ export function UIPreviewPage() {
   </main>;
 }
 
+// Preview-only sample lineup — mock data lives here (a design preview page),
+// never in the shared resolver.
+const PREVIEW_LINEUP = [
+  { name: 'Rophnan', handle: '@rophnan', role: 'Headliner', time: '11:00 PM', genre: 'Electronic', verified: true, followers: 184000, eventsPlayed: 72, rating: 4.9, bio: 'Pioneer of Ethio-electronic.', gradient: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 60%, #ec4899 100%)' },
+  { name: 'Mikaya Behailu', handle: '@mikayabehailu', role: 'Support', time: '9:30 PM', genre: 'Soul', verified: true, followers: 62000, eventsPlayed: 38, rating: 4.7, bio: 'Soulful vocals.', gradient: 'linear-gradient(135deg, #d6f905 0%, #ec4899 100%)' },
+  { name: 'DJ Henok', handle: '@djhenok', role: 'Opening Set', time: '8:00 PM', genre: 'House', verified: false, followers: 24000, eventsPlayed: 110, rating: 4.6, bio: 'Resident DJ.', gradient: 'linear-gradient(135deg, #06b6d4 0%, #d6f905 100%)' },
+];
+
 function LineupDesignOptions({ isDark, reflection }: { isDark: boolean; reflection: GlassSurfaceSettings }) {
-  const artists = resolveLineup(null).slice(0, 3);
+  const artists = resolveLineup(PREVIEW_LINEUP).slice(0, 3);
   const ink = isDark ? "#fff" : "#111";
   const muted = isDark ? "rgba(255,255,255,.52)" : "rgba(0,0,0,.5)";
   const surface = isDark ? "rgba(255,255,255,.045)" : "rgba(255,255,255,.68)";

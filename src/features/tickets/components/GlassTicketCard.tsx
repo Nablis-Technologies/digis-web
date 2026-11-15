@@ -6,6 +6,7 @@ import { useImageColor } from '@/lib/hooks/useImageColor';
 import { tierTheme } from '@/lib/utils/tierTheme';
 import { EventDateBadge } from '@/components/EventDateBadge';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { ticketStatusMeta } from '@/lib/tickets';
 import type { UserTicket } from '@/types';
 
 export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onClick: () => void }) {
@@ -13,6 +14,8 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
   const isVIP = tt.premium;
   const { rgb } = useImageColor(ticket.image || '');
   const { isDark } = useTheme();
+  // A non-active ticket (refunded/void/suspended) must not look valid.
+  const { inactive, label: statusLabel } = ticketStatusMeta(ticket.status);
 
   const countdown = (() => {
     const ts = Date.parse(ticket.eventDate);
@@ -43,7 +46,7 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.985 }}
       onClick={onClick}
-      className="relative cursor-pointer group rounded-[22px] overflow-hidden"
+      className={`relative cursor-pointer group rounded-[22px] overflow-hidden ${inactive ? 'opacity-65' : ''}`}
       style={{
         background: isDark ? '#101010' : '#fff',
         border: 'none',
@@ -133,12 +136,12 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
             style={{ borderTop: `1px dashed ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+              <div className="relative w-5 h-5 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0"
                 style={{
                   background: isDark ? 'rgba(214,249,5,0.12)' : '#d6f905',
-                  border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(0,0,0,0.08)'}`,
                 }}>
-                <TicketIcon className="w-2.5 h-2.5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2} />
+                <GlassReflection isDark={isDark} />
+                <TicketIcon className="relative z-10 w-2.5 h-2.5" style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} strokeWidth={2} />
               </div>
               <span className="text-[10px] tracking-[1px] truncate max-w-[92px]"
                 style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
@@ -147,7 +150,37 @@ export function GlassTicketCard({ ticket, onClick }: { ticket: UserTicket; onCli
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              {countdown && (
+              {inactive && (
+                <span
+                  className="relative inline-flex items-center gap-1 overflow-hidden text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: 600,
+                    background: isDark ? 'rgba(248,113,113,0.14)' : 'rgba(190,18,60,0.1)',
+                    color: isDark ? '#fca5a5' : '#b91c1c',
+                    boxShadow: `0 0 0 1px ${isDark ? 'rgba(248,113,113,0.3)' : 'rgba(190,18,60,0.25)'}`,
+                  }}
+                >
+                  <GlassReflection isDark={isDark} />
+                  <span className="relative z-10">{statusLabel}</span>
+                </span>
+              )}
+              {!inactive && ticket.pendingTransfer && (
+                <span
+                  className="relative inline-flex items-center gap-1 overflow-hidden text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: 600,
+                    background: isDark ? 'rgba(251,191,36,0.16)' : 'rgba(217,119,6,0.12)',
+                    color: isDark ? '#fcd34d' : '#b45309',
+                    boxShadow: `0 0 0 1px ${isDark ? 'rgba(251,191,36,0.32)' : 'rgba(217,119,6,0.28)'}`,
+                  }}
+                >
+                  <GlassReflection isDark={isDark} />
+                  <span className="relative z-10">Transfer pending</span>
+                </span>
+              )}
+              {!inactive && !ticket.pendingTransfer && countdown && (
                 <span
                   className="relative inline-flex items-center gap-1 overflow-hidden text-[9px] tracking-[1.2px] uppercase px-2 py-1 rounded-full"
                   style={{

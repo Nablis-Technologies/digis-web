@@ -6,23 +6,27 @@ import {
   ArrowLeft,
   X,
   User,
-  AtSign,
   Phone,
-  ShieldCheck,
   Check,
   AlertTriangle,
   Link2,
   Copy,
   Bell,
+  ShieldCheck,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
+import { Money } from '@/lib/money';
 import { Field, Row, TicketPreview } from '@/features/tickets/components/TransferTicketParts';
-import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { copyText } from '@/lib/utils/clipboard';
+import { toastError } from '@/lib/feedback';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { FieldError } from '@/components/primitives/FieldError';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassControl, glassEdge, glassField } from '@/lib/ui/glass';
+import { mapApiError } from '@/lib/errors';
 
 interface TransferTicketProps {
   ticket: {
@@ -38,7 +42,7 @@ interface TransferTicketProps {
   /** Uses the same in-dialog delivery flow with gift-specific language. */
   mode?: 'transfer' | 'gift';
   /** Optional extras can be included only when gifting. */
-  giftExtras?: { id: string; name: string; description: string; price: number }[];
+  giftExtras?: { id: string; name: string; description: string; priceMinor: number }[];
   onTransfer: (payload: { ticketId?: string; recipientName: string; contactMethod: ContactMethod; contactValue: string; note: string; extraIds?: string[] }) => Promise<TransferOutcome | void> | TransferOutcome | void;
 }
 
@@ -67,12 +71,13 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
   const { isDark } = useTheme();
   const [step, setStep] = useState(0); // 0=recipient, 1=note, 2=review, 3=sent
   const [recipientName, setRecipientName] = useState('');
-  const [contactMethod, setContactMethod] = useState<ContactMethod>('phone');
   const [contactValue, setContactValue] = useState('');
   const [note, setNote] = useState('');
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
   const [acknowledged, setAcknowledged] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [touched, setTouched] = useState<{ name?: boolean; contact?: boolean }>({});
   const [shareLink, setShareLink] = useState('');
   const [recipientHasAccount, setRecipientHasAccount] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -102,16 +107,23 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
   const selectedExtras = giftExtras.filter((extra) => selectedExtraIds.includes(extra.id));
 
   const recipientValid =
-    recipientName.trim().length > 0 && isValidContact(contactMethod, contactValue);
+    recipientName.trim().length > 0 && isValidContact('phone', contactValue);
   const canProceed = step === 0 ? recipientValid : step === 2 ? acknowledged : true;
+  // Explain the disabled Continue per field once the user leaves it.
+  const nameError = touched.name && !recipientName.trim() ? "Enter the recipient's name." : undefined;
+  const contactError = touched.contact && !isValidContact('phone', contactValue)
+    ? 'Enter a valid phone number, including the country code.'
+    : undefined;
 
   const handleSend = () => {
     setSending(true);
+    setSendError('');
+    let failed = false;
     setTimeout(() => {
       Promise.resolve(onTransfer({
         ticketId: ticket.id,
         recipientName: recipientName.trim(),
-        contactMethod,
+        contactMethod: 'phone',
         contactValue: contactValue.trim(),
         note: note.trim(),
         extraIds: isGift ? selectedExtraIds : undefined,
@@ -123,18 +135,23 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
           }
         })
         .catch((err) => {
+          failed = true;
           console.error(`Failed to ${isGift ? 'send gift' : 'transfer ticket'}:`, err);
+          setSendError(mapApiError(err));
         })
         .finally(() => {
           setSending(false);
-          setStep(3);
+          if (!failed) setStep(3);
         });
     }, 1400);
   };
 
   const handleCopy = () => {
     if (!shareLink) return;
-    copyText(shareLink).then((didCopy) => { if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); } });
+    copyText(shareLink).then((didCopy) => {
+      if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+      else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+    });
   };
 
   const stepTitle =
@@ -171,10 +188,11 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
         className="relative w-full max-w-md mx-0 sm:mx-4 overflow-hidden rounded-t-[28px] sm:rounded-[28px]"
         style={{
           background: surface,
-          border: `1px solid ${borderSoft}`,
           maxHeight: '92vh',
         }}
       >
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 contents">
         {/* Header */}
         <div className="relative px-6 pt-5 pb-3">
           <div className="flex items-center justify-between">
@@ -183,7 +201,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                 whileTap={{ scale: 0.92 }}
                 onClick={() => setStep(step - 1)}
                 className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ background: surfaceSoft, border: `1px solid ${border}` }}
+                style={{ background: surfaceSoft, ...glassEdge(isDark) }}
                 aria-label="Back"
               >
                 <ArrowLeft className="w-4 h-4" style={{ color: textDim }} strokeWidth={1.8} />
@@ -192,7 +210,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
               <div className="flex items-center gap-2">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}
+                  style={{ background: accentSoft, boxShadow: `0 0 0 1px ${accentBorder}` }}
                 >
                   <FlowIcon className="w-3.5 h-3.5" style={{ color: accentText }} strokeWidth={2} />
                 </div>
@@ -212,7 +230,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                 whileTap={{ scale: 0.92 }}
                 onClick={onClose}
                 className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ background: surfaceSoft, border: `1px solid ${border}` }}
+                style={{ background: surfaceSoft, ...glassEdge(isDark) }}
                 aria-label="Close"
               >
                 <X className="w-4 h-4" style={{ color: textDim }} strokeWidth={1.8} />
@@ -268,54 +286,44 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   icon={<User className="w-4 h-4" strokeWidth={1.8} />}
                   isDark={isDark}
                   active={recipientName.length > 0}
+                  error={Boolean(nameError)}
                 >
                   <AppInput
                     ref={nameRef}
                     type="text"
-                    placeholder="Recipient's full name"
+                    placeholder="Recipient's name"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                    aria-invalid={nameError ? true : undefined}
                     className={`w-full bg-transparent outline-none text-[14px] ${placeholderClass}`}
                     style={{ fontFamily: "'Inter', sans-serif", color: text }}
                   />
                 </Field>
+                {nameError && <FieldError error={nameError} className="flex items-center gap-1.5 px-1 -mt-1 text-[11px]" />}
 
-                {/* Contact method toggle */}
-                <SegmentedToggle
-                  value={contactMethod}
-                  onValueChange={(method) => {
-                    setContactMethod(method);
-                    setContactValue('');
-                  }}
-                  options={[
-                    { value: 'phone', label: 'Phone', icon: <Phone className="w-3.5 h-3.5" strokeWidth={2} /> },
-                    { value: 'email', label: 'Email', icon: <AtSign className="w-3.5 h-3.5" strokeWidth={2} /> },
-                  ]}
-                  isDark={isDark}
-                  ariaLabel="Recipient contact method"
-                />
-
-                {/* Contact value */}
+                {/* Recipient phone — transfers are bound to a verified phone number */}
                 <Field
-                  icon={
-                    contactMethod === 'phone' ? (
-                      <Phone className="w-4 h-4" strokeWidth={1.8} />
-                    ) : (
-                      <AtSign className="w-4 h-4" strokeWidth={1.8} />
-                    )
-                  }
+                  icon={<Phone className="w-4 h-4" strokeWidth={1.8} />}
                   isDark={isDark}
                   active={contactValue.length > 0}
+                  error={Boolean(contactError)}
                 >
                   <AppInput
-                    type={contactMethod === 'email' ? 'email' : 'tel'}
-                    placeholder={contactMethod === 'phone' ? '+251 9·· ·· ·· ··' : 'name@example.com'}
+                    type="tel"
+                    placeholder="+251 9·· ·· ·· ··"
                     value={contactValue}
                     onChange={(e) => setContactValue(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, contact: true }))}
+                    aria-invalid={contactError ? true : undefined}
                     className={`w-full bg-transparent outline-none text-[14px] ${placeholderClass}`}
                     style={{ fontFamily: "'Inter', sans-serif", color: text }}
                   />
                 </Field>
+                {contactError && <FieldError error={contactError} className="flex items-center gap-1.5 px-1 -mt-1 text-[11px]" />}
+                <p className="px-1 text-[10.5px]" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>
+                  They verify with a code sent to this number — the ticket is handed over only after that.
+                </p>
 
                 {/* Mini ticket preview */}
                 <TicketPreview ticket={ticket} isDark={isDark} compact />
@@ -324,12 +332,14 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
 
             {step === 1 && (
               <motion.div key="note" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }} className="mt-3 space-y-4">
-                <div className="rounded-2xl p-3.5" style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}>
-                  <p className="text-[12px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add a short personal note if you’d like. It will travel with the secure claim link.</p>
+                <div className="relative rounded-2xl overflow-hidden p-3.5" style={{ background: accentSoft }}>
+                  <GlassReflection isDark={isDark} />
+                  <p className="relative z-10 text-[12px] leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>Add a short personal note if you’d like. It will travel with the secure claim link.</p>
                 </div>
-                <div className="relative">
-                  <AppTextArea placeholder="Write something thoughtful…" value={note} onChange={(e) => setNote(e.target.value.slice(0, 140))} rows={2} className={`w-full px-4 py-3 rounded-2xl text-[13.5px] outline-none resize-none ${placeholderClass}`} style={{ background: surfaceSoft, border: `1px solid ${note ? accentBorder : borderSoft}`, color: text, fontFamily: "'Inter', sans-serif" }} />
-                  <span className="absolute bottom-2.5 right-3 text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>{note.length}/140</span>
+                <div className="relative rounded-2xl overflow-hidden" style={glassField(isDark, { focused: !!note })}>
+                  <GlassReflection isDark={isDark} />
+                  <AppTextArea placeholder="Write something thoughtful…" value={note} onChange={(e) => setNote(e.target.value.slice(0, 140))} rows={2} className={`relative z-10 w-full px-4 py-3 text-[13.5px] outline-none resize-none ${placeholderClass}`} style={{ color: text, fontFamily: "'Inter', sans-serif" }} />
+                  <span className="absolute bottom-2.5 right-3 z-10 text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textFaint }}>{note.length}/140</span>
                 </div>
                 {isGift && giftExtras.length > 0 && (
                   <div className="space-y-2">
@@ -338,10 +348,10 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                       {giftExtras.map((extra) => {
                         const selected = selectedExtraIds.includes(extra.id);
                         return (
-                          <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, border: `1px solid ${selected ? accentBorder : borderSoft}` }}>
-                            <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: selected ? ACCENT_HEX : 'transparent', border: `1px solid ${selected ? ACCENT_HEX : border}` }}>{selected && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}</span>
+                          <AppButton key={extra.id} onClick={() => setSelectedExtraIds((ids) => selected ? ids.filter((id) => id !== extra.id) : [...ids, extra.id])} className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3 text-left" style={{ background: selected ? accentSoft : surfaceSoft, ...(selected ? glassField(isDark, { focused: true }) : glassField(isDark)) }}>
+                            <span className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: selected ? ACCENT_HEX : 'transparent', boxShadow: `0 0 0 1px ${selected ? ACCENT_HEX : border}` }}>{selected && <Check className="w-3 h-3" style={{ color: '#0a0a0a' }} strokeWidth={3} />}</span>
                             <span className="min-w-0 flex-1"><span className="block text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: text, fontWeight: 600 }}>{extra.name}</span><span className="block mt-0.5 text-[11px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>{extra.description}</span></span>
-                            <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: text }}>ETB {extra.price.toLocaleString()}</span>
+                            <span className="text-[12px] flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif", color: text }}>ETB {Money.fromMinor(extra.priceMinor, "ETB").formatNumber()}</span>
                           </AppButton>
                         );
                       })}
@@ -363,9 +373,11 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
               >
                 {/* From → To */}
                 <div
-                  className="rounded-2xl p-4"
-                  style={{ background: surfaceSoft, border: `1px solid ${borderSoft}` }}
+                  className="relative rounded-2xl overflow-hidden p-4"
+                  style={{ background: surfaceSoft }}
                 >
+                  <GlassReflection isDark={isDark} />
+                  <div className="relative z-10">
                   <Row label="To" isDark={isDark}>
                     <div>
                       <p
@@ -396,12 +408,16 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                       </Row>
                     </>
                   )}
+                  </div>
                 </div>
 
                 {isGift && selectedExtras.length > 0 && (
-                  <div className="rounded-2xl px-4 py-3" style={{ background: surfaceSoft, border: `1px solid ${borderSoft}` }}>
+                  <div className="relative rounded-2xl overflow-hidden px-4 py-3" style={{ background: surfaceSoft }}>
+                    <GlassReflection isDark={isDark} />
+                    <div className="relative z-10">
                     <p className="text-[10px] tracking-[1.3px] uppercase mb-2" style={{ fontFamily: "'Inter', sans-serif", color: textFaint, fontWeight: 600 }}>Gift extras</p>
                     <p className="text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", color: text }}>{selectedExtras.map((extra) => extra.name).join(' · ')}</p>
+                    </div>
                   </div>
                 )}
 
@@ -414,7 +430,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   className="w-full flex items-start gap-3 rounded-2xl p-3.5 text-left"
                   style={{
                     background: acknowledged ? accentSoft : surfaceSoft,
-                    border: `1px solid ${acknowledged ? accentBorder : borderSoft}`,
+                    ...(acknowledged ? glassField(isDark, { focused: true }) : glassField(isDark)),
                     transition: 'all 0.25s',
                   }}
                 >
@@ -422,7 +438,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
                     style={{
                       background: acknowledged ? ACCENT_HEX : 'transparent',
-                      border: `1.5px solid ${acknowledged ? ACCENT_HEX : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}`,
+                      boxShadow: `0 0 0 1.5px ${acknowledged ? ACCENT_HEX : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}`,
                       transition: 'all 0.2s',
                     }}
                   >
@@ -443,6 +459,15 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     </p>
                   </div>
                 </AppButton>
+
+                {sendError && (
+                  <div className="flex items-start gap-2 rounded-2xl px-3.5 py-3" style={{ ...glassControl(isDark, 'danger') }}>
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} strokeWidth={2} />
+                    <p className="text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
+                      {sendError}
+                    </p>
+                  </div>
+                )}
 
                 {/* Security note */}
                 <div className="flex items-center gap-2 px-1">
@@ -475,7 +500,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                   />
                   <motion.div
                     className="absolute inset-0 rounded-full flex items-center justify-center"
-                    style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}
+                    style={{ background: accentSoft, boxShadow: `0 0 0 1px ${accentBorder}` }}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', damping: 14, stiffness: 220, delay: 0.1 }}
@@ -508,7 +533,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                 >
                   {isGift ? 'Your gift for ' : 'We sent '}
                   <span style={{ color: text, fontWeight: 500 }}>{recipientName}</span>{' '}
-                  {isGift ? `is on its way via ${contactMethod}.` : `a claim link via ${contactMethod}.`}
+                  {isGift ? `is on its way via phone.` : `a secure claim link via phone.`}
                 </motion.p>
 
                 {/* Account holders get an in-app notification too */}
@@ -517,13 +542,14 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.62 }}
-                    className="mt-4 w-full max-w-[300px] rounded-2xl px-4 py-3 flex items-center gap-3"
-                    style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}
+                    className="relative mt-4 w-full max-w-[300px] rounded-2xl overflow-hidden px-4 py-3 flex items-center gap-3"
+                    style={{ background: accentSoft }}
                   >
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: isDark ? 'rgba(214,249,5,0.14)' : 'rgba(214,249,5,0.25)' }}>
+                    <GlassReflection isDark={isDark} />
+                    <div className="relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: isDark ? 'rgba(214,249,5,0.14)' : 'rgba(214,249,5,0.25)' }}>
                       <Bell className="w-4 h-4" style={{ color: accentText }} strokeWidth={2} />
                     </div>
-                    <p className="text-left text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
+                    <p className="relative z-10 text-left text-[12px] leading-snug" style={{ fontFamily: "'Inter', sans-serif", color: text }}>
                       They have a Digis account — a notification is already waiting in their app.
                     </p>
                   </motion.div>
@@ -543,7 +569,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
                     <AppButton
                       onClick={handleCopy}
                       className="w-full rounded-2xl px-3.5 py-3 flex items-center gap-3"
-                      style={{ background: surfaceSoft, border: `1px solid ${borderSoft}` }}
+                      style={{ background: surfaceSoft, ...glassEdge(isDark) }}
                     >
                       <Link2 className="w-4 h-4 flex-shrink-0" style={{ color: textDim }} strokeWidth={1.8} />
                       <span className="flex-1 text-left text-[12px] truncate" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
@@ -641,6 +667,7 @@ export function TransferTicket({ ticket, onClose, onTransfer, mode = 'transfer',
             )}
           </div>
         )}
+        </div>
       </motion.div>
     </motion.div>
   );

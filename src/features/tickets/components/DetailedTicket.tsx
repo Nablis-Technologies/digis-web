@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, MapPin, Clock, Share2, Download, ChevronRight, Sparkles, Send, Tag, Check, X, ArrowUpRight, FilePenLine, Plus, Car, Coffee, Gift, Heart, Package, Smartphone, ShoppingBag, Armchair } from 'lucide-react';
+import { Calendar, MapPin, Clock, Share2, Download, ChevronRight, Sparkles, Send, Tag, Check, X, ArrowUpRight, FilePenLine, Plus, Car, Coffee, Gift, Heart, Package, Smartphone, ShoppingBag, Armchair, UserCheck, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useImageColor } from '@/lib/hooks/useImageColor';
@@ -8,6 +8,10 @@ import type { UserTicket } from '@/types';
 import { TicketQRCode } from './TicketQRCode';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { copyText } from '@/lib/utils/clipboard';
+import { toastError } from '@/lib/feedback';
+import { ticketStatusMeta } from '@/lib/tickets';
+import { glassControl } from '@/lib/ui/glass';
 
 const extraIconFor = { parking: Car, merchandise: Package, donation: Heart, food: Coffee, digital_addon: Smartphone, other: Gift, ticket: Gift } as const;
 
@@ -45,22 +49,22 @@ function ExtraCard({ item, index, isDark }: { item: import('@/types').SelectedEv
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05 * index, duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="relative rounded-2xl p-3 flex items-center gap-2.5"
+      className="relative rounded-2xl overflow-hidden p-3 flex items-center gap-2.5"
       style={{
         background: isDark ? `rgba(${s.rgb},0.09)` : 'rgba(255,255,255,0.78)',
-        border: `1px solid rgba(${s.rgb},${isDark ? 0.2 : 0.22})`,
         backdropFilter: 'blur(20px)',
       }}>
-      <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0"
+      <GlassReflection isDark={isDark} />
+      <div className="relative z-10 w-8 h-8 rounded-lg grid place-items-center shrink-0"
         style={{ background: `rgba(${s.rgb},${isDark ? 0.16 : 0.13})`, color: accent }}>
         <Icon className="w-4 h-4" strokeWidth={1.9} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="relative z-10 min-w-0 flex-1">
         <p className="text-[8.5px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: accent, fontWeight: 600 }}>{s.label}</p>
         <p className="text-[12px] leading-tight truncate" style={{ fontFamily: "'Inter', sans-serif", color: t.text, fontWeight: 500 }}>{item.name}</p>
       </div>
       {item.quantity > 1 && (
-        <span className="shrink-0 text-[10px] tabular-nums px-1.5 py-0.5 rounded-full"
+        <span className="relative z-10 shrink-0 text-[10px] tabular-nums px-1.5 py-0.5 rounded-full"
           style={{ fontFamily: "'Inter', sans-serif", color: accent, background: `rgba(${s.rgb},0.12)` }}>×{item.quantity}</span>
       )}
     </motion.div>
@@ -92,9 +96,11 @@ function formatAnswer(value: unknown) {
 /* ═══════════════════════════════════════════════════════
    DETAILED TICKET (modal view)
    ═══════════════════════════════════════════════════════ */
-export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell, onEditAnswers, onAddExtras, onDownload, downloading = false, downloadDone = false, receivedFrom, receivedNote, footer }: {
+export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell, onEditAnswers, onAddExtras, onDownload, downloading = false, downloadDone = false, receivedFrom, receivedNote, footer, onClaim }: {
   ticket: UserTicket; onClose: () => void; onTransfer?: () => void; onShare?: () => void; onResell?: () => void; onEditAnswers?: () => void; onAddExtras?: () => void;
   onDownload?: () => void; downloading?: boolean; downloadDone?: boolean;
+  /** Guest tickets only — "Save to my account" (#31 claim flow). */
+  onClaim?: () => void;
   /** When this ticket arrived via a transfer, the sender's name (shown instead of "Purchased"). */
   receivedFrom?: string;
   /** Optional personal note that came with the transfer. */
@@ -102,21 +108,28 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
   /** Custom call-to-action area rendered below the actions (e.g. "Sign in to add to My Tickets"). */
   footer?: React.ReactNode;
 }) {
+  const pendingTransfer = ticket.pendingTransfer;
   const secondaryActions = [
     onShare && { Icon: Share2, label: 'Share', action: onShare },
-    onTransfer && { Icon: Send, label: 'Transfer', action: onTransfer },
-    onResell && { Icon: Tag, label: 'Resell', action: onResell },
+    // #62: a pending transfer locks the transfer/resale actions until it is
+    // claimed or expires (the backend refuses them anyway — no optimistic UI).
+    !pendingTransfer && onTransfer && { Icon: Send, label: 'Transfer', action: onTransfer },
+    !pendingTransfer && onResell && { Icon: Tag, label: 'Resell', action: onResell },
   ].filter(Boolean) as { Icon: typeof Share2; label: string; action: () => void }[];
   const { rgb } = useImageColor(ticket.image || '');
   const { isDark } = useTheme();
   const t = ticketTokens(isDark);
   const [zoomQR, setZoomQR] = useState(false);
   const [responsesOpen, setResponsesOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Tier tag matches the ticket-type accents from the event/purchase page.
   const tt = tierTheme(ticket.ticketType, ticket.ticketLevel);
   const isVIP = tt.premium;
   const tier = { rgb: tt.rgb, color: isDark ? tt.bright : tt.ink, label: ticket.ticketType || 'Standard' };
+  // A non-active ticket (refunded/void/suspended) is not usable: show a banner
+  // and hide the QR + every action.
+  const { inactive, label: statusLabel } = ticketStatusMeta(ticket.status);
 
   // Countdown
   const countdown = (() => {
@@ -173,9 +186,10 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         <div className="relative px-5 sm:px-7 pt-5 sm:pt-7">
           <div className="flex items-start gap-4">
             {ticket.image && (
-              <div className="shrink-0 w-[54px] h-[54px] sm:w-[64px] sm:h-[64px] rounded-2xl overflow-hidden"
-                style={{ border: `1px solid ${t.panelBorder}`, boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.45)' : '0 10px 30px rgba(20,18,40,0.14)' }}>
-                <img src={ticket.image} alt="" className="w-full h-full object-cover" />
+              <div className="relative shrink-0 w-[54px] h-[54px] sm:w-[64px] sm:h-[64px] rounded-2xl overflow-hidden"
+                style={{ boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.45)' : '0 10px 30px rgba(20,18,40,0.14)' }}>
+                <GlassReflection isDark={isDark} />
+                <img src={ticket.image} alt="" className="relative z-10 w-full h-full object-cover" />
               </div>
             )}
             <div className="min-w-0 flex-1">
@@ -196,14 +210,14 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 {ticket.eventName}
               </h2>
             </div>
-            <AppButton whileTap={{ scale: 0.92 }} onClick={onClose}
-              className="shrink-0 -mt-1 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+            <AppButton whileTap={{ scale: 0.92 }} onClick={onClose} aria-label="Close ticket"
+              className="relative shrink-0 -mt-1 w-9 h-9 rounded-full overflow-hidden flex items-center justify-center cursor-pointer"
               style={{
                 background: isDark ? 'rgba(12,10,24,0.5)' : 'rgba(255,255,255,0.75)',
                 backdropFilter: 'blur(20px)',
-                border: `1px solid ${t.panelBorder}`,
               }}>
-              <X className="w-4 h-4" strokeWidth={1.8} style={{ color: t.textSoft }} />
+              <GlassReflection isDark={isDark} />
+              <X className="relative z-10 w-4 h-4" strokeWidth={1.8} style={{ color: t.textSoft }} />
             </AppButton>
           </div>
 
@@ -236,7 +250,47 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
           )}
         </div>
 
+        {/* Non-active (refunded/void/suspended) — a banner replaces the QR */}
+        {inactive && (
+          <div className="relative px-5 sm:px-7 pt-5">
+            <div className="rounded-2xl p-4 flex items-start gap-3"
+              style={{ ...glassControl(isDark, 'danger') }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#fca5a5' : '#b91c1c' }} strokeWidth={2} />
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fca5a5' : '#b91c1c' }}>
+                  This ticket is {statusLabel?.toLowerCase()}
+                </p>
+                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }}>
+                  It can no longer be used at the gate.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending transfer (#62) — transfer/resale lock until it resolves */}
+        {!inactive && pendingTransfer && (
+          <div className="relative px-5 sm:px-7 pt-5">
+            <div className="rounded-2xl p-4 flex items-start gap-3"
+              style={{
+                background: isDark ? 'rgba(251,191,36,0.10)' : 'rgba(217,119,6,0.08)',
+                border: `1px solid ${isDark ? 'rgba(251,191,36,0.3)' : 'rgba(217,119,6,0.25)'}`,
+              }}>
+              <Send className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: isDark ? '#fcd34d' : '#b45309' }} strokeWidth={2} />
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fcd34d' : '#b45309' }}>
+                  Transfer pending
+                </p>
+                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)' }}>
+                  This ticket is being transferred. Transfer and resale are locked until it is claimed or expires.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* QR — always light so it stays scannable */}
+        {!inactive && (
         <div className="relative px-5 sm:px-7 pt-5">
           <AppButton
             whileTap={{ scale: 0.99 }}
@@ -252,8 +306,8 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 style={{ fontFamily: "'Inter', sans-serif", color: '#9ca3af' }}>
                 Scan at entry
               </p>
-              <p className="text-[10px] sm:text-[11px] font-mono tracking-[1.5px] text-gray-500 break-all leading-snug">
-                {ticket.qrCode}
+              <p className="text-[13px] font-light text-gray-700 leading-snug">
+                {ticket.ticketType || 'Standard'}
               </p>
               <div className="flex items-center gap-1 mt-3 text-[10px] tracking-[1px] uppercase"
                 style={{ fontFamily: "'Inter', sans-serif", color: '#6b7280' }}>
@@ -263,6 +317,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
             </div>
           </AppButton>
         </div>
+        )}
 
         {/* Divider between the QR and the trip details */}
         <div className="relative mx-5 sm:mx-7 mt-5 h-px" style={{ background: t.panelBorder }} />
@@ -328,8 +383,10 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               </>
             ) : (
               <AppButton whileTap={{ scale: 0.99 }} onClick={onAddExtras}
-                className="w-full rounded-2xl px-4 py-3.5 flex items-center gap-3.5 text-left cursor-pointer"
-                style={{ background: t.panel, border: `1px solid ${t.panelBorder}`, backdropFilter: 'blur(24px)' }}>
+                className="relative w-full rounded-2xl overflow-hidden px-4 py-3.5 flex items-center gap-3.5 text-left cursor-pointer"
+                style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+                <GlassReflection isDark={isDark} />
+                <div className="relative z-10 flex items-center gap-3.5 w-full">
                 <span className="shrink-0 w-10 h-10 rounded-xl grid place-items-center"
                   style={{
                     background: isDark ? 'rgba(214,249,5,0.1)' : 'rgba(214,249,5,0.22)',
@@ -345,6 +402,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                   style={{ background: isDark ? 'rgba(214,249,5,0.14)' : 'rgba(214,249,5,0.28)', color: t.accent }}>
                   <Plus className="w-3.5 h-3.5" strokeWidth={2.4} />
                 </span>
+                </div>
               </AppButton>
             )}
           </section>
@@ -353,7 +411,9 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         {/* Responses — collapsed by default */}
         {ticket.customQuestions?.length ? (
           <section className="relative mx-5 sm:mx-7 mt-4 rounded-2xl overflow-hidden"
-            style={{ background: t.panel, border: `1px solid ${t.panelBorder}`, backdropFilter: 'blur(24px)' }}>
+            style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <AppButton
                 type="button"
@@ -391,11 +451,12 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 </motion.dl>
               )}
             </AnimatePresence>
+            </div>
           </section>
         ) : null}
 
-        {/* Primary action: Download */}
-        {onDownload && (
+        {/* Primary action: Download (hidden for a non-active ticket) */}
+        {!inactive && onDownload && (
         <div className="relative px-5 sm:px-7 pt-5">
           <AppButton
             whileTap={{ scale: downloading ? 1 : 0.98 }}
@@ -410,7 +471,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               background: downloadDone
                 ? (isDark ? 'rgba(52,211,153,0.14)' : 'rgba(15,155,108,0.12)')
                 : 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)',
-              border: downloadDone ? `1px solid ${isDark ? 'rgba(52,211,153,0.3)' : 'rgba(15,155,108,0.35)'}` : 'none',
+              boxShadow: downloadDone ? `0 0 0 1px ${isDark ? 'rgba(52,211,153,0.3)' : 'rgba(15,155,108,0.35)'}` : 'none',
               color: downloadDone ? (isDark ? '#34d399' : '#0b7c56') : '#0a0a0a',
             }}
           >
@@ -439,8 +500,8 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
         </div>
         )}
 
-        {/* Secondary actions — roomy stacked tiles */}
-        {secondaryActions.length > 0 && (
+        {/* Secondary actions — roomy stacked tiles (hidden for a non-active ticket) */}
+        {!inactive && secondaryActions.length > 0 && (
           <div className="relative px-5 sm:px-7 pt-3 grid gap-3"
             style={{ gridTemplateColumns: `repeat(${secondaryActions.length}, minmax(0, 1fr))` }}>
             {secondaryActions.map(({ Icon, label, action }) => (
@@ -448,15 +509,71 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
                 key={label}
                 whileTap={{ scale: 0.96 }}
                 onClick={action}
-                className="rounded-2xl py-3.5 flex items-center justify-center gap-2 cursor-pointer"
-                style={{ background: t.panel, border: `1px solid ${t.panelBorder}`, backdropFilter: 'blur(24px)' }}>
+                className="relative rounded-2xl overflow-hidden py-3.5 flex items-center justify-center gap-2 cursor-pointer"
+                style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+                <GlassReflection isDark={isDark} />
+                <span className="relative z-10 flex items-center justify-center gap-2">
                 <Icon className="w-[18px] h-[18px]" style={{ color: t.textSoft }} strokeWidth={1.8} />
                 <span className="text-[11.5px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: t.text }}>
                   {label}
                 </span>
+                </span>
               </AppButton>
             ))}
+          </div>
+        )}
+
+        {/* Signed public view link — guest payment-refresh tickets only (#14).
+            Lets a guest reopen/share the ticket from another device. */}
+        {ticket.ticketViewUrl && (
+          <div className="relative px-5 sm:px-7 pt-3">
+            <AppButton
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                void copyText(ticket.ticketViewUrl!).then((ok) => {
+                  if (ok) {
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 1800);
+                  } else {
+                    toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+                  }
+                });
+              }}
+              className="relative w-full rounded-2xl overflow-hidden py-3 px-4 flex items-center gap-3 cursor-pointer"
+              style={{ background: t.panel, backdropFilter: 'blur(24px)' }}>
+              <GlassReflection isDark={isDark} />
+              <ArrowUpRight className="relative z-10 w-[16px] h-[16px] flex-shrink-0" style={{ color: t.textSoft }} strokeWidth={1.8} />
+              <span className="relative z-10 flex-1 min-w-0">
+                <span className="block text-[11.5px]" style={{ fontFamily: "'Inter', sans-serif", color: t.text, fontWeight: 600 }}>
+                  Ticket link
+                </span>
+                <span className="block truncate text-[10.5px]" style={{ fontFamily: "'Inter', sans-serif", color: t.textSoft }}>
+                  Reopen or share this ticket from any device
+                </span>
+              </span>
+              <span className="relative z-10 flex items-center gap-1 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: linkCopied ? t.accent : t.textSoft, fontWeight: 600 }}>
+                {linkCopied && <Check className="w-3 h-3" strokeWidth={2.5} />}
+                {linkCopied ? 'Copied' : 'Copy'}
+              </span>
+            </AppButton>
+          </div>
+        )}
+
+        {/* Save-to-account — guest tickets only (#31 claim). */}
+        {onClaim && (
+          <div className="relative px-5 sm:px-7 pt-3">
+            <AppButton
+              whileTap={{ scale: 0.97 }}
+              onClick={onClaim}
+              className="relative w-full rounded-2xl overflow-hidden py-3.5 flex items-center justify-center gap-2 cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, #d9ff00, #d6f905)', color: '#0a0a0a' }}>
+              <GlassReflection isDark={isDark} />
+              <UserCheck className="relative z-10 w-[16px] h-[16px]" strokeWidth={2} />
+              <span className="relative z-10 text-[12.5px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>
+                Save to my account
+              </span>
+            </AppButton>
           </div>
         )}
 
@@ -491,7 +608,7 @@ export function DetailedTicket({ ticket, onClose, onTransfer, onShare, onResell,
               <div className="w-[280px] h-[280px] flex items-center justify-center">
                 <TicketQRCode code={ticket.qrCode} />
               </div>
-              <p className="text-[14px] font-mono tracking-[2px] text-gray-700 mt-6">{ticket.qrCode}</p>
+              <p className="text-[14px] font-light tracking-[1px] text-gray-700 mt-6">{ticket.ticketType || 'Standard'}</p>
               <p className="text-[11px] tracking-[1px] uppercase mt-8 text-gray-400"
                 style={{ fontFamily: "'Inter', sans-serif" }}>
                 Tap anywhere to close

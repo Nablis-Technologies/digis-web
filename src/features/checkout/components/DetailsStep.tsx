@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertCircle, Mail, Phone, Shield, User } from 'lucide-react';
+import { AlertCircle, Mail, Phone, User } from 'lucide-react';
 import type { ContactDetails } from '@/features/checkout/hooks/useCheckoutFlow';
 import { SegmentedToggle } from '@/components/primitives/SegmentedToggle';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassField } from '@/lib/ui/glass';
 
 export function DetailsStep({
   name, setName, email, setEmail, phone, setPhone,
@@ -29,7 +31,7 @@ export function DetailsStep({
       </div>
 
       <Field
-        icon={<User className="w-4 h-4" />} label="Full name" placeholder="Abebe Bekele"
+        icon={<User className="w-4 h-4" />} label="Name" placeholder="Abebe"
         value={name} onChange={(v: string) => { setName(v); setErrors((e: any) => ({ ...e, name: undefined })); }}
         error={errors.name} isDark={isDark}
       />
@@ -70,23 +72,11 @@ export function DetailsStep({
         )}
       </div>
 
-      <div className="flex items-start gap-2.5 rounded-xl p-3.5 mt-2"
-        style={{
-          background: isDark ? 'rgba(217,255,0,0.06)' : 'rgba(214,249,5,0.05)',
-          border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.12)'}`,
-        }}>
-        <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={1.5}
-          style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
-        <p className="text-[11px] leading-relaxed"
-          style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
-          Your details are encrypted and used only for your ticket. We never share with third parties.
-        </p>
-      </div>
     </div>
   );
 }
 
-function Field({ icon, label, type = 'text', placeholder, value, onChange, error, isDark }: any) {
+export function Field({ icon, label, type = 'text', placeholder, value, onChange, error, isDark, textarea, rows = 2, maxLength, helpText }: any) {
   const [focused, setFocused] = useState(false);
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.45)';
@@ -94,40 +84,57 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
 
   return (
     <div>
-      {label && (
-        <label className="text-[10px] tracking-[1.5px] uppercase mb-2 ml-1 block"
-          style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-          {label}
-        </label>
-      )}
-      <div className="relative">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2"
+      <div className="flex items-center justify-between mb-2 ml-1">
+        {label && (
+          <label className="text-[10px] tracking-[1.5px] uppercase block"
+            style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+            {label}
+          </label>
+        )}
+        {helpText && (
+          <span className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
+            {helpText}
+          </span>
+        )}
+      </div>
+      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+        <GlassReflection isDark={isDark} />
+        <div className={`absolute left-4 z-10 ${textarea ? 'top-4' : 'top-1/2 -translate-y-1/2'}`}
           style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim, transition: 'color 0.2s' }}>
           {icon}
         </div>
-        <AppInput
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3.5 rounded-xl outline-none transition-all"
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: '14px',
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-            border: `1px solid ${hasError
-              ? '#ef4444'
-              : focused
-                ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.4)')
-                : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
-            color: textPrimary,
-            boxShadow: focused && !hasError
-              ? `0 0 0 4px ${isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.08)'}`
-              : 'none',
-          }}
-        />
+        {textarea ? (
+          <AppTextArea
+            rows={rows}
+            maxLength={maxLength}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder}
+            className="relative z-10 w-full pl-11 pr-4 py-3 outline-none transition-all resize-none"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '14px',
+              color: textPrimary,
+            }}
+          />
+        ) : (
+          <AppInput
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder}
+            className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '14px',
+              color: textPrimary,
+            }}
+          />
+        )}
       </div>
       <AnimatePresence>
         {hasError && (

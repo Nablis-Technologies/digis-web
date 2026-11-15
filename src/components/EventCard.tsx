@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronRight, Clock, Hourglass, Lock, MapPin, Radio } from "lucide-react";
+import { ChevronRight, Clock, MapPin, Radio } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
-import { formatETB } from "@/lib/utils/format";
+import { Money } from "@/lib/money";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { EventDateBadge } from "@/components/EventDateBadge";
+import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadges";
 import { glassShadow } from "@/lib/ui/glass";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
+import { eventEnded } from "@/lib/eventDates";
+import { isSeries } from "@/lib/recurring";
+import { eventActionLabel } from "@/lib/eventAction";
+import { availabilityMeta } from "@/lib/eventAvailability";
+
+// Invite-only distinguisher accent — a fixed amber, deliberately not the
+// per-event category hue, so a gated event reads distinctly.
 
 /** Combine an event's date ("June 29, 2026") + time ("8:00 PM") into a Date. */
 export function getEventStart(dateStr: string, timeStr?: string): Date {
@@ -56,6 +64,56 @@ export function formatCountdown(ms: number): string {
   if (d > 0) return `${d}d ${String(h).padStart(2, "0")}h`;
   if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
   return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+/** Month abbreviation + day-of-month from an ISO date, for the range badge. */
+function monthDayOf(iso: string): { month: string; day: string } {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return { month: "---", day: "--" };
+  return {
+    month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
+    day: String(d.getDate()).padStart(2, "0"),
+  };
+}
+
+/**
+ * Card format vocabulary. `recurring` is produced **only** when the backend
+ * serves a series signal (`isSeries` in `lib/recurring.ts`) — never inferred
+ * from the date count (ADR-0002: never invent).
+ */
+export type CardFormat = "single" | "multiDay" | "recurring";
+
+/** Series when the backend signals one, else multi-day when >1 date. */
+export function cardFormat(event: Pick<Event, "eventDates" | "recurrence" | "isRecurring">): CardFormat {
+  if (isSeries(event)) return "recurring";
+  return (event.eventDates?.length ?? 0) > 1 ? "multiDay" : "single";
+}
+
+/**
+ * Uppercase label for a card format chip, e.g. "MULTI-DAY". A series reads
+ * "RECURRING" — the cadence word ("weekly") is not derivable from the public
+ * dates alone, so it is not claimed.
+ */
+export function cardFormatLabel(format: CardFormat): string {
+  if (format === "multiDay") return "MULTI-DAY";
+  if (format === "recurring") return "RECURRING";
+  return "";
+}
+
+/** Month/day range across an event's dates, e.g. { month: "AUG–SEP", range: "28–30" }. */
+export function cardDateRange(eventDates: Event["eventDates"]): { month: string; range: string } {
+  const dates = (eventDates ?? [])
+    .map((d) => new Date(d.startsAt))
+    .filter((d) => !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (dates.length < 2) {
+    const md = dates[0] ? monthDayOf(dates[0].toISOString()) : { month: "---", day: "--" };
+    return { month: md.month, range: md.day };
+  }
+  const first = monthDayOf(dates[0].toISOString());
+  const last = monthDayOf(dates[dates.length - 1].toISOString());
+  const month = first.month === last.month ? first.month : `${first.month}–${last.month}`;
+  return { month, range: first.day === last.day ? first.day : `${first.day}–${last.day}` };
 }
 
 export function parseDateParts(dateStr: string): {
@@ -178,10 +236,9 @@ export function CountdownBadge({ event }: { event: Event }) {
           background: bg,
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
-          border: `1px solid ${isLive ? "rgba(255,255,255,0.3)" : "rgba(214,249,5,0.4)"}`,
           boxShadow: isLive
-            ? "0 8px 20px rgba(220,38,38,0.3)"
-            : "0 8px 20px rgba(0,0,0,0.3)",
+            ? "0 0 0 1px rgba(255,255,255,0.3), 0 8px 20px rgba(220,38,38,0.3)"
+            : "0 0 0 1px rgba(214,249,5,0.4), 0 8px 20px rgba(0,0,0,0.3)",
         }}
       >
         {isLive ? (
@@ -216,24 +273,32 @@ export function CountdownBadge({ event }: { event: Event }) {
 export function EventCard({
   event,
   onClick,
+  /** Above-the-fold cards skip lazy-loading so the first paint isn't gated. */
+  eager = false,
 }: {
   event: Event;
   onClick: () => void;
+  eager?: boolean;
 }) {
   const { rgb } = useImageColor(event.image);
   const { isDark } = useTheme();
-  const isSoldOut = event.ticketsLeft <= 0;
+  // G-44: prefer the server's sellability/lifecycle. Fall back to the local
+  // derivation only when the backend omits them (ADR-0002 — never invent).
+  const availability = availabilityMeta(event);
+  const isSoldOut = availability.badge === 'Sold Out';
+  // Ended: server lifecycle wins; else the local past-date gate (#34).
+  const isEnded = event.eventLifecycle === 'ended' || eventEnded(event);
+  const isInactive = isSoldOut || isEnded || (availability.buyBlocked && event.ticketAvailability !== 'no_public_tickets');
   const isLow =
-    event.ticketsLeft > 0 && event.ticketsLeft <= 45;
+    typeof event.ticketsLeft === "number" && event.ticketsLeft > 0 && event.ticketsLeft <= 45;
   const accent = isDark ? "#d6f905" : "#d6f905";
   const accentRgb = "214,249,5";
   const priceColor = isDark ? "#d6f905" : "#0a0a0a";
-  const priceLabel =
-    event.eventType === "rsvp"
-      ? "Free RSVP"
-      : event.eventType === "inviteOnly" && !event.inviteOnlyPaid
-        ? "Invite only"
-        : formatETB(event.priceFrom);
+  const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const format = cardFormat(event);
+  const formatLabel = cardFormatLabel(format);
+  const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
+  const showDayPasses = format === "multiDay";
 
   return (
     <motion.div
@@ -257,13 +322,17 @@ export function EventCard({
         }}
       >
         <img
-          src={event.image}
+          src={event.imageThumb ?? event.image}
+          {...(event.imageThumb
+            ? { srcSet: `${event.imageThumb} 200w, ${event.image} 800w`, sizes: "(max-width: 768px) 100vw, 343px" }
+            : {})}
           alt={event.name}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
-          loading="lazy"
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : "auto"}
           decoding="async"
           style={{
-            filter: isSoldOut
+            filter: isInactive
               ? "saturate(0.3) brightness(0.65)"
               : "none",
           }}
@@ -276,7 +345,7 @@ export function EventCard({
           }}
         />
 
-        {isSoldOut && (
+        {isInactive && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9, rotate: -28 }}
             animate={{ opacity: 1, scale: 1, rotate: -28 }}
@@ -289,13 +358,12 @@ export function EventCard({
             <div
               className="px-5 py-2 rounded-lg"
               style={{
-                border: `1.5px solid rgba(${accentRgb},0.85)`,
                 background: isDark
                   ? "rgba(10,10,10,0.34)"
                   : "rgba(10,10,10,0.42)",
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
-                boxShadow: `0 12px 30px rgba(0,0,0,0.28)`,
+                boxShadow: `0 0 0 1.5px rgba(${accentRgb},0.85), 0 12px 30px rgba(0,0,0,0.28)`,
               }}
             >
               <span
@@ -307,61 +375,54 @@ export function EventCard({
                   textShadow: `0 2px 10px rgba(0,0,0,0.5)`,
                 }}
               >
-                Sold Out
+                {isEnded && !isSoldOut ? "Ended" : (availability.badge ?? "Unavailable")}
               </span>
             </div>
           </motion.div>
         )}
 
-        {/* Top-left: tickets left chip */}
-        {!isSoldOut && (
+        {/* Top-left format chip: names a multi-day/recurring schedule. */}
+        {format !== "single" && (
+          <div className="absolute top-3 left-3 z-20 inline-flex items-center h-[22px] px-2.5 rounded-full"
+            style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.18)" }}>
+            <FormatTag format={format} label={formatLabel} isDark />
+          </div>
+        )}
+
+        {/* Top-left status chip: remaining tickets, when the backend exposes a
+            count (event.type is offer-driven now — no invite-only mode). */}
+        {format === "single" && !isEnded && !isSoldOut && typeof event.ticketsLeft === "number" && (
           <div className="absolute top-3 left-3 z-20">
             <motion.span
-              animate={
-                isLow
-                  ? { opacity: [0.72, 1, 0.72] }
-                  : { opacity: 1 }
-              }
+              animate={isLow ? { opacity: [0.72, 1, 0.72] } : { opacity: 1 }}
               transition={
                 isLow
-                  ? {
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }
+                  ? { duration: 2, repeat: Infinity, ease: "easeInOut" }
                   : undefined
               }
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] tracking-[1.6px] uppercase leading-none"
               style={{
                 fontFamily: "'Inter', sans-serif",
-                background: isLow
-                  ? "rgba(220,38,38,0.88)"
-                  : "rgba(0,0,0,0.5)",
+                background: isLow ? "rgba(220,38,38,0.88)" : "rgba(0,0,0,0.5)",
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
                 color: "#fff",
                 fontWeight: 600,
-                border: `1px solid ${
-                  isLow
-                    ? "rgba(255,255,255,0.28)"
-                    : "rgba(255,255,255,0.18)"
-                }`,
-                boxShadow: isLow
-                  ? "0 8px 20px rgba(220,38,38,0.25)"
-                  : "none",
+                boxShadow: `${isLow ? "0 0 0 1px rgba(255,255,255,0.28)" : "0 0 0 1px rgba(255,255,255,0.18)"}${isLow ? ", 0 8px 20px rgba(220,38,38,0.25)" : ""}`,
               }}
             >
               {isLow && (
-                <span
-                  className="w-1 h-1 rounded-full"
-                  style={{ background: "#fff" }}
-                />
+                <span className="w-1 h-1 rounded-full" style={{ background: "#fff" }} />
               )}
               {event.ticketsLeft} Left
             </motion.span>
           </div>
         )}
-        <EventDateBadge date={event.date} accentRgb={rgb} className="absolute top-3 right-3 rounded-[13px]" />
+        {range ? (
+          <FeaturedDateRangeBadge month={range.month} range={range.range} accentRgb={rgb} className="absolute top-3 right-3 rounded-[13px]" />
+        ) : (
+          <EventDateBadge date={event.date} accentRgb={rgb} className="absolute top-3 right-3 rounded-[13px]" />
+        )}
 
         {/* Bottom-left of image: category + optional invite */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
@@ -383,36 +444,10 @@ export function EventCard({
               </span>
             );
           })()}
-          {event.eventType === "inviteOnly" && (
-            <span
-              className="relative inline-flex items-center h-[22px] gap-1 overflow-hidden px-2 rounded-full text-[9px] tracking-[1.4px] uppercase leading-none"
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                background: "rgba(0,0,0,0.55)",
-                backdropFilter: "blur(10px)",
-                color: "#fff",
-                fontWeight: 600,
-              }}
-            >
-              <GlassReflection isDark={isDark} />
-              {event.inviteWaitlistOnly ? (
-                <Hourglass
-                  className="relative z-10 w-2.5 h-2.5"
-                  strokeWidth={2.25}
-                />
-              ) : (
-                <Lock
-                  className="relative z-10 w-2.5 h-2.5"
-                  strokeWidth={2.5}
-                />
-              )}
-              <span className="relative z-10">{event.inviteWaitlistOnly ? "Waitlist" : "Invite"}</span>
-            </span>
-          )}
         </div>
 
         {/* Live countdown — same-day & tomorrow only */}
-        {!isSoldOut && <CountdownBadge event={event} />}
+        {!isInactive && <CountdownBadge event={event} />}
       </div>
 
       {/* Footer */}
@@ -475,6 +510,11 @@ export function EventCard({
             >
               {priceLabel}
             </span>
+            {showDayPasses && (
+              <span className="text-[7.5px] tracking-[1.1px] truncate" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}>
+                · DAY PASSES
+              </span>
+            )}
           </div>
 
           <motion.div
@@ -482,20 +522,19 @@ export function EventCard({
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full"
             style={{
-              background: isSoldOut
+              background: isInactive
                 ? isDark
                   ? "rgba(255,255,255,0.10)"
                   : "rgba(0,0,0,0.10)"
                 : accent,
-              color: isSoldOut
+              color: isInactive
                 ? isDark
                   ? "rgba(255,255,255,0.55)"
                   : "rgba(0,0,0,0.55)"
                 : "#0a0a0a",
-              border: isSoldOut
-                ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}`
-                : "1px solid transparent",
-              boxShadow: "none",
+              boxShadow: isInactive
+                ? `0 0 0 1px ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}`
+                : "none",
             }}
           >
             <span
@@ -505,7 +544,9 @@ export function EventCard({
                 fontWeight: 700,
               }}
             >
-              {isSoldOut ? "Sold Out" : "Tickets"}
+              {isEnded && !isSoldOut
+                ? "Ended"
+                : (availability.badge ?? eventActionLabel())}
             </span>
             <ChevronRight
               className="w-2.5 h-2.5"

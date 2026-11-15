@@ -112,7 +112,7 @@ export function glassEdgeReflection(
   const mask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
 
   return {
-    padding: "1px",
+    padding: "0.5px",
     background: `conic-gradient(from ${config.hairlineAngle}deg at 50% 50%, rgba(255,255,255,${opacity * 0.24}) 0deg, rgba(255,255,255,${opacity}) 50deg, rgba(255,255,255,${opacity * 0.34}) 132deg, rgba(255,255,255,${opacity * 0.08}) 230deg, rgba(255,255,255,${opacity * 0.24}) 360deg)`,
     borderRadius: "inherit",
     WebkitMask: mask,
@@ -133,4 +133,49 @@ export function glassShadow(isDark: boolean, settings: GlassSurfaceSettings = {}
 export function glassEdge(isDark: boolean): CSSProperties {
   const shadow = glassShadow(isDark).boxShadow;
   return { boxShadow: `inset 0 1px 0 rgba(255,255,255,${isDark ? 0.055 : 0.34}), ${shadow}` };
+}
+
+/**
+ * The boundary for compact controls (inputs, icon tiles, small buttons, pills)
+ * that are too small to host the reflection overlay: a glass fill composed with
+ * the restrained inset top light. `border` is deliberately absent — the edge is
+ * light, not a stroke (ADR-0007). Pass a tint for state (accent = selected,
+ * danger = error/destructive).
+ */
+export function glassControl(isDark: boolean, tint?: GlassTint): CSSProperties {
+  return { ...glass(isDark, tint), ...glassEdge(isDark) };
+}
+
+/**
+ * Exact styles copied from the discovery search bar (`SearchBar.tsx`): the
+ * canonical input surface. Translucent fill + 40px backdrop blur + a quiet
+ * float shadow. Every field uses this, so a field and the search bar are the
+ * same surface. The hairline is the separate `GlassReflection` overlay pair.
+ */
+export function glassInputSurface(isDark: boolean): CSSProperties {
+  return {
+    background: isDark ? "rgba(30,30,34,0.40)" : "rgba(255,255,255,0.68)",
+    backdropFilter: "blur(40px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.5)",
+    boxShadow: isDark
+      ? "0 12px 36px -16px rgba(0,0,0,0.48)"
+      : "0 12px 36px -18px rgba(20,18,40,0.18)",
+  };
+}
+
+/**
+ * Field/input surface + state. The same `glassInputSurface()` as the search
+ * bar at rest. Focus is a *quiet* shift: one hairline lime ring (no fill tint,
+ * no glow), so it reads as active without shouting. Error swaps lime for red
+ * (the message under the field still carries the failure). The reflected
+ * hairline comes from a `GlassReflection` overlay on the wrapper.
+ */
+export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
+  const out = glassInputSurface(isDark);
+  if (opts.error) {
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(248,113,113,0.5)" : "rgba(190,18,60,0.4)"}`;
+  } else if (opts.focused) {
+    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.4)" : "rgba(124,154,0,0.34)"}`;
+  }
+  return out;
 }

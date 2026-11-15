@@ -4,13 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { toPng } from 'html-to-image';
 import { BadgeCheck, ChevronRight, Clock, QrCode } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { ticketKeys, ticketsService } from '@/services/tickets.service';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { Pulse, useShowSkeleton } from '@/components/loading';
+import { ticketKeys, ticketsService } from '@/lib/tickets';
 import { DetailedTicket } from '@/features/tickets/components/DetailedTicket';
 import { DownloadableTicketCard } from '@/features/tickets/components/DownloadableTicketCard';
 import type { UserTicket } from '@/types';
 import { tierTheme } from '@/lib/utils/tierTheme';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { toastError } from '@/lib/feedback';
 
 /**
  * Second access point for a ticket the user already owns.
@@ -28,16 +31,20 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
   onNavigate?: (view: string) => void;
 }) {
   const { isDark } = useTheme();
+  const { isAuthenticated } = useAuth();
   const [openTicket, setOpenTicket] = useState<UserTicket | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadDone, setDownloadDone] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
 
-  // The router prefetches this query, so on a warm cache there's no spinner.
-  const { data: tickets = [] } = useQuery({
-    queryKey: ticketKeys.userTickets,
+  // Shares the router's auth-aware wallet query (keyed on auth state, disabled
+  // while signed out — a signed-out fetch would 401 on every event page).
+  const { data: tickets = [], isPending, isError, refetch } = useQuery({
+    queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
     queryFn: ticketsService.fetchUserTickets,
+    enabled: isAuthenticated,
   });
+  const showLoading = useShowSkeleton(isPending && isAuthenticated);
 
   const mine = tickets.filter(
     (t) => (eventId && t.eventId === eventId) || t.eventName === eventName,
@@ -57,13 +64,14 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
       setDownloadDone(true);
       setTimeout(() => setDownloadDone(false), 2500);
     } catch (err) {
-      console.error('Failed to download ticket:', err);
+      toastError(err, 'Couldn’t save your ticket image. Please try again.');
     } finally {
       setDownloading(false);
     }
   }, [openTicket]);
 
-  if (!mine.length) return null;
+  if (!isAuthenticated) return null;
+  if (!mine.length && !showLoading && !isError) return null;
 
   const accent = isDark ? '#d6f905' : '#5f7504';
   const ink = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(20,18,40,0.92)';
@@ -98,7 +106,52 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
         <BadgeCheck className="w-3.5 h-3.5" strokeWidth={2} style={{ color: accent }} />
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      {showLoading ? (
+        <div
+          className="w-full flex items-center gap-3.5 py-3.5 pl-5 pr-3.5 rounded-[14px]"
+          style={{
+            background: isDark ? 'rgba(214,249,5,0.05)' : 'rgba(255,255,255,0.78)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+          }}
+        >
+          <div className="min-w-0 flex-1 space-y-2">
+            <Pulse className="h-[9px] w-16 rounded-md" />
+            <Pulse className="h-[13px] w-40 rounded-md" />
+            <Pulse className="h-[10px] w-28 rounded-md" />
+          </div>
+          <Pulse className="w-9 h-9 rounded-full flex-shrink-0" />
+          <Pulse className="w-3.5 h-3.5 flex-shrink-0" />
+        </div>
+      ) : isError ? (
+        <div
+          className="w-full flex items-center gap-3.5 py-3.5 pl-5 pr-3.5 rounded-[14px]"
+          style={{
+            background: isDark ? 'rgba(214,249,5,0.05)' : 'rgba(255,255,255,0.78)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: ink }}>
+              Couldn't load your ticket.
+            </p>
+          </div>
+          <AppButton
+            onClick={() => void refetch()}
+            className="text-[11px] px-3 py-1.5 rounded-full cursor-pointer"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 600,
+              background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(20,18,40,0.06)',
+              color: accent,
+            }}
+          >
+            Retry
+          </AppButton>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
         {mine.map((ticket) => {
           const tierTag = tierTagStyle(ticket);
           return (
@@ -161,7 +214,8 @@ export function YourTicketAccess({ eventId, eventName, onNavigate }: {
           </AppButton>
         );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Full ticket */}
       <AnimatePresence>

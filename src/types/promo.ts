@@ -1,28 +1,10 @@
-export type PromoDiscountType = 'percent' | 'fixed';
-
-export interface PromoCode {
-  eventId: string;
+/**
+ * Promo codes are validated server-side (at quote / admission-selection time).
+ * The frontend only carries the applied code's display fields.
+ */
+export type AppliedPromo = {
   code: string;
   discount: number;
-  type: PromoDiscountType;
+  type: 'percent' | 'fixed';
   label: string;
-  minTicket: string | null;
-  maxUses: number | null;
-  usedCount: number;
-  expiresAt: string | null;
-  active: boolean;
-  createdAt: string;
-}
-
-export type PromoCreateInput = {
-  eventId: string;
-  code: string;
-  discount: number;
-  type: PromoDiscountType;
-  label: string;
-  minTicket?: string;
-  maxUses?: number;
-  expiresAt?: string;
 };
-
-export type AppliedPromo = Pick<PromoCode, 'code' | 'discount' | 'type' | 'label'>;

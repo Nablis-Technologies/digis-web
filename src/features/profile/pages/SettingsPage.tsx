@@ -1,38 +1,74 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Moon, Sun, Bell, Mail, Phone, Ticket, ArrowUpDown,
+  ArrowLeft, Moon, Sun, Bell, Mail, Phone,
   Globe, CreditCard, Languages, Shield, Lock, Eye, FileText, HelpCircle,
-  ChevronRight, LogOut, User, BadgeCheck, Sparkles, Pencil, Check, Loader2,
-  X, AlertCircle, KeyRound, ShieldCheck,
+  ChevronRight, LogOut, User, BadgeCheck, Sparkles, Pencil, Loader2,
+  X, ShieldCheck, Camera, Trash2,
 } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
-import { flatAvatarColor } from '@/lib/utils/avatarColor';
-import { CancelBtn, Divider, EditField, PickerList, Row, SaveBtn, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill } from '@/features/profile/components/SettingsPrimitives';
+import { UserAvatar } from '@/components/UserAvatar';
+import {
+  fetchNotificationPreferences, channelPreferences, updateChannelPreference,
+  type NotificationChannel, type ChannelPreferences,
+} from '@/lib/notifications';
+import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill, EditField } from '@/features/profile/components/SettingsPrimitives';
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 
 interface SettingsViewProps {
   onBack: () => void;
   onRequestAuth?: () => void;
 }
 
-// Edit flow: 'idle' | 'info' (name + email) | 'phone-entry' | 'phone-otp'
-type EditStep = 'idle' | 'info' | 'phone-entry' | 'phone-otp';
-
-// Fake OTP for demo — in production this would be sent via SMS.
-const DEMO_OTP = '123456';
-
 export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const { isDark, toggleTheme } = useTheme();
-  const { user, isAuthenticated, signOut, updateProfile } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
+
+  // Notification channel preferences — the backend stores a category × channel
+  // matrix (GET/PATCH /notification_preferences); each toggle writes every
+  // category on its channel. Fetched only while signed in (the endpoint is
+  // authenticated), and never faked: load/save failures are surfaced.
+  const [channelPrefs, setChannelPrefs] = useState<ChannelPreferences | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [savingChannel, setSavingChannel] = useState<NotificationChannel | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const loadPreferences = useCallback(async () => {
+    if (!isAuthenticated) { setChannelPrefs(null); return; }
+    setPrefsLoading(true);
+    setPrefsError(null);
+    try {
+      setChannelPrefs(channelPreferences(await fetchNotificationPreferences()));
+    } catch {
+      setChannelPrefs(null);
+      setPrefsError('Couldn’t load your notification settings.');
+    } finally {
+      setPrefsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => { void loadPreferences(); }, [loadPreferences]);
+
+  const toggleChannel = async (channel: NotificationChannel) => {
+    if (!channelPrefs || savingChannel) return;
+    setSavingChannel(channel);
+    setPrefsError(null);
+    try {
+      // Reflect the change only once the server confirms it.
+      setChannelPrefs(channelPreferences(await updateChannelPreference(channel, !channelPrefs[channel])));
+    } catch {
+      setPrefsError('Couldn’t save your notification settings. Please try again.');
+    } finally {
+      setSavingChannel(null);
+    }
+  };
 
   // Toggles
-  const [pushNotifs, setPushNotifs] = useState(true);
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [eventReminders, setEventReminders] = useState(true);
-  const [resaleAlerts, setResaleAlerts] = useState(false);
   const [publicProfile, setPublicProfile] = useState(true);
 
   // Preferences
@@ -43,117 +79,84 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   // Security
   const [twoFaEnabled, setTwoFaEnabled] = useState(false);
 
+  // Profile editing state (G-14 & G-47)
+  const { updateProfile, uploadAvatar, removeAvatar } = useAuth();
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarRemoving, setAvatarRemoving] = useState(false);
+
   // Sheet state — which bottom sheet is open
-  type Sheet = 'none' | 'changePassword' | 'language' | 'currency' | 'region' | '2fa' | 'help' | 'terms' | 'privacy';
+  type Sheet = 'none' | 'profile' | 'language' | 'currency' | 'region' | '2fa' | 'help' | 'terms' | 'privacy';
   const [sheet, setSheet] = useState<Sheet>('none');
 
-  // Change-password form state
-  const [pwCurrent, setPwCurrent] = useState('');
-  const [pwNew, setPwNew] = useState('');
-  const [pwConfirm, setPwConfirm] = useState('');
-  const [pwError, setPwError] = useState('');
-  const [pwSaving, setPwSaving] = useState(false);
-  const [pwSaved, setPwSaved] = useState(false);
-
-  const openSheet = (s: Sheet) => setSheet(s);
+  const openSheet = (s: Sheet) => {
+    if (s === 'profile') {
+      const parts = (user?.name || '').trim().split(' ');
+      const rawFirst = user?.profile?.first_name ?? parts[0] ?? '';
+      const rawLast = user?.profile?.last_name ?? parts.slice(1).join(' ') ?? '';
+      setEditFirstName(rawFirst);
+      setEditLastName(rawLast === rawFirst ? '' : rawLast);
+      setProfileError(null);
+    }
+    setSheet(s);
+  };
   const closeSheet = () => {
+    setProfileError(null);
     setSheet('none');
-    setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwError(''); setPwSaving(false); setPwSaved(false);
   };
 
-  const handleChangePassword = async () => {
-    if (!pwCurrent.trim()) { setPwError('Enter your current password.'); return; }
-    if (pwNew.length < 8) { setPwError('New password must be at least 8 characters.'); return; }
-    if (pwNew !== pwConfirm) { setPwError('Passwords don\'t match.'); return; }
-    setPwError(''); setPwSaving(true);
-    await new Promise(r => setTimeout(r, 900)); // simulated API call
-    setPwSaving(false); setPwSaved(true);
-    setTimeout(closeSheet, 1400);
-  };
-
-  // Edit state
-  const [step, setStep] = useState<EditStep>('idle');
-  const [formName, setFormName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [formError, setFormError] = useState('');
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  const openEdit = () => {
-    setFormName(user?.name || '');
-    setFormEmail(user?.email || '');
-    setFormPhone(user?.phone || '');
-    setFormError('');
-    setStep('info');
-  };
-
-  const saveInfo = async () => {
-    setFormError(''); setSaving(true);
-    const res = await updateProfile({ name: formName, email: formEmail });
-    setSaving(false);
-    if (res.ok) {
-      setStep('idle');
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2500);
-    } else {
-      setFormError(res.error || 'Could not save changes.');
-    }
-  };
-
-  // Proceed to phone OTP gate (if phone changed from current)
-  const proceedToPhone = () => {
-    const currentPhone = user?.phone || '';
-    if (formPhone === currentPhone) {
-      saveInfo();
-    } else {
-      setOtp(''); setOtpError('');
-      setStep('phone-otp');
-    }
-  };
-
-  const verifyOtp = async () => {
-    if (otp !== DEMO_OTP) {
-      setOtpError('Incorrect code. Try 123456 for the demo.');
+  const handleSaveProfile = async () => {
+    const trimmedFirst = editFirstName.trim();
+    const trimmedLast = editLastName.trim();
+    if (!trimmedFirst) {
+      setProfileError('Please enter your name.');
       return;
     }
-    setOtpError(''); setSaving(true);
-    const res = await updateProfile({ name: formName, email: formEmail, phone: formPhone });
-    setSaving(false);
+    setProfileSaving(true);
+    setProfileError(null);
+    const res = await updateProfile({
+      first_name: trimmedFirst,
+      last_name: trimmedLast || trimmedFirst,
+    });
+    setProfileSaving(false);
     if (res.ok) {
-      setStep('idle');
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2500);
+      closeSheet();
     } else {
-      setOtpError(res.error || 'Could not save changes.');
+      setProfileError(res.error || 'Could not update profile names.');
     }
   };
 
-  const closeEdit = () => { setStep('idle'); setFormError(''); setOtpError(''); };
-
-  // Photo upload: read as base64, save immediately
-  const pickPhoto = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        await updateProfile({ photo: dataUrl });
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Avatar image must be under 5 MB.');
+      return;
+    }
+    setAvatarUploading(true);
+    setProfileError(null);
+    const res = await uploadAvatar(file);
+    setAvatarUploading(false);
+    if (!res.ok) {
+      setProfileError(res.error || 'Could not upload avatar image.');
+    }
+    // Reset file input value
+    e.target.value = '';
   };
 
-  const removePhoto = async () => { await updateProfile({ photo: null }); };
+  const handleRemoveAvatar = async () => {
+    setAvatarRemoving(true);
+    setProfileError(null);
+    const res = await removeAvatar();
+    setAvatarRemoving(false);
+    if (!res.ok) {
+      setProfileError(res.error || 'Could not remove avatar.');
+    }
+  };
 
-  const avatarColor = flatAvatarColor(user?.name || user?.email || 'Digis');
   const brand = '#d6f905';
   const cardBg = isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.7)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
@@ -169,10 +172,13 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         <AppButton
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }}
           onClick={onBack}
-          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+          className="relative w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
+          style={{ background: cardBg }}
         >
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} style={{ color: value }} />
+          <GlassReflection isDark={isDark} />
+          <span className="relative z-10 flex items-center justify-center">
+            <ArrowLeft className="w-4 h-4" strokeWidth={1.75} style={{ color: value }} />
+          </span>
         </AppButton>
         <h1
           className="text-[28px] lg:text-[34px] font-light tracking-[-0.5px]"
@@ -188,34 +194,12 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         cardBg={cardBg}
         value={value}
         heading={heading}
-        avatarColor={avatarColor}
         isAuthenticated={isAuthenticated}
         user={user}
-        step={step}
-        savedFlash={savedFlash}
-        pickPhoto={pickPhoto}
-        removePhoto={removePhoto}
-        openEdit={openEdit}
         accentText={accentText}
         subtle={subtle}
-        formName={formName}
-        setFormName={setFormName}
-        formEmail={formEmail}
-        setFormEmail={setFormEmail}
-        formPhone={formPhone}
-        setFormPhone={setFormPhone}
-        formError={formError}
-        closeEdit={closeEdit}
-        saving={saving}
-        saveInfo={saveInfo}
-        setStep={setStep}
-        setOtpError={setOtpError}
-        proceedToPhone={proceedToPhone}
-        otp={otp}
-        setOtp={setOtp}
-        otpError={otpError}
-        verifyOtp={verifyOtp}
         onRequestAuth={onRequestAuth}
+        onEditProfile={() => openSheet('profile')}
       />
 
       {/* Appearance */}
@@ -227,19 +211,40 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         />
       </Section>
 
-      {/* Notifications */}
+      {/* Notifications — per-channel preferences from GET/PATCH
+          /notification_preferences. The backend stores one row per category ×
+          channel; each toggle writes every category on its channel. */}
       <Section title="Notifications" isDark={isDark}>
-        <Row icon={<Bell className="w-4 h-4" />} label="Push notifications" isDark={isDark}
-          right={<Toggle checked={pushNotifs} onChange={() => setPushNotifs(v => !v)} isDark={isDark} />} />
+        {prefsError && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: '#e5484d' }}>
+              {prefsError}
+            </span>
+            <AppButton
+              onClick={() => void loadPreferences()}
+              className="text-[12px] underline cursor-pointer flex-shrink-0"
+              style={{ fontFamily: "'Inter', sans-serif", color: accentText }}
+            >
+              Retry
+            </AppButton>
+          </div>
+        )}
+        <Row icon={<Bell className="w-4 h-4" />} label="Push notifications" hint="In-app alerts" isDark={isDark}
+          right={<Toggle checked={channelPrefs?.in_app ?? true} onChange={() => void toggleChannel('in_app')}
+            disabled={!isAuthenticated || channelPrefs === null || savingChannel !== null} isDark={isDark} />} />
         <Divider isDark={isDark} />
-        <Row icon={<Mail className="w-4 h-4" />} label="Email updates" isDark={isDark}
-          right={<Toggle checked={emailNotifs} onChange={() => setEmailNotifs(v => !v)} isDark={isDark} />} />
+        <Row icon={<Mail className="w-4 h-4" />} label="Email updates" hint="To your account email" isDark={isDark}
+          right={<Toggle checked={channelPrefs?.email ?? true} onChange={() => void toggleChannel('email')}
+            disabled={!isAuthenticated || channelPrefs === null || savingChannel !== null} isDark={isDark} />} />
         <Divider isDark={isDark} />
-        <Row icon={<Ticket className="w-4 h-4" />} label="Event reminders" hint="Before doors open" isDark={isDark}
-          right={<Toggle checked={eventReminders} onChange={() => setEventReminders(v => !v)} isDark={isDark} />} />
-        <Divider isDark={isDark} />
-        <Row icon={<ArrowUpDown className="w-4 h-4" />} label="Resale alerts" hint="When prices drop" isDark={isDark}
-          right={<Toggle checked={resaleAlerts} onChange={() => setResaleAlerts(v => !v)} isDark={isDark} />} />
+        <Row icon={<Phone className="w-4 h-4" />} label="Text messages" hint="SMS to your phone" isDark={isDark}
+          right={<Toggle checked={channelPrefs?.sms ?? true} onChange={() => void toggleChannel('sms')}
+            disabled={!isAuthenticated || channelPrefs === null || savingChannel !== null} isDark={isDark} />} />
+        {!isAuthenticated && (
+          <p className="px-4 pt-2 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: subtle }}>
+            Sign in to manage your notification settings.
+          </p>
+        )}
       </Section>
 
       {/* Preferences */}
@@ -259,8 +264,10 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
         <Row icon={<Eye className="w-4 h-4" />} label="Public profile" hint="Let others find you" isDark={isDark}
           right={<Toggle checked={publicProfile} onChange={() => setPublicProfile(v => !v)} isDark={isDark} />} />
         <Divider isDark={isDark} />
-        <Row icon={<Lock className="w-4 h-4" />} label="Change password" isDark={isDark}
-          right={<ChevronRight className="w-4 h-4" strokeWidth={1.75} style={{ color: subtle }} />} clickable onClick={() => openSheet('changePassword')} />
+        {/* No self-service password endpoint yet (BACKEND_GAPS #8-deferred), so
+            this is surfaced as unavailable rather than a fake success. */}
+        <Row icon={<Lock className="w-4 h-4" />} label="Change password" hint="Coming soon" isDark={isDark}
+          right={<ChevronRight className="w-4 h-4" strokeWidth={1.75} style={{ color: subtle, opacity: 0.4 }} />} />
         <Divider isDark={isDark} />
         <Row icon={<Shield className="w-4 h-4" />} label="Two-factor authentication" hint={twoFaEnabled ? 'On' : 'Off'} isDark={isDark}
           right={<ChevronRight className="w-4 h-4" strokeWidth={1.75} style={{ color: subtle }} />} clickable onClick={() => openSheet('2fa')} />
@@ -282,16 +289,20 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
       {isAuthenticated && (
         <AppButton
           whileTap={{ scale: 0.98 }}
-          onClick={signOut}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl cursor-pointer mb-6"
+          onClick={() => {
+            if (signingOut) return;
+            setSigningOut(true);
+            void signOut().finally(() => setSigningOut(false));
+          }}
+          disabled={signingOut}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl cursor-pointer mb-6 disabled:cursor-not-allowed disabled:opacity-60"
           style={{
-            background: isDark ? 'rgba(239,68,68,0.10)' : 'rgba(239,68,68,0.08)',
-            border: `1px solid ${isDark ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.2)'}`,
+            ...glassControl(isDark, 'danger'),
             color: '#ef4444', fontFamily: "'Inter', sans-serif", fontSize: '13px', fontWeight: 600, letterSpacing: '0.3px',
           }}
         >
           <LogOut className="w-4 h-4" strokeWidth={2} />
-          Sign out
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </AppButton>
       )}
 
@@ -324,37 +335,129 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
               onClick={closeSheet}
             />
 
-            {/* ── Change password ── */}
-            {sheet === 'changePassword' && (
-              <SettingsSheet key="pw" title="Change password" onClose={closeSheet} isDark={isDark} brand={brand} cardBorder={cardBorder}>
-                {pwSaved ? (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center py-4 gap-3">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center"
-                      style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>
-                      <Check className="w-6 h-6" strokeWidth={2.5} style={{ color: '#10b981' }} />
-                    </div>
-                    <p className="text-[15px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: heading, fontWeight: 300 }}>Password updated</p>
-                  </motion.div>
-                ) : (
-                  <div className="space-y-3">
-                    <EditField icon={<Lock className="w-4 h-4" />} type="password" placeholder="Current password" value={pwCurrent} onChange={setPwCurrent} isDark={isDark} />
-                    <EditField icon={<KeyRound className="w-4 h-4" />} type="password" placeholder="New password (min 8 chars)" value={pwNew} onChange={setPwNew} isDark={isDark} />
-                    <EditField icon={<ShieldCheck className="w-4 h-4" />} type="password" placeholder="Confirm new password" value={pwConfirm} onChange={setPwConfirm} isDark={isDark} />
-                    <AnimatePresence>
-                      {pwError && (
-                        <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                          className="text-[12px] flex items-center gap-1.5" style={{ fontFamily: "'Inter', sans-serif", color: '#ef4444' }}>
-                          <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} /> {pwError}
-                        </motion.p>
-                      )}
-                    </AnimatePresence>
-                    <div className="flex gap-2 pt-1">
-                      <CancelBtn onClick={closeSheet} isDark={isDark} value={value} cardBorder={cardBorder} />
-                      <SaveBtn onClick={handleChangePassword} saving={pwSaving} isDark={isDark} />
+            {/* ── Profile Editor (G-14 & G-47) ── */}
+            {sheet === 'profile' && (
+              <SettingsSheet key="profile" title="Edit Profile" onClose={closeSheet} isDark={isDark} brand={brand} cardBorder={cardBorder}>
+                <div className="space-y-4">
+                  {/* Avatar section */}
+                  <div className="flex items-center gap-4 py-1">
+                    <UserAvatar user={user} size={64} />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={handleAvatarFileChange}
+                            disabled={avatarUploading || avatarRemoving}
+                          />
+                          <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-opacity"
+                            style={{
+                              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                              color: heading,
+                              fontFamily: "'Inter', sans-serif",
+                              opacity: avatarUploading ? 0.6 : 1,
+                            }}
+                          >
+                            {avatarUploading ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Camera className="w-3.5 h-3.5" />
+                            )}
+                            {avatarUploading ? 'Uploading…' : 'Change photo'}
+                          </span>
+                        </label>
+                        {user?.profile?.avatar_url && (
+                          <AppButton
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleRemoveAvatar}
+                            disabled={avatarUploading || avatarRemoving}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium cursor-pointer"
+                            style={{
+                              background: isDark ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.08)',
+                              color: '#ef4444',
+                              fontFamily: "'Inter', sans-serif",
+                              opacity: avatarRemoving ? 0.6 : 1,
+                            }}
+                          >
+                            {avatarRemoving ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            {avatarRemoving ? 'Removing…' : 'Remove'}
+                          </AppButton>
+                        )}
+                      </div>
+                      <p className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: subtle }}>
+                        JPEG, PNG, or WebP. Max 5 MB.
+                      </p>
                     </div>
                   </div>
-                )}
+
+                  {/* Name Fields */}
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-[11px] mb-1 font-medium tracking-wide uppercase" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
+                        First Name
+                      </label>
+                      <EditField
+                        icon={<User className="w-4 h-4" />}
+                        placeholder="First name"
+                        value={editFirstName}
+                        onChange={setEditFirstName}
+                        isDark={isDark}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] mb-1 font-medium tracking-wide uppercase" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
+                        Last Name <span className="opacity-60 normal-case font-normal">(optional)</span>
+                      </label>
+                      <EditField
+                        icon={<User className="w-4 h-4" />}
+                        placeholder="Last name (optional)"
+                        value={editLastName}
+                        onChange={setEditLastName}
+                        isDark={isDark}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Error feedback */}
+                  {profileError && (
+                    <div
+                      className="p-3 rounded-xl text-[12px] leading-snug"
+                      style={{
+                        background: 'rgba(239,68,68,0.1)',
+                        color: '#ef4444',
+                        fontFamily: "'Inter', sans-serif",
+                      }}
+                    >
+                      {profileError}
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="pt-2">
+                    <AppButton
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSaveProfile}
+                      disabled={profileSaving}
+                      className="w-full py-3 rounded-2xl cursor-pointer text-[13px] flex items-center justify-center gap-2 font-semibold"
+                      style={{
+                        background: isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a',
+                        color: isDark ? '#000' : '#fff',
+                        fontFamily: "'Inter', sans-serif",
+                        opacity: profileSaving ? 0.7 : 1,
+                      }}
+                    >
+                      {profileSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {profileSaving ? 'Saving…' : 'Save changes'}
+                    </AppButton>
+                  </div>
+                </div>
               </SettingsSheet>
             )}
 
@@ -399,7 +502,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
               <SettingsSheet key="2fa" title="Two-factor authentication" onClose={closeSheet} isDark={isDark} brand={brand} cardBorder={cardBorder}>
                 <div className="flex flex-col items-center text-center gap-4 py-2">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                    style={{ background: twoFaEnabled ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${twoFaEnabled ? 'rgba(52,211,153,0.3)' : cardBorder}` }}>
+                    style={{ background: twoFaEnabled ? 'rgba(52,211,153,0.12)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'), ...glassEdge(isDark) }}>
                     <ShieldCheck className="w-7 h-7" strokeWidth={1.75} style={{ color: twoFaEnabled ? '#10b981' : (isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)') }} />
                   </div>
                   <div>
@@ -418,9 +521,10 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
                     className="w-full py-3 rounded-2xl cursor-pointer text-[13px]"
                     style={{
                       fontFamily: "'Inter', sans-serif", fontWeight: 600,
-                      background: twoFaEnabled ? 'rgba(239,68,68,0.1)' : (isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a'),
+                      ...(twoFaEnabled
+                        ? glassControl(isDark, 'danger')
+                        : { background: isDark ? 'linear-gradient(135deg, #d9ff00, #d6f905)' : '#0a0a0a' }),
                       color: twoFaEnabled ? '#ef4444' : (isDark ? '#000' : '#fff'),
-                      border: twoFaEnabled ? '1px solid rgba(239,68,68,0.25)' : 'none',
                     }}
                   >
                     {twoFaEnabled ? 'Disable 2FA' : 'Enable 2FA'}
@@ -445,10 +549,13 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
                         { label: 'WhatsApp', value: '+251 91 234 5678' },
                         { label: 'Hours', value: 'Mon–Sat, 8 AM – 8 PM EAT' },
                       ].map(({ label, value }) => (
-                        <div key={label} className="flex items-center justify-between p-3 rounded-xl"
-                          style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: `1px solid ${cardBorder}` }}>
-                          <span style={{ color: heading, fontWeight: 500 }}>{label}</span>
-                          <span>{value}</span>
+                        <div key={label} className="relative flex items-center justify-between p-3 rounded-xl overflow-hidden"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                          <GlassReflection isDark={isDark} />
+                          <div className="relative z-10 flex items-center justify-between w-full">
+                            <span style={{ color: heading, fontWeight: 500 }}>{label}</span>
+                            <span>{value}</span>
+                          </div>
                         </div>
                       ))}
                     </div>

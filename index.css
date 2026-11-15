@@ -24,4 +24,6 @@
 /* Import user's custom styles from the Make.
  * Note that we hoist @imports using a PostCSS plugin, so this can contain @imports e.g. for fonts.
  */
+@import './src/styles/fonts.css';
+@import './src/styles/theme.css';
 @import './src/styles/globals.css';

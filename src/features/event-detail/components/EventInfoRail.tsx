@@ -3,22 +3,21 @@ import { Calendar, Clock, MapPin, Users } from 'lucide-react';
 import type { Event } from '@/types';
 import { InfoStrip } from './InfoCards';
 import { LineupSection } from './LineupSection';
-import { OrganizerCard, resolveOrganizers } from './OrganizerSection';
+import { OrganizerCard, OrganizerInline, resolveOrganizers } from './OrganizerSection';
+import { FormatTag } from '@/components/EventFormatBadges';
+import { cardFormat, cardFormatLabel } from '@/components/EventCard';
 
 export function EventInfoRail({
   event,
   isDark,
-  isInvite,
-  inviteUnlocked,
   posterRgb,
 }: {
   event: Event;
   isDark: boolean;
-  isInvite: boolean;
-  inviteUnlocked: boolean;
   posterRgb?: [number, number, number] | null;
 }) {
   const organizers = resolveOrganizers(event);
+  const format = cardFormat(event);
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -26,6 +25,11 @@ export function EventInfoRail({
       transition={{ duration: 0.5, delay: 0.1 }}
       className="col-span-7 flex flex-col py-2"
     >
+      {format !== 'single' && (
+        <div className="mb-4">
+          <FormatTag format={format} label={cardFormatLabel(format)} isDark={isDark} size="md" />
+        </div>
+      )}
       <h1 className="tracking-[-1px] leading-[0.95]"
         style={{
           fontFamily: "'Zalando Sans Expanded', sans-serif",
@@ -36,21 +40,19 @@ export function EventInfoRail({
         {event.name}
       </h1>
 
-      {(!isInvite || inviteUnlocked) && (
-        <div className="mt-7">
-          <InfoStrip
-            rgb={posterRgb}
-            items={[
-              { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Date', value: event.date },
-              { icon: <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Time', value: event.time },
-              { icon: <MapPin className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Venue', value: event.venue },
-              { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Age', value: event.ageRestriction || 'Any Age' },
-            ]}
-          />
-        </div>
-      )}
+      <div className="mt-7">
+        <InfoStrip
+          rgb={posterRgb}
+          items={[
+            { icon: <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Date', value: event.date },
+            { icon: <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Time', value: event.time },
+            { icon: <MapPin className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Venue', value: event.venue },
+            { icon: <Users className="w-3.5 h-3.5" strokeWidth={1.75} />, label: 'Age', value: event.ageRestriction || 'Any Age' },
+          ]}
+        />
+      </div>
 
-      {(!isInvite || inviteUnlocked) && (
+      {event.description && (
         <div className="mt-5">
           <h2 className="text-[11px] tracking-[2px] uppercase mb-2.5"
             style={{
@@ -62,9 +64,7 @@ export function EventInfoRail({
           </h2>
           <p className="text-[13px] leading-relaxed font-light"
             style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>
-            Experience an unforgettable evening of music, culture, and community.
-            Join us for a celebration that brings together the best of Ethiopian
-            entertainment with world-class production.
+            {event.description}
           </p>
         </div>
       )}
@@ -75,13 +75,17 @@ export function EventInfoRail({
         the top of the page. The price and "Get tickets" CTA aren't repeated: the
         docked purchase bar already carries both.
       */}
-      {(!isInvite || inviteUnlocked) && (
-        <div className="mt-6 flex flex-col gap-5">
-          <LineupSection lineup={event.lineup} isDark={isDark} compact />
+      <div className="mt-6 flex flex-col gap-5">
+        <LineupSection lineup={event.lineup} isDark={isDark} compact />
 
+        {/* A single organizer shows its full profile inline (the same card the
+            popup would show); several keep the compact list + sheet. */}
+        {organizers.length === 1 ? (
+          <OrganizerInline organizer={organizers[0]} isDark={isDark} />
+        ) : (
           <OrganizerCard organizers={organizers} isDark={isDark} compact />
-        </div>
-      )}
+        )}
+      </div>
     </motion.div>
   );
 }

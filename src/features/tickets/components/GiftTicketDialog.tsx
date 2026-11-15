@@ -9,7 +9,7 @@ interface GiftTicketProps {
     image?: string;
   };
   /** Retained for event-level callers; gift extras are selected in checkout. */
-  extras?: { id: string; name: string; description: string; price: number }[];
+  extras?: { id: string; name: string; description: string; priceMinor: number }[];
   onClose: () => void;
   onSend: () => void;
 }

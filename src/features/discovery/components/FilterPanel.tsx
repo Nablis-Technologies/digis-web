@@ -3,11 +3,11 @@ import { Check } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { EventAccessFilter, EventPriceFilter, EventSortBy } from "@/features/discovery/hooks/useEventFilter";
 import { AppButton } from '@/components/primitives/AppButton';
+import { glassEdge } from '@/lib/ui/glass';
 
 const EVENT_TYPES: { id: EventAccessFilter; label: string }[] = [
-  { id: "free-rsvp", label: "Free RSVP" },
+  { id: "free", label: "Free" },
   { id: "ticketed", label: "Ticketed" },
-  { id: "invite-only", label: "Invite only" },
 ];
 
 const PRICE_RANGES: { id: EventPriceFilter; label: string }[] = [
@@ -90,7 +90,7 @@ export function FilterPanel({
       </AppButton>
 
       {activeFilterCount > 0 && (
-        <AppButton onClick={() => { onSortChange("soonest"); onOnlyAvailableChange(false); onEventTypesChange([]); onPriceRangeChange(null); }} className="mt-3 text-[11px] tracking-[1.2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)", fontWeight: 600, borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)"}`, paddingBottom: 1 }}>Reset filters</AppButton>
+        <AppButton onClick={() => { onSortChange("soonest"); onOnlyAvailableChange(false); onEventTypesChange([]); onPriceRangeChange(null); }} className="mt-3 text-[11px] tracking-[1.2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)", fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2, textDecorationColor: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)" }}>Reset filters</AppButton>
       )}
     </>
   );
@@ -103,7 +103,7 @@ function FilterLabel({ children }: { children: React.ReactNode }) {
 
 function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   const { isDark } = useTheme();
-  return <AppButton onClick={onClick} className="px-3 py-1.5 rounded-full text-[11px] tracking-[0.5px] transition-all flex items-center gap-1.5" style={{ fontFamily: "'Inter', sans-serif", background: active ? (isDark ? "#d6f905" : "#0a0a0a") : (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"), color: active ? (isDark ? "#0a0a0a" : "#fff") : (isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.65)"), fontWeight: active ? 600 : 500, border: `1px solid ${active ? "transparent" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` }}>{active && <Check className="w-3 h-3" strokeWidth={3} />}{label}</AppButton>;
+  return <AppButton onClick={onClick} className="px-3 py-1.5 rounded-full text-[11px] tracking-[0.5px] transition-all flex items-center gap-1.5" style={{ fontFamily: "'Inter', sans-serif", background: active ? (isDark ? "#d6f905" : "#0a0a0a") : (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"), color: active ? (isDark ? "#0a0a0a" : "#fff") : (isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.65)"), fontWeight: active ? 600 : 500, ...glassEdge(isDark) }}>{active && <Check className="w-3 h-3" strokeWidth={3} />}{label}</AppButton>;
 }
 
 function Divider() {

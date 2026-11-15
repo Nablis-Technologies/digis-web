@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Check, ChevronRight, Loader2, Moon, Sun, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { Switch } from '@/components/ui/switch';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 
@@ -33,14 +35,9 @@ export function OtpInput({ value, onChange, isDark }: { value: string; onChange:
             fontWeight: 600,
             color: isDark ? '#fff' : '#0a0a0a',
             background: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.9)',
-            border: `1.5px solid ${
-              d
-                ? isDark ? 'rgba(217,255,0,0.55)' : 'rgba(180,210,0,0.7)'
-                : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'
-            }`,
             boxShadow: d
-              ? `0 0 0 3px ${isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.15)'}`
-              : 'none',
+              ? `0 0 0 1.5px ${isDark ? 'rgba(217,255,0,0.55)' : 'rgba(180,210,0,0.7)'}, 0 0 0 3px ${isDark ? 'rgba(217,255,0,0.12)' : 'rgba(214,249,5,0.15)'}`
+              : `0 0 0 1.5px ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
           }}
         >
           {d || <span style={{ opacity: 0.2 }}>·</span>}
@@ -59,7 +56,7 @@ export function CancelBtn({ onClick, isDark, value, cardBorder, label = 'Cancel'
       onClick={onClick}
       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl cursor-pointer"
       style={{
-        background: 'transparent', border: `1px solid ${cardBorder}`,
+        background: 'transparent', ...glassEdge(isDark),
         color: value, fontFamily: "'Inter', sans-serif", fontSize: '13px', fontWeight: 600,
       }}
     >
@@ -96,14 +93,14 @@ export function Section({ title, isDark, children }: { title: string; isDark: bo
         {title}
       </h2>
       <div
-        className="rounded-2xl overflow-hidden"
+        className="relative rounded-2xl overflow-hidden"
         style={{
           background: isDark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.7)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}`,
           backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
         }}
       >
-        {children}
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10">{children}</div>
       </div>
     </motion.div>
   );
@@ -143,18 +140,16 @@ export function EditField({ icon, type = 'text', placeholder, value, onChange, i
   const [focused, setFocused] = useState(false);
   const dim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
   return (
-    <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all"
-      style={{
-        background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.85)',
-        border: `1px solid ${focused ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(180,210,0,0.7)') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')}`,
-      }}
+    <div className="relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all overflow-hidden"
+      style={glassField(isDark, { focused })}
     >
-      <span style={{ color: focused ? (isDark ? '#d6f905' : '#5a6b00') : dim }}>{icon}</span>
+      <GlassReflection isDark={isDark} />
+      <span className="relative z-10" style={{ color: focused ? (isDark ? '#d6f905' : '#5a6b00') : dim }}>{icon}</span>
       <AppInput
         type={type} value={value} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        className="flex-1 bg-transparent outline-none text-[14px]"
+        className="relative z-10 flex-1 bg-transparent outline-none text-[14px]"
         style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}
       />
     </div>
@@ -172,9 +167,10 @@ export function ValuePill({ value, isDark }: { value: string; isDark: boolean })
   );
 }
 
-export function Toggle({ checked, onChange, isDark }: { checked: boolean; onChange: () => void; isDark: boolean }) {
+export function Toggle({ checked, onChange, isDark, disabled = false }: { checked: boolean; onChange: () => void; isDark: boolean; disabled?: boolean }) {
   return (
-    <Switch checked={checked} onCheckedChange={onChange} unstyled aria-label="Toggle setting" className="relative rounded-full cursor-pointer transition-colors duration-300"
+    <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} unstyled aria-label="Toggle setting"
+      className={`relative rounded-full transition-colors duration-300 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       style={{ width: 44, height: 26, background: checked ? (isDark ? '#d6f905' : '#0a0a0a') : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.14)') }}
       thumbClassName="absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-[transform,background-color] duration-300 data-[state=unchecked]:translate-x-[3px] data-[state=checked]:translate-x-[21px] dark:data-[state=checked]:bg-[#0a0a0a]" />
   );
@@ -186,7 +182,7 @@ export function ThemeSwitch({ checked, onToggle, isDark }: { checked: boolean; o
       style={{
         width: 64, height: 30,
         background: isDark ? 'rgba(217,255,0,0.15)' : 'rgba(0,0,0,0.06)',
-        border: `1px solid ${isDark ? 'rgba(217,255,0,0.25)' : 'rgba(0,0,0,0.08)'}`,
+        ...glassEdge(isDark),
       }}
       aria-pressed={checked}>
       <motion.div className="absolute rounded-full flex items-center justify-center"
@@ -218,15 +214,16 @@ export function SettingsSheet({ title, onClose, isDark, brand, cardBorder, child
         className="relative rounded-[24px] overflow-hidden px-5 pt-6 pb-5"
         style={{
           background: isDark ? 'rgba(18,18,22,0.96)' : 'rgba(255,255,255,0.98)',
-          border: `1px solid ${cardBorder}`,
           backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
           boxShadow: isDark ? '0 -20px 60px rgba(0,0,0,0.6)' : '0 -16px 48px rgba(20,18,40,0.16)',
         }}
       >
+        <GlassReflection isDark={isDark} />
         {/* Handle */}
-        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full"
+        <div className="absolute z-10 top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full"
           style={{ background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }} />
         {/* Header */}
+        <div className="relative z-10">
         <div className="flex items-center justify-between mb-5">
           <p className="text-[17px] font-light" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: heading }}>{title}</p>
           <AppButton whileTap={{ scale: 0.9 }} onClick={onClose}
@@ -236,6 +233,7 @@ export function SettingsSheet({ title, onClose, isDark, brand, cardBorder, child
           </AppButton>
         </div>
         {children}
+        </div>
       </div>
     </motion.div>
   );
@@ -259,7 +257,7 @@ export function PickerList({ options, selected, onSelect, isDark }: {
             className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl cursor-pointer text-left"
             style={{
               background: active ? (isDark ? 'rgba(214,249,5,0.1)' : 'rgba(214,249,5,0.14)') : 'transparent',
-              border: `1px solid ${active ? (isDark ? 'rgba(214,249,5,0.3)' : 'rgba(180,210,0,0.5)') : 'transparent'}`,
+              ...(active ? glassEdge(isDark) : {}),
             }}
           >
             <span className="text-[14px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: active ? 600 : 400, color: heading }}>{opt}</span>

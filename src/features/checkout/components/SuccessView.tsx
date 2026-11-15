@@ -1,12 +1,44 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, Mail } from 'lucide-react';
+import { Check, Mail, Gift, RefreshCw } from 'lucide-react';
 import { SummaryLine } from './OrderSummary';
+import { Money } from '@/lib/money';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { AppButton } from '@/components/primitives/AppButton';
+import { glassControl } from '@/lib/ui/glass';
+import { giftService } from '@/lib/gifts';
+import { toastSuccess, toastError } from '@/lib/feedback';
 
-export function SuccessView({ event, ticketType, total, isDark }: any) {
+export function SuccessView({
+  event,
+  ticketType,
+  total,
+  isDark,
+  isGift,
+  giftRecipientPhone,
+  giftPurchases = [],
+  orderId,
+}: any) {
+  const [resending, setResending] = useState(false);
+
+  const handleResend = async (giftId: string) => {
+    if (!orderId || resending) return;
+    setResending(true);
+    try {
+      await giftService.resendGift(orderId, giftId);
+      toastSuccess('Claim link resent successfully via SMS!');
+    } catch {
+      toastError('Could not resend link. Please try again.');
+    } finally {
+      setResending(false);
+    }
+  };
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
   const textDim = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.4)';
-  const notchColor = isDark ? '#0f0f0f' : '#ffffff';
+  // Cutouts read as holes only when they match the sheet surface behind them.
+  const notchColor = isDark ? '#0a0a0a' : '#ffffff';
+  const hasTotal = typeof total === 'number';
 
   return (
     <div className="flex flex-col items-center text-center w-full">
@@ -34,7 +66,9 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
         transition={{ type: 'spring', damping: 14, stiffness: 200, delay: 0.1 }}
         className="relative w-20 h-20 rounded-full flex items-center justify-center mb-6"
         style={{
-          background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+          background: isGift
+            ? 'linear-gradient(135deg, #d9ff00 0%, #d6f905 100%)'
+            : 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
           boxShadow: 'none',
         }}
       >
@@ -43,56 +77,58 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.4, type: 'spring', damping: 12, stiffness: 200 }}
         >
-          <Check className="w-9 h-9 text-white" strokeWidth={3} />
+          {isGift ? (
+            <Gift className="w-9 h-9 text-black" strokeWidth={2.5} />
+          ) : (
+            <Check className="w-9 h-9 text-white" strokeWidth={3} />
+          )}
         </motion.div>
       </motion.div>
 
       <p className="text-[10px] tracking-[3px] uppercase mb-2"
-        style={{ fontFamily: "'Inter', sans-serif", color: '#34d399' }}>
-        Payment Confirmed
+        style={{ fontFamily: "'Inter', sans-serif", color: isGift ? '#d6f905' : '#34d399' }}>
+        {isGift ? 'Gift Ticket Sent' : 'Payment Confirmed'}
       </p>
       <h3 className="text-[26px] font-light mb-2"
         style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-        You're going!
+        {isGift ? 'Gift on its way!' : "You're going!"}
       </h3>
-      <p className="text-[13px] max-w-[300px] mb-7"
+      <p className="text-[13px] max-w-[320px] mb-7"
         style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
-        Your ticket for <span style={{ color: textPrimary }}>{event.name}</span> is ready in your collection.
+        {isGift
+          ? `We’ve delivered the claim link to ${giftRecipientPhone || 'your recipient'} via SMS.`
+          : <>Your ticket for <span style={{ color: textPrimary }}>{event.name}</span> is ready in your collection.</>}
       </p>
 
-      {/* Physical confirmation ticket — drops in and settles */}
+      {/* Confirmation ticket — the app's standard glass surface, no glow. */}
       <motion.div
         initial={{ y: -28, opacity: 0, rotate: -3, scale: 0.92 }}
         animate={{ y: 0, opacity: 1, rotate: 0, scale: 1 }}
         transition={{ delay: 0.55, type: 'spring', stiffness: 220, damping: 18 }}
         className="relative w-full flex rounded-2xl overflow-hidden"
         style={{
-          background: isDark
-            ? 'linear-gradient(150deg, #1a2207 0%, #0e1304 100%)'
-            : 'linear-gradient(150deg, #fbffe0 0%, #f2fab8 100%)',
-          boxShadow: isDark
-            ? '0 24px 48px -18px rgba(0,0,0,0.7), 0 14px 34px -12px rgba(214,249,5,0.25), inset 0 1px 0 rgba(255,255,255,0.06)'
-            : '0 24px 48px -18px rgba(0,0,0,0.28), 0 14px 30px -14px rgba(214,249,5,0.5), inset 0 1px 0 rgba(255,255,255,0.7)',
-          border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.4)'}`,
+          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
         }}
       >
-        {/* Paper grain */}
-        <div className="absolute inset-0 pointer-events-none"
-          style={{
-            opacity: 0.04,
-            mixBlendMode: isDark ? 'overlay' : 'multiply',
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='gc'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23gc)'/%3E%3C/svg%3E")`,
-            backgroundSize: '160px 160px',
-          }}
-        />
+        <GlassReflection isDark={isDark} />
 
         {/* Main section */}
-        <div className="relative flex-1 p-4 text-left space-y-2.5 min-w-0">
+        <div className="relative z-10 flex-1 p-4 text-left space-y-2.5 min-w-0">
           <SummaryLine label="Event" value={event.name} isDark={isDark} />
           <SummaryLine label="Tier" value={ticketType} isDark={isDark} />
           <SummaryLine label="When" value={`${event.date} · ${event.time}`} isDark={isDark} />
-          <div className="h-px" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.1)' }} />
-          <SummaryLine label="Paid" value={`ETB ${total.toLocaleString()}`} isDark={isDark} />
+          {isGift && (
+            <>
+              <SummaryLine label="Recipient" value={giftRecipientPhone || 'Gift Recipient'} isDark={isDark} />
+              <SummaryLine label="Delivery" value="SMS claim link" isDark={isDark} />
+            </>
+          )}
+          {hasTotal && (
+            <>
+              <div className="h-px" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.1)' }} />
+              <SummaryLine label="Paid" value={Money.fromMinor(total, "ETB").format()} isDark={isDark} />
+            </>
+          )}
         </div>
 
         {/* Vertical perforation + notches */}
@@ -101,7 +137,7 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
           <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-3 h-3 rounded-full" style={{ background: notchColor }} />
           <div className="absolute inset-y-2 left-1/2 -translate-x-1/2 w-px"
             style={{
-              backgroundImage: `radial-gradient(circle, ${isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'} 0%, ${isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'} 40%, transparent 45%)`,
+              backgroundImage: `radial-gradient(circle, ${isDark ? 'rgba(255,255,255,0.28)' : 'rgba(26,26,46,0.28)'} 0%, ${isDark ? 'rgba(255,255,255,0.28)' : 'rgba(26,26,46,0.28)'} 40%, transparent 45%)`,
               backgroundSize: '2px 6px',
               backgroundRepeat: 'repeat-y',
             }}
@@ -109,20 +145,35 @@ export function SuccessView({ event, ticketType, total, isDark }: any) {
         </div>
 
         {/* Stub */}
-        <div className="relative w-[78px] flex-shrink-0 flex flex-col items-center justify-center gap-2 py-4 px-2">
+        <div className="relative z-10 w-[78px] flex-shrink-0 flex flex-col items-center justify-center gap-2 py-4 px-2">
           {/* Faux barcode */}
           <div className="flex items-end gap-[2px] h-8">
             {[3,7,4,8,2,6,3,7,5,2,8,4].map((h, i) => (
               <div key={i} className="w-[2px] rounded-sm"
-                style={{ height: `${h * 3}px`, background: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.6)' }} />
+                style={{ height: `${h * 3}px`, background: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.5)' }} />
             ))}
           </div>
           <span className="text-[7px] tracking-[2px] uppercase"
-            style={{ fontFamily: "'Courier New', ui-monospace, monospace", color: isDark ? 'rgba(214,249,5,0.7)' : 'rgba(0,0,0,0.5)', fontWeight: 700 }}>
-            Admit One
+            style={{ fontFamily: "'Courier New', ui-monospace, monospace", color: textDim, fontWeight: 700 }}>
+            {isGift ? 'Gift Pass' : 'Admit One'}
           </span>
         </div>
       </motion.div>
+
+      {isGift && orderId && giftPurchases?.[0]?.id && (
+        <div className="w-full mt-4">
+          <AppButton
+            whileTap={{ scale: 0.98 }}
+            disabled={resending}
+            onClick={() => handleResend(giftPurchases[0].id)}
+            className="w-full py-3 rounded-xl flex items-center justify-center gap-2 cursor-pointer text-[13px] font-medium"
+            style={glassControl(isDark)}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
+            {resending ? 'Resending Link...' : 'Resend Claim Link'}
+          </AppButton>
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5 mt-5"
         style={{ color: textDim, fontFamily: "'Inter', sans-serif" }}>

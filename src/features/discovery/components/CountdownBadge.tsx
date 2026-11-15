@@ -59,10 +59,9 @@ export function CountdownBadge({ event }: { event: Event }) {
           background: bg,
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
-          border: `1px solid ${isLive ? "rgba(255,255,255,0.3)" : "rgba(214,249,5,0.4)"}`,
           boxShadow: isLive
-            ? "0 8px 20px rgba(220,38,38,0.3)"
-            : "0 8px 20px rgba(0,0,0,0.3)",
+            ? "0 0 0 1px rgba(255,255,255,0.3), 0 8px 20px rgba(220,38,38,0.3)"
+            : "0 0 0 1px rgba(214,249,5,0.4), 0 8px 20px rgba(0,0,0,0.3)",
         }}
       >
         {isLive ? (

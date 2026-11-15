@@ -1,14 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { promoService } from '@/services/promo.service';
-import { checkoutService } from '@/services/checkout.service';
-import { ticketKeys } from '@/services/tickets.service';
+import { orderModule, type OrderQuote } from '@/lib/order';
+import { clearCheckoutResumeKeys } from '@/lib/payment-return';
+import { openHostedCheckout as openHostedCheckoutTab } from '@/lib/checkout-popup';
+import { registrationModule, type ConsentDocument } from '@/lib/registration';
+import { admissionModule, type AdmissionResult } from '@/lib/admission';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { ApiError, messageForCode } from '@/lib/errors';
+import { readActiveCheckout, type ActiveCheckoutRecovery } from '@/lib/checkoutConflict';
+import { randomUuid } from '@/lib/api';
 import type { AppliedPromo, CheckoutStep, ContactDetails, CustomQuestion, EventProduct, PaymentMethod, SeatMapConfig, SelectedEventProduct, SelectedSeat } from '@/types';
 
 
 export type { AppliedPromo, CheckoutStep, ContactDetails, PaymentMethod };
 
-const SERVICE_FEE_RATE = 0.05;
 const MAX_SEATS = 8;
 
 /** Sections available for the chosen tier: those matching its name, else all. */
@@ -18,35 +23,66 @@ function sectionsForTier(seatMap: SeatMapConfig | undefined, ticketType: string)
   return scoped.length ? scoped : seatMap.sections.filter((s) => !s.tierName);
 }
 
-export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestions, products = [], includedProductIds = [], answerEditWindowHours, seatMap, requiredSeatCount = 1, onClose }: {
-  basePrice: number; eventId?: string; ticketType: string; customQuestions?: CustomQuestion[]; products?: EventProduct[]; includedProductIds?: string[]; answerEditWindowHours?: number | null; seatMap?: SeatMapConfig; /** Tier-specific assigned-seat count; couples tiers require two seats. */ requiredSeatCount?: number; onClose: () => void;
+export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, ticketProductId, ticketTypeId, accessCode, invitationToken, customQuestions, products = [], includedProductIds = [], answerEditWindowHours, seatMap, requiredSeatCount = 1, dateSelection, eventDates = [], initialGiftMode = false, onClose }: {
+  basePrice: number; eventId?: string; /** Backend slug — consent_requirements is slug-addressed. */ eventSlug?: string; ticketType: string; /** Real backend product id — what order_quotes consumes. Falls back to the synthetic id for mock tiers. */ ticketProductId?: string; /** Real Ticketing::TicketType id — consent + registration address it. */ ticketTypeId?: string; /** Audience proof for gated ticket types (access-code / invitation). */ accessCode?: string; invitationToken?: string; customQuestions?: CustomQuestion[]; products?: EventProduct[]; includedProductIds?: string[]; answerEditWindowHours?: number | null; seatMap?: SeatMapConfig; /** Tier-specific assigned-seat count; couples require two seats. */ requiredSeatCount?: number; /** Ticket-type date_selection mode (choose_one tiers need a selected date). */ dateSelection?: 'fixed' | 'choose_one'; /** Backend event dates (id + startsAt) for the choose_one date step. */ eventDates?: { id: string; startsAt: string; name?: string }[]; initialGiftMode?: boolean; onClose: () => void;
 }) {
-  // Extras bundled into the chosen tier are pre-selected and free (already in ticket price).
+  const { user, isAuthenticated } = useAuth();
+  const [isGift, setIsGiftState] = useState<boolean>(Boolean(initialGiftMode));
+  const [giftRecipientPhone, setGiftRecipientPhone] = useState('');
+  const [giftNote, setGiftNote] = useState('');
+  const [giftErrors, setGiftErrors] = useState<{ recipientPhone?: string; note?: string }>({});
+  const [giftPurchases, setGiftPurchases] = useState<Array<{ id: string; status: string; deliveryStatus?: string }>>([]);
+  const [orderId, setOrderId] = useState<string>();
+  // Sections available for the chosen tier: those matching its name, else all.
   const [selectedAddOns, setSelectedAddOns] = useState<SelectedEventProduct[]>(() =>
     products
       .filter((p) => includedProductIds.includes(p.id))
       .map((p) => ({ productId: p.id, type: p.type, name: p.name, unitPrice: 0, quantity: 1 })));
   const addOns = selectedAddOns;
-  // Seat-map events pick assigned seats first; quantity is then derived from them.
   const seatSections = useMemo(() => sectionsForTier(seatMap, ticketType), [seatMap, ticketType]);
   const hasSeats = seatSections.length > 0;
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeat[]>([]);
   const seatLimit = Math.max(1, requiredSeatCount);
   const hasFixedSeatRequirement = seatLimit > 1;
-  const [step, setStep] = useState<CheckoutStep>(hasSeats ? 'seat' : 'review');
+  // choose_one ticket types require a selected event date at registration
+  // (the backend rejects without one: invalid_registration). A single-date
+  // event auto-selects it; multi-date events get a Date step before Review.
+  const needsDate = dateSelection === 'choose_one' && eventDates.length > 0;
+  const multiDate = needsDate && eventDates.length > 1;
+  const [selectedEventDateId, setSelectedEventDateId] = useState<string | undefined>(
+    () => (needsDate ? eventDates[0]?.id : undefined),
+  );
+  const [step, setStep] = useState<CheckoutStep>(hasSeats ? 'seat' : (needsDate ? 'date' : 'review'));
   const [manualQuantity, setManualQuantity] = useState(1);
-  // When seats drive the order, quantity always equals the number chosen.
-  const quantity = hasSeats ? selectedSeats.length : manualQuantity;
-  const setQuantity = setManualQuantity;
+  const quantity = isGift ? 1 : (hasSeats ? selectedSeats.length : manualQuantity);
+  const setQuantity = (q: number) => {
+    if (!isGift) setManualQuantity(q);
+  };
+  const setIsGift = (val: boolean) => {
+    setIsGiftState(val);
+    if (val) {
+      setManualQuantity(1);
+    }
+    setGiftErrors({});
+  };
+  const [paying, setPaying] = useState(false);
   const [promoApplied, setPromoApplied] = useState<AppliedPromo | null>(null);
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [promoExpanded, setPromoExpanded] = useState(false);
   const [promoError, setPromoError] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
-  const [contactDetails, setContactDetails] = useState<ContactDetails>({ name: '', email: '', phone: '', contactMethod: 'email' });
+  // Logged-in buyers skip the details step — identity already lives on the
+  // session user (registration uses user.phone; the backend never reads these
+  // fields). Prefilled so receipts/contact display still has values.
+  const [contactDetails, setContactDetails] = useState<ContactDetails>(() => ({
+    name: user?.name ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? '',
+    contactMethod: user?.email ? 'email' : 'phone',
+  }));
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
   const questions = customQuestions ?? [];
-  const hasQuestions = questions.length > 0;
+  const hasQuestions = questions.length > 0 && !isGift;
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {
     const seed: Record<string, unknown> = {};
     questions.forEach((q) => { seed[q.id] = q.type === 'checkbox' ? [] : ''; });
@@ -58,51 +94,326 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const queryClient = useQueryClient();
+
+  /* ─── Phase 3 registration + consent state ─── */
+
+  // Live ticket (real product + ticket type id on a real event) — everything
+  // else stays on the mock pipeline.
+  const isLiveTicket = !!(eventId && eventSlug && ticketProductId && ticketTypeId);
+  const [consents, setConsents] = useState<ConsentDocument[]>([]);
+  const [consentsLoading, setConsentsLoading] = useState(isLiveTicket);
+  const [consentsError, setConsentsError] = useState<string>();
+  const [acceptedConsents, setAcceptedConsents] = useState<Record<string, boolean>>({});
+  const [consentError, setConsentError] = useState<string>();
+  // Applicable published form version for this ticket type (#19 resolved) —
+  // answers must carry its id for stale-version detection. Absent when the
+  // ticket type publishes no form (single-line/answer-free tickets still work).
+  const [formVersionId, setFormVersionId] = useState<string>();
+  const [registrationId, setRegistrationId] = useState<string>();
+  const [registrationError, setRegistrationError] = useState<string>();
+  const [paymentError, setPaymentError] = useState<string>();
+  // Guest free-admission phone proof. The backend demands it only for an
+  // unauthenticated buyer whose selection prices to $0 (a paid selection just
+  // declares `phone_confirmation: true` and is bound to the phone by a signed
+  // order-access token, so it is never asked to prove it); it arrives as the
+  // `phone_verification_required` error, never a next_action. The verified
+  // token is re-submitted with the selection.
+  const [guestOtp, setGuestOtp] = useState<{ challengeId: string; phone: string } | null>(null);
+  const [guestOtpError, setGuestOtpError] = useState<string>();
+  const [guestOtpLoading, setGuestOtpLoading] = useState(false);
+  const [guestOtpVerifying, setGuestOtpVerifying] = useState(false);
+  const verificationTokenRef = useRef<string | undefined>(undefined);
+  // Guard against double-registration when the user bounces payment ↔ details.
+  const registeringRef = useRef(false);
+  // Single-flight Pay: two taps must not open two checkouts.
+  const payingRef = useRef(false);
+  // Stable per-checkout key so a retried Pay click replays the SAME admission
+  // selection instead of creating a second order: the backend's admission
+  // replay store keys on the Idempotency-Key header AND fingerprints the
+  // selection into a request digest, so a fresh key per retry would create a
+  // duplicate order. Persisted per tab so remounts stay stable too.
+  const checkoutKeyName = eventId && ticketTypeId ? `digis:checkout-key:${eventId}:${ticketTypeId}` : null;
+  const checkoutKeyRef = useRef<string | null>(null);
+  if (checkoutKeyRef.current === null) {
+    let key: string | null = checkoutKeyName ? sessionStorage.getItem(checkoutKeyName) : null;
+    if (!key) {
+      key = randomUuid();
+      if (checkoutKeyName) {
+        try {
+          sessionStorage.setItem(checkoutKeyName, key);
+        } catch { /* storage unavailable — key stays in-memory only */ }
+      }
+    }
+    checkoutKeyRef.current = key;
+  }
+
+  // Event terms (consent docs) are per-ticket-type on the backend — fetched on
+  // checkout open so they're normally ready by the review step. The consent
+  // section's Retry re-runs the same fetch; a placeholder row shows while it's
+  // loading so terms never silently pop into the review page.
+  const loadConsents = useCallback(() => {
+    if (!isLiveTicket || !eventSlug || !ticketTypeId) return;
+    setConsentsLoading(true);
+    setConsentsError(undefined);
+    registrationModule.fetchConsentRequirements(eventSlug, ticketTypeId)
+      .then((docs) => setConsents(docs))
+      .catch(() => setConsentsError('Could not load the event terms. Please try again.'))
+      .finally(() => setConsentsLoading(false));
+  }, [isLiveTicket, eventSlug, ticketTypeId]);
+
+  useEffect(() => { loadConsents(); }, [loadConsents]);
+
+  // Load the published registration form version (public schema, #19). The
+  // applicable version id goes on every answer at submit; no form = no version.
+  useEffect(() => {
+    if (!isLiveTicket || !eventSlug || !ticketTypeId) return;
+    let alive = true;
+    registrationModule.fetchRegistrationSchema(eventSlug, ticketTypeId)
+      .then((schema) => {
+        if (!alive || !schema) return;
+        const first = schema.forms[0];
+        if (first) setFormVersionId(first.id);
+      })
+      .catch(() => { /* schema is advisory — answers submit without a version when unavailable */ });
+    return () => { alive = false; };
+  }, [isLiveTicket, eventSlug, ticketTypeId]);
+
+  const toggleConsent = (versionId: string) => {
+    setAcceptedConsents((prev) => ({ ...prev, [versionId]: !prev[versionId] }));
+    setConsentError(undefined);
+  };
+
+  /**
+   * Chapa V2 does NOT redirect the buyer back to the app (verified: the receipt
+   * page stays put, and the API `return_url` is ignored). So open the hosted
+   * checkout in a NEW tab and keep THIS tab alive to confirm — the webhook
+   * fulfills server-side and the refresh + wallet poll then resolve it. Falls
+   * back to a same-tab navigation when the popup is blocked. The
+   * `digis:awaiting-confirm` flag tells the router to start the confirmation
+   * poll on this (still-open) tab.
+   */
+  const openedCheckoutsRef = useRef<Set<string>>(new Set());
+  const openHostedCheckout = (orderId: string, checkoutUrl: string) => {
+    // Both the hook-level and per-call onSuccess handlers can fire for one
+    // attempt; open exactly once per order.
+    if (openedCheckoutsRef.current.has(orderId)) return;
+    openedCheckoutsRef.current.add(orderId);
+    openHostedCheckoutTab(orderId, checkoutUrl);
+  };
+
   const completeCheckoutMutation = useMutation({
     mutationKey: ['checkout', 'complete'],
-    mutationFn: checkoutService.completeOrder,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+    // Admission selection → registration(s) + quote + ONE order. The backend
+    // owns pricing, registration, and idempotency (its replay store replaces
+    // the old register → quote → create-order pipeline). payNow branches on the
+    // returned `next_action`.
+    mutationFn: async ({ guestPhone, verificationToken }: { payMethod: PaymentMethod; guestPhone?: string; verificationToken?: string }): Promise<AdmissionResult> => {
+      return admissionModule.create(
+        eventSlug!,
+        buildSelectionInput(guestPhone, verificationToken),
+        checkoutKeyRef.current ?? randomUuid(),
+      );
     },
   });
 
+  const finalizeSuccess = () => {
+    // Terminal outcome — drop per-checkout resume keys so the NEXT purchase
+    // of the same tier starts fresh instead of replaying this registration.
+    // Tickets are always issued server-side after payment
+    // (Ticketing::Packages::Issue) and read from GET /tickets.
+    clearCheckoutResumeKeys();
+    setStep('success');
+  };
+
+  /** Terminal non-order state from registration (approval / free-confirm flows). */
+  const [pendingNotice, setPendingNotice] = useState<string>();
+  const enterPending = (notice: string) => {
+    setPendingNotice(notice);
+    setStep('pending');
+  };
+
+  /**
+   * Notice state: the backend refused to supersede a checkout this buyer
+   * already has open for the event (`active_checkout_exists` /
+   * `idempotency_conflict`). The 409 now carries `meta.active_checkout` (#58,
+   * resolved 2026-10-16): when it includes a hosted `checkout_url` the sheet
+   * offers to resume that payment; otherwise it degrades to "View Tickets".
+   */
+  const [conflict, setConflict] = useState(false);
+  const [conflictRecovery, setConflictRecovery] = useState<ActiveCheckoutRecovery | null>(null);
+  const openConflictSheet = (recovery: ActiveCheckoutRecovery | null = null) => {
+    setConflictRecovery(recovery);
+    setConflict(true);
+    setStep('payment');
+  };
+  const closeConflictSheet = () => { setConflict(false); setConflictRecovery(null); };
+  /** Resume the open checkout's hosted payment page (only when it has a URL). */
+  const resumeActiveCheckout = () => {
+    const url = conflictRecovery?.payment?.checkoutUrl;
+    if (!conflictRecovery || !url) return;
+    openHostedCheckout(conflictRecovery.orderId, url);
+  };
+
   const promoCode = promoApplied?.code;
-  const discountAmount = promoApplied ? promoApplied.type === 'percent' ? Math.round(basePrice * promoApplied.discount / 100) : promoApplied.discount : 0;
-  const addOnsSubtotal = addOns.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const subtotal = basePrice * quantity + addOnsSubtotal;
-  const discountTotal = discountAmount * quantity;
-  const afterDiscount = Math.max(0, subtotal - discountTotal);
-  const serviceFee = Math.round(afterDiscount * SERVICE_FEE_RATE);
-  const total = afterDiscount + serviceFee;
+
+  // Backend-authoritative money: the quote (orderModule.quote) computes subtotal,
+  // discount, buyer fee, and total — the frontend only displays what it returns.
+  // The quote only becomes REAL once registration exists (ticket lines require a
+  // registration_id); until then live tiers show the local mock estimate.
+  // Server-side promo failures surface on the promo field (not the total line).
+  const validGuestPhone = !isAuthenticated && contactDetails.phone.replace(/\s/g, '').length >= 10
+    ? contactDetails.phone : undefined;
+  const quoteInput = useMemo(() => {
+    const ticketLine = { eventProductId: ticketProductId ?? `ticket:${ticketType}`, quantity, unitPriceMinor: basePrice, registrationId };
+    const addOnLines = addOns
+      .filter((a) => a.quantity > 0)
+      .map((a) => ({ eventProductId: a.productId, quantity: a.quantity, unitPriceMinor: a.unitPrice }));
+    return {
+      eventId, items: [ticketLine, ...addOnLines], chargeCurrency: "ETB", promotionCode: promoCode ?? undefined,
+      ...(validGuestPhone ? { guestPhone: validGuestPhone } : {}),
+    };
+  }, [eventId, ticketType, quantity, addOns, promoCode, basePrice, registrationId, ticketProductId, validGuestPhone]);
+
+  const [quote, setQuote] = useState<OrderQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(true);
+  const [quoteError, setQuoteError] = useState<string>();
+  // A guest with no valid phone yet cannot hit either quote endpoint: the
+  // authenticated one 401s (authentication_required) and the guest one needs
+  // a real phone. Show the local estimate until the Details step is complete.
+  const guestNeedsPhone = !isAuthenticated && !validGuestPhone;
+  useEffect(() => {
+    if (guestNeedsPhone) {
+      setQuote(null);
+      setQuoteLoading(false);
+      setQuoteError(undefined);
+      setPromoLoading(false);
+      return;
+    }
+    let alive = true;
+    setQuoteLoading(true);
+    setQuoteError(undefined);
+    orderModule.quote(quoteInput).then((q) => {
+      if (!alive) return;
+      setQuote(q);
+      setQuoteLoading(false);
+      // The server accepted the quote — a pending promo code is now applied.
+      if (promoCode) {
+        setPromoError('');
+        setPromoLoading(false);
+        setPromoExpanded(false);
+      }
+    }).catch((e) => {
+      if (!alive) return;
+      setQuote(null);
+      setQuoteLoading(false);
+      setPromoLoading(false);
+      // A live TICKET quote without a registration is rejected by design
+      // (registration_required) — not an error. Until registration at Pay,
+      // the tier price is the display estimate; the authoritative quote
+      // happens right after registration. Any other failure is real.
+      const isPreregistrationTicketQuote =
+        isLiveTicket && !registrationId && e instanceof ApiError && e.code === 'registration_required';
+      if (isPreregistrationTicketQuote) {
+        setQuoteError(undefined);
+      } else if (
+        isLiveTicket && promoCode && e instanceof ApiError &&
+        (e.code === 'invalid_promotion_code' || e.code === 'promotion_unavailable')
+      ) {
+        // Bad promo code: keep the totals area clean, revert the optimistic
+        // apply so the field reopens, and explain on the field.
+        setQuoteError(undefined);
+        setPromoApplied(null);
+        setPromoExpanded(true);
+        setPromoError(messageForCode(e.code, e.message));
+      } else {
+        setQuoteError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Could not load pricing. Check your connection and try again.');
+      }
+    });
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteInput, guestNeedsPhone]);
+
+  // Display-only money (cents). Live-ticket pre-registration: estimate from
+  // the tier price (the backend cannot price a ticket before registration).
+  // After registration (or for extras-only carts) the server quote wins.
+  const estimateMinor = basePrice * quantity + addOns.reduce((s, a) => s + a.unitPrice * a.quantity, 0);
+  const subtotal = quote?.subtotal_minor ?? estimateMinor;
+  const discountTotal = quote?.discount_minor ?? 0;
+  const discountAmount = Math.round((discountTotal / Math.max(1, quantity)) / 100) * 100;
+  const serviceFee = quote?.buyer_fee_total ?? 0;
+  const total = quote?.total_minor ?? estimateMinor;
+  const quoteToken = quote?.quote_token;
 
   const hasExtras = products.length > 0;
+  // A signed-in user has nothing to type on the details step — identity comes
+  // from the session (registration sends user.phone; the backend ignores the
+  // contact fields). Guests still get the form.
+  const needsDetails = !isAuthenticated;
   const steps = useMemo<{ id: CheckoutStep; label: string }[]>(() => [
     ...(hasSeats ? [{ id: 'seat' as CheckoutStep, label: 'Seats' }] : []),
+    ...(multiDate ? [{ id: 'date' as CheckoutStep, label: 'Date' }] : []),
     { id: 'review', label: 'Review' },
     ...(hasExtras ? [{ id: 'extras' as CheckoutStep, label: 'Extras' }] : []),
-    { id: 'details', label: 'Details' },
+    ...(needsDetails ? [{ id: 'details' as CheckoutStep, label: 'Details' }] : []),
     ...(hasQuestions ? [{ id: 'questions' as CheckoutStep, label: 'Questions' }] : []),
     { id: 'payment', label: 'Payment' },
-  ], [hasSeats, hasExtras, hasQuestions]);
+  ], [hasSeats, multiDate, hasExtras, hasQuestions, needsDetails]);
   const stepIndex = steps.findIndex(s => s.id === step);
   const visibleStep = stepIndex >= 0 ? stepIndex : 0;
 
   const validatePromo = async () => {
+    // Promo validation is server-side at quote time (order_quotes validates
+    // promotion_code). "Apply" just stores the code — the quote request below
+    // carries it and the quote error surfaces invalid codes on the field.
     const code = promoCodeInput.trim().toUpperCase();
     if (!code) return;
-    setPromoError(''); setPromoLoading(true);
-    try {
-      const res = await promoService.validate(eventId || '', code, ticketType);
-      if (res.valid && res.promo) { setPromoApplied({ code: res.promo.code, discount: res.promo.discount, type: res.promo.type, label: res.promo.label }); setPromoExpanded(false); }
-      else setPromoError(res.error || 'Invalid promo code. Please try again.');
-    } catch (err) { console.log('Promo validation error:', err); setPromoError('Failed to validate promo code. Please try again.'); }
-    finally { setPromoLoading(false); }
+    removePromoErrorOnly();
+    // Optimistically queue the code (it drives the quote request); the field
+    // stays open with a spinner until the server confirms (see PromoCodeField),
+    // then collapses to the applied pill — or reverts with the error on reject.
+    setPromoApplied({ code, discount: 0, type: 'fixed', label: code });
+    setPromoLoading(true);
+    setPromoExpanded(true);
   };
-  const removePromo = () => { setPromoApplied(null); setPromoCodeInput(''); setPromoError(''); };
+  const removePromo = () => { setPromoApplied(null); setPromoCodeInput(''); setPromoError(''); setPromoLoading(false); };
+  const removePromoErrorOnly = () => { setPromoError(''); };
+
+  const normalizePhone = (phone: string): string => {
+    const cleaned = phone.replace(/[\s()-]/g, '');
+    if (cleaned.startsWith('+251')) return cleaned;
+    if (cleaned.startsWith('09')) return '+251' + cleaned.slice(1);
+    if (cleaned.startsWith('9') && cleaned.length === 9) return '+251' + cleaned;
+    if (cleaned.startsWith('+')) return cleaned;
+    return cleaned;
+  };
+
+  const validateGift = (): boolean => {
+    if (!isGift) return true;
+    const errs: typeof giftErrors = {};
+    const rawPhone = giftRecipientPhone.trim();
+    if (!rawPhone) {
+      errs.recipientPhone = 'Recipient phone number is required';
+    } else {
+      const cleaned = rawPhone.replace(/[\s()-]/g, '');
+      if (!/^(\+251|0)?9\d{8}$/.test(cleaned) && !/^\+\d{10,15}$/.test(cleaned)) {
+        errs.recipientPhone = 'Enter a valid phone number (e.g. +251 91 123 4567)';
+      } else {
+        const normRecipient = normalizePhone(rawPhone);
+        if (user?.phone && normalizePhone(user.phone) === normRecipient) {
+          errs.recipientPhone = 'You cannot send a gift ticket to your own phone number';
+        }
+      }
+    }
+    if (giftNote.length > 500) {
+      errs.note = 'Gift note cannot exceed 500 characters';
+    }
+    setGiftErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const validateDetails = () => {
     const e: typeof errors = {};
-    if (!contactDetails.name.trim() || contactDetails.name.trim().length < 2) e.name = 'Please enter your full name';
+    if (!contactDetails.name.trim() || contactDetails.name.trim().length < 2) e.name = 'Please enter your name';
     if (contactDetails.contactMethod === 'email') {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactDetails.email)) e.email = 'Enter a valid email';
     } else if (!/^(\+251|0)?9\d{8}$/.test(contactDetails.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid Ethiopian phone';
@@ -113,8 +424,232 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
     questions.forEach((q) => { if (!q.required) return; const v = answers[q.id]; if (q.type === 'checkbox') { if (!Array.isArray(v) || v.length === 0) qe[q.id] = 'Please select at least one option'; } else if (typeof v !== 'string' || v.trim() === '') qe[q.id] = 'This field is required'; });
     setQuestionErrors(qe); return Object.keys(qe).length === 0;
   };
-  const goNext = () => { if (step === 'seat') setStep('review'); else if (step === 'review') setStep(hasExtras ? 'extras' : 'details'); else if (step === 'extras') setStep('details'); else if (step === 'details') { if (validateDetails()) setStep(hasQuestions ? 'questions' : 'payment'); } else if (step === 'questions') { if (validateQuestions()) setStep('payment'); } else if (step === 'payment') { const order = checkoutService.createOrder({ eventId, ticketType, basePrice, quantity, seats: hasSeats ? selectedSeats : undefined, promoApplied, contactDetails, answers, addOns, customQuestions: questions, answerEditWindowHours, paymentMethod: payMethod, subtotal, discountAmount, discountTotal, serviceFee, total }); setStep('processing'); completeCheckoutMutation.mutate(order, { onSettled: () => setStep('success') }); } };
-  const goBack = () => { if (step === 'review') { if (hasSeats) setStep('seat'); else onClose(); } else if (step === 'extras') setStep('review'); else if (step === 'details') setStep(hasExtras ? 'extras' : 'review'); else if (step === 'questions') setStep('details'); else if (step === 'payment') setStep(hasQuestions ? 'questions' : 'details'); else onClose(); };
+  /** Required consents accepted? Only enforced for live tickets with consents. */
+  const validateConsents = () => {
+    const missing = consents.filter((c) => c.required && !acceptedConsents[c.versionId]);
+    if (missing.length > 0) {
+      setConsentError(`Please accept ${missing[0].title} to continue.`);
+      return false;
+    }
+    setConsentError(undefined);
+    return true;
+  };
+
+  /**
+   * Build the admission selection from the cart. The backend turns this into
+   * the registration(s) + quote + ONE order (replacing the old
+   * register → quote → create-order pipeline). Only consents the buyer actually
+   * accepted are sent; the backend re-validates required ones.
+   */
+  const buildSelectionInput = (guestPhone?: string, verificationToken?: string) => {
+    const accepted = consents.filter((c) => acceptedConsents[c.versionId]);
+    const ticketItem = {
+      eventProductId: ticketProductId ?? `ticket:${ticketType}`,
+      quantity: isGift ? 1 : quantity,
+      ...(selectedEventDateId ? { selectedEventDateId } : {}),
+      ...(!isGift && accessCode ? { accessCode } : {}),
+      ...(!isGift && invitationToken ? { invitationToken } : {}),
+      ...(!isGift
+        ? {
+            answers: questions.map((q) => ({
+              ...(formVersionId ? { formVersionId } : {}),
+              questionKey: q.id,
+              value: answers[q.id],
+            })),
+            consents: accepted,
+          }
+        : {}),
+      ...(isGift
+        ? {
+            gift: {
+              recipientPhone: normalizePhone(giftRecipientPhone.trim()),
+              ...(giftNote.trim() ? { note: giftNote.trim() } : {}),
+            },
+          }
+        : {}),
+    };
+    const addOnItems = addOns
+      .filter((a) => a.quantity > 0)
+      .map((a) => ({
+        eventProductId: a.productId,
+        quantity: a.quantity,
+        ...(selectedEventDateId ? { eventDateIds: [selectedEventDateId] } : {}),
+      }));
+    return {
+      items: [ticketItem, ...addOnItems],
+      chargeCurrency: 'ETB' as const,
+      ...(promoCode ? { promotionCode: promoCode } : {}),
+      ...(!isAuthenticated && guestPhone
+        ? {
+            phone: guestPhone,
+            phoneConfirmation: true,
+            ...(verificationToken ? { verificationToken } : {}),
+            ...(contactDetails.name ? { fullName: contactDetails.name } : {}),
+            ...(contactDetails.email ? { email: contactDetails.email } : {}),
+          }
+        : {}),
+    };
+  };
+
+  const goNext = async () => {
+    if (step === 'seat') setStep(multiDate ? 'date' : 'review');
+    else if (step === 'date') { if (selectedEventDateId) setStep('review'); }
+    else if (step === 'review') {
+      if (!validateConsents()) return;
+      if (isGift && !validateGift()) return;
+      setStep(hasExtras ? 'extras' : (needsDetails ? 'details' : (hasQuestions ? 'questions' : 'payment')));
+    }
+    else if (step === 'extras') setStep(needsDetails ? 'details' : (hasQuestions ? 'questions' : 'payment'));
+    else if (step === 'details') { if (validateDetails()) setStep(hasQuestions ? 'questions' : 'payment'); }
+    else if (step === 'questions') { if (validateQuestions()) setStep('payment'); }
+    else if (step === 'payment') {
+      // Pay is single-flight: a second tap while the first is registering /
+      // quoting / redirecting must not open a duplicate checkout.
+      if (payingRef.current || completeCheckoutMutation.isPending) return;
+      payingRef.current = true;
+      try {
+        return await payNow();
+      } finally {
+        payingRef.current = false;
+      }
+    }
+  };
+
+  /**
+   * Ask the backend for a phone-verification code for a $0 guest selection,
+   * then show the inline OTP step. The endpoint preflights the exact quote, so
+   * it fails the same way `create` would (e.g. a stale product) — that error is
+   * surfaced on the payment step rather than stranding the buyer on OTP.
+   */
+  const beginGuestOtp = async (guestPhone: string) => {
+    setGuestOtpLoading(true);
+    setGuestOtpError(undefined);
+    try {
+      const challenge = await admissionModule.requestOtp(
+        eventSlug!,
+        buildSelectionInput(guestPhone, verificationTokenRef.current),
+      );
+      setPaymentError(undefined);
+      setGuestOtp({ challengeId: challenge.challengeId, phone: guestPhone });
+      setStep('otp');
+    } catch (e) {
+      setStep('payment');
+      setPaymentError(
+        e instanceof ApiError
+          ? messageForCode(e.code, e.message)
+          : 'We could not send a verification code. Please try again.',
+      );
+    } finally {
+      setGuestOtpLoading(false);
+    }
+  };
+
+  /** Trade the OTP code for a verification token, then retry the selection. */
+  const verifyGuestOtp = async (code: string) => {
+    if (!guestOtp || guestOtpVerifying) return;
+    setGuestOtpVerifying(true);
+    setGuestOtpError(undefined);
+    try {
+      const { verificationToken } = await registrationModule.verifyPhoneOtp(guestOtp.challengeId, code);
+      verificationTokenRef.current = verificationToken;
+      await payNow();
+    } catch (e) {
+      setGuestOtpError(
+        e instanceof ApiError ? messageForCode(e.code, e.message) : 'That code didn’t work. Please try again.',
+      );
+    } finally {
+      setGuestOtpVerifying(false);
+    }
+  };
+
+  const resendGuestOtp = () => {
+    if (guestOtp) void beginGuestOtp(guestOtp.phone);
+  };
+
+  const payNow = async () => {
+    const guestPhone = !isAuthenticated && validGuestPhone ? validGuestPhone : undefined;
+    setPaying(true);
+    setStep('processing');
+    try {
+      // One call: registration(s) + quote + order, then branch on next_action.
+      // A verified guest phone proof (from the OTP step) rides every submit.
+      const result = await completeCheckoutMutation.mutateAsync({
+        payMethod,
+        guestPhone,
+        verificationToken: verificationTokenRef.current,
+      });
+      const { nextAction, order, guestOrderToken, giftPurchases: resultGifts } = result;
+      if (order?.id) setOrderId(order.id);
+      else if (nextAction.orderId) setOrderId(nextAction.orderId);
+      if (resultGifts && resultGifts.length > 0) {
+        setGiftPurchases(resultGifts);
+      }
+
+      // Free / fully-discounted admission — the backend confirms + issues.
+      if (nextAction.type === 'confirmed' || nextAction.type === 'issuing') {
+        finalizeSuccess();
+        return;
+      }
+      if (nextAction.type === 'awaiting_approval') {
+        enterPending('Your request was received. The organizer will review it and you’ll be notified once it’s approved.');
+        return;
+      }
+      if (nextAction.type === 'waitlist_available') {
+        setStep('payment');
+        setPaymentError('One or more of those tickets just sold out — try joining the waitlist instead.');
+        return;
+      }
+      if (nextAction.type === 'checkout_required' && nextAction.orderId && order) {
+        const guest = guestPhone ? { orderAccessToken: guestOrderToken, phone: guestPhone } : undefined;
+        const { payment } = await orderModule.startPayment({
+          orderId: nextAction.orderId,
+          provider: 'chapa',
+          paymentMethod: payMethod,
+          eventId,
+          ...(guest ? { guest } : {}),
+        });
+        if (!payment || payment.status === 'succeeded') { finalizeSuccess(); return; }
+        if (payment.status === 'processing' && payment.checkout_url) {
+          openHostedCheckout(order.id, payment.checkout_url);
+          return;
+        }
+        setStep('payment');
+        setPaymentError('Payment could not be started. Please try again.');
+        return;
+      }
+      enterPending('Your registration was received and is being confirmed. Check Tickets shortly.');
+    } catch (e) {
+      setStep('payment');
+      if (e instanceof ApiError && (e.code === 'payment_already_accepted' || e.code === 'payment_succeeded_pending_acceptance')) {
+        // Money already moved — a confirmation wait, not a failure.
+        enterPending('Your payment is being confirmed. Check Tickets shortly — your tickets will appear there.');
+        return;
+      }
+      if (e instanceof ApiError && (e.code === 'active_checkout_exists' || e.code === 'idempotency_conflict')) {
+        // A previous checkout for this buyer+event is still open — offer the
+        // notice sheet, resuming its hosted payment when the 409's
+        // `meta.active_checkout` carries a checkout_url (#58).
+        openConflictSheet(readActiveCheckout(e.meta));
+        return;
+      }
+      // A $0 guest selection needs the phone proved before the backend will
+      // accept it. An invalid/expired proof is re-requested from scratch.
+      if (
+        e instanceof ApiError && guestPhone &&
+        (e.code === 'phone_verification_required' ||
+          e.code === 'phone_confirmation_required' ||
+          e.code === 'phone_verification_invalid')
+      ) {
+        verificationTokenRef.current = undefined;
+        await beginGuestOtp(guestPhone);
+        return;
+      }
+      setPaymentError(e instanceof ApiError ? messageForCode(e.code, e.message) : 'Something went wrong. Please try again.');
+    } finally {
+      setPaying(false);
+    }
+  };
+  const goBack = () => { if (step === 'pending') { setStep('payment'); return; } if (step === 'otp') { setGuestOtp(null); setGuestOtpError(undefined); verificationTokenRef.current = undefined; setStep('payment'); return; } if (step === 'date') { if (hasSeats) setStep('seat'); else onClose(); } if (step === 'review') { if (multiDate) setStep('date'); else if (hasSeats) setStep('seat'); else onClose(); } else if (step === 'extras') setStep('review'); else if (step === 'details') setStep(hasExtras ? 'extras' : 'review'); else if (step === 'questions') setStep(needsDetails ? 'details' : (hasExtras ? 'extras' : 'review')); else if (step === 'payment') setStep(hasQuestions ? 'questions' : (needsDetails ? 'details' : (hasExtras ? 'extras' : (multiDate ? 'date' : 'review')))); else onClose(); };
   const toggleSeat = (seat: SelectedSeat) => {
     setSelectedSeats((prev) => {
       const exists = prev.some((s) => s.id === seat.id);
@@ -125,8 +660,9 @@ export function useCheckoutFlow({ basePrice, eventId, ticketType, customQuestion
   };
   const canContinue = useMemo(() => {
     if (step === 'seat') return hasFixedSeatRequirement ? selectedSeats.length === seatLimit : selectedSeats.length > 0;
+    if (step === 'date') return Boolean(selectedEventDateId);
     return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
-  }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc]);
+  }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId]);
 
-  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns };
+  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, conflictRecovery, closeConflictSheet, resumeActiveCheckout, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp, isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId };
 }

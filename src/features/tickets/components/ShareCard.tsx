@@ -3,15 +3,19 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Copy, Instagram, Twitter, Check, Share2 } from 'lucide-react';
 import { useRef, useState, useCallback } from 'react';
 import { toPng } from 'html-to-image';
+import { useTheme } from '@/app/components/ThemeContext';
+import { glassEdge } from '@/lib/ui/glass';
 import { useImageColor } from '@/lib/hooks/useImageColor';
 import { useProminentHue } from '@/lib/hooks/useProminentHue';
 import { readableAccent } from '@/lib/utils/color';
 import { BoldCard, NightCard, ShareIconButton, StubCard } from '@/features/tickets/components/ShareCardParts';
 import { AppButton } from '@/components/primitives/AppButton';
+import { toastError } from '@/lib/feedback';
 
 interface ShareCardProps {
   event: {
     name: string;
+    slug?: string;
     date: string;
     time?: string;
     venue: string;
@@ -30,11 +34,11 @@ type CardStyle = 'bold' | 'night' | 'stub';
 
 const BRAND = '#d6f905';
 const INK = '#0a0a0a';
-const STATUS = 'Ticket Secured';
 
 /* ── modal shell ─────────────────────────────────────────── */
 
-export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCardProps) {
+export function ShareCard({ event, ticketType, ticketLevel, purchased = false, onClose }: ShareCardProps) {
+  const { isDark } = useTheme();
   const cardRef = useRef<HTMLDivElement>(null);
   const isVIP = ticketType?.toUpperCase().includes('VIP');
   const [activeStyle, setActiveStyle] = useState<CardStyle>('bold');
@@ -56,13 +60,20 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
       link.href = dataUrl;
       link.click();
     } catch (err) {
-      console.error('Failed to generate image:', err);
+      toastError(err, 'Couldn’t generate the share image. Please try again.');
     }
     setDownloading(false);
   }, [event.name]);
 
   const handleCopyLink = () => {
-    copyText(`https://digis.app/event/${event.name.replace(/\s+/g, '-').toLowerCase()}`).then((didCopy) => { if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); } });
+    // Real, resolvable event route — never a fabricated domain.
+    const slug = (event as { slug?: string }).slug
+      || event.name.replace(/\s+/g, '-').toLowerCase();
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    copyText(`${origin}/events/${slug}`).then((didCopy) => {
+      if (didCopy) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+      else toastError(new Error('clipboard unavailable'), 'Couldn’t copy the link — long-press to copy it manually.');
+    });
   };
 
   const styles: { key: CardStyle; label: string }[] = [
@@ -71,7 +82,7 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
     { key: 'stub', label: 'Ticket Cut' },
   ];
 
-  const cardProps = { event, ticketType, ticketLevel, isVIP, hued, accentText };
+  const cardProps = { event, ticketType, ticketLevel, isVIP, hued, accentText, purchased };
 
   return (
     <motion.div
@@ -96,7 +107,7 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
           whileTap={{ scale: 0.9 }}
           onClick={onClose}
           className="absolute -top-2 right-3 z-20 w-10 h-10 rounded-full flex items-center justify-center cursor-pointer"
-          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.14)' }}
+          style={{ background: 'rgba(255,255,255,0.1)', ...glassEdge(isDark) }}
         >
           <X className="w-5 h-5 text-white/80" strokeWidth={1.75} />
         </AppButton>
@@ -131,7 +142,7 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: active ? 700 : 500,
                   background: active ? BRAND : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${active ? BRAND : 'rgba(255,255,255,0.12)'}`,
+                  boxShadow: `0 0 0 1px ${active ? BRAND : 'rgba(255,255,255,0.12)'}`,
                   color: active ? INK : 'rgba(255,255,255,0.6)',
                 }}
               >
@@ -173,11 +184,12 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
           className="w-full space-y-3"
         >
           <AppButton
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={{ scale: downloading ? 1 : 1.02 }}
+            whileTap={{ scale: downloading ? 1 : 0.97 }}
             onClick={handleDownload}
-            className="w-full h-[54px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer"
-            style={{ background: BRAND }}
+            disabled={downloading}
+            className="w-full h-[54px] rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
+            style={{ background: BRAND, opacity: downloading ? 0.7 : 1 }}
           >
             {downloading ? (
               <motion.div
@@ -201,7 +213,7 @@ export function ShareCard({ event, ticketType, ticketLevel, onClose }: ShareCard
               whileTap={{ scale: 0.95 }}
               onClick={handleCopyLink}
               className="flex-1 h-[48px] rounded-xl flex items-center justify-center gap-2 cursor-pointer"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)' }}
+              style={{ background: 'rgba(255,255,255,0.08)', ...glassEdge(isDark) }}
             >
               {copied ? <Check className="w-4 h-4" style={{ color: BRAND }} strokeWidth={2} /> : <Copy className="w-4 h-4 text-white/70" strokeWidth={1.75} />}
               <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: copied ? BRAND : 'rgba(255,255,255,0.8)', fontWeight: 600 }}>

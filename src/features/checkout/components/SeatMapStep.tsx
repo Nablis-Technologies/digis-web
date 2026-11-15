@@ -1,6 +1,9 @@
 import { motion } from 'motion/react';
 import type { SeatSection, SelectedSeat } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
+import { Money } from '@/lib/money';
 
 interface SeatMapStepProps {
   sections: SeatSection[];
@@ -52,7 +55,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
       {/* Stage / screen orientation bar */}
       <div className="flex flex-col items-center mb-5">
         <div className="w-3/4 h-8 rounded-b-[40px] flex items-center justify-center"
-          style={{ background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.12)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(214,249,5,0.25)'}`, borderTop: 'none' }}>
+          style={{ background: isDark ? 'rgba(214,249,5,0.08)' : 'rgba(214,249,5,0.12)', boxShadow: `0 0 0 1px ${isDark ? 'rgba(214,249,5,0.2)' : 'rgba(214,249,5,0.25)'}` }}>
           <span className="text-[10px] tracking-[4px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#d6f905' : '#5a6b00' }}>
             {stageLabel}
           </span>
@@ -69,7 +72,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
                   {section.name}
                 </p>
                 <p className="text-[10px]" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
-                  ETB {basePrice.toLocaleString()}
+                  {Money.fromMinor(basePrice, "ETB").format()}
                 </p>
               </div>
 
@@ -121,15 +124,17 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
       </div>
 
       {/* Selection summary */}
-      <div className="mt-5 rounded-2xl p-4"
-        style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(26,26,46,0.02)' }}>
+      <div className="relative mt-5 rounded-2xl overflow-hidden p-4"
+        style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(26,26,46,0.02)' }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
           <p className="text-[10px] tracking-[2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
             {selectedSeats.length === 0 ? (requiredSeats ? `Select ${requiredSeats} seats` : 'Select your seats') : `${selectedSeats.length} of ${maxSeats} selected`}
           </p>
           {selectedSeats.length > 0 && (
             <p className="text-[12px]" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-              ETB {(basePrice * selectedSeats.length).toLocaleString()}
+              ETB {Money.fromMinor(basePrice * selectedSeats.length, "ETB").formatNumber()}
             </p>
           )}
         </div>
@@ -142,7 +147,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
             {selectedSeats.map((s) => (
               <AppButton key={s.id} onClick={() => toggleSeat(s)}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer"
-                style={{ background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.15)', border: `1px solid ${isDark ? 'rgba(214,249,5,0.25)' : 'rgba(214,249,5,0.3)'}` }}>
+                style={{ background: isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.15)', ...glassEdge(isDark) }}>
                 <span className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#f4ff66' : '#3a4600' }}>
                   {s.row}{s.seat}
                 </span>
@@ -151,6 +156,7 @@ export function SeatMapStep({ sections, stageLabel = 'STAGE', basePrice, selecte
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

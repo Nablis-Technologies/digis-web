@@ -1,5 +1,7 @@
 import { ClipboardList } from 'lucide-react';
 import type { CustomQuestion } from '@/types';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge } from '@/lib/ui/glass';
 import { QuestionField } from './QuestionField';
 
 export function QuestionsStep({
@@ -21,7 +23,7 @@ export function QuestionsStep({
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-3"
           style={{
             background: isDark ? 'rgba(217,255,0,0.08)' : 'rgba(214,249,5,0.08)',
-            border: `1px solid ${isDark ? 'rgba(217,255,0,0.18)' : 'rgba(214,249,5,0.18)'}`,
+            ...glassEdge(isDark),
           }}>
           <ClipboardList className="w-5 h-5" strokeWidth={1.6} style={{ color: accent }} />
         </div>
@@ -35,11 +37,12 @@ export function QuestionsStep({
         </p>
       </div>
 
-      <div className="space-y-4 rounded-2xl p-4"
+      <div className="relative space-y-4 rounded-2xl overflow-hidden p-4"
         style={{
           background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(26,26,46,0.02)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)'}`,
         }}>
+        <GlassReflection isDark={isDark} />
+        <div className="relative z-10 space-y-4">
         {questions.map((q: CustomQuestion) => (
           <QuestionField
             key={q.id}
@@ -53,6 +56,7 @@ export function QuestionsStep({
             isDark={isDark}
           />
         ))}
+        </div>
       </div>
     </div>
   );

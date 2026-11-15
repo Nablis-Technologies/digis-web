@@ -4,9 +4,12 @@ import { AlertCircle, Building2, Calendar, Check, ChevronRight, CreditCard, Lock
 import type { PaymentMethod } from '@/features/checkout/hooks/useCheckoutFlow';
 import { OrderSummary } from './OrderSummary';
 import { PromoCodeField } from './PromoCodeField';
+import { Money } from '@/lib/money';
 import { ProviderLogo } from '@/components/ProviderLogo';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 
 export function PaymentStep({
   method, setMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, total, subtotal, discountTotal, promoCode, serviceFee, isDark,
@@ -15,9 +18,11 @@ export function PaymentStep({
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
 
-  const methods: { id: PaymentMethod; label: string; tag: string; icon: any; accent: string }[] = [
+  // The backend recognizes only the canonical `cbebirr` (not `cbe` / `cbe_birr`,
+  // which 422 invalid_payment_method) — see G-12.
+  const methods: { id: PaymentMethod; label: string; tag: string; icon: any; accent: string; disabled?: boolean; note?: string }[] = [
     { id: 'telebirr', label: 'Telebirr', tag: 'Mobile money', icon: <ProviderLogo kind="telebirr" size={40} />, accent: '#1aa64b' },
-    { id: 'cbe', label: 'CBE Birr', tag: 'Bank transfer', icon: <ProviderLogo kind="cbe" size={40} />, accent: '#7b2d8e' },
+    { id: 'cbebirr', label: 'CBE Birr', tag: 'Bank transfer', icon: <ProviderLogo kind="cbe" size={40} />, accent: '#7b2d8e' },
     { id: 'card', label: 'Credit / Debit Card', tag: 'Visa, Mastercard', icon: <CreditCard className="w-5 h-5" />, accent: '#d6f905' },
   ];
 
@@ -39,7 +44,7 @@ export function PaymentStep({
           <PaymentOption
             key={m.id} option={m}
             selected={method === m.id}
-            onClick={() => setMethod(m.id)}
+            onClick={() => { if (!m.disabled) setMethod(m.id); }}
             isDark={isDark}
           />
         ))}
@@ -87,18 +92,18 @@ export function PaymentStep({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="rounded-xl p-4 flex items-center gap-3"
+            className="relative overflow-hidden rounded-xl p-4 flex items-center gap-3"
             style={{
               background: isDark ? 'rgba(217,255,0,0.06)' : 'rgba(214,249,5,0.05)',
-              border: `1px solid ${isDark ? 'rgba(217,255,0,0.15)' : 'rgba(214,249,5,0.12)'}`,
             }}
           >
-            <ChevronRight className="w-4 h-4" strokeWidth={1.5}
+            <GlassReflection isDark={isDark} />
+            <ChevronRight className="relative z-10 w-4 h-4" strokeWidth={1.5}
               style={{ color: isDark ? '#d6f905' : '#0a0a0a' }} />
-            <p className="text-[11px] leading-relaxed"
+            <p className="relative z-10 text-[11px] leading-relaxed"
               style={{ fontFamily: "'Inter', sans-serif", color: textMuted }}>
               You'll be redirected to {method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to authorize{' '}
-              <span style={{ color: textPrimary, fontWeight: 500 }}>ETB {total.toLocaleString()}</span>.
+              <span style={{ color: textPrimary, fontWeight: 500 }}>{Money.fromMinor(total, "ETB").format()}</span>.
             </p>
           </motion.div>
         )}
@@ -110,21 +115,21 @@ export function PaymentStep({
 function PaymentOption({ option, selected, onClick, isDark }: any) {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
   const textDim = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(26,26,46,0.45)';
+  const disabled = !!option.disabled;
 
   return (
     <AppButton
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={disabled ? undefined : { scale: 1.01 }}
+      whileTap={disabled ? undefined : { scale: 0.99 }}
       onClick={onClick}
-      className="w-full p-4 rounded-2xl flex items-center gap-3.5 cursor-pointer relative overflow-hidden"
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      className="w-full p-4 rounded-2xl flex items-center gap-3.5 cursor-pointer relative overflow-hidden disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         background: selected
           ? (isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.06)')
           : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(26,26,46,0.03)'),
-        border: `1.5px solid ${selected
-          ? (isDark ? 'rgba(217,255,0,0.4)' : 'rgba(214,249,5,0.35)')
-          : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.06)')}`,
-        boxShadow: 'none',
+        ...(selected ? glassEdge(isDark) : {}),
         transition: 'all 0.2s',
       }}
     >
@@ -132,14 +137,20 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
         style={{
           background: `${option.accent}20`,
           color: option.accent,
-          border: `1px solid ${option.accent}33`,
+          ...glassEdge(isDark),
         }}>
         {option.icon}
       </div>
       <div className="flex-1 text-left">
-        <p className="text-[14px] font-light"
+        <p className="text-[14px] font-light flex items-center gap-2"
           style={{ fontFamily: "'Inter', sans-serif", color: textPrimary, fontWeight: 500 }}>
           {option.label}
+          {option.note && (
+            <span className="text-[9px] tracking-[1px] uppercase px-1.5 py-0.5 rounded-full"
+              style={{ fontFamily: "'Inter', sans-serif", color: textDim, ...glassEdge(isDark) }}>
+              {option.note}
+            </span>
+          )}
         </p>
         <p className="text-[11px]"
           style={{ fontFamily: "'Inter', sans-serif", color: textDim }}>
@@ -149,7 +160,7 @@ function PaymentOption({ option, selected, onClick, isDark }: any) {
       <motion.div
         className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
         style={{
-          border: selected ? 'none' : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(26,26,46,0.2)'}`,
+          boxShadow: selected ? 'none' : `0 0 0 1.5px ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(26,26,46,0.2)'}`,
           background: selected ? '#d6f905' : 'transparent',
         }}
         animate={{ scale: selected ? [1, 1.15, 1] : 1 }}
@@ -181,8 +192,9 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
           {label}
         </label>
       )}
-      <div className="relative">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2"
+      <div className="relative rounded-xl overflow-hidden" style={glassField(isDark, { error: hasError, focused })}>
+        <GlassReflection isDark={isDark} />
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
           style={{ color: focused ? (isDark ? '#d6f905' : '#0a0a0a') : textDim, transition: 'color 0.2s' }}>
           {icon}
         </div>
@@ -193,20 +205,11 @@ function Field({ icon, label, type = 'text', placeholder, value, onChange, error
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3.5 rounded-xl outline-none transition-all"
+          className="relative z-10 w-full pl-11 pr-4 py-3.5 outline-none transition-all"
           style={{
             fontFamily: "'Inter', sans-serif",
             fontSize: '14px',
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,26,46,0.03)',
-            border: `1px solid ${hasError
-              ? '#ef4444'
-              : focused
-                ? (isDark ? 'rgba(217,255,0,0.5)' : 'rgba(214,249,5,0.4)')
-                : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,26,46,0.08)')}`,
             color: textPrimary,
-            boxShadow: focused && !hasError
-              ? `0 0 0 4px ${isDark ? 'rgba(217,255,0,0.1)' : 'rgba(214,249,5,0.08)'}`
-              : 'none',
           }}
         />
       </div>

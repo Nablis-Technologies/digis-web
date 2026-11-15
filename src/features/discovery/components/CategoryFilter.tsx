@@ -5,15 +5,18 @@ import {
   useRef,
   useState,
 } from "react";
+import { LayoutGrid } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeContext";
-import { CATEGORIES, hexToRgba, readableCategoryRgb } from "@/lib/categoryColors";
+import { CATEGORIES, categoryMeta, FALLBACK_CATEGORY_HEX, hexToRgb, hexToRgba, readableCategoryRgb } from "@/lib/categoryColors";
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 
 export function CategoryFilter({
+  categories,
   selectedCategory,
   onChange,
 }: {
+  categories: string[];
   selectedCategory: string;
   onChange: (category: string) => void;
 }) {
@@ -135,7 +138,14 @@ export function CategoryFilter({
           touchAction: "pan-x",
         }}
       >
-        {CATEGORIES.map(({ name, Icon, hex: color }) => {
+        {['All', ...categories].map((name) => {
+          // Icons/hues are a design mapping keyed by category name; a backend
+          // category we don't have art for falls back to the brand lime.
+          const meta = name === 'All'
+            ? CATEGORIES[0]
+            : (categoryMeta(name) ?? { name, Icon: LayoutGrid, hex: FALLBACK_CATEGORY_HEX, rgb: hexToRgb(FALLBACK_CATEGORY_HEX) });
+          const Icon = meta.Icon;
+          const color = meta.hex;
           const active = selectedCategory === name;
           // Same hue, pushed into a band that keeps icon/label legible per theme.
           const hue = readableCategoryRgb(name, isDark);
@@ -164,8 +174,7 @@ export function CategoryFilter({
                   : isDark
                     ? `linear-gradient(135deg, ${hexToRgba(color, 0.1)}, ${hexToRgba(color, 0.025)})`
                     : `linear-gradient(135deg, ${hexToRgba(color, 0.09)}, ${hexToRgba(color, 0.03)})`,
-                border: active ? `1px solid ${hexToRgba(color, isDark ? 0.6 : 0.5)}` : "none",
-                boxShadow: "none",
+                boxShadow: active ? `0 0 0 1px ${hexToRgba(color, isDark ? 0.6 : 0.5)}` : "none",
               }}
             >
               <GlassReflection isDark={isDark} />

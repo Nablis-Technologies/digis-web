@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FastAverageColor } from 'fast-average-color';
+import { proxiedImageUrl } from '@/lib/utils/imageProxy';
 
 interface ImageColor {
   hex: string;
@@ -10,14 +11,9 @@ interface ImageColor {
 
 const colorCache = new Map<string, { hex: string; rgb: string; isDark: boolean }>();
 
-// Route an image through a CORS-enabled proxy so its pixels can be read.
-// Many hosts (i.ibb.co, i.postimg.cc, …) don't send Access-Control-Allow-Origin,
-// which taints the canvas and blocks color extraction. weserv adds the headers
-// and lets us downscale for a faster read.
-function proxiedUrl(url: string): string {
-  const stripped = url.replace(/^https:\/\//, 'ssl:').replace(/^http:\/\//, '');
-  return `https://images.weserv.nl/?url=${encodeURIComponent(stripped)}&w=160`;
-}
+// Colour extraction needs readable pixels, so it routes through the shared
+// CORS proxy (many cover hosts taint the canvas otherwise).
+const proxiedUrl = (url: string) => proxiedImageUrl(url, 160);
 
 export function useImageColor(imageUrl: string): ImageColor {
   const [color, setColor] = useState<ImageColor>({

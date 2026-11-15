@@ -1,26 +1,31 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Tag, X } from 'lucide-react';
 import type { AppliedPromo } from '@/features/checkout/hooks/useCheckoutFlow';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
+import { glassEdge, glassField } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { Money } from '@/lib/money';
 
 interface PromoCodeFieldProps { promoApplied: AppliedPromo | null; promoCodeInput: string; setPromoCodeInput: (value: string) => void; promoExpanded: boolean; setPromoExpanded: (value: boolean) => void; promoError: string; setPromoError: (value: string) => void; promoLoading: boolean; validatePromo: () => void; removePromo: () => void; discountAmount: number; isDark: boolean; }
 
 export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, discountAmount, isDark }: PromoCodeFieldProps) {
+  const [focused, setFocused] = useState(false);
   return (
-        <>{promoApplied ? (
+        <>{promoApplied && !promoLoading ? (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between p-3 rounded-xl"
+            className="relative overflow-hidden flex items-center justify-between p-3 rounded-xl"
             style={{
               background: isDark ? 'rgba(52,211,153,0.06)' : 'rgba(34,197,94,0.06)',
-              border: `1px solid ${isDark ? 'rgba(52,211,153,0.2)' : 'rgba(34,197,94,0.2)'}`,
             }}>
-            <div className="flex items-center gap-2.5 min-w-0">
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                style={{ background: 'rgba(52,211,153,0.12)', ...glassEdge(isDark) }}>
                 <Tag className="w-3.5 h-3.5" style={{ color: '#34d399' }} strokeWidth={1.75} />
               </div>
               <div className="min-w-0">
@@ -29,12 +34,12 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                   {promoApplied.label}
                 </p>
                 <p className="text-[10px] truncate" style={{ color: isDark ? 'rgba(52,211,153,0.55)' : 'rgba(22,163,74,0.6)', fontFamily: "'Inter', sans-serif" }}>
-                  {promoApplied.code} · −ETB {discountAmount.toLocaleString()} per ticket
+                  {promoApplied.code} · −{Money.fromMinor(discountAmount, "ETB").format()} per ticket
                 </p>
               </div>
             </div>
             <AppButton whileTap={{ scale: 0.9 }} onClick={removePromo}
-              className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer flex-shrink-0 ml-2"
+              className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer flex-shrink-0 ml-2"
               style={{ background: 'rgba(52,211,153,0.1)' }}>
               <X className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(52,211,153,0.7)' : 'rgba(22,163,74,0.7)' }} strokeWidth={1.5} />
             </AppButton>
@@ -60,20 +65,22 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                   transition={{ duration: 0.25 }}
                   className="overflow-hidden">
                   <div className="flex gap-2 mt-3">
-                    <AppInput
-                      type="text"
-                      value={promoCodeInput}
-                      onChange={(e) => { setPromoCodeInput(e.target.value.toUpperCase()); setPromoError(''); }}
-                      onKeyDown={(e) => e.key === 'Enter' && validatePromo()}
-                      placeholder="Enter code"
-                      className="flex-1 px-4 py-2.5 rounded-xl text-[13px] tracking-[1px] uppercase outline-none placeholder:normal-case placeholder:tracking-normal"
-                      style={{
-                        fontFamily: "'Inter', sans-serif",
-                        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                        color: isDark ? '#fff' : '#1a1a1a',
-                      }}
-                    />
+                    <div className="relative flex-1 rounded-xl overflow-hidden" style={glassField(isDark, { error: !!promoError, focused })}>
+                      <GlassReflection isDark={isDark} />
+                      <AppInput
+                        type="text"
+                        value={promoCodeInput}
+                        onChange={(e) => { setPromoCodeInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+                        onKeyDown={(e) => e.key === 'Enter' && validatePromo()}
+                        placeholder="Enter code"
+                        className="relative z-10 w-full px-4 py-2.5 text-[13px] tracking-[1px] uppercase outline-none placeholder:normal-case placeholder:tracking-normal"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          color: isDark ? '#fff' : '#1a1a1a',
+                        }}
+                      />
+                    </div>
                     <AppButton
                       whileTap={{ scale: 0.97 }}
                       onClick={validatePromo}
@@ -85,7 +92,7 @@ export function PromoCodeField({ promoApplied, promoCodeInput, setPromoCodeInput
                           ? disabledSurface(isDark)
                           : {
                               background: isDark ? 'rgba(214,249,5,0.15)' : 'rgba(214,249,5,0.12)',
-                              border: '1px solid rgba(214,249,5,0.2)',
+                              ...glassEdge(isDark),
                               color: isDark ? '#d6f905' : '#0a0a0a',
                             }),
                         minWidth: 64,

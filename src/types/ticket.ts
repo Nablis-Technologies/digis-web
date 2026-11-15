@@ -1,23 +1,26 @@
 import type { CheckoutAnswers, CustomQuestion } from './checkout';
 import type { SelectedEventProduct } from './event';
 
-export type RsvpStatus = 'going' | 'maybe' | 'declined' | null;
-
-export type InviteUnlockState = {
-  unlocked: boolean;
-  method: 'code' | 'guestlist' | 'waitlist' | null;
-  selectedTicket?: string;
-};
-
 export interface UserTicket {
   id: string;
   eventId?: string;
+  /** Backend event slug — lets the ticket's event products (extras) be fetched. */
+  eventSlug?: string;
   eventName: string;
   eventDate: string;
   eventTime: string;
+  /** Raw ISO event start (from the wallet wire) — used for resale-cutoff math. */
+  eventStartsAt?: string;
   venue: string;
   ticketType: string;
   ticketLevel?: string;
+  /** Backend ticket status (active, transferred, ...). Absent on legacy mocks. */
+  status?: string;
+  /** Guest payment-refresh projection only — registration + signed view link. */
+  registrationId?: string;
+  ticketViewToken?: string;
+  ticketViewUrl?: string;
+  shortUrl?: string;
   qrCode: string;
   gradient?: string;
   purchased: string;
@@ -31,6 +34,24 @@ export interface UserTicket {
   addOns?: SelectedEventProduct[];
   /** Assigned seat label (e.g. "Balcony · A12") for seat-map events. */
   seat?: string;
+  /** Resale policy for this ticket's tier, projected on the wallet (BACKEND_GAPS #25). */
+  resalePolicy?: {
+    enabled: boolean;
+    capType: 'none' | 'percentage' | 'fixed' | null;
+    /** Server-computed maximum asking price in minor units (#42 resolved
+     *  2026-09-30) — resolves a percentage cap to an amount. Null until served. */
+    priceCapMinor: number | null;
+    fixedCapMinor: number | null;
+    fixedCapCurrency: string | null;
+    percentageCapBps: number | null;
+    cutoffSecondsBeforeStart: number;
+    maxCompletedResales: number;
+  };
+  /** A pending transfer on this ticket (owner view — backend `pending_transfer`,
+   *  #62 resolved 2026-10-16). Presence badges the ticket and gates transfer/resale. */
+  pendingTransfer?: { id: string; status: string; expiresAt: string | null };
+  /** Backend `registration_answers.url` — the answers read/revise endpoint (#50). */
+  registrationAnswersUrl?: string;
 }
 
 export interface TicketActionResult {

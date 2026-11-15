@@ -1,15 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bell, Settings, LogOut, HelpCircle, Globe, Ticket, Tag, Sparkles, Calendar, Search, User, LogIn, Send } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { NAV_ITEMS } from '@/components/Navigation';
 import { UserAvatar } from '@/components/UserAvatar';
-import { useNotifications, notificationsStore } from '@/services/notifications.service';
-import type { NotificationType } from '@/types/notification';
+import { useNotifications, notificationsStore, fetchNotifications, markNotificationRead } from '@/lib/notifications';
+import { transferService } from '@/lib/transfer';
+import { ticketKeys } from '@/lib/tickets';
+import { toastError, toastSuccess } from '@/lib/feedback';
+import type { AppNotification, NotificationType } from '@/types/notification';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassEdge, glassControl } from '@/lib/ui/glass';
 
 interface TopBarProps {
   currentView?: string;
@@ -30,8 +35,13 @@ const NOTIF_ICON: Record<NotificationType, typeof Ticket> = {
 
 export function TopBar({ currentView, onNavigate, hidden = false, showSearchButton = false, onSearchClick, onRequestAuth }: TopBarProps = {}) {
   const [openMenu, setOpenMenu] = useState<'none' | 'notif' | 'profile'>('none');
+  const [markingAll, setMarkingAll] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [acceptedTransfers, setAcceptedTransfers] = useState<ReadonlySet<string>>(new Set());
   const notifications = useNotifications();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated, signOut } = useAuth();
 
@@ -42,6 +52,28 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
   const mobileWrapRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
+
+  // Live inbox when authenticated (#7 resolved): hydrate the store so the bell,
+  // badge, and panel all read backend rows. Guests keep the local seed/simulated
+  // store (no auth — the endpoint would 401).
+  const { data: liveNotifications, isError: notificationsError, refetch: refetchNotifications } = useQuery({
+    queryKey: ['notifications', isAuthenticated] as const,
+    queryFn: fetchNotifications,
+    enabled: isAuthenticated,
+    staleTime: 0,
+  });
+  useEffect(() => {
+    // Only hydrate on a successful fetch — an error must not wipe the store and
+    // masquerade as an empty "all caught up" inbox.
+    if (!isAuthenticated || liveNotifications === undefined) return;
+    notificationsStore.replace(liveNotifications);
+  }, [liveNotifications, isAuthenticated]);
+
+  // The inbox is recipient-owned: a signed-out session must never read the
+  // previous user's persisted notifications.
+  useEffect(() => {
+    if (!isAuthenticated) notificationsStore.clear();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (openMenu === 'none') return;
@@ -55,25 +87,52 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
     return () => document.removeEventListener('mousedown', handler);
   }, [openMenu]);
 
-  // Simulated real-time incoming notification
-  useEffect(() => {
-    const t = setTimeout(() => {
-      notificationsStore.push({
-        type: 'price',
-        title: 'New resale listing',
-        body: 'A standard ticket for Tibeb Sounds is now available.',
-      });
-    }, 18000);
-    return () => clearTimeout(t);
-  }, []);
-
   const accent = isDark ? '#d6f905' : '#d6f905';
   // Foreground accent for text/icons — lime is illegible on the light panel, so use dark ink.
   const accentFg = isDark ? '#d6f905' : '#0a0a0a';
   const accentSoft = isDark ? 'rgba(214,249,5,0.12)' : 'rgba(214,249,5,0.08)';
-  const accentBorder = isDark ? 'rgba(214,249,5,0.3)' : 'rgba(214,249,5,0.18)';
 
-  const markAllRead = () => notificationsStore.markAllRead();
+  const markRead = (id: string) => {
+    // Optimistic: clear the dot now; the refetch below restores it if the write failed.
+    notificationsStore.markRead(id);
+    if (!isAuthenticated) return;
+    void markNotificationRead(id)
+      .catch(() => toastError('Couldn’t mark that notification as read.'))
+      .finally(() => queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] }));
+  };
+  /**
+   * Accept an incoming transfer straight from its notification (#61). The
+   * recipient owns the transfer, so the bearer alone authorizes it — no token,
+   * empty body, Idempotency-Key injected by `apiFetch` (a replay is a no-op).
+   */
+  const acceptTransfer = (n: AppNotification) => {
+    const transferId = n.acceptTransferId;
+    if (!transferId) return;
+    setAcceptingId(n.id);
+    void transferService
+      .acceptAuthenticated(transferId)
+      .then(() => {
+        // Read state follows the confirmed accept, never the attempt.
+        markRead(n.id);
+        setAcceptedTransfers((prev) => new Set(prev).add(transferId));
+        toastSuccess('Ticket accepted — it’s in your wallet.');
+        queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
+      })
+      .catch((err) => toastError(err, 'Couldn’t accept that ticket — please try again.'))
+      .finally(() => setAcceptingId(null));
+  };
+  const markAllRead = () => {
+    const unreadIds = notifications.filter((n) => n.unread).map((n) => n.id);
+    notificationsStore.markAllRead();
+    if (!isAuthenticated || unreadIds.length === 0) return;
+    setMarkingAll(true);
+    void Promise.all(unreadIds.map((id) => markNotificationRead(id)))
+      .catch(() => toastError('Couldn’t mark all notifications as read.'))
+      .finally(() => {
+        setMarkingAll(false);
+        queryClient.invalidateQueries({ queryKey: ['notifications', isAuthenticated] });
+      });
+  };
 
   const panelStyle = {
     background: isDark
@@ -140,7 +199,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             background: isAuthenticated ? 'transparent' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
             transition: 'border-color 0.25s ease',
           }}
-          aria-label="Profile"
+          aria-label="Account menu"
         >
           {!isAuthenticated && <GlassReflection isDark={isDark} />}
           {isAuthenticated && user ? (
@@ -168,7 +227,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             <GlassReflection isDark={isDark} />
             <div
               className="relative z-10 px-4 py-3 flex items-center justify-between"
-              style={{ borderBottom: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
+              style={{ boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
             >
               <div className="flex items-center gap-2">
                 <span
@@ -184,7 +243,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                       fontFamily: "'Inter', sans-serif",
                       background: accentSoft,
                       color: accentFg,
-                      border: `1px solid ${accentBorder}`,
+                      ...glassEdge(isDark),
                     }}
                   >
                     {unreadCount} new
@@ -194,85 +253,122 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
               {unreadCount > 0 && (
                 <AppButton
                   onClick={markAllRead}
-                  className="text-[11px] tracking-[0.5px] transition-opacity hover:opacity-70"
+                  disabled={markingAll}
+                  className="text-[11px] tracking-[0.5px] transition-opacity hover:opacity-70 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ fontFamily: "'Inter', sans-serif", color: accentFg }}
                 >
-                  Mark all read
+                  {markingAll ? 'Marking…' : 'Mark all read'}
                 </AppButton>
               )}
             </div>
 
             <div className="relative z-10 max-h-[380px] overflow-y-auto scrollbar-hide py-1">
-              {notifications.length === 0 && (
+              {isAuthenticated && notificationsError ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
+                    Couldn't load your notifications.
+                  </p>
+                  <AppButton
+                    onClick={() => void refetchNotifications()}
+                    className="mt-2 text-[12px] underline cursor-pointer"
+                    style={{ fontFamily: "'Inter', sans-serif", color: accentFg }}
+                  >
+                    Try again
+                  </AppButton>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div
                   className="px-4 py-10 text-center text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}
                 >
                   You're all caught up.
                 </div>
-              )}
+              ) : null}
               {notifications.map((n) => {
                 const Icon = NOTIF_ICON[n.type];
+                const accepted = !!n.acceptTransferId && acceptedTransfers.has(n.acceptTransferId);
                 return (
-                  <AppButton
-                    key={n.id}
-                    onClick={() => {
-                      notificationsStore.markRead(n.id);
-                      if (n.link) {
-                        setOpenMenu('none');
-                        navigate(n.link);
-                      }
-                    }}
-                    className="w-full flex items-start gap-3 px-4 py-3 transition-colors text-left"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{
-                        background: accentSoft,
-                        border: `1px solid ${accentBorder}`,
+                  <div key={n.id}>
+                    <AppButton
+                      onClick={() => {
+                        markRead(n.id);
+                        if (n.link) {
+                          setOpenMenu('none');
+                          navigate(n.link);
+                        }
+                      }}
+                      className="w-full flex items-start gap-3 px-4 py-3 transition-colors text-left"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
                       }}
                     >
-                      <Icon className="w-[15px] h-[15px]" strokeWidth={1.75} style={{ color: accentFg }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span
-                          className="text-[12.5px] truncate"
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background: accentSoft,
+                          ...glassEdge(isDark),
+                        }}
+                      >
+                        <Icon className="w-[15px] h-[15px]" strokeWidth={1.75} style={{ color: accentFg }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span
+                            className="text-[12.5px] truncate"
+                            style={{
+                              fontFamily: "'Inter', sans-serif",
+                              color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
+                            }}
+                          >
+                            {n.title}
+                          </span>
+                          {n.unread && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: accentFg }} />}
+                        </div>
+                        <p
+                          className="text-[11.5px] leading-snug mb-1 line-clamp-2"
                           style={{
                             fontFamily: "'Inter', sans-serif",
-                            color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
+                            color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
                           }}
                         >
-                          {n.title}
+                          {n.body}
+                        </p>
+                        <span
+                          className="text-[10px] tracking-[0.5px] uppercase"
+                          style={{
+                            fontFamily: "'Inter', sans-serif",
+                            color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+                          }}
+                        >
+                          {n.time}
                         </span>
-                        {n.unread && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: accentFg }} />}
                       </div>
-                      <p
-                        className="text-[11.5px] leading-snug mb-1 line-clamp-2"
-                        style={{
-                          fontFamily: "'Inter', sans-serif",
-                          color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
-                        }}
-                      >
-                        {n.body}
-                      </p>
-                      <span
-                        className="text-[10px] tracking-[0.5px] uppercase"
-                        style={{
-                          fontFamily: "'Inter', sans-serif",
-                          color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
-                        }}
-                      >
-                        {n.time}
-                      </span>
-                    </div>
-                  </AppButton>
+                    </AppButton>
+                    {n.acceptTransferId && (
+                      <div className="flex justify-end px-4 pb-2 -mt-1">
+                        {/* DESIGN.md: disabled is a flat translucent surface at
+                            full opacity (the neutral glass), never `opacity-50`. */}
+                        <AppButton
+                          whileHover={accepted ? undefined : { scale: 1.03 }}
+                          whileTap={accepted ? undefined : { scale: 0.96 }}
+                          onClick={() => acceptTransfer(n)}
+                          disabled={accepted || acceptingId !== null}
+                          loading={acceptingId === n.id}
+                          className="min-h-9 px-3.5 rounded-2xl text-[11.5px] font-medium tracking-[0.3px]"
+                          style={{
+                            fontFamily: "'Inter', sans-serif",
+                            color: accepted ? (isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)') : accentFg,
+                            ...glassControl(isDark, accepted ? undefined : 'accent'),
+                          }}
+                        >
+                          {accepted ? 'Accepted' : 'Accept'}
+                        </AppButton>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -294,7 +390,7 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
             <GlassReflection isDark={isDark} />
             <div
               className="relative z-10 p-4 pb-3 flex items-center gap-3"
-              style={{ borderBottom: `1px solid ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
+              style={{ boxShadow: `inset 0 -1px 0 ${isDark ? 'rgba(214,249,5,0.1)' : 'rgba(0,0,0,0.05)'}` }}
             >
               <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
                 style={{ background: !isAuthenticated ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : 'transparent' }}>
@@ -408,12 +504,18 @@ export function TopBar({ currentView, onNavigate, hidden = false, showSearchButt
                 <>
                   <div className="my-1.5 h-px mx-2" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }} />
                   <AppButton
-                    onClick={() => { signOut(); setOpenMenu('none'); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-red-500/[0.06]"
+                    onClick={() => {
+                      if (signingOut) return;
+                      setSigningOut(true);
+                      setOpenMenu('none');
+                      void signOut().finally(() => setSigningOut(false));
+                    }}
+                    disabled={signingOut}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-red-500/[0.06] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <LogOut className="w-4 h-4" strokeWidth={1.5} style={{ color: 'rgba(239,68,68,0.6)' }} />
                     <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(239,68,68,0.7)' }}>
-                      Log out
+                      {signingOut ? 'Logging out…' : 'Log out'}
                     </span>
                   </AppButton>
                 </>

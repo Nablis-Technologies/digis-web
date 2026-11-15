@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, SlidersHorizontal } from 'lucide-react';
 import { useTheme } from '@/app/components/ThemeContext';
 import { AppButton } from '@/components/primitives/AppButton';
 import { AppInput, AppTextArea } from '@/components/primitives/AppInput';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassField } from '@/lib/ui/glass';
 
 interface SearchBarProps {
   value: string;
@@ -32,6 +34,7 @@ export function SearchBar({
 }: SearchBarProps) {
   const { isDark } = useTheme();
   const isNav = variant === 'nav';
+  const [focused, setFocused] = useState(false);
 
   // Reserve room on the right for the embedded controls (clear + filter).
   const rightPad = showFilter
@@ -47,14 +50,8 @@ export function SearchBar({
       <div
         className="relative overflow-hidden rounded-2xl"
         style={{
-          background: isDark ? 'rgba(30,30,34,0.40)' : 'rgba(255,255,255,0.68)',
-          backdropFilter: 'blur(40px) saturate(1.5)',
-          WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
-          boxShadow: isNav
-            ? 'none'
-            : (isDark
-              ? '0 12px 36px -16px rgba(0,0,0,0.48)'
-              : '0 12px 36px -18px rgba(20,18,40,0.18)'),
+          ...glassField(isDark, { focused }),
+          ...(isNav ? { boxShadow: 'none' } : {}),
         }}
       >
         <GlassReflection isDark={isDark} />
@@ -76,8 +73,8 @@ export function SearchBar({
           placeholder="Search events, venues, artists..."
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={onFocus}
-          onBlur={onBlur}
+          onFocus={() => { setFocused(true); onFocus?.(); }}
+          onBlur={() => { setFocused(false); onBlur?.(); }}
           className={`relative z-10 w-full rounded-2xl bg-transparent pl-11 ${rightPad} focus:outline-none transition-all ${
             isNav ? 'py-2.5 text-[13px]' : 'py-3.5 lg:py-4 text-[13px] lg:text-[14px]'
           }`}
@@ -138,7 +135,7 @@ export function SearchBar({
                 color: isDark ? '#d6f905' : '#0a0a0a',
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 700,
-                border: `2px solid ${isDark ? '#d6f905' : '#fff'}`,
+                boxShadow: `0 0 0 2px ${isDark ? '#d6f905' : '#fff'}`,
               }}
             >
               {activeFilterCount}

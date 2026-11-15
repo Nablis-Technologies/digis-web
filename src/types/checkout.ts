@@ -12,8 +12,8 @@ export type CustomQuestion = {
   maxLength?: number;
 };
 
-export type CheckoutStep = 'seat' | 'review' | 'extras' | 'details' | 'questions' | 'payment' | 'processing' | 'success';
-export type PaymentMethod = 'telebirr' | 'cbe' | 'card';
+export type CheckoutStep = 'seat' | 'date' | 'review' | 'extras' | 'details' | 'questions' | 'payment' | 'otp' | 'processing' | 'pending' | 'success';
+export type PaymentMethod = 'telebirr' | 'cbebirr' | 'card';
 
 export interface ContactDetails {
   name: string;

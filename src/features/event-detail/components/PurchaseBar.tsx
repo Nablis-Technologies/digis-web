@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { ArrowRight, Gift } from 'lucide-react';
-import { formatETB } from '@/lib/utils/format';
 import type { TicketTier } from '@/types';
+import { Money } from '@/lib/money';
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 
@@ -24,13 +24,19 @@ export function PurchaseBar({
   onGift: () => void;
   onPurchase: () => void;
 }) {
-  const priceLabel = formatETB(selectedTicketType ? totalPrice : minPrice);
-  const [priceAmount, priceCurrency] = priceLabel.split(' ');
+  const shownMinor = selectedTicketType ? totalPrice : minPrice;
+  const priceAmount = Money.fromMinor(shownMinor, "ETB").formatNumber();
+  const priceCurrency = "ETB";
+  const isFree = shownMinor === 0;
+  const isManual = selectedTicket?.approvalMode === 'manual';
+  const ctaLabel = selectedTicketType ? (isManual ? 'Apply' : 'Buy Now') : 'Get Tickets';
 
   return (
     <div className="relative flex items-center gap-3 min-[380px]:gap-4 overflow-hidden px-4 min-[380px]:px-5 py-3 rounded-2xl"
       style={{
-        background: isDark ? 'transparent' : 'rgba(255,255,255,0.72)',
+        // Translucent night/paper tint — blur alone over a transparent fill
+        // lets page text ghost through behind the price.
+        background: isDark ? 'rgba(8,9,11,0.62)' : 'rgba(255,255,255,0.72)',
         backdropFilter: isDark
           ? 'blur(60px) saturate(2) brightness(1.15)'
           : 'blur(24px) saturate(1.8)',
@@ -59,14 +65,16 @@ export function PurchaseBar({
               fontFamily: "'Zalando Sans Expanded', sans-serif",
               color: isDark ? '#fff' : '#1a1a1a',
               fontVariantNumeric: 'tabular-nums',
-              fontSize: (selectedTicketType ? totalPrice : minPrice) >= 1000 ? 14 : 18,
+              fontSize: shownMinor >= 1000 ? 14 : 18,
             }}>
-            {priceAmount}
+            {isFree ? 'Free' : priceAmount}
           </span>
-          <span className="text-[10px] tracking-[1px] flex-shrink-0"
-            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }}>
-            {priceCurrency}
-          </span>
+          {!isFree && (
+            <span className="text-[10px] tracking-[1px] flex-shrink-0"
+              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }}>
+              {priceCurrency}
+            </span>
+          )}
         </div>
       </div>
       <div className="relative z-10 w-px self-stretch my-1"
@@ -98,7 +106,7 @@ export function PurchaseBar({
         }}>
         <span className="text-[12px] sm:text-[14px] tracking-[0.2px] sm:tracking-[0.3px]"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-          {selectedTicketType ? 'Buy Now' : 'Get Tickets'}
+          {ctaLabel}
         </span>
         <ArrowRight className="w-4 h-4" strokeWidth={2.25} />
       </AppButton>

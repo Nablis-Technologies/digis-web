@@ -1,51 +1,111 @@
-export type AuthProvider = 'password' | 'google';
+/**
+ * Auth wire contract — mirrors digis_backend (Core::UserAuthSerializer +
+ * /auth endpoints).
+ *
+ * Backend user fields: `id, email, phone, verified_at, permissions, roles`.
+ * There is NO `name` yet (BACKEND_GAPS.md #8) — the signup form collects it and
+ * sends it, and the UI falls back to a derived display name (email local-part /
+ * phone) until the backend persists and serializes it.
+ *
+ * Session shape (src/lib/session.ts): `{ access_token, refresh_token, user }`.
+ */
+
+export type AuthRole = {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+};
+
+export type UserProfile = {
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  avatar_url: string | null;
+};
+
+export type UserProfileWire = {
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
+};
 
 export type AuthUser = {
   id: string;
+  /** Server name when the backend provides one; else derived from profile/email/phone. */
   name: string;
   email?: string;
   phone?: string;
-  provider: AuthProvider;
-  photo?: string;
+  verified_at?: string;
+  permissions: string[];
+  roles: AuthRole[];
+  profile?: UserProfile | null;
+};
+
+/** Raw user as the backend serializes it (Core::CurrentUserSerializer / Core::UserAuthSerializer). */
+export type AuthUserWire = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  verified_at?: string | null;
+  permissions?: string[] | null;
+  roles?: Array<{ id: string; code: string; name: string; active: boolean }> | null;
+  profile?: UserProfileWire | null;
 };
 
 export type AuthSession = {
-  token: string;
+  access_token: string;
+  refresh_token: string;
   user: AuthUser;
 };
 
-export type AuthErrorResponse = { ok: false; error: string };
-export type AuthSuccessResponse<T = Record<string, never>> = { ok: true; error?: undefined } & T;
-export type AuthResult<T = Record<string, never>> = AuthSuccessResponse<T> | AuthErrorResponse;
-
-export type CheckAccountRequest = { identifier: string };
-export type CheckAccountResponse = AuthResult<{ exists: boolean; isEmail: boolean }>;
+export type AuthErrorResponse = { ok: false; error: string; fieldErrors?: string[] };
+export type AuthSuccessResponse<T = {}> = { ok: true; error?: never } & T;
+export type AuthResult<T = {}> = AuthSuccessResponse<T> | AuthErrorResponse;
 
 export type SignInRequest = { identifier: string; password: string };
 export type SignInResponse = AuthResult<AuthSession>;
 
-export type SignUpRequest = { name: string; phone: string; email?: string; password: string };
-export type VerificationPurpose = 'signup' | 'password_reset';
-export type PendingVerification = { verificationToken: string; identifier: string; purpose: VerificationPurpose };
-export type SignUpResponse = AuthResult<{ verification: PendingVerification }>;
+export type SignupOtpRequest = { phone: string };
+export type SignupOtpResponse = AuthResult<{
+  challenge_id: string;
+  status: string;
+  expires_at: string;
+}>;
 
-export type VerifyOtpRequest = { verificationToken: string; code: string };
-export type VerifyOtpResponse = AuthResult<{ session?: AuthSession; passwordResetToken?: string }>;
+export type VerifySignupOtpRequest = {
+  challenge_id: string;
+  code: string;
+};
+export type VerifySignupOtpResponse = AuthResult<{
+  verification_token: string;
+  expires_at: string;
+}>;
 
-export type ResendOtpRequest = { verificationToken: string };
-export type ResendOtpResponse = AuthResult<{ verification: PendingVerification }>;
+/**
+ * POST /auth/signup body (G-14). Phone-first with separate first_name and last_name,
+ * and required OTP verification token.
+ */
+export type SignUpRequest = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email?: string;
+  password: string;
+  passwordConfirmation: string;
+  verification_token: string;
+};
+export type SignUpResponse = AuthResult<AuthSession>;
 
-export type PasswordResetRequest = { identifier: string };
-export type PasswordResetResponse = AuthResult<{ verification: PendingVerification }>;
+export type UpdateProfileInput = {
+  first_name?: string;
+  last_name?: string;
+};
 
-export type SetNewPasswordRequest = { passwordResetToken: string; password: string };
-export type SetNewPasswordResponse = AuthResult<AuthSession>;
+export type UpdateProfileResponse = AuthResult<{ user: AuthUser }>;
+export type AvatarResponse = AuthResult<{ user: AuthUser }>;
 
-export type UpdateProfileRequest = { token: string; updates: { name?: string; email?: string; phone?: string; photo?: string | null } };
-export type UpdateProfileResponse = AuthResult<AuthSession>;
-
-export type GoogleSignInRequest = Record<string, never>;
-export type GoogleSignInResponse = AuthResult<{ session?: AuthSession; needsPhone: boolean; phoneCompletionToken?: string }>;
-
-export type CompleteGooglePhoneRequest = { phoneCompletionToken: string; phone: string };
-export type CompleteGooglePhoneResponse = AuthResult<AuthSession>;
+export type MeResponse = AuthResult<{ user: AuthUser }>;
+export type LogoutResponse = AuthResult<Record<string, never>>;

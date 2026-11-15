@@ -1,12 +1,35 @@
 import { motion } from 'motion/react';
 import { Check, Crown, MapPin, Share2 } from 'lucide-react';
 import { formatETB } from '@/lib/utils/format';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useTheme } from '@/app/components/ThemeContext';
 import { getCategoryColor } from '@/lib/categoryColors';
+import { glassEdge } from '@/lib/ui/glass';
 import { AppButton } from '@/components/primitives/AppButton';
+import { proxiedImageUrl, isProxied } from '@/lib/utils/imageProxy';
 
 const BRAND = '#d6f905';
-const STATUS = 'Ticket Secured';
+
+/**
+ * Event covers come from non-CORS hosts (i.ibb.co, …) — a raw `<img crossorigin>`
+ * fails to load and `html-to-image` can't inline it, so the exported card shows a
+ * blank frame. Render through the CORS proxy (already used for colour extraction)
+ * so the image loads and is inlinable, with a plain fallback if the proxy is down.
+ */
+function ShareImage({ src, className, style }: { src: string; className: string; style?: React.CSSProperties }) {
+  const [failed, setFailed] = useState(false);
+  const proxied = isProxied(src) ? src : proxiedImageUrl(src, 1080);
+  return (
+    <img
+      src={failed ? src : proxied}
+      alt=""
+      crossOrigin="anonymous"
+      className={className}
+      style={style}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export type ShareCardEvent = { name: string; date: string; time?: string; venue: string; image: string; category?: string; price?: number; };
 
@@ -43,15 +66,18 @@ type CardProps = {
   isVIP?: boolean;
   hued: string;        // "r,g,b" — image-extracted accent
   accentText: string;  // "r,g,b" — legibility-clamped accent for text on dark
+  /** True only when the user owns the ticket; drives the status pill copy. */
+  purchased?: boolean;
 };
 
 
 export function ShareIconButton({ icon, color }: { icon: React.ReactNode; color: string }) {
+  const { isDark } = useTheme();
   return (
     <AppButton
       whileTap={{ scale: 0.9 }}
       className="w-[48px] h-[48px] rounded-xl flex items-center justify-center cursor-pointer"
-      style={{ background: `${color}1f`, border: `1px solid ${color}40`, color }}
+      style={{ background: `${color}1f`, ...glassEdge(isDark), color }}
     >
       {icon}
     </AppButton>
@@ -109,7 +135,7 @@ export function TierBadge({ ticketType, isVIP, tier }: { ticketType?: string; is
   if (!ticketType) return null;
   return (
     <span className="inline-flex items-center gap-1 text-[9.5px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
-      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `rgba(${tier.rgb},0.18)`, border: `1px solid rgba(${tier.rgb},0.55)`, color: tier.color }}>
+      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `rgba(${tier.rgb},0.18)`, boxShadow: `0 0 0 1px rgba(${tier.rgb},0.55)`, color: tier.color }}>
       {isVIP && <Crown className="w-3 h-3" strokeWidth={2} />}
       {ticketType}
     </span>
@@ -117,14 +143,14 @@ export function TierBadge({ ticketType, isVIP, tier }: { ticketType?: string; is
 }
 
 /** Small status pill. */
-export function StatusChip({ accentText }: { accentText: string }) {
+export function StatusChip({ accentText, label = 'Ticket Ready' }: { accentText: string; label?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] tracking-[1.5px] uppercase px-2.5 py-1 rounded-full whitespace-nowrap"
       style={{
         fontFamily: "'Inter', sans-serif", fontWeight: 700,
-        background: `rgba(${accentText},0.16)`, border: `1px solid rgba(${accentText},0.45)`, color: `rgb(${accentText})`,
+        background: `rgba(${accentText},0.16)`, boxShadow: `0 0 0 1px rgba(${accentText},0.45)`, color: `rgb(${accentText})`,
       }}>
-      {STATUS}
+      {label}
     </span>
   );
 }
@@ -200,7 +226,7 @@ export function BrandCTA({ accentText }: { accentText: string }) {
 
 export function MetaFooter({ event, accentText, borderColor }: { event: ShareCardEvent; accentText: string; borderColor: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${borderColor}` }}>
+    <div className="flex items-center justify-between gap-3 pt-4" style={{ boxShadow: `inset 0 1px 0 ${borderColor}` }}>
       <div className="min-w-0">
         <div className="text-[13px] tracking-[0.8px] uppercase truncate" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: '#fff' }}>
           {shortDate(event.date)}{event.time ? ` · ${event.time}` : ''}
@@ -254,23 +280,23 @@ export function BoldCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
         <h2 className="mt-2 leading-[0.9] tracking-[-1.5px] line-clamp-3"
           style={{
             ...titleStyle, fontWeight: 800, fontSize: titleSize, color: '#ffffff',
-            textShadow: `0 2px 30px rgba(${hued},0.45)`,
+            textShadow: '0 2px 12px rgba(0,0,0,0.5)',
           }}>
           {event.name}
         </h2>
       </div>
 
-      {/* Framed poster — glowing centerpiece */}
+      {/* Framed poster */}
       <div className="relative px-6 mt-5 flex-1 min-h-0">
         <div className="relative w-full h-full rounded-[20px] overflow-hidden"
-          style={{ boxShadow: `0 0 0 1.5px rgba(255,255,255,0.25), 0 22px 60px -12px rgba(${hued},0.55), 0 8px 24px rgba(0,0,0,0.5)` }}>
-          <img src={event.image} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
+          style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.25), 0 12px 32px rgba(0,0,0,0.45)' }}>
+          <ShareImage src={event.image} className="w-full h-full object-cover" />
           {/* foil shimmer sweep */}
           <div className="absolute inset-0 pointer-events-none"
             style={{ background: `linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.22) 47%, transparent 60%)` }} />
           {event.category && (
             <span className="absolute top-3 left-3 text-[9px] tracking-[2px] uppercase px-2.5 py-1 rounded-full"
-              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`, border: `1px solid rgba(${categoryTokens.rgb},${categoryTokens.border})`, color: `rgb(${categoryTokens.rgb})` }}>
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`, boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`, color: `rgb(${categoryTokens.rgb})` }}>
               {event.category}
             </span>
           )}
@@ -290,7 +316,7 @@ export function BoldCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
    CARD 2: AFTER DARK — cinematic full-bleed poster, huge title,
    verified trust mark, moody two-tone wash.
    ==================================================================== */
-export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentText }: CardProps) {
+export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentText, purchased }: CardProps) {
   const tier = tierTheme(ticketType, ticketLevel);
   const second = secondTone(hued);
   const titleSize = eventTitleSize(event.name, 46, 37, 30);
@@ -298,7 +324,7 @@ export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentT
     <div className="relative w-full rounded-[28px] overflow-hidden flex flex-col" style={{ aspectRatio: '9/16', background: '#08080a' }}>
       {/* Full-bleed cinematic image */}
       <div className="relative w-full" style={{ height: '60%' }}>
-        <img src={event.image} alt="" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
+        <ShareImage src={event.image} className="absolute inset-0 w-full h-full object-cover" />
         {/* cinematic fade to black */}
         <div className="absolute inset-0 pointer-events-none"
           style={{ background: 'linear-gradient(180deg, rgba(8,8,10,0.30) 0%, transparent 30%, rgba(8,8,10,0.55) 72%, #08080a 100%)' }} />
@@ -326,10 +352,10 @@ export function NightCard({ event, ticketType, ticketLevel, isVIP, hued, accentT
 
         {/* Verified status row */}
         <div className="relative mt-4 inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-full"
-          style={{ background: `rgba(${accentText},0.14)`, border: `1px solid rgba(${accentText},0.5)` }}>
+          style={{ background: `rgba(${accentText},0.14)`, boxShadow: `0 0 0 1px rgba(${accentText},0.5)` }}>
           <Check className="w-3.5 h-3.5" strokeWidth={3} style={{ color: `rgb(${accentText})` }} />
           <span className="text-[11px] tracking-[1.5px] uppercase" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: `rgb(${accentText})` }}>
-            {STATUS}
+            {purchased ? 'Ticket Ready' : 'Get Tickets'}
           </span>
         </div>
 
@@ -369,7 +395,7 @@ export function StubCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
       <Grain opacity={0.05} />
       <div className="absolute inset-0 p-3.5 flex z-10">
         <div className="relative w-full flex flex-col rounded-[22px] overflow-hidden"
-          style={{ background: '#0e0e11', boxShadow: `0 22px 60px -14px rgba(${hued},0.4), 0 0 0 1px rgba(255,255,255,0.06)` }}>
+          style={{ background: '#0e0e11', boxShadow: '0 12px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)' }}>
           {/* Foil top edge — two-tone */}
           <div className="shrink-0" style={{ height: 6, background: `linear-gradient(90deg, rgb(${hued}), rgb(${second}), rgb(${hued}))` }} />
 
@@ -379,7 +405,7 @@ export function StubCard({ event, ticketType, ticketLevel, isVIP, hued, accentTe
               <Wordmark shadow />
               <TierBadge ticketType={ticketType} isVIP={isVIP} tier={tier} />
             </div>
-            <img src={event.image} alt="" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
+        <ShareImage src={event.image} className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 pointer-events-none"
               style={{ background: 'linear-gradient(180deg, rgba(10,10,12,0.25) 0%, transparent 38%, rgba(14,14,17,0.55) 70%, rgba(14,14,17,0.97) 100%)' }} />
             <div className="absolute bottom-0 left-0 right-0 p-4">

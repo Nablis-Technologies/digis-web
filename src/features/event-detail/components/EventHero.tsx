@@ -10,8 +10,6 @@ import { GlassReflection } from '@/components/primitives/GlassReflection';
 export function EventHero({
   event,
   isDark,
-  isInvite,
-  inviteUnlocked,
   liked,
   onLikedChange,
   onBack,
@@ -24,8 +22,6 @@ export function EventHero({
 }: {
   event: Event;
   isDark: boolean;
-  isInvite: boolean;
-  inviteUnlocked: boolean;
   liked: boolean;
   onLikedChange: (liked: boolean) => void;
   onBack: () => void;
@@ -167,7 +163,7 @@ export function EventHero({
                     background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`,
                     backdropFilter: "blur(20px)",
                     color: `rgb(${categoryTokens.rgb})`,
-                    border: `1px solid rgba(${categoryTokens.rgb},${categoryTokens.border})`,
+                    boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`,
                     fontWeight: 600,
                   }}
                 >
@@ -186,8 +182,6 @@ export function EventHero({
           <EventInfoRail
             event={event}
             isDark={isDark}
-            isInvite={isInvite}
-            inviteUnlocked={inviteUnlocked}
             posterRgb={posterRgb}
           />
         </div>
@@ -196,28 +190,35 @@ export function EventHero({
       {/* Mobile / tablet hero with scroll zoom — full-bleed poster (any aspect
           via object-cover). The immersive blurred artwork lives behind the page. */}
       <div className="lg:hidden relative h-[56vh] overflow-hidden">
-        <motion.div
+        <div
           className="absolute inset-0"
           style={{
-            scale: heroScale,
-            transformOrigin: "center center",
+            maskImage: "linear-gradient(180deg,#000 0%,#000 66%,rgba(0,0,0,0.75) 80%,rgba(0,0,0,0.35) 92%,transparent 100%)",
+            WebkitMaskImage: "linear-gradient(180deg,#000 0%,#000 66%,rgba(0,0,0,0.75) 80%,rgba(0,0,0,0.35) 92%,transparent 100%)",
           }}
         >
-          <ImageCarousel
-            images={carouselImages}
-            alt={event.name}
-            idx={carouselIdx}
-            onIdxChange={onCarouselIdxChange}
-          />
-        </motion.div>
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              scale: heroScale,
+              transformOrigin: "center center",
+            }}
+          >
+            <ImageCarousel
+              images={carouselImages}
+              alt={event.name}
+              idx={carouselIdx}
+              onIdxChange={onCarouselIdxChange}
+            />
+          </motion.div>
 
-        {/* Poster-aware progressive shade — keeps title readable and gives the
-            metadata cards a surface to overlap into */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: isDark
-              ? `
+          {/* Poster-aware progressive shade — keeps title readable and gives the
+              metadata cards a surface to overlap into */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: isDark
+                ? `
                 linear-gradient(
                   to bottom,
                   rgba(0,0,0,0.10) 0%,
@@ -231,36 +232,37 @@ export function EventHero({
                   transparent 72%
                 )
               `
-                          : `
+                            : `
                 linear-gradient(
                   to bottom,
-                  rgba(0,0,0,0.03) 0%,
-                  transparent 34%,
-                  rgba(0,0,0,0.20) 74%,
-                  rgba(0,0,0,0.42) 100%
+                  rgba(0,0,0,0.04) 0%,
+                  transparent 32%,
+                  transparent 100%
                 ),
                 radial-gradient(
                   ellipse 110% 48% at 50% 100%,
-                  rgba(${rgb},0.26),
+                  rgba(${rgb},0.22),
                   transparent 74%
                 )
               `,
-          }}
-        />
+            }}
+          />
+        </div>
         {/* Top nav */}
         <div className="absolute top-0 left-0 right-0 p-5 flex items-center justify-between">
           <AppButton
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.9 }}
             onClick={onBack}
-            className="w-11 h-11 rounded-full flex items-center justify-center border border-white/[0.12]"
+            className="relative w-11 h-11 rounded-full flex items-center justify-center overflow-hidden"
             style={{
               background: "rgba(8,8,8,0.5)",
               backdropFilter: "blur(30px)",
             }}
           >
+            <GlassReflection isDark={isDark} />
             <ArrowLeft
-              className="w-5 h-5 text-white/80"
+              className="relative z-10 w-5 h-5 text-white/80"
               strokeWidth={1.5}
             />
           </AppButton>
@@ -270,14 +272,15 @@ export function EventHero({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => onLikedChange(!liked)}
-              className="w-11 h-11 rounded-full flex items-center justify-center border border-white/[0.12]"
+              className="relative w-11 h-11 rounded-full flex items-center justify-center overflow-hidden"
               style={{
                 background: "rgba(8,8,8,0.5)",
                 backdropFilter: "blur(30px)",
               }}
             >
+              <GlassReflection isDark={isDark} />
               <Heart
-                className={`w-5 h-5 ${liked ? "fill-red-400 text-red-400" : "text-white/80"}`}
+                className={`relative z-10 w-5 h-5 ${liked ? "fill-red-400 text-red-400" : "text-white/80"}`}
                 strokeWidth={1.5}
               />
             </AppButton>
@@ -285,14 +288,15 @@ export function EventHero({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => onShare()}
-              className="w-11 h-11 rounded-full flex items-center justify-center border border-white/[0.12]"
+              className="relative w-11 h-11 rounded-full flex items-center justify-center overflow-hidden"
               style={{
                 background: "rgba(8,8,8,0.5)",
                 backdropFilter: "blur(30px)",
               }}
             >
+              <GlassReflection isDark={isDark} />
               <Share2
-                className="w-5 h-5 text-white/80"
+                className="relative z-10 w-5 h-5 text-white/80"
                 strokeWidth={1.5}
               />
             </AppButton>
@@ -330,6 +334,13 @@ export function EventHero({
           </div>
         )}
 
+        {/* Soft local shade behind the title — dissolves on every side, so it never forms an edge */}
+        {!isDark && (
+          <div
+            className="absolute inset-x-0 bottom-0 h-[48%] pointer-events-none"
+            style={{ background: "radial-gradient(ellipse 95% 46% at 40% 58%, rgba(12,10,24,0.55), transparent 100%)" }}
+          />
+        )}
         {/* Title */}
         <div className="absolute bottom-0 left-0 right-0 px-6 pb-6">
           <motion.div
@@ -338,13 +349,13 @@ export function EventHero({
             transition={{ delay: 0.2, duration: 0.5 }}
           >
             <div
-              className="inline-block px-3 py-1.5 rounded-full text-[10px] tracking-[1.5px] uppercase mb-4 border"
+              className="inline-block px-3 py-1.5 rounded-full text-[10px] tracking-[1.5px] uppercase mb-4"
               style={{
                 background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`,
                 backdropFilter: "blur(20px)",
                 fontFamily: "'Inter', sans-serif",
                 color: `rgb(${categoryTokens.rgb})`,
-                borderColor: `rgba(${categoryTokens.rgb},${categoryTokens.border})`,
+                boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`,
               }}
             >
               {event.category}

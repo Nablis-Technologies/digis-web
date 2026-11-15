@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { glassEdge } from '@/lib/ui/glass';
 
 type SegmentOption<T extends string> = {
   value: T;
@@ -27,7 +28,6 @@ export function SegmentedToggle<T extends string>({
   className?: string;
 }) {
   const surface = isDark ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.035)';
-  const outline = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
   const activeSurface = isDark ? '#121212' : '#ffffff';
   const activeText = isDark ? '#ffffff' : '#111214';
   const inactiveText = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
@@ -35,7 +35,7 @@ export function SegmentedToggle<T extends string>({
   return (
     <div
       className={`grid gap-1 rounded-2xl p-1 ${className}`}
-      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`, background: surface, border: `1px solid ${outline}` }}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`, background: surface, ...glassEdge(isDark) }}
       role="group"
       aria-label={ariaLabel}
     >

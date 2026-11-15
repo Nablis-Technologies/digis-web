@@ -1,9 +1,12 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
-import { Calendar, MapPin, Clock, Tag, TrendingUp, TrendingDown, Shield, ArrowRight, X, ArrowLeft, AlertTriangle, Check, ChevronDown, ChevronRight, DollarSign, ArrowUpDown, Search, Filter, Sparkles, Crown, Minus, Plus, Ticket } from 'lucide-react';
-import type { ResaleListing, UserTicket } from '@/types';
+import { X, AlertTriangle } from 'lucide-react';
+import type { ResaleListing } from '@/types';
 import { AppButton } from '@/components/primitives/AppButton';
+import { Money } from '@/lib/money';
+import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { glassControl, glassEdge } from '@/lib/ui/glass';
 
 export function RemoveListingSheet({
   listing,
@@ -12,7 +15,7 @@ export function RemoveListingSheet({
   onConfirm,
   removing = false,
 }: {
-  listing: { ticket: UserTicket; price: number; id: string };
+  listing: ResaleListing;
   isDark: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -41,15 +44,13 @@ export function RemoveListingSheet({
         <div
           className="relative rounded-[28px] overflow-hidden px-6 pt-8 pb-6"
           style={{
-            background: isDark
-              ? 'linear-gradient(160deg, rgba(40,18,18,0.92) 0%, rgba(20,8,8,0.97) 100%)'
-              : 'linear-gradient(160deg, #fff 0%, #fdf6f6 100%)',
-            border: `1px solid rgba(239,68,68,${isDark ? 0.25 : 0.2})`,
+            background: isDark ? '#101115' : '#fff',
+            border: 'none',
             backdropFilter: 'blur(32px)',
             WebkitBackdropFilter: 'blur(32px)',
-            boxShadow: isDark ? '0 -24px 60px -16px rgba(239,68,68,0.2)' : '0 -16px 48px -16px rgba(239,68,68,0.12)',
           }}
         >
+          <GlassReflection isDark={isDark} />
           {/* Pull handle */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full"
             style={{ background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }} />
@@ -57,7 +58,7 @@ export function RemoveListingSheet({
           {/* Warning icon */}
           <div className="flex justify-center mb-5">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              style={glassControl(isDark, 'danger')}>
               <AlertTriangle className="w-6 h-6 text-red-400" strokeWidth={2} />
             </div>
           </div>
@@ -74,22 +75,23 @@ export function RemoveListingSheet({
           </div>
 
           {/* Listing preview card */}
-          <div className="flex items-center gap-3 p-3 rounded-2xl mb-6"
+          <div className="relative flex items-center gap-3 p-3 rounded-2xl overflow-hidden mb-6"
             style={{
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}`,
             }}>
-            {listing.ticket.image && (
+            <GlassReflection isDark={isDark} />
+            <div className="relative z-10 contents">
+            {listing.ticket?.image && (
               <img src={listing.ticket.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
             )}
             <div className="min-w-0">
               <p className="text-[13px] font-medium truncate"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? '#fff' : '#1a1a1a' }}>
-                {listing.ticket.eventName}
+                {listing.ticket?.eventName ?? listing.eventName}
               </p>
               <p className="text-[12px] mt-0.5"
                 style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
-                {listing.ticket.eventDate} · ETB {listing.price.toLocaleString()}
+                {listing.ticket?.eventDate ?? listing.eventDate} · {Money.fromMinor(listing.askingPriceMinor, "ETB").format()}
               </p>
               <div className="flex items-center gap-1 mt-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
@@ -99,6 +101,7 @@ export function RemoveListingSheet({
                 </span>
               </div>
             </div>
+            </div>
           </div>
 
           {/* Actions */}
@@ -107,16 +110,16 @@ export function RemoveListingSheet({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={onCancel}
-              className="flex-1 py-3.5 rounded-2xl cursor-pointer text-[13px]"
+              className="relative flex-1 py-3.5 rounded-2xl overflow-hidden cursor-pointer text-[13px]"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 600,
                 background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
                 color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)',
               }}
             >
-              Keep listed
+              <GlassReflection isDark={isDark} />
+              <span className="relative z-10">Keep listed</span>
             </AppButton>
             <AppButton
               whileHover={{ scale: 1.02 }}
@@ -129,7 +132,7 @@ export function RemoveListingSheet({
                 fontWeight: 600,
                 background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                 color: '#fff',
-                boxShadow: '0 8px 24px -8px rgba(239,68,68,0.5)',
+                ...glassEdge(isDark),
               }}
             >
               Yes, delist

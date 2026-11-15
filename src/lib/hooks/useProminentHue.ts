@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { proxiedImageUrl } from "@/lib/utils/imageProxy";
 
 // Hue-bucketed prominent-color extractor weighted by AREA (count) not by lightness,
 // so dark dominant backgrounds (e.g. navy poster) win over bright small accents.
@@ -24,17 +25,11 @@ export function useProminentHue(
     const img = new Image();
     img.crossOrigin = "anonymous";
     // Non-CORS hosts (i.ibb.co, i.postimg.cc, …) taint the canvas; retry once
-    // through a CORS-enabled proxy so the read succeeds.
-    const proxied = (u: string) =>
-      `https://images.weserv.nl/?url=${encodeURIComponent(
-        u
-          .replace(/^https:\/\//, "ssl:")
-          .replace(/^http:\/\//, ""),
-      )}&w=160`;
+    // through the shared CORS-enabled proxy so the read succeeds.
     const onFail = () => {
       if (triedProxy || cancelled) return;
       triedProxy = true;
-      img.src = proxied(imageUrl);
+      img.src = proxiedImageUrl(imageUrl, 160);
     };
     img.onerror = onFail;
     img.src = imageUrl;

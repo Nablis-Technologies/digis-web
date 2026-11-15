@@ -3,12 +3,18 @@ import { ArrowUpRight, MapPin } from "lucide-react";
 import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
-import { formatETB } from "@/lib/utils/format";
+import { Money } from "@/lib/money";
 import { readableAccent } from "@/lib/utils/color";
 import { useProminentHue } from "@/lib/hooks/useProminentHue";
 import { EventDateBadge } from "@/components/EventDateBadge";
+import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadges";
 import { GlassReflection } from "@/components/primitives/GlassReflection";
 import { AppButton } from '@/components/primitives/AppButton';
+import { eventActionLabel } from "@/lib/eventAction";
+import { cardFormat, cardDateRange, cardFormatLabel } from "@/components/EventCard";
+
+// Invite-only distinguisher accent — a fixed amber, matching the grid card so a
+// gated event reads the same everywhere in discovery.
 
 export function FeaturedEventCard({
   event,
@@ -29,12 +35,9 @@ export function FeaturedEventCard({
   const hued = useProminentHue(event.image, rgb, isDark);
 
   const isLarge = variant === "large" || large;
-  const priceLabel =
-    event.eventType === "rsvp"
-      ? "Free"
-      : event.eventType === "inviteOnly" && !event.inviteOnlyPaid
-        ? "Invite only"
-        : formatETB(event.priceFrom);
+  const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const format = cardFormat(event);
+  const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
 
   // Desktop magazine layout — unchanged
   if (isLarge) {
@@ -59,6 +62,9 @@ export function FeaturedEventCard({
           <img
             src={event.image}
             alt={event.name}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div
@@ -69,22 +75,32 @@ export function FeaturedEventCard({
             }}
           />
 
-          <div className="absolute top-5 left-5">
+          <div className="absolute top-5 left-5 flex items-center gap-2">
             <div
               className="px-3 py-1.5 rounded-full text-[10px] tracking-[2px] uppercase"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 color: `rgb(${hued})`,
                 background: `rgba(${hued},0.16)`,
-                border: `1px solid rgba(${hued},0.4)`,
+                boxShadow: `0 0 0 1px rgba(${hued},0.4)`,
                 backdropFilter: "blur(12px)",
                 fontWeight: 600,
               }}
             >
               {event.category}
             </div>
+
           </div>
-          <EventDateBadge date={event.date} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
+          {range ? (
+            <FeaturedDateRangeBadge month={range.month} range={range.range} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
+          ) : (
+            <EventDateBadge date={event.date} accentRgb={hued} size="featured" tone="featured" className="absolute top-3 right-3 scale-90 origin-top-right rounded-[13px]" />
+          )}
+          {format !== "single" && (
+            <div className="absolute top-5 right-5 translate-y-10">
+              <FormatTag format={format} label={cardFormatLabel(format)} isDark size="md" />
+            </div>
+          )}
           <div className="absolute bottom-3 left-5 right-5">
             <h3
               className="text-[42px] xl:text-[52px] font-light tracking-[-0.5px] leading-[1.02] text-white"
@@ -207,6 +223,9 @@ export function FeaturedEventCard({
         <img
           src={event.image}
           alt={event.name}
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           draggable={false}
         />
@@ -268,7 +287,11 @@ export function FeaturedEventCard({
         }}
       >
         <div className="flex items-center gap-3">
-          <EventDateBadge date={event.date} accentRgb={hued} tone="featured" className="rounded-[13px]" />
+          {range ? (
+            <FeaturedDateRangeBadge month={range.month} range={range.range} accentRgb={hued} tone="featured" className="rounded-[13px]" />
+          ) : (
+            <EventDateBadge date={event.date} accentRgb={hued} tone="featured" className="rounded-[13px]" />
+          )}
 
           {/* Price */}
           <div className="flex flex-col min-w-0 flex-1">
@@ -280,7 +303,7 @@ export function FeaturedEventCard({
                 fontWeight: 600,
               }}
             >
-              {event.eventType === "rsvp" ? "RSVP" : "From"}
+              From
             </span>
             <span
               className="mt-1 text-[15px] leading-none truncate"
@@ -315,7 +338,7 @@ export function FeaturedEventCard({
                 fontWeight: 700,
               }}
             >
-              {event.eventType === "rsvp" ? "RSVP" : "Tickets"}
+              {eventActionLabel()}
             </span>
             <span
               className="flex items-center justify-center w-7 h-7 rounded-full"
