@@ -44,7 +44,7 @@ for (const width of [1280, 390]) {
 }
 
 for (const age of [
-  { label: 'omitted', config: {}, expected: 'Not provided' },
+  { label: 'omitted', config: {}, expected: null },
   { label: 'explicitly unrestricted', config: { age_restriction: { has_restriction: false } }, expected: 'Any Age' },
   { label: 'bounded', config: { age_restriction: { has_restriction: true, min_age: 21, max_age: 25 } }, expected: '21–25' },
 ]) {
@@ -54,8 +54,13 @@ for (const age of [
       event_dates: [{ id: 'date-one', starts_at: '2030-08-01T18:00:00Z', venue: { id: 'venue-one', name: 'Test Venue', city: 'Addis Ababa' } }],
     } : [] } }));
     await page.goto('/events/display-event');
-    await expect(page.getByText(age.expected, { exact: true }).filter({ visible: true }).first()).toBeVisible();
-    if (age.label === 'omitted') await expect(page.getByText('Any Age', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Display Event', exact: true }).filter({ visible: true })).toBeVisible();
+    if (age.expected) {
+      await expect(page.getByText(age.expected, { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    } else {
+      await expect(page.getByText('Age', { exact: true }).filter({ visible: true })).toHaveCount(0);
+      await expect(page.getByText('Any Age', { exact: true })).toHaveCount(0);
+    }
   });
 }
 

@@ -77,13 +77,14 @@ test('completed batch checkout links to correctly ordered delivery without a man
     if (path === '/public/events/batch-event/admission_selections') {
       submissions.push(route.request().postDataJSON().admission_selection);
       issuedGifts = submissions[0].items.map((item, index) => ({ id: `completed-gift-${index + 1}`, line_id: item.line_id, status: 'ready', delivery_status: index === 0 ? 'failed' : 'sent', expires_at: '2099-01-01T00:00:00Z' })).reverse();
-      return route.fulfill({ json: { success: true, data: { order: { id: 'completed-order', status: 'fulfilled', charge_currency: 'ETB', total_minor: 0 }, gift_purchases: issuedGifts, next_action: { type: 'confirmed', order_id: 'completed-order' } } } });
+      return route.fulfill({ json: { success: true, data: { order: { id: 'completed-order', status: 'pending', charge_currency: 'ETB', total_minor: 20000 }, gift_purchases: issuedGifts, next_action: { type: 'checkout_required', order_id: 'completed-order' } } } });
     }
+    if (path === '/orders/completed-order/payment_attempts') return route.fulfill({ json: { success: true, data: { id: 'completed-payment', order_id: 'completed-order', status: 'succeeded', amount_minor: 20000, currency: 'ETB' } } });
     if (path === '/orders/completed-order/gift_purchases') return route.fulfill({ json: { success: true, data: issuedGifts } });
     let data: unknown = [];
     if (path === '/user') data = buyer;
     if (path === '/public/events/batch-event') data = { id: 'event-batch', slug: 'batch-event', title: 'Batch Event', currency: 'ETB', event_dates_preview: [{ id: 'date-one', starts_at: '2027-01-01T18:00:00Z' }] };
-    if (path === '/public/events/batch-event/products') data = [{ id: 'product-one', event_id: 'event-batch', name: 'General Admission', type: 'ticket', available: true, min_per_order: 1, max_per_order: 5, price_options: [{ currency: 'ETB', amount_minor: 0, active_from: '2020-01-01T00:00:00Z', active_to: null }], ticket_type: { id: 'type-one', admissions_per_unit: 1, audience: 'public', date_selection: 'fixed' } }];
+    if (path === '/public/events/batch-event/products') data = [{ id: 'product-one', event_id: 'event-batch', name: 'General Admission', type: 'ticket', available: true, min_per_order: 1, max_per_order: 5, price_options: [{ currency: 'ETB', amount_minor: 10000, active_from: '2020-01-01T00:00:00Z', active_to: null }], ticket_type: { id: 'type-one', admissions_per_unit: 1, audience: 'public', date_selection: 'fixed' } }];
     return route.fulfill({ json: { success: true, data } });
   });
 
