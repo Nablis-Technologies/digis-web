@@ -46,10 +46,12 @@ test(`saving a guest ticket uses shared auth fields and requires all six code di
   await expect(code).toHaveAttribute('placeholder', '••••••');
   await code.fill('1234');
   await page.getByPlaceholder('At least 8 characters', { exact: true }).fill('password123');
+  await expect(page.getByPlaceholder('At least 8 characters', { exact: true })).toHaveValue('password123');
   await page.getByPlaceholder('Repeat password', { exact: true }).fill('password123');
   await page.getByRole('button', { name: /Show create a password/i }).click();
   await expect(page.getByPlaceholder('At least 8 characters', { exact: true })).toHaveAttribute('type', 'text');
   await page.getByRole('button', { name: /Hide create a password/i }).click();
+  await expect(page.getByPlaceholder('At least 8 characters', { exact: true })).toHaveValue('password123');
   await page.getByRole('button', { name: 'Claim my tickets', exact: true }).click();
   await expect(code).toHaveAttribute('aria-invalid', 'true');
   await expect(code).toHaveAccessibleDescription('Enter the 6-digit code we sent.');
@@ -61,6 +63,7 @@ test(`saving a guest ticket uses shared auth fields and requires all six code di
   await page.getByRole('button', { name: 'Resend code', exact: true }).click();
   await expect.poll(() => otpRequests).toBe(2);
   await expect(code).toHaveValue('');
+  await expect(code).toBeFocused();
   await code.fill('111111');
   await page.getByRole('button', { name: 'Claim my tickets', exact: true }).click();
   await expect(code).toHaveAttribute('aria-invalid', 'true');

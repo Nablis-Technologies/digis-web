@@ -234,7 +234,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
               <>
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Verification code</label>
-                  <OtpCodeField autoFocus value={otpCode} onChange={value => { setOtpCode(value); clearField('otp'); }} isDark={isDark} error={errors.otp} disabled={busy || proof.current !== null || accountClaimed} />
+                  <OtpCodeField value={otpCode} onChange={value => { setOtpCode(value); clearField('otp'); }} isDark={isDark} error={errors.otp} disabled={busy || proof.current !== null || accountClaimed} />
                   <p className="mt-2 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
                     We sent a code to <span style={{ color: text }}>{phone}</span>.{' '}
                     <AppButton type="button" onClick={sendCode} disabled={busy || accountClaimed} className="inline min-h-9 text-[11px] underline" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? accent : '#0a0a0a' }}>Resend code</AppButton>
