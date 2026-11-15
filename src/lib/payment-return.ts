@@ -11,6 +11,8 @@ import { guestWallet } from '@/lib/guest-wallet';
 import { toApiError } from '@/lib/errors';
 import { toastWarning } from '@/lib/feedback';
 import type { UserTicket } from '@/types';
+import type { SetStateAction } from 'react';
+import { getSession } from '@/lib/session';
 
 /**
  * Clear per-checkout resume state after a payment reaches a terminal outcome.
@@ -220,8 +222,18 @@ export function usePaymentReturnConfirmation(
   // payments that simply queued behind the drain.
   { pollMs = 3_000, timeoutMs = 300_000, userId }: { pollMs?: number; timeoutMs?: number; userId?: string } = {},
 ): PaymentReturnController {
-  const [state, setState] = useState<PaymentReturnState>({ kind: 'idle' });
-  const [dismissed, setDismissed] = useState(false);
+  const identity = isAuthenticated ? userId ?? 'authenticated' : null;
+  const currentIdentity = useRef(identity);
+  currentIdentity.current = identity;
+  const [ownedState, setOwnedState] = useState<{ identity: string | null; state: PaymentReturnState }>({ identity, state: { kind: 'idle' } });
+  const state: PaymentReturnState = ownedState.identity === identity ? ownedState.state : { kind: 'idle' };
+  const setState = (next: SetStateAction<PaymentReturnState>) => setOwnedState(current => {
+    if (currentIdentity.current !== identity) return current;
+    const previous: PaymentReturnState = current.identity === identity ? current.state : { kind: 'idle' };
+    return { identity, state: typeof next === 'function' ? next(previous) : next };
+  });
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const dismissed = dismissedFor !== null && dismissedFor === identity;
   const queryClient = useQueryClient();
   // Prefer an unseen ticket within the exact verified order response.
   // This baseline never supplies payment proof itself.
@@ -239,7 +251,7 @@ export function usePaymentReturnConfirmation(
     if (state.kind !== 'idle') return;
     seen.current = baseline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knownKey, state.kind]);
+  }, [knownKey, state.kind, identity]);
 
   // Only the server reconciliation for this exact attempt can confirm payment.
   useEffect(() => {
@@ -248,7 +260,7 @@ export function usePaymentReturnConfirmation(
     const reconcile = async () => {
       try {
         const result = await orderModule.refreshPayment(paymentId);
-        if (!alive) return;
+        if (!alive || currentIdentity.current !== identity || (userId && getSession()?.user.id !== userId)) return;
         const giftOrderId = completedGiftOrder(result, paymentId, eventId);
         if (giftOrderId) {
           clearCheckoutResumeKeys();
@@ -279,7 +291,7 @@ export function usePaymentReturnConfirmation(
     const id = window.setInterval(() => { void reconcile(); }, pollMs);
     return () => { alive = false; window.clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.kind, paymentId, eventId, isAuthenticated, queryClient, pollMs]);
+  }, [state.kind, paymentId, eventId, isAuthenticated, queryClient, pollMs, identity, userId]);
 
   // Timeout watchdog.
   useEffect(() => {
@@ -288,17 +300,17 @@ export function usePaymentReturnConfirmation(
       setState((cur) => (cur.kind === 'confirming' ? { kind: 'timeout' } : cur));
     }, timeoutMs);
     return () => window.clearTimeout(id);
-  }, [state.kind, timeoutMs]);
+  }, [state.kind, timeoutMs, identity]);
 
   const start = () => {
-    setDismissed(false);
+    setDismissedFor(null);
     setState((s) => {
       if (s.kind !== 'idle') return s;
       seen.current = baseline();
       return { kind: 'confirming' };
     });
   };
-  const dismiss = () => setDismissed(true);
+  const dismiss = () => setDismissedFor(identity);
   const stop = () => setState({ kind: 'idle' });
   return { state, dismissed, start, dismiss, stop };
 }

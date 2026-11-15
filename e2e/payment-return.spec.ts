@@ -38,6 +38,48 @@ async function loginThroughUi(page: Page) {
   await expect(page.getByPlaceholder('Phone number', { exact: true })).toBeHidden({ timeout: 15_000 });
 }
 
+for (const phase of ['pending', 'confirmed']) {
+  test(`an account switch discards ${phase} payment confirmation from the previous buyer`, async ({ page }) => {
+    const user = { id: 'return-buyer', phone: '+251911000002', profile: { full_name: 'Return Buyer' }, roles: [], permissions: [] };
+    await page.addInitScript(user => {
+      localStorage.setItem('digis_session', JSON.stringify({ access_token: 'token-a', refresh_token: 'refresh-a', user }));
+      sessionStorage.setItem('digis:awaiting-confirm', 'identity-order');
+      sessionStorage.setItem('digis:payment-id:identity-order', 'identity-payment');
+      sessionStorage.setItem('digis:payment-event:identity-order', 'evt-1');
+    }, user);
+    let release = () => {};
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    let started = false;
+    const response = page.waitForResponse(response => apiPath(response.url()) === '/payments/identity-payment/refresh');
+    await page.route('**/payments/identity-payment/refresh', async route => {
+      started = true;
+      await waiting;
+      await route.fulfill({ json: { success: true, data: {
+        state: 'ready', payment: { id: 'identity-payment', order_id: 'identity-order', status: 'succeeded' },
+        order: { id: 'identity-order', event_id: 'evt-1', status: 'fulfilled' }, tickets: [WALLET_WIRE],
+      } } });
+    });
+    await page.goto('/');
+    await expect.poll(() => started).toBe(true);
+    if (phase === 'confirmed') {
+      release();
+      await expect(page.getByRole('button', { name: 'View My Ticket', exact: true })).toBeVisible();
+    }
+    // Exercise the real session store without unmounting the app between accounts.
+    await page.evaluate(async () => {
+      const { setSession } = await import('/src/lib/session.ts');
+      setSession({ access_token: 'token-b', refresh_token: 'refresh-b', user: {
+        id: 'buyer-b', phone: '+251911000003', profile: { full_name: 'Buyer B' }, roles: [], permissions: [],
+      } });
+    });
+    release();
+    await (await response).finished();
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(page.getByRole('button', { name: 'View My Ticket', exact: true })).toHaveCount(0);
+    await expect(page.getByText("You're going!", { exact: true })).toHaveCount(0);
+  });
+}
+
 test('guest in-app return reconciles with the payment id written after mount', async ({ page }) => {
   // Regression: Chapa V2 opens the hosted checkout in a NEW tab, so the app tab
   // is already mounted when `startPayment` writes `digis:payment-id:*` and the
