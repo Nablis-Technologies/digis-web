@@ -6,7 +6,11 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "test:acceptance": "playwright test --config playwright.acceptance.config.ts",
+    "test:release": "tsc --noEmit && vitest run && vite build && playwright test && playwright test --config playwright.acceptance.config.ts",
+    "test:frontend": "playwright test --config playwright.frontend.config.ts"
   },
   "dependencies": {
     "@popperjs/core": "2.11.8",
@@ -71,9 +75,12 @@
     "@tailwindcss/vite": "4.1.12",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.20.0",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "4.7.0",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
     "tailwindcss": "4.1.12",
     "typescript": "^5.9.3",
     "vite": "6.3.5",

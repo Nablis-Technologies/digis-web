@@ -28,6 +28,8 @@ export interface AdmissionAnswerInput {
   formVersionId?: string;
   questionKey: string;
   value: unknown;
+  packageUnitNumber?: number;
+  admissionPosition?: number;
 }
 
 export interface AdmissionGiftInput {
@@ -37,6 +39,8 @@ export interface AdmissionGiftInput {
 }
 
 export interface AdmissionItemInput {
+  /** Stable UUID per recipient; preserve across OTP and checkout retries. */
+  lineId?: string;
   /** Catalog::EventProduct id. */
   eventProductId: string;
   quantity: number;
@@ -112,7 +116,7 @@ export interface AdmissionResult {
   order?: AdmissionOrder;
   registration?: { id: string; status: string };
   registrations: AdmissionRegistration[];
-  giftPurchases?: Array<{ id: string; status: string; deliveryStatus?: string }>;
+  giftPurchases?: Array<{ id: string; lineId?: string; status: string; deliveryStatus?: string }>;
   nextAction: AdmissionNextAction;
   /** Bound to the order for guest payment endpoints (`order_access_token`). */
   guestOrderToken?: string;
@@ -145,6 +149,7 @@ interface WireOrder {
 }
 
 interface WireGiftPurchase {
+  line_id?: string | null;
   id: string;
   status: string;
   delivery_status?: string;
@@ -167,6 +172,7 @@ function wireItems(items: AdmissionItemInput[]) {
     const isGift = Boolean(item.gift);
     return {
       event_product_id: item.eventProductId,
+      ...(item.lineId ? { line_id: item.lineId } : {}),
       quantity: item.quantity,
       ...(item.gift
         ? {
@@ -194,6 +200,8 @@ function wireItems(items: AdmissionItemInput[]) {
               ...(answer.formVersionId ? { form_version_id: answer.formVersionId } : {}),
               question_key: answer.questionKey,
               value: answer.value,
+              ...(answer.packageUnitNumber != null ? { package_unit_number: answer.packageUnitNumber } : {}),
+              ...(answer.admissionPosition != null ? { admission_position: answer.admissionPosition } : {}),
             })),
           }
         : {}),
@@ -264,6 +272,7 @@ function mapResult(wire: WireSelectionResponse): AdmissionResult {
       ? {
           giftPurchases: wire.gift_purchases.map((g) => ({
             id: g.id,
+            ...(g.line_id ? { lineId: g.line_id } : {}),
             status: g.status,
             deliveryStatus: g.delivery_status,
           })),

@@ -49,7 +49,7 @@ export interface TicketTier {
   /** Admissions granted per unit (≥1) — drives quantity/seat math. */
   admissionsPerUnit?: number;
   /** Event dates this ticket offer is valid for (backend `covered_event_date_ids`,
-   *  #69). Present on live ticket products; absent/empty = available any day. */
+   *  #69). Empty means all event dates; absent means metadata was not served. */
   coveredEventDateIds?: string[];
   /** Order bounds from the product. */
   minPerOrder?: number;
@@ -118,6 +118,7 @@ export interface SelectedSeat {
 
 export interface EventArtist {
   name: string;
+  artistId?: string;
   handle?: string;
   /**
    * Backend `event_date_id` — pins a festival participant to one scheduled date
@@ -156,6 +157,7 @@ export interface Event {
   date: string;
   time: string;
   venue: string;
+  venueId?: string;
   city: string;
   image: string;
   /**

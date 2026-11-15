@@ -81,6 +81,7 @@ export interface TicketWalletWire {
 /** Map the wallet wire projection onto the UI's UserTicket shape. */
 export function mapWalletTicket(w: TicketWalletWire): UserTicket {
   const firstCredential = w.credentials[0];
+  const activeCredential = w.credentials.find(credential => credential.status === 'active' && !!credential.qr_token);
   const firstDate = w.event_dates[0];
   const tt = w.ticket_type;
   return {
@@ -101,7 +102,7 @@ export function mapWalletTicket(w: TicketWalletWire): UserTicket {
     ticketType: w.product.name,
     status: w.status,
     // QR secret is delivered only for active tickets — never render a fake code.
-    qrCode: w.status === "active" ? (firstCredential?.qr_token ?? "") : "",
+    qrCode: w.status === "active" ? (activeCredential?.qr_token ?? "") : "",
     purchased: isoToDisplayDate(firstCredential?.issued_at ?? firstDate?.starts_at),
     // Purchased extras projected onto the wallet ticket (#29 resolved).
     ...(w.add_ons?.length
@@ -222,4 +223,5 @@ export const ticketsService = {
 
 export const ticketKeys = {
   userTickets: ["tickets", "user"] as const,
+  forUser: (userId: string | undefined) => ['tickets', 'user', userId ?? null] as const,
 };

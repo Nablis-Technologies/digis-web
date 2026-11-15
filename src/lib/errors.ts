@@ -36,6 +36,23 @@ export class ApiError extends Error {
 
 /** Friendly copy for known backend error codes (fall back to the API message). */
 const CODE_MESSAGES: Record<string, string> = {
+  correction_window_closed: 'The correction window has closed. This answer can no longer be changed.',
+  answer_erased: 'This answer is no longer retained and cannot be changed.',
+  retention_expired: 'This answer is no longer retained and cannot be changed.',
+  invalid_answer_revision: 'Check this answer and the event’s allowed values, then try again.',
+  revision_conflict: 'This correction conflicts with an earlier request. Refresh your answers before trying again.',
+  gift_invalid: 'This gift link is invalid. Open the original message link and try again.',
+  gift_not_ready: 'This gift order is still awaiting payment confirmation.',
+  gift_expired: 'This gift ticket has expired.',
+  gift_revoked: 'This gift purchase was refunded or cancelled by the purchaser.',
+  gift_recipient_authentication_required: 'Sign in with the recipient account to claim this gift.',
+  gift_recipient_mismatch: 'This gift belongs to another account. Use the recipient account to continue.',
+  gift_refund_in_progress: 'A refund is being processed for this gift. It cannot be claimed right now.',
+  gift_claim_invalid: 'Please check your attendee details and required consents.',
+  gift_claim_failed: 'Couldn’t complete your gift claim. Please try again.',
+  gift_quantity_invalid: 'Send one gift ticket per recipient.',
+  gift_recipient_same_as_purchaser: 'You cannot send a gift ticket to your own phone number.',
+  recipient_phone_invalid: 'Enter a valid recipient phone number.',
   invalid_credentials: 'Incorrect email/phone or password.',
   authentication_required: 'Please log in to continue.',
   guest_requires_authentication: 'This phone is already linked to a Digis account. Log in to continue — or open a guest ticket under Tickets.',
@@ -238,6 +255,17 @@ export function mapFieldErrors(fieldErrors?: string[] | null): FieldErrorMap {
  * Normalize any thrown value into an `ApiError`. Understands axios errors
  * (error.response), the backend envelope ({ error, code }), and plain Errors.
  */
+function normalizedFieldMessages(errors: unknown): string[] | undefined {
+  if (Array.isArray(errors)) return errors.filter((message): message is string => typeof message === 'string');
+  if (!errors || typeof errors !== 'object') return undefined;
+  return Object.entries(errors).flatMap(([field, values]) => {
+    const label = field.replace(/^profile\./, '').replace(/_/g, ' ');
+    return (Array.isArray(values) ? values : [values])
+      .filter((value): value is string => typeof value === 'string')
+      .map(value => `${label} ${value}`);
+  });
+}
+
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
 
@@ -262,7 +290,7 @@ export function toApiError(error: unknown): ApiError {
           ? body.error
           : (body as { error?: string; message?: string; code?: string; errors?: string[]; meta?: Record<string, unknown> });
     const message = (typeof data.error === 'string' && data.error) || data.message || `Request failed (${status})`;
-    return new ApiError(message, status, data.code, data.errors, data.meta);
+    return new ApiError(message, status, data.code, normalizedFieldMessages(data.errors), data.meta);
   }
 
   // network / timeout / no response

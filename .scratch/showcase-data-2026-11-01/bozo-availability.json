@@ -1,0 +1,172 @@
+{
+  "slug": "bozo",
+  "event": {
+    "id": "01a19acd-98b5-724b-996d-092a9f8f6edf",
+    "slug": "bozo",
+    "title": "Bozo",
+    "description": null,
+    "visibility": "public",
+    "timezone": "Africa/Addis_Ababa",
+    "currency": "ETB",
+    "published_at": "2026-11-02T05:48:51.135Z",
+    "created_at": "2026-11-02T05:48:47.668Z",
+    "is_recurring": false,
+    "event_dates_preview": [
+      {
+        "id": "01a19acd-9d9e-72f2-9290-2b3799444471",
+        "name": "Main Event",
+        "doors_at": null,
+        "starts_at": "2026-11-09T16:00:00Z",
+        "ends_at": "2026-11-09T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19ac8-5658-7e9a-8508-c7af96d111aa",
+          "name": "Atmosphere",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      },
+      {
+        "id": "01a19acd-9f23-73a1-b71d-2603d2534a61",
+        "name": "Session 2",
+        "doors_at": null,
+        "starts_at": "2026-11-16T16:00:00Z",
+        "ends_at": "2026-11-16T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19ac8-5658-7e9a-8508-c7af96d111aa",
+          "name": "Atmosphere",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      },
+      {
+        "id": "01a19acd-9ffe-7ba0-9da9-264aa14fd0d2",
+        "name": "Session 3",
+        "doors_at": null,
+        "starts_at": "2026-11-23T16:00:00Z",
+        "ends_at": "2026-11-23T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19ac8-5658-7e9a-8508-c7af96d111aa",
+          "name": "Atmosphere",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      },
+      {
+        "id": "01a19acd-a0e0-70b4-91ee-3b0995569d3e",
+        "name": "Session 4",
+        "doors_at": null,
+        "starts_at": "2026-11-30T16:00:00Z",
+        "ends_at": "2026-11-30T20:00:00Z",
+        "status": "scheduled",
+        "venue": {
+          "id": "01a19ac8-5658-7e9a-8508-c7af96d111aa",
+          "name": "Atmosphere",
+          "city": "Addis Ababa"
+        },
+        "series_id": null
+      }
+    ],
+    "event_dates_url": "/public/events/bozo/dates",
+    "categories": [
+      {
+        "id": "01a19893-db9c-79d8-954e-612c5ccab63c",
+        "name": "Charity",
+        "description": "Fundraisers, galas, and community service events",
+        "slug": "charity"
+      }
+    ],
+    "event_media": [
+      {
+        "id": "01a19acd-9bbb-7056-9716-8f4fc9fccfe4",
+        "type": "gallery",
+        "position": 1,
+        "alt_text": "Bozo 1",
+        "caption": "",
+        "file": {
+          "thumbnail": "http://localhost:3000/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6IjFiOTIxZGY0LTIxMDEtNDk0YS04Mjk5LTcyY2I1NWZkYWVmYyIsInB1ciI6ImJsb2JfaWQifX0=--61937a21c03ca26e3a14dfbc26bf64c224a7b900/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJwbmciLCJyZXNpemVfdG9fbGltaXQiOlsyMDAsMjAwXX0sInB1ciI6InZhcmlhdGlvbiJ9fQ==--271461a99c32fa18a3d46cceada0a4379660ca1c/vlcsnap-2026-08-31-21h38m41s869.png",
+          "medium": "http://localhost:3000/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6IjFiOTIxZGY0LTIxMDEtNDk0YS04Mjk5LTcyY2I1NWZkYWVmYyIsInB1ciI6ImJsb2JfaWQifX0=--61937a21c03ca26e3a14dfbc26bf64c224a7b900/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJwbmciLCJyZXNpemVfdG9fbGltaXQiOls4MDAsODAwXX0sInB1ciI6InZhcmlhdGlvbiJ9fQ==--86e4fa361b1ae7d17aa9abe0564c30e7b2b990aa/vlcsnap-2026-08-31-21h38m41s869.png"
+        }
+      },
+      {
+        "id": "01a19acd-99f2-7a0e-b2f8-7146ef597506",
+        "type": "cover",
+        "position": 0,
+        "alt_text": "Bozo",
+        "caption": "",
+        "file": {
+          "thumbnail": "http://localhost:3000/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6ImViY2UzY2U4LTRjNDMtNDQxNS1iZmJmLTI3YmY4MjI0NGEwYiIsInB1ciI6ImJsb2JfaWQifX0=--69f1dbba1edcafac340c85137ac9695120d6a655/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJwbmciLCJyZXNpemVfdG9fbGltaXQiOlsyMDAsMjAwXX0sInB1ciI6InZhcmlhdGlvbiJ9fQ==--271461a99c32fa18a3d46cceada0a4379660ca1c/vlcsnap-2026-08-31-21h38m30s644.png",
+          "medium": "http://localhost:3000/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsiZGF0YSI6ImViY2UzY2U4LTRjNDMtNDQxNS1iZmJmLTI3YmY4MjI0NGEwYiIsInB1ciI6ImJsb2JfaWQifX0=--69f1dbba1edcafac340c85137ac9695120d6a655/eyJfcmFpbHMiOnsiZGF0YSI6eyJmb3JtYXQiOiJwbmciLCJyZXNpemVfdG9fbGltaXQiOls4MDAsODAwXX0sInB1ciI6InZhcmlhdGlvbiJ9fQ==--86e4fa361b1ae7d17aa9abe0564c30e7b2b990aa/vlcsnap-2026-08-31-21h38m30s644.png"
+        }
+      }
+    ],
+    "event_organizations": [],
+    "event_participants": [
+      {
+        "id": "01a19acd-a4fd-7774-bdcc-d0142e3d2066",
+        "artist_id": "01a19894-3bad-72c8-be63-b676449caaca",
+        "event_date_id": "01a19acd-9d9e-72f2-9290-2b3799444471",
+        "name": "Showcase host (demo)",
+        "type": "performer",
+        "description": null,
+        "display_order": 1
+      },
+      {
+        "id": "01a19acd-a57a-7b81-a830-321704b6a7fe",
+        "artist_id": "01a19894-3f3d-73e9-8e21-87b707e7dbf1",
+        "event_date_id": "01a19acd-9d9e-72f2-9290-2b3799444471",
+        "name": "Sulaf",
+        "type": "performer",
+        "description": null,
+        "display_order": 2
+      }
+    ],
+    "event_setting": {
+      "id": "01a19acd-98c3-772a-87c9-d7b2c196f78f",
+      "config": {}
+    },
+    "organization": {
+      "id": "01a19893-e2e1-74e7-8e5e-3497a9c3d16c",
+      "name": "Addis Music Fest",
+      "slug": "addis-music-fest"
+    }
+  },
+  "products": [
+    {
+      "id": "01a19acd-a192-7edf-bc3d-a4fa06ebb7b0",
+      "event_id": "01a19acd-98b5-724b-996d-092a9f8f6edf",
+      "name": "General Admission",
+      "description": null,
+      "type": "ticket",
+      "allow_custom_price": false,
+      "sales_start_at": null,
+      "sales_end_at": null,
+      "min_per_order": 1,
+      "max_per_order": 10,
+      "schedule_change_refund_policy": "full_or_partial",
+      "sort_order": 1,
+      "price_options": [
+        {
+          "currency": "ETB",
+          "amount_minor": 50000,
+          "active_from": "2026-11-02T05:48:49.847Z",
+          "active_to": null
+        }
+      ],
+      "available": false,
+      "covered_event_date_ids": [],
+      "requires_ticket": false,
+      "ticket_type": {
+        "id": "01a19acd-a19a-7484-8542-a402c8c182d7",
+        "event_product_id": "01a19acd-a192-7edf-bc3d-a4fa06ebb7b0",
+        "approval_mode": "automatic",
+        "audience": "public",
+        "date_selection": "fixed",
+        "admissions_per_unit": 1,
+        "waitlist_enabled": false
+      }
+    }
+  ]
+}

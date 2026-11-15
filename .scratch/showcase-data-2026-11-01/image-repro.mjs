@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage();
+const failures = [];
+page.on('requestfailed', request => { if (request.resourceType() === 'image') failures.push({url:request.url().split('/rails/')[0],error:request.failure()?.errorText}); });
+await page.goto('https://measures-associate-combine-network.trycloudflare.com/events/addis-city-cup', { waitUntil: 'domcontentloaded' });
+console.log('DOM loaded: ' + await page.title());
+await page.getByRole('heading',{name:'Addis City Cup',exact:true}).waitFor();
+await page.waitForFunction(() => [...document.images].some(image => image.complete));
+console.log(JSON.stringify(await page.locator('img').evaluateAll(images => images.map(image => ({origin:new URL(image.src).origin,complete:image.complete,width:image.naturalWidth,alt:image.alt})))));
+console.log(JSON.stringify(failures));
+await browser.close();

@@ -12,7 +12,10 @@ pnpm dev          # start Vite dev server
 pnpm build        # production build (vite)
 npx tsc --noEmit  # typecheck
 npx vitest run    # unit tests (259)
-npx playwright test  # e2e vs the live backend on :3000 (42 deterministic; zz-* manual)
+pnpm test:frontend   # deterministic browser/API regressions
+pnpm test:browser    # includes live seeded Rails integration
+pnpm test:acceptance # real Chapa sandbox payment → exact ticket + usable QR
+pnpm test:release    # all checks, including the live acceptance gate
 ```
 
 Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
@@ -22,6 +25,8 @@ Checks are `npx tsc --noEmit` + `npx vitest run` + `pnpm build` (+
 
 The frontend is being wired from 100% mock data to the real Rails backend.
 **The user is the FRONTEND developer — do NOT make backend product changes.**
+Our frontend scope is the attendee `digis-web` app. Treat organizer/admin
+`digis-apps` product code as read-only; hand off defects in `docs/ORGANIZER_GAPS.md`.
 Backend product changes = architecture, schema/migrations, models, controllers,
 routes, serializers, policies, services — anything in `digis_backend` that
 changes what the API *is* or *returns*. When the frontend needs a backend surface
@@ -164,12 +169,20 @@ unless every status change was swept and either wired or tracked. History: the
 missed the one _partial_ one — #18 `payment_refresh` is still unwired. This
 sweep is the rule that prevents that.
 
-**Open — blocking:** #53 (**`seat_map`** only), #57, #65. **Open — degrading:**
-#44, #46, #48, #67, #71, #72. (Re-verified 2026-10-17 after the age-restriction
-pull `0741c53b` → `8419aaaf` — see the sweep log at the top of `BACKEND_GAPS.md`;
-that file's at-a-glance table is authoritative. This pull resolved **#36** (public
-participants) and the **`age_restriction`** half of #53, both frontend-wired in the
-run.)
+**Latest backend integration (2026-11-01):** remote `c15d6ff3` merged as
+`5c2890c7`; local seed/catalog changes preserved. No backend product patches.
+#75 payment correlation is resolved and real sandbox acceptance passes after
+restarting Rails/workers. #74 batch contract is frontend-wired (stable line IDs,
+per-recipient rows and delivery ordering), but #76 blocks live existing-DB gifts.
+See latest INTEGRATION_STATUS entry and `.scratch/backend-wireup-2026-11-01/`.
+
+**Open — blocking:** #53 (**seat_map** only), #57, #73, #76.
+**Partial:** #74 (live rollout awaits #76 forward migration).
+**Open — degrading:** #38, #44, #46, #48, #67, #71, #72, #77–#80.
+
+- **#38 reopened 2026-11-02:** `requires_ticket:true` extras receive quotes without
+  admission entitlement. Frontend gating is not backend enforcement; no product
+  patch or payment was made to close this gap.
 
 - **#53** Public detail payload drops **`seat_map`** (re-scoped 2026-10-16:
   `rating` / `answer_edit_window_hours` / `price_foreign_from_minor` dropped as
@@ -178,6 +191,16 @@ run.)
   RESOLVED 2026-10-17** — the detail serves
   `event_setting.config.age_restriction` and the adapter maps it to the Age card.
   lineup → #36 (resolved).
+- **#75 resolved 2026-11-01:** committed Chapa success correlation verified by
+  real sandbox payment → exact ticket → decoded QR → reload persistence. No
+  historical expired payment recovery claimed.
+- **#74 partial 2026-11-01:** repeated quantity-one gifts now accept stable UUID
+  line_id; frontend batch checkout/retry/delivery mapping wired and tested.
+- **#76 open 2026-11-01:** client_line_id was added to an old migration, with no
+  forward migration. Existing DB lacks the column. Backend engineer owns fix;
+  do not patch schema or claim live gift acceptance.
+- **#73** Consumer achievements have no backend contract. The backend developer
+  owns earning rules and API design; do not invent them in the frontend.
 - **#57** No password reset / forgot-password endpoint (phone-first reset would
   reuse the existing OTP infra).
 - **#60 (withdrawn 2026-10-16 — FALSE POSITIVE)** The claim that Chapa `amount` is
@@ -185,10 +208,11 @@ run.)
   response** (live probe: `amount: 100` → **1.00 ETB**), so
   `integer_amount(amount_minor)` is correct. Detail in `NOT_BACKEND_GAPS.md`. The
   real unit defect is **#71**.
-- **#65** Seller payout dispatch always ends in a provider rejection
-  (`invalid_format`); no payout has ever reached `succeeded`.
-- **#44** Event-level `event_type` / `access_mode` / `rsvp_*` config is inert and
-  unwritable → the public payload can't say rsvp vs inviteOnly vs ticketed.
+- **#65 reclassified 2026-10-24:** synthetic provider test recipient was rejected;
+  successful settlement remains unverified (NOT_BACKEND_GAPS.md). No confirmed
+  request-shape defect; do not claim a payout fix.
+- **#44 narrowed 2026-10-24:** public `public_guest_limit` remains inert;
+  obsolete event-level admission keys are superseded by offer-scoped rules.
 - **#46** No saved-events/favourites, follows-based feed (`GET /feed` has no
   controller), or reviews/ratings. (Follows to venues/artists/organizations *do*
   exist.)
@@ -199,16 +223,22 @@ run.)
   `NOT_BACKEND_GAPS.md`); the only real part — events-by-followable — lives in #49.
 - **#67** `Core::UserProfile` enforces mandatory `last_name` (`null: false`,
   presence) → single-name signups need a client-side fallback (`splitFullName`).
-- **#72** Public **detail** payload omits `event_lifecycle` + `ticket_availability`
-  (only the list serves them) → an ended event's detail page can no longer gate
-  purchase (the 2026-10-16 date reshape replaced the full `event_dates` array with
-  an upcoming-only preview). 4 ended events are live; the fix is to serve the same
-  availability projection on the detail serializer.
+- **#72** Public detail still omits lifecycle/availability. Existing schedule
+  probing mitigates ended-event gating; no new server projection has landed.
 - **#71** Chapa `provider_fee_minor` is recorded 100× too large — the adapter
   converts the provider's **minor-unit** `service_fee`/`charge` as if it were major
   (`minor_amount` × 100), so a real 0.03 ETB fee is stored as 3.00 ETB → overstates
   platform provider cost + reconciliation variance (`Finance::PostPlatformBillingEntry`,
   `Commercial::Reconciliation::Run`). No frontend impact.
+
+**Attachment audit / wiring 2026-10-26:** older “all wired” notes below are
+historical, not proof that every UI is complete. Gift recipient/core payer flow
+is now wired (11 browser cases); multi-recipient batch remains tracked. #50
+answer metadata is mapped, but wallet answer read/revise UI remains owed. Separate
+required names/avatar refresh and age/coverage/Featured display corrections are
+also tracked in `.scratch/handoff-wireup-2026-10-26/issues/`. Read the latest
+INTEGRATION_STATUS entry before picking up this work. All 57 browser tests passed
+under direct API config; older mocks need proxy compatibility (issue 05).
 
 **Resolved 2026-10-16 (frontend-wiring sweep) — all wired:** #17 (`cbebirr` in the
 payment enum; CBE Birr enabled), #8/#9 (auth serves `profile.full_name`; `GET`/`PATCH

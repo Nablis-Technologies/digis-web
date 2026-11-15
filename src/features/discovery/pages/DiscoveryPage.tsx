@@ -57,6 +57,7 @@ export function EventDiscovery({
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<EventSortBy>("soonest");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [eventTypes, setEventTypes] = useState<EventAccessFilter[]>([]);
   const [priceRange, setPriceRange] = useState<EventPriceFilter | null>(null);
   const { isDark } = useTheme();
@@ -105,8 +106,9 @@ export function EventDiscovery({
         sortBy,
         eventTypes,
         priceRange,
+        onlyFeatured,
       }),
-    [debouncedSearch, categorySlug, sortBy, eventTypes, priceRange],
+    [debouncedSearch, categorySlug, sortBy, eventTypes, priceRange, onlyFeatured],
   );
   const filtersImpossible = serverQuery === null;
 
@@ -151,6 +153,7 @@ export function EventDiscovery({
   const activeFilterCount =
     (sortBy !== "soonest" ? 1 : 0) +
     (onlyAvailable ? 1 : 0) +
+    (onlyFeatured ? 1 : 0) +
     eventTypes.length +
     (priceRange ? 1 : 0);
   const filtersActive =
@@ -234,6 +237,8 @@ export function EventDiscovery({
         activeFilterCount={activeFilterCount}
         sortBy={sortBy}
         onSortChange={setSortBy}
+        onlyFeatured={onlyFeatured}
+        onOnlyFeaturedChange={setOnlyFeatured}
         onlyAvailable={onlyAvailable}
         onOnlyAvailableChange={setOnlyAvailable}
         eventTypes={eventTypes}
@@ -328,6 +333,7 @@ export function EventDiscovery({
           setSearchQuery("");
           setSortBy("soonest");
           setOnlyAvailable(false);
+          setOnlyFeatured(false);
           setEventTypes([]);
           setPriceRange(null);
           onSearchModeChange?.(false);

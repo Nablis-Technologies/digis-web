@@ -1,0 +1,30 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const failures = [];
+page.on('response', response => { if (response.url().startsWith('http://localhost:3000/') && response.status() >= 400) failures.push({ path: new URL(response.url()).pathname, status: response.status() }); });
+await page.goto('http://localhost:3001/');
+await page.getByLabel('Email', { exact: true }).fill('organizer@digis.et');
+await page.getByLabel('Password', { exact: true }).fill('password123');
+const loginResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/auth/login' && response.request().method() === 'POST');
+await page.getByRole('button', { name: 'Login', exact: true }).click();
+await page.waitForURL('**/organizer', { timeout: 60000 });
+const auth = (await (await loginResponse).json()).data;
+const owned = await (await page.request.get('http://localhost:3000/organizations/owner', { headers: { Authorization: `Bearer ${auth.access_token}` } })).json();
+const fest = owned.data.find(org => org.name === 'Addis Music Fest');
+await page.goto('http://localhost:3001/organizer/events');
+await page.getByRole('heading', { name: 'Events', exact: true }).waitFor({ timeout: 60000 });
+await page.getByRole('button').filter({ hasText: owned.data[0].name }).first().click();
+await page.getByRole('button').filter({ hasText: 'Addis Music Fest' }).last().click();
+await page.locator('h3:visible').filter({ hasText: /^Bozo$/ }).first().waitFor();
+await page.locator('h3:visible').filter({ hasText: /^Mozooo$/ }).first().waitFor();
+await page.locator('h3:visible').filter({ hasText: /^Addis Sound Festival 2026$/ }).first().waitFor();
+await page.screenshot({ path: '.scratch/showcase-data-2026-11-01/organizer-events.png', fullPage: true });
+const pages = [];
+for (const route of ['', '/organization', '/team', '/payouts', '/campaigns']) {
+  await page.goto('http://localhost:3001/organizer' + route);
+  await page.waitForLoadState('networkidle', { timeout: 15000 });
+  pages.push({ route: '/organizer' + route, heading: await page.locator('main h1').allTextContents() });
+}
+console.log(JSON.stringify({ workspace: fest.name, preservedUserEventsVisible: ['Bozo', 'Mozooo'], publicSeedEventVisible: 'Addis Sound Festival 2026', pages, apiFailures: failures }, null, 2));
+await browser.close();

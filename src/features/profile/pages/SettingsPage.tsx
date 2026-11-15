@@ -16,6 +16,8 @@ import {
 import { Divider, PickerList, Row, Section, SettingsSheet, ThemeSwitch, Toggle, ValuePill, EditField } from '@/features/profile/components/SettingsPrimitives';
 import { SettingsAccountCard } from '@/features/profile/components/SettingsAccountCard';
 import { AppButton } from '@/components/primitives/AppButton';
+import { mapFieldErrors } from '@/lib/errors';
+import { profileNameErrors } from '@/lib/profile-names';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glassControl, glassEdge } from '@/lib/ui/glass';
 
@@ -85,6 +87,7 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const [editLastName, setEditLastName] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [nameErrors, setNameErrors] = useState<Record<string, string>>({});
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarRemoving, setAvatarRemoving] = useState(false);
 
@@ -94,11 +97,9 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
 
   const openSheet = (s: Sheet) => {
     if (s === 'profile') {
-      const parts = (user?.name || '').trim().split(' ');
-      const rawFirst = user?.profile?.first_name ?? parts[0] ?? '';
-      const rawLast = user?.profile?.last_name ?? parts.slice(1).join(' ') ?? '';
-      setEditFirstName(rawFirst);
-      setEditLastName(rawLast === rawFirst ? '' : rawLast);
+      setEditFirstName(user?.profile?.first_name ?? '');
+      setEditLastName(user?.profile?.last_name ?? '');
+      setNameErrors({});
       setProfileError(null);
     }
     setSheet(s);
@@ -111,21 +112,22 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
   const handleSaveProfile = async () => {
     const trimmedFirst = editFirstName.trim();
     const trimmedLast = editLastName.trim();
-    if (!trimmedFirst) {
-      setProfileError('Please enter your name.');
-      return;
-    }
+    const errors = profileNameErrors(trimmedFirst, trimmedLast);
+    setNameErrors(errors);
+    if (Object.keys(errors).length) return;
     setProfileSaving(true);
     setProfileError(null);
     const res = await updateProfile({
       first_name: trimmedFirst,
-      last_name: trimmedLast || trimmedFirst,
+      last_name: trimmedLast,
     });
     setProfileSaving(false);
     if (res.ok) {
       closeSheet();
     } else {
-      setProfileError(res.error || 'Could not update profile names.');
+      const mapped = mapFieldErrors(res.fieldErrors);
+      setNameErrors(mapped.fields);
+      setProfileError(mapped.general.join(' ') || (Object.keys(mapped.fields).length ? null : res.error || 'Could not update profile names.'));
     }
   };
 
@@ -400,26 +402,32 @@ export function SettingsView({ onBack, onRequestAuth }: SettingsViewProps) {
                   {/* Name Fields */}
                   <div className="space-y-2.5">
                     <div>
-                      <label className="block text-[11px] mb-1 font-medium tracking-wide uppercase" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
-                        First Name
+                      <label htmlFor="profile-first-name" className="block text-[11px] mb-1 font-medium tracking-wide" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
+                        Given Name / ስም
                       </label>
                       <EditField
                         icon={<User className="w-4 h-4" />}
                         placeholder="First name"
+                        id="profile-first-name"
+                        error={nameErrors.firstName}
+                        disabled={profileSaving}
                         value={editFirstName}
-                        onChange={setEditFirstName}
+                        onChange={value => { setEditFirstName(value); setNameErrors(prev => ({ ...prev, firstName: '' })); }}
                         isDark={isDark}
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] mb-1 font-medium tracking-wide uppercase" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
-                        Last Name <span className="opacity-60 normal-case font-normal">(optional)</span>
+                      <label htmlFor="profile-last-name" className="block text-[11px] mb-1 font-medium tracking-wide" style={{ color: subtle, fontFamily: "'Inter', sans-serif" }}>
+                        Father's Name / የአባት ስም
                       </label>
                       <EditField
                         icon={<User className="w-4 h-4" />}
-                        placeholder="Last name (optional)"
+                        placeholder="Father's name"
+                        id="profile-last-name"
+                        error={nameErrors.lastName}
+                        disabled={profileSaving}
                         value={editLastName}
-                        onChange={setEditLastName}
+                        onChange={value => { setEditLastName(value); setNameErrors(prev => ({ ...prev, lastName: '' })); }}
                         isDark={isDark}
                       />
                     </div>

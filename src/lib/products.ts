@@ -127,7 +127,7 @@ function toTier(p: BackendProduct): TicketTier | null {
     maxPerOrder: p.max_per_order ?? undefined,
     // Real per-day coverage from the backend (#69) — drives the multi-day tier
     // assignment. Absent/empty means the offer is available on any day.
-    ...(p.covered_event_date_ids?.length
+    ...(Array.isArray(p.covered_event_date_ids)
       ? { coveredEventDateIds: p.covered_event_date_ids }
       : {}),
     name: p.name,

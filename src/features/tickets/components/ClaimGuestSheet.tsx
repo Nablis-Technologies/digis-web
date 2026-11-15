@@ -1,6 +1,9 @@
+import { randomUuid } from '@/lib/api';
+import { OtpCodeField, PasswordField } from '@/features/auth/components/AuthFormFields';
+import { primaryButtonSurface } from '@/lib/ui/disabledStyles';
 import { motion } from 'motion/react';
-import { X, Phone, ShieldCheck, KeyRound, Lock, ArrowRight, Check, UserCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { X, Phone, ArrowRight, Check, UserCheck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/app/components/ThemeContext';
 import type { UserTicket } from '@/types';
 import { useAuth } from '@/features/auth/context/AuthContext';
@@ -32,10 +35,35 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   const [otpCode, setOtpCode] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const proof = useRef<string | null>(null);
+  const claimKey = useRef(randomUuid());
+  const [accountClaimed, setAccountClaimed] = useState(false);
   // Per-field messages so a failure points at the input that caused it; `formError`
   // carries anything that names no field (API/ownership failures).
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
+  const busy = otpStage === 'sending' || otpStage === 'submitting';
+  const panel = useRef<HTMLElement>(null);
+  const busyRef = useRef(busy);
+  const closeRef = useRef(onClose);
+  busyRef.current = busy;
+  closeRef.current = onClose;
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panel.current?.querySelector<HTMLInputElement>('input')?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!busyRef.current) closeRef.current(); }
+      if (event.key !== 'Tab') return;
+      const controls = [...(panel.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], [tabindex="0"]') ?? [])].filter(element => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first) { event.preventDefault(); panel.current?.focus(); }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', keyboard, true);
+    return () => { document.removeEventListener('keydown', keyboard, true); if (previous?.isConnected) previous.focus(); };
+  }, []);
 
   // Pre-fill the phone we already captured at guest checkout, so the buyer
   // never re-types what we know — they only confirm it with the OTP.
@@ -48,7 +76,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   }, [ticket.id]);
 
   const text = isDark ? '#fff' : '#1a1a1a';
-  const muted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.46)';
+  const muted = isDark ? 'rgba(255,255,255,0.64)' : 'rgba(0,0,0,0.64)';
   const surface = isDark ? '#101115' : '#fff';
   const accent = '#d6f905';
 
@@ -74,7 +102,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   };
   const validateClaim = (): boolean => {
     const next: Record<string, string> = {};
-    if (otpCode.replace(/\D/g, '').length < 4) next.otp = 'Enter the 6-digit code we sent.';
+    if (!accountClaimed && !/^\d{6}$/.test(otpCode)) next.otp = 'Enter the 6-digit code we sent.';
     if (password.length < 8) next.password = 'Password must be at least 8 characters.';
     if (password !== passwordConfirm) next.passwordConfirm = 'Passwords do not match.';
     if (Object.keys(next).length) { setErrors(next); return false; }
@@ -82,17 +110,22 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   };
 
   const sendCode = async () => {
+    if (busy || accountClaimed) return;
     clearAll();
     if (!validatePhone()) return;
     if (!ticket.ticketViewToken) {
       setFormError('This ticket can’t be claimed — no signed view token.');
       return;
     }
+    proof.current = null;
+    claimKey.current = randomUuid();
     setOtpStage('sending');
     try {
       const { challengeId: id } = await registrationModule.claimOtpRequest(ticket.ticketViewToken, phone);
       setChallengeId(id);
+      setOtpCode('');
       setOtpStage('sent');
+      requestAnimationFrame(() => panel.current?.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]')?.focus());
     } catch (err) {
       setFormError(mapApiError(err));
       setOtpStage('idle');
@@ -100,6 +133,7 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
   };
 
   const claim = async () => {
+    if (busy) return;
     clearAll();
     if (!validateClaim()) return;
     if (!ticket.registrationId || !challengeId) {
@@ -108,24 +142,33 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
     }
     setOtpStage('submitting');
     try {
-      const { verificationToken } = await registrationModule.verifyPhoneOtp(challengeId, otpCode);
-      await registrationModule.claimGuest(ticket.registrationId, {
-        phone,
-        verificationToken,
-        password,
-        passwordConfirmation: passwordConfirm,
-      });
+      if (!accountClaimed) {
+        if (!proof.current) {
+          const verified = await registrationModule.verifyPhoneOtp(challengeId, otpCode);
+          proof.current = verified.verificationToken;
+        }
+        await registrationModule.claimGuest(ticket.registrationId, {
+          phone, verificationToken: proof.current, password, passwordConfirmation: passwordConfirm,
+        }, claimKey.current);
+        setAccountClaimed(true);
+      }
       // The claim set this password on the identity — sign in with it so the
       // ticket appears in the account wallet.
       const result = await signIn(phone, password);
       if (!result.ok) {
-        setFormError(result.error ?? 'We could not sign you in after claiming.');
+        setFormError(`Your account was saved. ${result.error ?? 'We could not sign you in.'} Retry signing in.`);
         setOtpStage('sent');
         return;
       }
       onClaimed();
     } catch (err) {
       // Backend field errors (e.g. a rejected password) point at their input.
+      if (err instanceof ApiError && ['code_invalid', 'code_format_invalid', 'verification_expired', 'attempts_exhausted', 'verification_already_used'].includes(err.code ?? '')) {
+        proof.current = null;
+        setErrors({ otp: mapApiError(err) });
+        setOtpStage('sent');
+        return;
+      }
       const { fields, general } = mapFieldErrors(err instanceof ApiError ? err.fieldErrors : undefined);
       const mapped: Record<string, string> = {};
       if (fields.password) mapped.password = fields.password;
@@ -141,9 +184,9 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[110] flex items-end sm:items-center sm:justify-center"
       style={{ background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(10px)' }}
-      onClick={onClose}
+      onClick={() => { if (!busy) onClose(); }}
     >
-      <motion.section
+      <motion.section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Save to my account"
         initial={{ y: 44, opacity: 0, scale: 0.985 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 44, opacity: 0, scale: 0.985 }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
         onClick={(e) => e.stopPropagation()}
@@ -166,17 +209,17 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
                 Link your <span style={{ color: text }}>{ticket.eventName}</span> ticket to an account so it stays in My Tickets on any device.
               </p>
             </div>
-            <AppButton onClick={onClose} aria-label="Close claim" className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', color: muted }}><X className="w-4 h-4" /></AppButton>
+            <AppButton onClick={() => { if (!busy) onClose(); }} disabled={busy} aria-label="Close claim" className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', color: muted }}><X className="w-4 h-4" /></AppButton>
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Phone</label>
+              <label htmlFor="claim-phone" className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Phone</label>
               <div className="relative rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.phone), 'phone')}>
                 <GlassReflection isDark={isDark} />
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Phone className="w-4 h-4" /></span>
                 <AppInput
-                  type="tel" value={phone} disabled={otpStage === 'sent' || otpStage === 'submitting'}
+                  id="claim-phone" type="tel" value={phone} disabled={challengeId !== null || busy}
                   onChange={(e) => { setPhone(e.target.value); clearField('phone'); }}
                   {...focusProps('phone')}
                   placeholder="The phone you checked out with"
@@ -187,57 +230,21 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
               <FieldError error={errors.phone} />
             </div>
 
-            {otpStage === 'sent' && (
+            {challengeId !== null && (
               <>
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Verification code</label>
-                  <div className="relative rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.otp), 'otp')}>
-                    <GlassReflection isDark={isDark} />
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><ShieldCheck className="w-4 h-4" /></span>
-                    <AppInput
-                      type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otpCode}
-                      onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); clearField('otp'); }}
-                      {...focusProps('otp')}
-                      placeholder="6-digit code"
-                      className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px] tracking-[0.3em]"
-                      style={inputStyle} aria-invalid={errors.otp ? true : undefined}
-                    />
-                  </div>
-                  <FieldError error={errors.otp} />
+                  <OtpCodeField value={otpCode} onChange={value => { setOtpCode(value); clearField('otp'); }} isDark={isDark} error={errors.otp} disabled={busy || proof.current !== null || accountClaimed} />
                   <p className="mt-2 text-[11px]" style={{ fontFamily: "'Inter', sans-serif", color: muted }}>
                     We sent a code to <span style={{ color: text }}>{phone}</span>.{' '}
-                    <AppButton type="button" onClick={sendCode} className="inline text-[11px] underline" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? accent : '#0a0a0a' }}>Resend</AppButton>
+                    <AppButton type="button" onClick={sendCode} disabled={busy || accountClaimed} className="inline min-h-9 text-[11px] underline" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? accent : '#0a0a0a' }}>Resend code</AppButton>
                   </p>
                 </div>
 
                 <div>
                   <label className="text-[10px] tracking-[1.4px] uppercase mb-1.5 block" style={{ fontFamily: "'Inter', sans-serif", color: muted, fontWeight: 700 }}>Create a password</label>
-                  <div className="relative mb-2 rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.password), 'password')}>
-                    <GlassReflection isDark={isDark} />
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><Lock className="w-4 h-4" /></span>
-                    <AppInput
-                      type="password" autoComplete="new-password" value={password}
-                      onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
-                      {...focusProps('password')}
-                      placeholder="At least 8 characters"
-                      className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px]"
-                      style={inputStyle} aria-invalid={errors.password ? true : undefined}
-                    />
-                  </div>
-                  <FieldError error={errors.password} />
-                  <div className="relative mt-2 rounded-xl overflow-hidden" style={inputSurface(Boolean(errors.passwordConfirm), 'passwordConfirm')}>
-                    <GlassReflection isDark={isDark} />
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10" style={{ color: muted }}><KeyRound className="w-4 h-4" /></span>
-                    <AppInput
-                      type="password" autoComplete="new-password" value={passwordConfirm}
-                      onChange={(e) => { setPasswordConfirm(e.target.value); clearField('passwordConfirm'); }}
-                      {...focusProps('passwordConfirm')}
-                      placeholder="Repeat password"
-                      className="relative z-10 w-full h-12 pl-10 pr-3.5 outline-none text-[13px]"
-                      style={inputStyle} aria-invalid={errors.passwordConfirm ? true : undefined}
-                    />
-                  </div>
-                  <FieldError error={errors.passwordConfirm} />
+                  <PasswordField value={password} onChange={value => { setPassword(value); claimKey.current = randomUuid(); clearField('password'); }} isDark={isDark} label="Create a password" placeholder="At least 8 characters" autoComplete="new-password" error={errors.password} disabled={busy || accountClaimed} />
+                  <div className="mt-3"><PasswordField value={passwordConfirm} onChange={value => { setPasswordConfirm(value); claimKey.current = randomUuid(); clearField('passwordConfirm'); }} isDark={isDark} label="Confirm password" placeholder="Repeat password" autoComplete="new-password" error={errors.passwordConfirm} disabled={busy || accountClaimed} /></div>
                 </div>
               </>
             )}
@@ -248,10 +255,10 @@ export function ClaimGuestSheet({ ticket, onClose, onClaimed }: {
           <AppButton
             onClick={otpStage === 'sent' ? claim : sendCode}
             disabled={otpStage === 'sending' || otpStage === 'submitting'}
-            className="mt-5 w-full h-12 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ background: accent, color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13 }}
+            className="mt-5 w-full h-12 rounded-2xl flex items-center justify-center gap-2"
+            style={{ ...primaryButtonSurface(!busy, isDark), color: '#0a0a0a', fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13 }}
           >
-            {otpStage === 'submitting' ? 'Linking…' : otpStage === 'sent' ? 'Claim my tickets' : otpStage === 'sending' ? 'Sending…' : 'Send code'}
+            {otpStage === 'submitting' ? (accountClaimed ? 'Signing in…' : 'Linking…') : accountClaimed ? 'Retry sign in' : otpStage === 'sent' ? 'Claim my tickets' : otpStage === 'sending' ? 'Sending…' : 'Send code'}
             {otpStage === 'sent' && <Check className="w-4 h-4" strokeWidth={2.4} />}
             {otpStage === 'idle' && <ArrowRight className="w-4 h-4" strokeWidth={2.2} />}
           </AppButton>

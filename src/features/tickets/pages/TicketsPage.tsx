@@ -5,6 +5,8 @@ import { useTheme } from '@/app/components/ThemeContext';
 import { TransferTicket } from '@/features/tickets/components/TransferTicketDialog';
 import { ShareCard } from '@/features/tickets/components/ShareCard';
 import { DetailedTicket } from '@/features/tickets/components/DetailedTicket';
+import { RegistrationAnswersDialog } from '@/features/tickets/components/RegistrationAnswersDialog';
+import { isRegistrationAnswersPath } from '@/lib/registration-answers';
 import { DownloadableTicketCard } from '@/features/tickets/components/DownloadableTicketCard';
 import { GlassTicketCard } from '@/features/tickets/components/GlassTicketCard';
 import { TicketsEmptyState } from '@/features/tickets/components/TicketsEmptyState';
@@ -48,6 +50,7 @@ interface TicketViewProps {
 
 export function TicketView({ tickets, onListForResale, onDiscover, loading = false, refreshing = false, loadError = false, onRetry, initialOpenTicket, isAuthenticated = true, onRequestAuth, selectedTicketId = null, onOpenTicket, onCloseTicket }: TicketViewProps) {
   const [showQR, setShowQR] = useState(false);
+  const [answersPath, setAnswersPath] = useState<string | null>(null);
   const [transferringTicket, setTransferringTicket] = useState<UserTicket | null>(null);
   const [sharingTicket, setSharingTicket] = useState<UserTicket | null>(null);
   const [claimingTicket, setClaimingTicket] = useState<UserTicket | null>(null);
@@ -78,12 +81,14 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
   const deviceCount = guestDevice.tickets.length;
   // The open ticket is route-driven (`/tickets/:id`) so it is deep-linkable and
   // Back closes it. `pendingOpenTicket` covers the post-purchase instant-open
-  // (the confirmed ticket before the wallet refetch settles) when no route id
-  // is present. `setSelectedTicket` keeps the existing call sites working:
+  // (the confirmed ticket before the wallet refetch settles). An exact route
+  // ID can also use that server-confirmed snapshot while the wallet catches up.
+  // `setSelectedTicket` keeps the existing call sites working:
   // opening navigates, closing returns to /tickets.
   const [pendingOpenTicket, setPendingOpenTicket] = useState<UserTicket | null>(null);
   const routeOpenTicket = selectedTicketId
-    ? combinedTickets.find((t) => t.id === selectedTicketId) ?? null
+    ? combinedTickets.find((t) => t.id === selectedTicketId)
+      ?? (initialOpenTicket?.id === selectedTicketId ? initialOpenTicket : null)
     : null;
   const selectedTicket = selectedTicketId ? routeOpenTicket : pendingOpenTicket;
   const setSelectedTicket = (ticket: UserTicket | null) => {
@@ -126,8 +131,8 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
 
   // Just-returned-from-Chapa: the router opens `/tickets/:id` and also passes the
   // confirmed ticket (with its QR) from the refresh projection, so open it
-  // instantly rather than waiting for the wallet refetch. Only used when no
-  // route id is present (the route is the source of truth once it is).
+  // instantly rather than waiting for the wallet refetch. Route selection is
+  // still authoritative; only a snapshot matching that ticket ID may open.
   const initialRef = useRef<string | null>(null);
   useEffect(() => {
     if (initialOpenTicket && initialRef.current !== initialOpenTicket.id) {
@@ -312,6 +317,8 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
               onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto scrollbar-hide rounded-[28px]">
               <DetailedTicket ticket={selectedTicket}
                 onClose={() => setSelectedTicket(null)}
+                onEditAnswers={isAuthenticated && selectedTicket.registrationAnswersUrl && isRegistrationAnswersPath(selectedTicket.registrationAnswersUrl)
+                  ? () => setAnswersPath(selectedTicket.registrationAnswersUrl!) : undefined}
                 onTransfer={() => { setTransferringTicket(selectedTicket); setSelectedTicket(null); }}
                 onShare={() => { setSharingTicket(selectedTicket); setSelectedTicket(null); }}
                 onResell={selectedTicket.status === 'active' && onListForResale ? () => { onListForResale(selectedTicket); setSelectedTicket(null); } : undefined}
@@ -326,6 +333,7 @@ export function TicketView({ tickets, onListForResale, onDiscover, loading = fal
       </AnimatePresence>
 
 
+      {isAuthenticated && answersPath && <RegistrationAnswersDialog key={`${user?.id}:${answersPath}`} path={answersPath} onClose={() => setAnswersPath(null)} />}
       <AnimatePresence>
         {addingExtrasTicket && (
           <AddExtrasDialog

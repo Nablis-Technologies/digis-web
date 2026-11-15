@@ -1,10 +1,6 @@
-/**
- * The primary call-to-action label for an event card/button.
- *
- * Events are offer-driven now (the backend removed the event-level
- * `rsvp`/`inviteOnly` mode), so every card buys/selects admission. Sold-out and
- * ended states override the label at the call site.
- */
-export function eventActionLabel(): string {
-  return 'Tickets';
+import type { Event } from '@/types';
+
+/** Discovery only has a starting price, so free public admission is a proxy for RSVP. */
+export function eventActionLabel(event?: Pick<Event, 'priceFromMinor' | 'ticketAvailability'>): string {
+  return event?.priceFromMinor === 0 && event.ticketAvailability === 'available' ? 'RSVP' : 'Tickets';
 }

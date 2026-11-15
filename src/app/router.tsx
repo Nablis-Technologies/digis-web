@@ -1,3 +1,5 @@
+import { GiftOrderPage } from '@/features/tickets/pages/GiftOrderPage';
+import { giftLinkToken } from '@/lib/gift-link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -189,7 +191,8 @@ function AppContent() {
       state: { returnTo: location.pathname + location.search },
     });
   }, [navigate, location.pathname, location.search]);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const paymentIdentity = isAuthenticated ? `user:${user?.id}` : 'guest';
   const [heroSearchInView, setHeroSearchInView] = useState(true);
   const heroSearchRef = useRef<HTMLDivElement>(null);
   const heroSearchInputRef = useRef<HTMLInputElement>(null);
@@ -233,7 +236,7 @@ function AppContent() {
     if (heroSearchInView && !searchQuery) setSearchMode(false);
   }, [heroSearchInView, searchQuery]);
 
-  // Owner wallet — GET /tickets (real). Keyed on auth state so signing in
+  // Owner wallet — GET /tickets (real). Keyed on identity so signing in
   // fetches (the signed-out 401 must not poison the cache) and signing out
   // drops the previous user's tickets. Disabled while signed out.
   const {
@@ -243,7 +246,7 @@ function AppContent() {
     isError: walletError,
     refetch: refetchWallet,
   } = useQuery({
-    queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
+    queryKey: ticketKeys.forUser(user?.id),
     queryFn: ticketsService.fetchUserTickets,
     enabled: isAuthenticated,
     // Personal data is never "fresh" (ADR-0005: personal data staleTime 0) —
@@ -251,6 +254,7 @@ function AppContent() {
     // 60s later. The return-confirmation poll keeps it updating while a
     // payment is settling.
     staleTime: 0,
+    gcTime: 0,
   });
 
   // Post-Chapa return: CHAPA_RETURN_URL lands the browser on /?status=return
@@ -302,6 +306,7 @@ function AppContent() {
     userTickets,
     isAuthenticated,
     returnScope.paymentId,
+    { userId: user?.id },
   );
   const guestReturnController = useGuestPaymentReturnConfirmation(
     returnScope.eventId,
@@ -309,6 +314,15 @@ function AppContent() {
   );
   const { state: returnState, start: startReturnConfirm } = returnController;
   const { state: guestReturnState, start: startGuestReturnConfirm } = guestReturnController;
+  const confirmedGiftOrder = returnState.kind === 'gift-confirmed' ? returnState.orderId
+    : guestReturnState.kind === 'gift-confirmed' ? guestReturnState.orderId : undefined;
+  useEffect(() => {
+    if (!confirmedGiftOrder) return;
+    closeCheckoutPopup();
+    returnController.stop();
+    guestReturnController.stop();
+    navigate(`/orders/${encodeURIComponent(confirmedGiftOrder)}/gifts`, { replace: true });
+  }, [confirmedGiftOrder, navigate]);
 
   useEffect(() => {
     if (!isPaymentReturn) return;
@@ -342,17 +356,23 @@ function AppContent() {
   useEffect(() => {
     const handler = () => confirmStartRef.current();
     window.addEventListener('digis:awaiting-confirm', handler);
+    // A reload, HMR update, or browser restoration loses the custom event but
+    // retains this tab's pending order. Resume its server reconciliation once
+    // the current authentication state is known, without needing a provider
+    // redirect (Chapa V2 can remain on its receipt page).
+    try {
+      if (sessionStorage.getItem('digis:awaiting-confirm')) handler();
+    } catch { /* storage unavailable */ }
     return () => window.removeEventListener('digis:awaiting-confirm', handler);
-  }, []);
+  }, [isAuthenticated]);
 
   // When the payment resolves, CLOSE the Chapa tab so the buyer is returned to
-  // Digis (Chapa V2 never redirects back). Drop the awaiting flag either way so
-  // a later load doesn't re-start the poll.
+  // Digis (Chapa V2 never redirects back). A UI timeout is not a terminal
+  // provider outcome: retain its order marker so a later reload can reconcile.
   useEffect(() => {
     const confirmed = returnState.kind === 'confirmed' || guestReturnState.kind === 'confirmed';
     const done =
-      returnState.kind === 'timeout' || returnState.kind === 'terminal' ||
-      guestReturnState.kind === 'timeout' || guestReturnState.kind === 'terminal';
+      returnState.kind === 'terminal' || guestReturnState.kind === 'terminal';
     if (confirmed) closeCheckoutPopup();
     if (confirmed || done) {
       try { sessionStorage.removeItem('digis:awaiting-confirm'); } catch { /* ignore */ }
@@ -365,7 +385,7 @@ function AppContent() {
     guestReturnState.kind === 'confirmed' ? guestReturnState.ticket : null;
   // Snapshot of the last confirmed purchase — survives `returnController.stop()`
   // so the tickets view can open the ticket QR without waiting for the wallet.
-  const lastConfirmedTicketRef = useRef<UserTicket | null>(null);
+  const lastConfirmedTicketRef = useRef<{ ticket: UserTicket; identity: string } | null>(null);
   const returnConfirming = isAuthenticated
     ? returnState.kind === 'confirming'
     : guestReturnState.kind === 'confirming';
@@ -548,8 +568,10 @@ function AppContent() {
                 />
               ) : currentView === 'tickets' ? (
                 <TicketView
+                  key={paymentIdentity}
                   tickets={userTickets}
-                  initialOpenTicket={lastConfirmedTicketRef.current ?? confirmedTicket}
+                  initialOpenTicket={lastConfirmedTicketRef.current?.identity === paymentIdentity
+                    ? lastConfirmedTicketRef.current.ticket : null}
                   selectedTicketId={ticketId}
                   onOpenTicket={(id) => navigate(`/tickets/${encodeURIComponent(id)}`)}
                   onCloseTicket={() => navigate('/tickets', { replace: true })}
@@ -693,7 +715,8 @@ function AppContent() {
               onViewTicket: () => {
                 const id = activeConfirmed?.id;
                 const controller = isAuthenticated ? returnController : guestReturnController;
-                lastConfirmedTicketRef.current = activeConfirmed;
+                lastConfirmedTicketRef.current = activeConfirmed
+                  ? { ticket: activeConfirmed, identity: paymentIdentity } : null;
                 controller.stop();
                 navigate(id ? `/tickets/${encodeURIComponent(id)}` : '/tickets');
               },
@@ -850,37 +873,26 @@ function ClaimRoute() {
   );
 }
 
+function GiftOrderRoute() {
+  usePageTitle('Gift delivery · Digis');
+  const { orderId = '' } = useParams();
+  return <GiftOrderPage key={orderId} orderId={orderId} />;
+}
+
 function ClaimGiftRoute() {
   const navigate = useNavigate();
   usePageTitle('Claim your gift ticket · Digis');
-  const [authModal, setAuthModal] = useState<null | 'signin' | 'signup'>(null);
-  const { isDark } = useTheme();
   const { id = '' } = useParams();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token') ?? '';
-  return (
-    <div
-      className="relative min-h-screen"
-      style={{
-        fontFamily: "'Inter', sans-serif",
-        background: isDark ? '#0a0a0a' : '#f8f7fc',
-        color: isDark ? '#fff' : '#1a1a1a',
-      }}
-    >
-      <ClaimGiftPage
-        id={id}
-        token={token}
-        onRequestAuth={() => setAuthModal('signin')}
-        onNavigateHome={() => navigate(VIEW_PATHS.discover)}
-        onNavigateTickets={() => navigate(VIEW_PATHS.tickets)}
-      />
-      <AnimatePresence>
-        {authModal && <AuthModal onClose={() => setAuthModal(null)} />}
-      </AnimatePresence>
-    </div>
-  );
+  const token = giftLinkToken(id);
+  return <ClaimGiftPage
+    key={id}
+    id={id}
+    token={token}
+    onRequestAuth={() => navigate('/login', { state: { returnTo: `/gift/${encodeURIComponent(id)}` } })}
+    onNavigateHome={() => navigate(VIEW_PATHS.discover)}
+    onNavigateTickets={() => navigate(VIEW_PATHS.tickets)}
+  />;
 }
-
 export function AppRouterProvider() {
   // Create the router lazily inside the component so it is always constructed
   // inside the React tree (and therefore inside AuthProvider / ThemeProvider).
@@ -903,6 +915,7 @@ export function AppRouterProvider() {
       { path: '/signup', Component: AuthSignupRoute },
       { path: '/claim/:id', Component: ClaimRoute },
       { path: '/gift/:id', Component: ClaimGiftRoute },
+      { path: '/orders/:orderId/gifts', Component: GiftOrderRoute },
       { path: '/gifts/:id', Component: ClaimGiftRoute },
       // UI preview is a dev-only design sandbox; it is not registered in prod.
       ...(import.meta.env.DEV ? [{ path: '/ui-preview', Component: UIPreviewPage }] : []),

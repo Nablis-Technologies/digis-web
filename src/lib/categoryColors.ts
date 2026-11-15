@@ -1,5 +1,11 @@
 import {
   LayoutGrid,
+  HandHeart,
+  Briefcase,
+  BookOpen,
+  Baby,
+  Handshake,
+  Tent,
   Music,
   Landmark,
   Cpu,
@@ -43,6 +49,14 @@ export function hexToRgba(hex: string, alpha: number): string {
 
 const DEFINITIONS: [name: string, Icon: LucideIcon, hex: string][] = [
   ['All', LayoutGrid, FALLBACK_CATEGORY_HEX],
+  ['Conference', Briefcase, '#3357ff'],
+  ['Arts & Culture', Palette, '#8b5cf6'],
+  ['Workshop', BookOpen, '#eab308'],
+  ['Family & Kids', Baby, '#f97316'],
+  ['Food & Drink', UtensilsCrossed, '#f97316'],
+  ['Networking', Handshake, '#0ea5e9'],
+  ['Charity', HandHeart, '#f43f5e'],
+  ['Festivals', Tent, '#f59e0b'],
   ['Music', Music, '#a855f7'],
   ['Sports', Trophy, '#22c55e'],
   ['Nightlife', PartyPopper, '#ec4899'],
@@ -68,7 +82,7 @@ export const CATEGORIES: CategoryMeta[] = DEFINITIONS.map(([name, Icon, hex]) =>
 const BY_NAME = new Map(CATEGORIES.map((c) => [c.name.toLowerCase(), c]));
 
 export function categoryMeta(category?: string): CategoryMeta | undefined {
-  return category ? BY_NAME.get(category.trim().toLowerCase()) : undefined;
+  return category ? BY_NAME.get(category.trim().toLowerCase().replace(/^festival$/, 'festivals')) : undefined;
 }
 
 /** Category hue as a hex string, falling back to the brand lime. */

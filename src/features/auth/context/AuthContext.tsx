@@ -33,13 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!session?.access_token;
 
   useEffect(() => {
-    if (!getSession()) return;
+    const requestingSession = getSession();
+    if (!requestingSession) return;
     let cancelled = false;
     authService.me()
       .then((res) => {
         if (cancelled || !res.ok) return;
         const current = getSession();
-        if (current) setSession({ ...current, user: res.user });
+        if (current === requestingSession) setSession({ ...current, user: res.user });
       })
       // Best-effort revalidation: on failure the stored session stays as-is.
       .catch(() => undefined);

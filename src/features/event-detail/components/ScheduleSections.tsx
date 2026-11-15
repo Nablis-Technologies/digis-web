@@ -1,3 +1,6 @@
+import { Ticket } from 'lucide-react';
+import { glassControl } from '@/lib/ui/glass';
+import type { TicketTier } from '@/types';
 import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -55,6 +58,21 @@ export function SectionHeading({ children, right }: SectionHeadingProps) {
 }
 
 /* ─────────────────────────── Multi-day Notices ─────────────────────────── */
+
+export function TicketsUnavailableNotice() {
+  const { isDark } = useTheme();
+  return (
+    <div role="status" className="flex items-center gap-3 py-2">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={glassControl(isDark)}>
+        <Ticket aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+      </span>
+      <div>
+        <p className="text-[9px] uppercase tracking-[1.5px] text-muted-foreground" style={{ fontFamily: INTER }}>Unavailable</p>
+        <p className="text-xs" style={{ fontFamily: ZALANDO }}>No tickets right now</p>
+      </div>
+    </div>
+  );
+}
 
 export function SoldOutDayNotice({ headline, hasOtherOpenDays }: SoldOutDayNoticeData) {
   const { isDark } = useTheme();
@@ -310,10 +328,10 @@ export function DayLineup({ days, dayId, onPickDay, agenda, onOpenArtist }: DayL
                   <span className="text-[13px]" style={{ fontFamily: ZALANDO, fontWeight: 400, color: isDark ? '#fff' : '#0a0a0a' }}>{d.dowLong}</span>
                   <span className="ml-1.5 text-[9px] tracking-[1.3px] uppercase" style={{ fontFamily: INTER, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.5)' }}>{d.monDay}</span>
                 </span>
-                <span className="ml-auto flex-shrink-0 whitespace-nowrap">
+                {d.doorsLabel && <span className="ml-auto flex-shrink-0 whitespace-nowrap">
                   <span className="text-[8px] tracking-[1.3px] uppercase" style={{ fontFamily: INTER, fontWeight: 800, color: isDark ? 'rgba(255,255,255,0.42)' : 'rgba(0,0,0,0.45)' }}>Doors </span>
                   <span className="text-[11px] tabular-nums" style={{ fontFamily: INTER, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.78)' : 'rgba(0,0,0,0.7)' }}>{d.doorsLabel}</span>
-                </span>
+                </span>}
               </div>
             )}
             {d.cancelledAlert && <div className="mb-4"><CancelledDayAlert {...d.cancelledAlert} /></div>}
@@ -711,6 +729,7 @@ export interface FestivalTicketSelectorProps {
   dayId: string;
   onDayChange: (id: string) => void;
   selectedTicketType: string | null;
+  onJoinWaitlist?: (tier: TicketTier) => void;
   onSelectTicketType: (name: string) => void;
   underway: boolean;
   cancelledCount: number;
@@ -733,6 +752,7 @@ export function FestivalTicketSelector({
   onDayChange,
   selectedTicketType,
   onSelectTicketType,
+  onJoinWaitlist,
   underway,
   cancelledCount: cancelled,
   showPasses,
@@ -805,6 +825,7 @@ export function FestivalTicketSelector({
                 index={i}
                 selected={selectedTicketType === t.name}
                 onSelect={() => onSelectTicketType(t.name)}
+                onJoinWaitlist={t.id && onJoinWaitlist ? () => onJoinWaitlist(t) : undefined}
                 savings={savings}
               />
             </div>

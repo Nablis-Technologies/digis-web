@@ -10,6 +10,7 @@
 import { apiFetch } from "@/lib/api";
 
 export interface GiftPurchaseStatus {
+  line_id?: string | null;
   id: string;
   status: 'pending_payment' | 'ready' | 'pending_recipient_consent' | 'claimed' | 'expired' | 'revoked';
   expires_at: string;
@@ -25,8 +26,11 @@ export interface GiftFormQuestion {
   response_scope: string;
   label: string;
   required: boolean;
-  options?: string[];
-  validation_rules?: Record<string, unknown>;
+  options?: { key: string; label: string }[];
+  validation_rules?: {
+    min_length?: number; max_length?: number; min_items?: number; max_items?: number;
+    allowed_option_keys?: string[]; min_date?: string; max_date?: string;
+  };
 }
 
 export interface GiftFormVersion {
@@ -80,6 +84,14 @@ export interface ResolvedGiftView {
   forms?: GiftFormVersion[];
   consents?: GiftConsentVersion[];
   ticket?: GiftClaimedTicket | null;
+  pending_consents?: Array<{
+    id: string;
+    consent_document_version_id: string;
+    acceptance_scope: string;
+    package_unit_number?: number | null;
+    admission_position?: number | null;
+    required: boolean;
+  }>;
 }
 
 export interface ClaimGiftInput {
@@ -88,17 +100,24 @@ export interface ClaimGiftInput {
     question_key: string;
     value: unknown;
     form_version_id?: string;
+    package_unit_number?: number;
+    admission_position?: number;
   }>;
   consents?: Array<{
     consent_document_version_id: string;
     content_sha256: string;
+    package_unit_number?: number;
+    admission_position?: number;
+    request_uuid?: string;
+    acceptance_method?: 'checkbox';
+    idempotency_key?: string;
   }>;
 }
 
 export const giftService = {
   /** Resolve bearer gift capability for recipient view. */
   async resolveGift(giftId: string, token: string): Promise<ResolvedGiftView> {
-    const { data } = await apiFetch<ResolvedGiftView>(`public/gift_purchases/${giftId}/resolve`, {
+    const { data } = await apiFetch<ResolvedGiftView>(`public/gift_purchases/${encodeURIComponent(giftId)}/resolve`, {
       method: "POST",
       body: { gift: { token } },
     });
@@ -106,9 +125,10 @@ export const giftService = {
   },
 
   /** Recipient claims gift ticket with optional registration form answers and consents. */
-  async claimGift(giftId: string, input: ClaimGiftInput): Promise<ResolvedGiftView> {
-    const { data } = await apiFetch<ResolvedGiftView>(`public/gift_purchases/${giftId}/claim`, {
+  async claimGift(giftId: string, input: ClaimGiftInput, idempotencyKey?: string): Promise<ResolvedGiftView> {
+    const { data } = await apiFetch<ResolvedGiftView>(`public/gift_purchases/${encodeURIComponent(giftId)}/claim`, {
       method: "POST",
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: {
         gift: {
           token: input.token,
@@ -122,15 +142,30 @@ export const giftService = {
 
   /** Buyer fetches delivery status of all gift tickets in an order. */
   async fetchOrderGifts(orderId: string): Promise<GiftPurchaseStatus[]> {
-    const { data } = await apiFetch<GiftPurchaseStatus[]>(`orders/${orderId}/gift_purchases`);
+    const { data } = await apiFetch<GiftPurchaseStatus[]>(`orders/${encodeURIComponent(orderId)}/gift_purchases`);
     return Array.isArray(data) ? data : [];
   },
 
   /** Buyer resends gift notification SMS/email. */
-  async resendGift(orderId: string, giftId: string): Promise<GiftPurchaseStatus> {
-    const { data } = await apiFetch<GiftPurchaseStatus>(`orders/${orderId}/gift_purchases/${giftId}/resend`, {
+  async resendGift(orderId: string, giftId: string, idempotencyKey?: string): Promise<GiftPurchaseStatus> {
+    const { data } = await apiFetch<GiftPurchaseStatus>(`orders/${encodeURIComponent(orderId)}/gift_purchases/${encodeURIComponent(giftId)}/resend`, {
       method: "POST",
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
     });
     return data;
   },
 };
+
+/** Preserve checkout recipient order without persisting recipient contact details. */
+export function giftsInRecipientOrder(orderId: string, gifts: GiftPurchaseStatus[]): GiftPurchaseStatus[] {
+  let lineIds: string[] = [];
+  try {
+    const saved: unknown = JSON.parse(sessionStorage.getItem(`digis:gift-lines:${orderId}`) ?? '[]');
+    if (Array.isArray(saved) && saved.every(value => typeof value === 'string')) lineIds = saved;
+  } catch { /* Storage is optional; keep server ordering for older orders. */ }
+  const rank = (gift: GiftPurchaseStatus) => {
+    const index = gift.line_id ? lineIds.indexOf(gift.line_id) : -1;
+    return index < 0 ? lineIds.length : index;
+  };
+  return [...gifts].sort((a, b) => rank(a) - rank(b));
+}

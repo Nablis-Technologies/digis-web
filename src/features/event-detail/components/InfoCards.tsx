@@ -45,7 +45,7 @@ export function InfoStrip({ items, rgb, reflectionSettings }: {
       <div className="relative z-10 grid grid-cols-2 lg:flex lg:flex-nowrap lg:justify-between -ml-px -mt-px">
         {items.map((item) => (
           <div key={item.label}
-            className="flex flex-col gap-2 px-4 py-4 min-w-0 lg:px-5"
+            className={`flex flex-col gap-2 px-4 py-4 min-w-0 lg:px-5 ${items.length === 3 && item.label === 'Venue' ? "col-span-2 lg:flex-1" : ""}`}
             style={{ boxShadow: `inset 1px 0 0 ${dividerColor}, inset 0 1px 0 ${dividerColor}` }}>
             <div className="flex items-center gap-1.5" style={{ color: iconColor }}>
               {item.icon}

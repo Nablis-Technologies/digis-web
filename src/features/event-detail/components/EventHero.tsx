@@ -3,9 +3,11 @@ import { ArrowLeft, Heart, Share2 } from "lucide-react";
 import { ImageCarousel, CarouselDots } from "./ImageCarousel";
 import type { Event } from "@/types";
 import { EventInfoRail } from "./EventInfoRail";
-import { getCategoryColor } from "@/lib/categoryColors";
+import { EventCategoryTag } from "@/components/EventCategoryTag";
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
+import { FormatTag } from '@/components/EventFormatBadges';
+import { cardFormat, cardFormatLabel } from '@/components/EventCard';
 
 export function EventHero({
   event,
@@ -32,7 +34,7 @@ export function EventHero({
   rgb: string;
   posterRgb?: [number, number, number] | null;
 }) {
-  const categoryTokens = getCategoryColor(event.category, rgb);
+  const format = cardFormat(event);
   const { scrollY } = useScroll();
   const heroScale = useTransform(
     scrollY,
@@ -156,19 +158,7 @@ export function EventHero({
                 }}
               />
               <div className="absolute top-5 left-5">
-                <div
-                  className="px-3 py-1.5 rounded-full text-[10px] tracking-[2px] uppercase"
-                  style={{
-                    fontFamily: "'Inter', sans-serif",
-                    background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`,
-                    backdropFilter: "blur(20px)",
-                    color: `rgb(${categoryTokens.rgb})`,
-                    boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`,
-                    fontWeight: 600,
-                  }}
-                >
-                  {event.category}
-                </div>
+                <EventCategoryTag category={event.category} rgb={rgb} isDark={isDark} detail />
               </div>
             </motion.div>
             <CarouselDots
@@ -348,17 +338,11 @@ export function EventHero({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            <div
-              className="inline-block px-3 py-1.5 rounded-full text-[10px] tracking-[1.5px] uppercase mb-4"
-              style={{
-                background: `linear-gradient(${categoryTokens.scrim}, ${categoryTokens.scrim}), rgba(${categoryTokens.rgb},${categoryTokens.tint})`,
-                backdropFilter: "blur(20px)",
-                fontFamily: "'Inter', sans-serif",
-                color: `rgb(${categoryTokens.rgb})`,
-                boxShadow: `0 0 0 1px rgba(${categoryTokens.rgb},${categoryTokens.border})`,
-              }}
-            >
-              {event.category}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+            <EventCategoryTag category={event.category} rgb={rgb} isDark={isDark} detail />
+            {format !== 'single' && (
+              <FormatTag format={format} label={cardFormatLabel(format)} isDark size="md" />
+            )}
             </div>
             <h1
               className="text-[30px] font-light leading-tight tracking-[-0.3px]"

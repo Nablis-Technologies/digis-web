@@ -9,10 +9,11 @@ import { test, expect, type Route, type Page } from '@playwright/test';
  * an OTP, and re-submit the selection with the traded `verification_token` —
  * without leaving the checkout sheet.
  *
- * The seed has no free ticket product, so the selection/OTP/quote endpoints are
- * mocked at the network boundary with the exact wire shapes the backend
- * produces (verified against `digis_backend` @ 326f6a3); every other request
- * (event detail, products, auth) still hits the live dev backend.
+ * The selection/OTP/quote endpoints are mocked at the network boundary with the
+ * exact wire shapes the backend produces (verified against `digis_backend` @
+ * 326f6a3); every other request (event detail, products, auth) still hits the
+ * live dev backend. It runs on `friends` (free tier) so it does not share
+ * `on-on` with the checkout suite.
  */
 
 const CORS = {
@@ -30,9 +31,9 @@ function fulfillJson(route: Route, status: number, body: unknown) {
   });
 }
 
-async function walkGuestToPayment(page: Page) {
+async function walkGuestToRsvpConfirmation(page: Page) {
   for (let i = 0; i < 6; i++) {
-    const payNow = page.getByRole('button', { name: /^Pay .*/ });
+    const payNow = page.getByRole('button', { name: 'Confirm RSVP' });
     if (await payNow.count() > 0) break;
     const nameField = page.getByPlaceholder('Abebe');
     if (await nameField.isVisible().catch(() => false)) {
@@ -42,7 +43,7 @@ async function walkGuestToPayment(page: Page) {
       const phoneField = page.getByPlaceholder('+251 9 XX XXX XXX');
       if (await phoneField.isVisible().catch(() => false)) await phoneField.fill('+251911777888');
     }
-    const consentToggle = page.locator('[role="checkbox"]').first();
+    const consentToggle = page.locator('[role="checkbox"], button[aria-label^="Accept "]').first();
     if (await consentToggle.isVisible().catch(() => false)) {
       await consentToggle.click().catch(() => {});
     }
@@ -51,84 +52,95 @@ async function walkGuestToPayment(page: Page) {
   }
 }
 
-test('guest $0 admission completes through the inline OTP step', async ({ page }) => {
-  test.setTimeout(90_000);
+for (const requiresOtp of [false, true]) {
+  test(`guest RSVP ${requiresOtp ? 'handles a server OTP challenge' : 'confirms without a code when accepted'}`, async ({ page }) => {
+    test.setTimeout(180_000);
 
-  let selectionCalls = 0;
-  let verificationTokenSeen: string | undefined;
+    let selectionCalls = 0;
+    let otpRequests = 0;
+    let verificationTokenSeen: string | undefined;
 
-  await page.route('http://localhost:3000/**', async (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
+    await page.route(/^http:\/\/localhost:(?:3000\/|5173\/__digis_api\/)/, async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname.replace(/^\/__digis_api/, '');
 
-    if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
+      if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
 
-    if (path === '/public/events/on-on/admission_selections') {
-      selectionCalls += 1;
-      const body = request.postDataJSON() as { admission_selection?: { verification_token?: string } };
-      verificationTokenSeen = body?.admission_selection?.verification_token ?? verificationTokenSeen;
-      if (selectionCalls === 1) {
-        return fulfillJson(route, 422, {
-          success: false,
-          error: 'Phone verification required',
-          code: 'phone_verification_required',
+      if (path === '/public/events/friends/admission_selections') {
+        selectionCalls += 1;
+        const body = request.postDataJSON() as { admission_selection?: { verification_token?: string; items: { quantity: number }[] } };
+        expect(body.admission_selection?.items.map(item => item.quantity)).toEqual([1]);
+        verificationTokenSeen = body?.admission_selection?.verification_token ?? verificationTokenSeen;
+        if (requiresOtp && selectionCalls === 1) {
+          return fulfillJson(route, 422, {
+            success: false,
+            error: 'Phone verification required',
+            code: 'phone_verification_required',
+          });
+        }
+        return fulfillJson(route, 201, {
+          success: true,
+          data: { registrations: [], next_action: { type: 'confirmed' } },
         });
       }
-      return fulfillJson(route, 201, {
-        success: true,
-        data: { registrations: [], next_action: { type: 'confirmed' } },
-      });
+
+      if (path.endsWith('/admission_selections/request_otp')) {
+        otpRequests += 1;
+        return fulfillJson(route, 201, {
+          success: true,
+          data: { challenge_id: 'ch-1', status: 'pending', expires_at: '2026-09-30T12:10:00Z' },
+        });
+      }
+
+      if (/\/phone_verifications\/[^/]+\/verify$/.test(path)) {
+        return fulfillJson(route, 200, { success: true, data: { verification_token: 'vt-test' } });
+      }
+
+      if (path.endsWith('/order_quotes')) {
+        return fulfillJson(route, 200, {
+          success: true,
+          data: {
+            quote_token: 'quote-test',
+            charge_currency: 'ETB',
+            sales_channel: 'online',
+            quoted_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 600_000).toISOString(),
+            subtotal_minor: 0,
+            discount_minor: 0,
+            subsidy_total: 0,
+            buyer_fee_total: 0,
+            total_minor: 0,
+            items: [],
+          },
+        });
+      }
+
+      return route.fallback();
+    });
+
+    await page.goto('/events/friends');
+    await expect(page.getByRole('heading', { name: 'Select Your Ticket' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Gift this ticket' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'RSVP', exact: true }).click();
+    await expect(page.getByText('Review', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+
+    await expect(page.getByText(/set quantity for your whole group/)).toHaveCount(0);
+    await walkGuestToRsvpConfirmation(page);
+    await expect(page.getByText("Telebirr", { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Confirm RSVP' }).click();
+
+    if (requiresOtp) {
+      // 422 phone_verification_required → the inline OTP step.
+      await expect(page.getByText('Confirm your phone number')).toBeVisible({ timeout: 15_000 });
+      await page.getByPlaceholder('6-digit code').fill('123456');
+      await page.getByRole('button', { name: /Verify & continue/i }).click();
+
     }
 
-    if (path.endsWith('/admission_selections/request_otp')) {
-      return fulfillJson(route, 201, {
-        success: true,
-        data: { challenge_id: 'ch-1', status: 'pending', expires_at: '2026-09-30T12:10:00Z' },
-      });
-    }
-
-    if (/\/phone_verifications\/[^/]+\/verify$/.test(path)) {
-      return fulfillJson(route, 200, { success: true, data: { verification_token: 'vt-test' } });
-    }
-
-    if (path.endsWith('/order_quotes')) {
-      return fulfillJson(route, 200, {
-        success: true,
-        data: {
-          quote_token: 'quote-test',
-          charge_currency: 'ETB',
-          sales_channel: 'online',
-          quoted_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 600_000).toISOString(),
-          subtotal_minor: 0,
-          discount_minor: 0,
-          subsidy_total: 0,
-          buyer_fee_total: 0,
-          total_minor: 0,
-          items: [],
-        },
-      });
-    }
-
-    return route.fallback();
+    // The re-submitted selection carries the traded proof and the order confirms.
+    await expect(page.getByText("You're going!")).toBeVisible({ timeout: 15_000 });
+    expect(verificationTokenSeen).toBe(requiresOtp ? 'vt-test' : undefined);
+    expect(otpRequests).toBe(requiresOtp ? 1 : 0);
+    expect(selectionCalls).toBe(requiresOtp ? 2 : 1);
   });
-
-  await page.goto('/events/on-on');
-  await expect(page.getByRole('heading', { name: 'Select Your Ticket' })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('heading', { name: 'Regular' }).first().click();
-  await page.getByRole('button', { name: /Buy Now/i }).click();
-  await expect(page.getByText('Review', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
-
-  await walkGuestToPayment(page);
-  await page.getByRole('button', { name: /^Pay .*/ }).click();
-
-  // 422 phone_verification_required → the inline OTP step.
-  await expect(page.getByText('Confirm your phone number')).toBeVisible({ timeout: 15_000 });
-  await page.getByPlaceholder('6-digit code').fill('123456');
-  await page.getByRole('button', { name: /Verify & continue/i }).click();
-
-  // The re-submitted selection carries the traded proof and the order confirms.
-  await expect(page.getByText("You're going!")).toBeVisible({ timeout: 15_000 });
-  expect(verificationTokenSeen).toBe('vt-test');
-  expect(selectionCalls).toBe(2);
-});
+}

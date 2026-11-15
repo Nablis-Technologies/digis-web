@@ -31,6 +31,7 @@ describe("backendEventToEvent", () => {
     expect(ev.description).toBe("A night of sound");
     expect(ev.category).toBe("Music");
     expect(ev.venue).toBe("The Hub");
+    expect(ev.venueId).toBe("v1");
     expect(ev.city).toBe("Addis Ababa");
     expect(ev.organizer).toBe("Digis");
     expect(ev.organizerId).toBe("o1");
@@ -186,14 +187,14 @@ describe("backendEventToEvent", () => {
     expect(restriction({ has_restriction: true, max_age: 12 })).toBe("Up to 12");
   });
 
-  it("leaves ageRestriction absent when there is no explicit restriction (#53)", () => {
+  it("distinguishes unrestricted age from omitted or malformed metadata (#53)", () => {
     const restriction = (age_restriction?: unknown) =>
       backendEventToEvent(wire({ event_setting: { config: { age_restriction } } })).ageRestriction;
 
     // The list payload never carries it; an explicit "no restriction" is not a
     // bound; and a malformed/legacy value must not be invented into one.
     expect(restriction(undefined)).toBeUndefined();
-    expect(restriction({ has_restriction: false })).toBeUndefined();
+    expect(restriction({ has_restriction: false })).toBe("Any Age");
     expect(restriction({ has_restriction: true })).toBeUndefined();
     expect(restriction("21+")).toBeUndefined();
     expect(backendEventToEvent(wire()).ageRestriction).toBeUndefined();

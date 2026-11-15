@@ -1,32 +1,18 @@
-/**
- * Hooks for the Chapa return-URL flow.
- *
- * `CHAPA_RETURN_URL` on the backend is the customer-facing destination the
- * browser lands on after paying. It is not a payment confirmation endpoint;
- * the server verifies the outcome independently (webhook + return-URL verify).
- * From the buyer's perspective: show "Confirming your payment…" until either
- * a wallet ticket appears, the attempt is known-failed, or the timeout elapses.
- *
- * Because the backend has no buyer-scoped `GET /orders/:id` today, we poll
- * the authenticated wallet (the only buyer-visible completion signal). The
- * submitter (Chapa webhook → `orders.payment.fulfilled` →
- * `Ticketing::Packages::Issue`) puts a ticket in the wallet, so ticket
- * appearance is the truthful confirmation.
- *
- * For unauthenticated buyers (guest checkout, BACKEND_GAPS #14), the
- * POST /guest/payments/:id/refresh endpoint is called instead, using the
- * quote_token + phone persisted alongside the payment attempt id at redirect
- * time. A wallet poll is not available for guests — the refresh endpoint is
- * the sole confirmation signal.
+/** Reconcile the exact hosted payment attempt through the server refresh API.
+ * A wallet ticket alone cannot prove payment. Missing attempt IDs and transient
+ * verification failures remain unconfirmed until the watchdog expires.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ticketsService, ticketKeys, mapWalletTicket } from '@/lib/tickets';
+import { useQueryClient } from '@tanstack/react-query';
+import { ticketKeys, mapWalletTicket } from '@/lib/tickets';
 import { orderModule, findGuestReturnCreds } from '@/lib/order';
+import type { PaymentRefreshResult } from '@/lib/order';
 import { guestWallet } from '@/lib/guest-wallet';
 import { toApiError } from '@/lib/errors';
 import { toastWarning } from '@/lib/feedback';
 import type { UserTicket } from '@/types';
+import type { SetStateAction } from 'react';
+import { getSession } from '@/lib/session';
 
 /**
  * Clear per-checkout resume state after a payment reaches a terminal outcome.
@@ -38,7 +24,7 @@ import type { UserTicket } from '@/types';
  */
 export function clearCheckoutResumeKeys(): void {
   try {
-    const prefixes = ['digis:checkout-key:', 'digis:stuck-order:', 'digis:payment-url:', 'digis:payment-key:', 'digis:payment-event:', 'digis:payment-id:', 'digis:awaiting-confirm', 'digis:guest:'];
+    const prefixes = ['digis:checkout-key:', 'digis:stuck-order:', 'digis:payment-url:', 'digis:payment-key:', 'digis:payment-event:', 'digis:payment-id:', 'digis:awaiting-confirm', 'digis:guest:', 'digis:gift-order:', 'digis:gift-draft-lines:'];
     const clearStore = (store: Storage) => {
       const doomed: string[] = [];
       for (let i = 0; i < store.length; i++) {
@@ -57,6 +43,7 @@ export type PaymentReturnState =
   | { kind: 'idle' }
   | { kind: 'confirming' }
   | { kind: 'confirmed'; ticket: UserTicket }
+  | { kind: 'gift-confirmed'; orderId: string }
   | { kind: 'terminal' }
   | { kind: 'timeout' }
   | { kind: 'error'; message: string };
@@ -72,6 +59,21 @@ export interface PaymentReturnController {
    *  server-side — webhook → outbox → issue). */
   dismiss: () => void;
   stop: () => void;
+}
+
+/** Gift-only orders intentionally create no ticket in the payer wallet. Require
+ * server-confirmed payment + fulfillment, scoped to this exact hosted attempt. */
+function verifiedPaymentOrder(result: PaymentRefreshResult, paymentId: string, eventId?: string): boolean {
+  return result.payment?.id === paymentId && !!result.order?.id && result.payment.order_id === result.order.id &&
+    result.payment.status === 'succeeded' && ['paid', 'fulfilled'].includes(result.order.status) &&
+    (!eventId || result.order.event_id === eventId);
+}
+
+function completedGiftOrder(result: PaymentRefreshResult, paymentId: string, eventId?: string): string | undefined {
+  if (!verifiedPaymentOrder(result, paymentId, eventId) || result.order.status !== 'fulfilled') return;
+  try {
+    return sessionStorage.getItem(`digis:gift-order:${result.order.id}`) === 'true' ? result.order.id : undefined;
+  } catch { return; }
 }
 
 /**
@@ -116,10 +118,16 @@ export function useGuestPaymentReturnConfirmation(
       try {
         const result = await orderModule.guestRefreshPayment(paymentId, guestCreds);
         if (!alive) return;
-        if (result.state === 'ready') {
+        const giftOrderId = completedGiftOrder(result, paymentId, eventId);
+        if (giftOrderId) {
+          clearCheckoutResumeKeys();
+          setState({ kind: 'gift-confirmed', orderId: giftOrderId });
+          return;
+        }
+        if (result.state === 'ready' && verifiedPaymentOrder(result, paymentId, eventId)) {
           const scoped = (result.tickets ?? [])
-            .filter((w) => !eventId || w.event.id === eventId)
-            .map(mapWalletTicket);
+            .filter((w) => w.event.id === result.order.event_id)
+            .map(mapWalletTicket).filter(ticket => ticket.status === 'active' && !!ticket.qrCode);
           const fresh = scoped.filter((t) => !seen.current.has(t.id)).sort(
             (a, b) => Date.parse(b.purchased || '') - Date.parse(a.purchased || ''),
           )[0] ?? scoped[0];
@@ -199,9 +207,7 @@ export function useGuestPaymentReturnConfirmation(
   return { state, dismissed, start, dismiss, stop };
 }
 
-/** A new (not-yet-known) wallet ticket is the success signal. `seen` lets
- *  callers pass the ticket set they already have on screen, so the very first
- *  poll that includes a new ticket resolves the confirmation. */
+/** Confirm authenticated purchases from server-verified attempt evidence. */
 export function usePaymentReturnConfirmation(
   eventId: string | undefined,
   knownTicketIds: ReadonlySet<string> | UserTicket[],
@@ -209,20 +215,28 @@ export function usePaymentReturnConfirmation(
   // Buyer-owned attempt id persisted at redirect time. When present, the
   // return screen reconciles via POST /payments/:id/refresh FIRST (backend
   // verifies the attempt and returns a `state`): ready → confirm instantly,
-  // terminal → surface the failure, pending → wallet-poll as before.
+  // terminal → surface the failure, pending → keep reconciling.
   paymentId?: string,
   // 5-minute ceiling: verification runs through two per-minute outbox drains
   // (accept, then fulfill → issue), so a 2-minute timeout fires on healthy
   // payments that simply queued behind the drain.
-  { pollMs = 3_000, timeoutMs = 300_000 }: { pollMs?: number; timeoutMs?: number } = {},
+  { pollMs = 3_000, timeoutMs = 300_000, userId }: { pollMs?: number; timeoutMs?: number; userId?: string } = {},
 ): PaymentReturnController {
-  const [state, setState] = useState<PaymentReturnState>({ kind: 'idle' });
-  const [dismissed, setDismissed] = useState(false);
+  const identity = isAuthenticated ? userId ?? 'authenticated' : null;
+  const currentIdentity = useRef(identity);
+  currentIdentity.current = identity;
+  const [ownedState, setOwnedState] = useState<{ identity: string | null; state: PaymentReturnState }>({ identity, state: { kind: 'idle' } });
+  const state: PaymentReturnState = ownedState.identity === identity ? ownedState.state : { kind: 'idle' };
+  const setState = (next: SetStateAction<PaymentReturnState>) => setOwnedState(current => {
+    if (currentIdentity.current !== identity) return current;
+    const previous: PaymentReturnState = current.identity === identity ? current.state : { kind: 'idle' };
+    return { identity, state: typeof next === 'function' ? next(previous) : next };
+  });
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const dismissed = dismissedFor !== null && dismissedFor === identity;
   const queryClient = useQueryClient();
-  // A new (not-yet-known) wallet ticket is the success signal. `seen` is the
-  // frozen pre-return baseline: tickets the buyer already had before returning.
-  // The first poll that surfaces a ticket for this event NOT in `seen` resolves
-  // the confirmation.
+  // Prefer an unseen ticket within the exact verified order response.
+  // This baseline never supplies payment proof itself.
   const knownKey = knownTicketIds instanceof Set
     ? `set:${knownTicketIds.size}`
     : `arr:${(knownTicketIds as UserTicket[]).map((t) => t.id).join(',')}`;
@@ -232,52 +246,31 @@ export function usePaymentReturnConfirmation(
     : new Set((knownTicketIds as UserTicket[]).map((t) => t.id));
 
   // Keep the baseline in sync ONLY while idle (before a return starts). Once
-  // confirming, it must stay frozen: the poll shares the wallet's cache, so
-  // re-deriving `seen` from live wallet data would absorb the freshly-issued
-  // ticket before the confirmation check can see it — the confirmation would
-  // never fire and the spinner would run to timeout.
+  // confirming, freeze it so a wallet refresh cannot absorb the newly issued ticket.
   useEffect(() => {
     if (state.kind !== 'idle') return;
     seen.current = baseline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knownKey, state.kind]);
+  }, [knownKey, state.kind, identity]);
 
-  const wallet = useQuery({
-    // Same key the router's wallet uses so confirmation shares (and
-    // invalidates) the cache the ticket view actually reads.
-    queryKey: [...ticketKeys.userTickets, isAuthenticated] as const,
-    queryFn: ticketsService.fetchUserTickets,
-    enabled: isAuthenticated && state.kind === 'confirming',
-    refetchInterval: (query) => {
-      // Stop polling once we resolve OR after the configured timeout.
-      const last = query.state.data as UserTicket[] | undefined;
-      if (last && eventId && last.some((t) => t.eventId === eventId && !seen.current.has(t.id))) {
-        return false;
-      }
-      return state.kind === 'confirming' ? pollMs : false;
-    },
-    refetchIntervalInBackground: true,
-    staleTime: 0,
-  });
-
-  // Reconcile via POST /payments/:id/refresh while we know the attempt. This is
-  // the primary completion signal (backend-verified): `ready` → confirm now,
-  // `terminal` → surface the failure. `pending` → keep re-checking on the same
-  // cadence as the wallet poll — a fresh refresh picks up `ready` the moment the
-  // backend verifies (webhook/callback → outbox), instead of waiting for the
-  // wallet to gain the ticket. A refresh failure must NOT block confirmation —
-  // the wallet poll below remains the safety net.
+  // Only the server reconciliation for this exact attempt can confirm payment.
   useEffect(() => {
     if (state.kind !== 'confirming' || !paymentId || !isAuthenticated) return;
     let alive = true;
     const reconcile = async () => {
       try {
         const result = await orderModule.refreshPayment(paymentId);
-        if (!alive) return;
-        if (result.state === 'ready') {
+        if (!alive || currentIdentity.current !== identity || (userId && getSession()?.user.id !== userId)) return;
+        const giftOrderId = completedGiftOrder(result, paymentId, eventId);
+        if (giftOrderId) {
+          clearCheckoutResumeKeys();
+          setState({ kind: 'gift-confirmed', orderId: giftOrderId });
+          return;
+        }
+        if (result.state === 'ready' && verifiedPaymentOrder(result, paymentId, eventId)) {
           const scoped = (result.tickets ?? [])
-            .filter((w) => !eventId || w.event.id === eventId)
-            .map(mapWalletTicket);
+            .filter((w) => w.event.id === result.order.event_id)
+            .map(mapWalletTicket).filter(ticket => ticket.status === 'active' && !!ticket.qrCode);
           const fresh = scoped.filter((t) => !seen.current.has(t.id)).sort(
             (a, b) => Date.parse(b.purchased || '') - Date.parse(a.purchased || ''),
           )[0] ?? scoped[0];
@@ -292,47 +285,13 @@ export function usePaymentReturnConfirmation(
           setState({ kind: 'terminal' });
         }
         // pending → next interval re-checks.
-      } catch { /* refresh is best-effort — wallet poll still resolves */ }
+      } catch { /* Keep reconciling; a wallet alone cannot prove this payment. */ }
     };
     void reconcile();
     const id = window.setInterval(() => { void reconcile(); }, pollMs);
     return () => { alive = false; window.clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.kind, paymentId, eventId, isAuthenticated, queryClient, pollMs]);
-
-  useEffect(() => {
-    if (state.kind !== 'confirming') return;
-    const data = wallet.data;
-    if (!data) return;
-    // When event-scoped, ignore tickets for other events entirely — and if
-    // the baseline is empty (wallet hadn't loaded before start()), don't
-    // treat the whole wallet as fresh: wait for a ticket newer than the
-    // return began. Otherwise the first poll confirms on a pre-existing
-    // ticket and "View My Ticket" opens the wrong one.
-    if (eventId && seen.current.size === 0) {
-      const scoped = data.filter((t) => t.eventId === eventId);
-      if (scoped.length === 0) return;
-      // Can't distinguish fresh from pre-existing without a baseline — keep
-      // polling until a subsequent poll grows the set.
-      seen.current = new Set(scoped.map((t) => t.id).slice(0, Math.max(0, scoped.length - 1)));
-      const freshEmpty = scoped.filter((t) => !seen.current.has(t.id));
-      if (freshEmpty.length !== 1) return;
-      queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
-      clearCheckoutResumeKeys();
-      setState({ kind: 'confirmed', ticket: freshEmpty[0] });
-      return;
-    }
-    const candidates = (eventId
-      ? data.filter((t) => t.eventId === eventId && !seen.current.has(t.id))
-      : data.filter((t) => !seen.current.has(t.id))
-    ).sort((a, b) => Date.parse(b.purchased || '') - Date.parse(a.purchased || ''));
-    const fresh = candidates[0];
-    if (fresh) {
-      queryClient.invalidateQueries({ queryKey: ticketKeys.userTickets });
-      clearCheckoutResumeKeys();
-      setState({ kind: 'confirmed', ticket: fresh });
-    }
-  }, [state.kind, eventId, wallet.data, queryClient]);
+  }, [state.kind, paymentId, eventId, isAuthenticated, queryClient, pollMs, identity, userId]);
 
   // Timeout watchdog.
   useEffect(() => {
@@ -341,17 +300,17 @@ export function usePaymentReturnConfirmation(
       setState((cur) => (cur.kind === 'confirming' ? { kind: 'timeout' } : cur));
     }, timeoutMs);
     return () => window.clearTimeout(id);
-  }, [state.kind, timeoutMs]);
+  }, [state.kind, timeoutMs, identity]);
 
   const start = () => {
-    setDismissed(false);
+    setDismissedFor(null);
     setState((s) => {
       if (s.kind !== 'idle') return s;
       seen.current = baseline();
       return { kind: 'confirming' };
     });
   };
-  const dismiss = () => setDismissed(true);
+  const dismiss = () => setDismissedFor(identity);
   const stop = () => setState({ kind: 'idle' });
   return { state, dismissed, start, dismiss, stop };
 }

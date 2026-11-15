@@ -18,6 +18,8 @@ export function HeroSearch({
   activeFilterCount,
   sortBy,
   onSortChange,
+  onlyFeatured,
+  onOnlyFeaturedChange,
   onlyAvailable,
   onOnlyAvailableChange,
   eventTypes,
@@ -37,6 +39,8 @@ export function HeroSearch({
   activeFilterCount: number;
   sortBy: EventSortBy;
   onSortChange: (sortBy: EventSortBy) => void;
+  onlyFeatured: boolean;
+  onOnlyFeaturedChange: (value: boolean) => void;
   onlyAvailable: boolean;
   onOnlyAvailableChange: (value: boolean) => void;
   eventTypes: EventAccessFilter[];
@@ -168,6 +172,8 @@ export function HeroSearch({
                 <FilterPanel
                   sortBy={sortBy}
                   onSortChange={onSortChange}
+                  onlyFeatured={onlyFeatured}
+                  onOnlyFeaturedChange={onOnlyFeaturedChange}
                   onlyAvailable={onlyAvailable}
                   onOnlyAvailableChange={onOnlyAvailableChange}
                   eventTypes={eventTypes}

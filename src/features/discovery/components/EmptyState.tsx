@@ -1,44 +1,10 @@
 import { motion } from "motion/react";
-import {
-  LayoutGrid,
-  Music,
-  Landmark,
-  Cpu,
-  Palette,
-  UtensilsCrossed,
-  Trophy,
-  Dumbbell,
-  Laugh,
-  Clapperboard,
-  Mic2,
-  PartyPopper,
-  GraduationCap,
-  Heart,
-  Bell,
-  Compass,
-  Search,
-} from "lucide-react";
+import { Bell, Compass, Search } from "lucide-react";
+import { categoryMeta } from "@/lib/categoryColors";
 import { useTheme } from "@/app/components/ThemeContext";
 import { AppButton } from '@/components/primitives/AppButton';
 import { GlassReflection } from '@/components/primitives/GlassReflection';
 import { glass, glassEdge } from '@/lib/ui/glass';
-
-const categoryIcons: Record<string, typeof Music> = {
-  All: LayoutGrid,
-  Music: Music,
-  Sports: Trophy,
-  Nightlife: PartyPopper,
-  Culture: Landmark,
-  Food: UtensilsCrossed,
-  Art: Palette,
-  Comedy: Laugh,
-  Fitness: Dumbbell,
-  Film: Clapperboard,
-  Tech: Cpu,
-  Wellness: Heart,
-  Education: GraduationCap,
-  "Spoken Word": Mic2,
-};
 
 // Short, playful copy per category — the headline stays human, never error-y.
 const categoryCopy: Record<string, string> = {
@@ -79,7 +45,7 @@ export function EmptyState({
   const isSearch = !!searchQuery?.trim();
   const Icon = isSearch
     ? Search
-    : categoryIcons[selectedCategory] ?? Compass;
+    : categoryMeta(selectedCategory)?.Icon ?? Compass;
 
   const headline = isSearch
     ? "Nothing matched that"

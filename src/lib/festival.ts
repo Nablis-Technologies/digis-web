@@ -5,6 +5,7 @@ export type DayState = 'open' | 'soldOut' | 'cancelled' | 'past' | 'live';
 
 export type ScheduleArtist = {
   name: string;
+  artistId?: string;
   image?: string;
   role?: string;
   genre?: string;
@@ -136,6 +137,7 @@ export function resolveFestivalSchedule(
 
   const artists: ScheduleArtist[] = (event.lineup ?? []).map((a) => ({
     name: a.name,
+    artistId: a.artistId,
     image: a.image,
     role: a.role,
     genre: a.genre,
@@ -152,18 +154,18 @@ export function resolveFestivalSchedule(
   const tiers = passedTiers ?? event.ticketTypes ?? [];
   // Tier classification: when the backend serves real per-day coverage
   // (`covered_event_date_ids`, #69 resolved 2026-10-16) that is authoritative —
-  // a tier covering more than one date is a pass, one covering a single date is
-  // a single-day offer. Only when coverage is absent do we fall back to the
+  // an empty scope or coverage of every known date is an all-event pass;
+  // partial coverage remains a dated offer. Only when coverage is absent do we fall back to the
   // name heuristic (the previous, invented classification).
-  const hasCoverage = tiers.some((t) => (t.coveredEventDateIds?.length ?? 0) > 0);
+  const hasCoverage = tiers.some((t) => t.coveredEventDateIds !== undefined);
   const legacyPass = (t: TicketTier) => {
     const n = t.name.toLowerCase();
     return n.includes('pass') || n.includes('full') || n.includes('weekend') || (t.admissionsPerUnit ?? 1) > 1;
   };
   const isPassTier = (t: TicketTier) => {
-    const covered = t.coveredEventDateIds?.length ?? 0;
-    if (!hasCoverage || covered === 0) return legacyPass(t);
-    return covered > 1;
+    const ids = t.coveredEventDateIds;
+    if (ids !== undefined) return ids.length === 0 || [...knownDateIds].every(id => ids.includes(id));
+    return hasCoverage ? false : legacyPass(t);
   };
   const passTiers = tiers.filter(isPassTier);
   const singleDayTiers = tiers.filter((t) => !isPassTier(t));
@@ -178,7 +180,7 @@ export function resolveFestivalSchedule(
     });
   };
 
-  const showPass = passTiers.length > 0 || tiers.length > 0;
+  const showPass = passTiers.length > 0 || (!hasCoverage && tiers.length > 0);
   const lowestPassPrice = (passTiers.length > 0 ? passTiers : tiers)
     .map((t) => t.priceMinor)
     .filter((p) => p > 0)
@@ -198,7 +200,7 @@ export function resolveFestivalSchedule(
   const tiersByDay: Record<string, FestivalTier[]> = {};
 
   // Group tiers into 'all'
-  tiersByDay['all'] = (passTiers.length > 0 ? passTiers : tiers).map((t) => {
+  tiersByDay['all'] = (hasCoverage ? passTiers : (passTiers.length > 0 ? passTiers : tiers)).map((t) => {
     const savings = t.originalPriceMinor && t.originalPriceMinor > t.priceMinor
       ? { label: `${Math.round(((t.originalPriceMinor - t.priceMinor) / t.originalPriceMinor) * 100)}% OFF` }
       : undefined;
@@ -236,7 +238,7 @@ export function resolveFestivalSchedule(
       dayNum,
       dow,
       state,
-      inPass: !isCancelled && !isPast,
+      inPass: showPass && !isCancelled && !isPast,
     });
 
     // Per-day assignment (#36): pinned participants go to their day (event-level
@@ -280,7 +282,7 @@ export function resolveFestivalSchedule(
       dayNumberLabel: pad2(i + 1),
       dowLong,
       monDay,
-      doorsLabel: '6 PM',
+      doorsLabel: d.doorsAt ? new Date(d.doorsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '',
       cancelled: isCancelled,
       cancelledAlert: isCancelled
         ? {

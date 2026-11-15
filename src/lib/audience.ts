@@ -36,6 +36,8 @@ export interface AuthorizeAudienceInput {
 export interface AudienceProof {
   accessCode?: string;
   invitationToken?: string;
+  /** Exact offers accepted by the server; a proof does not unlock other tiers. */
+  authorizedTicketTypeIds?: string[];
 }
 
 /* ─── The module ─── */
@@ -71,19 +73,7 @@ export const audienceModule = {
    * retryable "couldn't verify" message rather than blaming the user's code.
    */
   async authorizeAny(ticketTypeIds: string[], input: { accessCode?: string; invitationToken?: string }): Promise<boolean> {
-    if (ticketTypeIds.length === 0) return false;
-    const results = await Promise.all(
-      ticketTypeIds.map((id) =>
-        audienceModule
-          .authorize({ ticketTypeId: id, ...input })
-          .then((r) => r.authorized)
-          .catch((e) => {
-            if (e instanceof ApiError && e.status === 422) return false;
-            throw e;
-          }),
-      ),
-    );
-    return results.some(Boolean);
+    return (await authorizedTicketTypes(ticketTypeIds, input)).length > 0;
   },
 
   /**
@@ -96,11 +86,13 @@ export const audienceModule = {
   async resolveProof(ticketTypeIds: string[], raw: string): Promise<AudienceProof | null> {
     const value = raw.trim();
     if (!value || ticketTypeIds.length === 0) return null;
-    if (await audienceModule.authorizeAny(ticketTypeIds, { accessCode: value })) {
-      return { accessCode: value };
+    const codeTiers = await authorizedTicketTypes(ticketTypeIds, { accessCode: value });
+    if (codeTiers.length > 0) {
+      return { accessCode: value, authorizedTicketTypeIds: codeTiers };
     }
-    if (await audienceModule.authorizeAny(ticketTypeIds, { invitationToken: value })) {
-      return { invitationToken: value };
+    const invitationTiers = await authorizedTicketTypes(ticketTypeIds, { invitationToken: value });
+    if (invitationTiers.length > 0) {
+      return { invitationToken: value, authorizedTicketTypeIds: invitationTiers };
     }
     return null;
   },
@@ -112,8 +104,21 @@ export const audienceModule = {
   async proveInvitation(ticketTypeIds: string[], token: string): Promise<AudienceProof | null> {
     const value = token.trim();
     if (!value || ticketTypeIds.length === 0) return null;
-    return (await audienceModule.authorizeAny(ticketTypeIds, { invitationToken: value }))
-      ? { invitationToken: value }
+    const accepted = await authorizedTicketTypes(ticketTypeIds, { invitationToken: value });
+    return accepted.length > 0
+      ? { invitationToken: value, authorizedTicketTypeIds: accepted }
       : null;
   },
 };
+
+async function authorizedTicketTypes(ticketTypeIds: string[], input: { accessCode?: string; invitationToken?: string }): Promise<string[]> {
+  const accepted = await Promise.all(ticketTypeIds.map(async id => {
+    try {
+      return (await audienceModule.authorize({ ticketTypeId: id, ...input })).authorized ? id : null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 422) return null;
+      throw error;
+    }
+  }));
+  return accepted.filter((id): id is string => id !== null);
+}

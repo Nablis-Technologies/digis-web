@@ -164,25 +164,29 @@ export function resolveSeries(
   const firstUpcoming = dates.find((d) => d.dateObj.getTime() >= now) ?? dates[dates.length - 1];
   const chosen = (pickedSessionId && dates.find((d) => d.id === pickedSessionId)) || firstUpcoming;
 
-  const days: SessionRailDay[] = dates.map((d) => {
-    const iso = toISODate(d.dateObj);
-    return {
+  const daysByDate = new Map<string, SessionRailDay>();
+  for (const date of dates) {
+    const iso = toISODate(date.dateObj);
+    const showtime = { id: date.id, timeLabel: timeLabel(date.startsAt), full: false, showLabel: date.name ?? 'Session' };
+    const day = daysByDate.get(iso);
+    if (day) {
+      day.showtimes.push(showtime);
+      continue;
+    }
+    daysByDate.set(iso, {
       date: iso,
-      monLabel: d.dateObj.toLocaleDateString('en-US', { month: 'short' }),
-      dayLabel: String(d.dateObj.getDate()),
-      dowLabel: d.dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
-      // Not derivable from the public payload yet (#68) — never invented.
+      monLabel: date.dateObj.toLocaleDateString('en-US', { month: 'short' }),
+      dayLabel: String(date.dateObj.getDate()),
+      dowLabel: date.dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
       soldOut: false,
-      primarySessionId: d.id,
-      showtimes: [
-        { id: d.id, timeLabel: timeLabel(d.startsAt), full: false, showLabel: d.name ?? 'Session' },
-      ],
-    };
-  });
-
-  const selectedDate = days.find((day) => day.primarySessionId === chosen.id) ?? days[0];
+      primarySessionId: date.id,
+      showtimes: [showtime],
+    });
+  }
+  const days = [...daysByDate.values()];
+  const selectedDate = daysByDate.get(toISODate(chosen.dateObj)) ?? days[0];
   const selected: SelectedSession = {
-    id: selectedDate.primarySessionId,
+    id: chosen.id,
     date: selectedDate.date,
     dateLabel: dateLabel(chosen.startsAt),
     timeLabel: timeLabel(chosen.startsAt),
@@ -197,17 +201,17 @@ export function resolveSeries(
   const fromLabel =
     lowestFrom !== undefined ? `From ${Money.fromMinor(lowestFrom, event.currency).format()}` : undefined;
 
-  const sessions: CalendarSession[] = days.map((day, i) => {
-    const src = dates[i];
-    const guests = guestsForSession(event, day.primarySessionId);
+  const sessions: CalendarSession[] = dates.map((src) => {
+    const iso = toISODate(src.dateObj);
+    const guests = guestsForSession(event, src.id);
     const guestNames = guests.slice(0, 2).map((g) => g.name);
     const detailParts = [fromLabel, guestNames.length ? guestNames.join(', ') : undefined].filter(
       (p): p is string => Boolean(p),
     );
     return {
-      id: day.primarySessionId,
-      date: day.date,
-      primary: true,
+      id: src.id,
+      date: iso,
+      primary: daysByDate.get(iso)?.primarySessionId === src.id,
       soldOut: false,
       dateLabel: src.dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
       detailLabel: detailParts.length ? detailParts.join(' · ') : 'Session',

@@ -1,9 +1,11 @@
+import { normalizeGiftPhone, validateGiftRecipient, readGiftLineIds, type GiftRecipientDraft, type GiftRecipientErrors } from '@/lib/gift-checkout';
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { orderModule, type OrderQuote } from '@/lib/order';
 import { clearCheckoutResumeKeys } from '@/lib/payment-return';
 import { openHostedCheckout as openHostedCheckoutTab } from '@/lib/checkout-popup';
-import { registrationModule, type ConsentDocument } from '@/lib/registration';
+import { registrationModule, type ConsentDocument, type RegistrationSchema, type SchemaQuestion } from '@/lib/registration';
+import { giftAnswerError, type GiftAnswer } from '@/lib/gift-recipient';
 import { admissionModule, type AdmissionResult } from '@/lib/admission';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { ApiError, messageForCode } from '@/lib/errors';
@@ -15,6 +17,11 @@ import type { AppliedPromo, CheckoutStep, ContactDetails, CustomQuestion, EventP
 export type { AppliedPromo, CheckoutStep, ContactDetails, PaymentMethod };
 
 const MAX_SEATS = 8;
+const QUESTION_TYPES = new Set(['short_text', 'long_text', 'single_choice', 'multiple_choice', 'checkbox', 'date']);
+export type CheckoutQuestion = CustomQuestion & {
+  published?: SchemaQuestion; formVersionId?: string;
+  packageUnitNumber?: number; admissionPosition?: number;
+};
 
 /** Sections available for the chosen tier: those matching its name, else all. */
 function sectionsForTier(seatMap: SeatMapConfig | undefined, ticketType: string) {
@@ -29,8 +36,25 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   const { user, isAuthenticated } = useAuth();
   const [isGift, setIsGiftState] = useState<boolean>(Boolean(initialGiftMode));
   const [giftRecipientPhone, setGiftRecipientPhone] = useState('');
+  const [giftRecipientEmail, setGiftRecipientEmail] = useState('');
   const [giftNote, setGiftNote] = useState('');
-  const [giftErrors, setGiftErrors] = useState<{ recipientPhone?: string; note?: string }>({});
+  const giftDraftKey = eventId && ticketTypeId ? `digis:gift-draft-lines:${user?.id ?? 'guest'}:${eventId}:${ticketTypeId}` : undefined;
+  const [savedGiftLineIds] = useState(() => readGiftLineIds(giftDraftKey));
+  const [firstGiftLineId] = useState(() => savedGiftLineIds[0] ?? randomUuid());
+  const [additionalRecipients, setAdditionalRecipients] = useState<GiftRecipientDraft[]>(() => savedGiftLineIds.slice(1).map(lineId => ({ lineId, phone: '', email: '', note: '' })));
+  useEffect(() => {
+    if (!giftDraftKey) return;
+    try { sessionStorage.setItem(giftDraftKey, JSON.stringify([firstGiftLineId, ...additionalRecipients.map(row => row.lineId)])); } catch { /* No contacts are persisted; in-memory retries remain stable. */ }
+  }, [giftDraftKey, firstGiftLineId, additionalRecipients]);
+  const [additionalGiftErrors, setAdditionalGiftErrors] = useState<Record<string, GiftRecipientErrors>>({});
+  const giftRecipients: GiftRecipientDraft[] = [{ lineId: firstGiftLineId, phone: giftRecipientPhone, email: giftRecipientEmail, note: giftNote }, ...additionalRecipients];
+  const addGiftRecipient = () => setAdditionalRecipients(rows => [...rows, { lineId: randomUuid(), phone: '', email: '', note: '' }]);
+  const updateGiftRecipient = (id: string, changes: Partial<Pick<GiftRecipientDraft, 'phone' | 'email' | 'note'>>) => {
+    setAdditionalRecipients(rows => rows.map(row => row.lineId === id ? { ...row, ...changes } : row));
+    setAdditionalGiftErrors(errors => ({ ...errors, [id]: {} }));
+  };
+  const removeGiftRecipient = (id: string) => setAdditionalRecipients(rows => rows.filter(row => row.lineId !== id));
+  const [giftErrors, setGiftErrors] = useState<{ recipientPhone?: string; recipientEmail?: string; note?: string }>({});
   const [giftPurchases, setGiftPurchases] = useState<Array<{ id: string; status: string; deliveryStatus?: string }>>([]);
   const [orderId, setOrderId] = useState<string>();
   // Sections available for the chosen tier: those matching its name, else all.
@@ -54,7 +78,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   );
   const [step, setStep] = useState<CheckoutStep>(hasSeats ? 'seat' : (needsDate ? 'date' : 'review'));
   const [manualQuantity, setManualQuantity] = useState(1);
-  const quantity = isGift ? 1 : (hasSeats ? selectedSeats.length : manualQuantity);
+  const quantity = isGift ? giftRecipients.length : (hasSeats ? selectedSeats.length : manualQuantity);
   const setQuantity = (q: number) => {
     if (!isGift) setManualQuantity(q);
   };
@@ -81,8 +105,30 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     contactMethod: user?.email ? 'email' : 'phone',
   }));
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
-  const questions = customQuestions ?? [];
-  const hasQuestions = questions.length > 0 && !isGift;
+  const isLiveTicket = !!(eventId && eventSlug && ticketProductId && ticketTypeId);
+  const [registrationSchema, setRegistrationSchema] = useState<RegistrationSchema | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(isLiveTicket && !isGift);
+  const [schemaError, setSchemaError] = useState<string>();
+  const schemaRequest = useRef(0);
+  const questions: CheckoutQuestion[] = useMemo(() => {
+    if (!isLiveTicket) return customQuestions ?? [];
+    return (registrationSchema?.forms ?? []).flatMap(form => form.questions.flatMap(question => {
+      if (!QUESTION_TYPES.has(question.type)) return [];
+      const coordinates = question.response_scope === 'admission_slot'
+        ? Array.from({ length: quantity }, (_, unit) => Array.from({ length: requiredSeatCount }, (_, position) => ({ packageUnitNumber: unit + 1, admissionPosition: position + 1 }))).flat()
+        : [{}];
+      return coordinates.map(coordinate => {
+        const slot = 'admissionPosition' in coordinate;
+        const label = slot ? `${question.label} — Package ${coordinate.packageUnitNumber}, attendee ${coordinate.admissionPosition}` : question.label;
+        return {
+          id: `${form.id}:${question.key}:${slot ? `${coordinate.packageUnitNumber}:${coordinate.admissionPosition}` : 'registration'}`,
+          type: 'text' as const, label, required: question.required,
+          published: { ...question, label }, formVersionId: form.id, ...coordinate,
+        };
+      });
+    }));
+  }, [isLiveTicket, customQuestions, registrationSchema, quantity, requiredSeatCount]);
+  const hasQuestions = !isGift && (questions.length > 0 || schemaLoading || !!schemaError);
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {
     const seed: Record<string, unknown> = {};
     questions.forEach((q) => { seed[q.id] = q.type === 'checkbox' ? [] : ''; });
@@ -99,16 +145,11 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
 
   // Live ticket (real product + ticket type id on a real event) — everything
   // else stays on the mock pipeline.
-  const isLiveTicket = !!(eventId && eventSlug && ticketProductId && ticketTypeId);
   const [consents, setConsents] = useState<ConsentDocument[]>([]);
   const [consentsLoading, setConsentsLoading] = useState(isLiveTicket);
   const [consentsError, setConsentsError] = useState<string>();
   const [acceptedConsents, setAcceptedConsents] = useState<Record<string, boolean>>({});
   const [consentError, setConsentError] = useState<string>();
-  // Applicable published form version for this ticket type (#19 resolved) —
-  // answers must carry its id for stale-version detection. Absent when the
-  // ticket type publishes no form (single-line/answer-free tickets still work).
-  const [formVersionId, setFormVersionId] = useState<string>();
   const [registrationId, setRegistrationId] = useState<string>();
   const [registrationError, setRegistrationError] = useState<string>();
   const [paymentError, setPaymentError] = useState<string>();
@@ -163,20 +204,35 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
 
   useEffect(() => { loadConsents(); }, [loadConsents]);
 
-  // Load the published registration form version (public schema, #19). The
-  // applicable version id goes on every answer at submit; no form = no version.
-  useEffect(() => {
-    if (!isLiveTicket || !eventSlug || !ticketTypeId) return;
-    let alive = true;
-    registrationModule.fetchRegistrationSchema(eventSlug, ticketTypeId)
-      .then((schema) => {
-        if (!alive || !schema) return;
-        const first = schema.forms[0];
-        if (first) setFormVersionId(first.id);
-      })
-      .catch(() => { /* schema is advisory — answers submit without a version when unavailable */ });
-    return () => { alive = false; };
-  }, [isLiveTicket, eventSlug, ticketTypeId]);
+  // Published forms are required checkout inputs. A failed/malformed read must
+  // not silently become an answer-free registration; only forms:[] means none.
+  const reloadSchema = useCallback(async () => {
+    const request = ++schemaRequest.current;
+    if (!isLiveTicket || !eventSlug || !ticketTypeId || isGift) { setSchemaLoading(false); return; }
+    setSchemaLoading(true);
+    setSchemaError(undefined);
+    try {
+      const schema = await registrationModule.fetchRegistrationSchema(eventSlug, ticketTypeId);
+      if (!schema || !Array.isArray(schema.forms)) throw new Error('Invalid schema');
+      for (const form of schema.forms) {
+        if (!form.id || !Array.isArray(form.questions)) throw new Error('Invalid form');
+        for (const question of form.questions) {
+          if (typeof question.key !== 'string' || !question.key || typeof question.label !== 'string' || !question.label || typeof question.required !== 'boolean' || !['registration', 'admission_slot'].includes(question.response_scope) ||
+              (question.required && !QUESTION_TYPES.has(question.type)) ||
+              (['single_choice', 'multiple_choice'].includes(question.type) && (!Array.isArray(question.options) || question.options.some(option => typeof option.key !== 'string' || typeof option.label !== 'string')))) throw new Error('Unsupported question');
+        }
+      }
+      if (request === schemaRequest.current) setRegistrationSchema(schema);
+    } catch {
+      if (request === schemaRequest.current) {
+        setRegistrationSchema(null);
+        setSchemaError('Could not load the organizer questions. Please retry before continuing.');
+      }
+    } finally {
+      if (request === schemaRequest.current) setSchemaLoading(false);
+    }
+  }, [isLiveTicket, eventSlug, ticketTypeId, isGift]);
+  useEffect(() => { void reloadSchema(); return () => { schemaRequest.current++; }; }, [reloadSchema]);
 
   const toggleConsent = (versionId: string) => {
     setAcceptedConsents((prev) => ({ ...prev, [versionId]: !prev[versionId] }));
@@ -198,6 +254,9 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     // attempt; open exactly once per order.
     if (openedCheckoutsRef.current.has(orderId)) return;
     openedCheckoutsRef.current.add(orderId);
+    if (isGift) {
+      try { sessionStorage.setItem(`digis:gift-order:${orderId}`, 'true'); } catch { /* optional return context */ }
+    }
     openHostedCheckoutTab(orderId, checkoutUrl);
   };
 
@@ -344,11 +403,12 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   const total = quote?.total_minor ?? estimateMinor;
   const quoteToken = quote?.quote_token;
 
-  const hasExtras = products.length > 0;
+  const hasExtras = basePrice > 0 && products.length > 0;
   // A signed-in user has nothing to type on the details step — identity comes
   // from the session (registration sends user.phone; the backend ignores the
   // contact fields). Guests still get the form.
   const needsDetails = !isAuthenticated;
+  const isFreeRsvp = basePrice === 0 && total === 0 && !isGift;
   const steps = useMemo<{ id: CheckoutStep; label: string }[]>(() => [
     ...(hasSeats ? [{ id: 'seat' as CheckoutStep, label: 'Seats' }] : []),
     ...(multiDate ? [{ id: 'date' as CheckoutStep, label: 'Date' }] : []),
@@ -356,8 +416,8 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     ...(hasExtras ? [{ id: 'extras' as CheckoutStep, label: 'Extras' }] : []),
     ...(needsDetails ? [{ id: 'details' as CheckoutStep, label: 'Details' }] : []),
     ...(hasQuestions ? [{ id: 'questions' as CheckoutStep, label: 'Questions' }] : []),
-    { id: 'payment', label: 'Payment' },
-  ], [hasSeats, multiDate, hasExtras, hasQuestions, needsDetails]);
+    { id: 'payment', label: isFreeRsvp ? 'Confirm RSVP' : 'Payment' },
+  ], [hasSeats, multiDate, hasExtras, hasQuestions, needsDetails, isFreeRsvp]);
   const stepIndex = steps.findIndex(s => s.id === step);
   const visibleStep = stepIndex >= 0 ? stepIndex : 0;
 
@@ -389,26 +449,10 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
 
   const validateGift = (): boolean => {
     if (!isGift) return true;
-    const errs: typeof giftErrors = {};
-    const rawPhone = giftRecipientPhone.trim();
-    if (!rawPhone) {
-      errs.recipientPhone = 'Recipient phone number is required';
-    } else {
-      const cleaned = rawPhone.replace(/[\s()-]/g, '');
-      if (!/^(\+251|0)?9\d{8}$/.test(cleaned) && !/^\+\d{10,15}$/.test(cleaned)) {
-        errs.recipientPhone = 'Enter a valid phone number (e.g. +251 91 123 4567)';
-      } else {
-        const normRecipient = normalizePhone(rawPhone);
-        if (user?.phone && normalizePhone(user.phone) === normRecipient) {
-          errs.recipientPhone = 'You cannot send a gift ticket to your own phone number';
-        }
-      }
-    }
-    if (giftNote.length > 500) {
-      errs.note = 'Gift note cannot exceed 500 characters';
-    }
-    setGiftErrors(errs);
-    return Object.keys(errs).length === 0;
+    const errors = giftRecipients.map(row => validateGiftRecipient(row, user?.phone));
+    setGiftErrors(errors[0]);
+    setAdditionalGiftErrors(Object.fromEntries(giftRecipients.slice(1).map((row, index) => [row.lineId, errors[index + 1]])));
+    return errors.every(error => Object.keys(error).length === 0);
   };
 
   const validateDetails = () => {
@@ -421,7 +465,25 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
   };
   const validateQuestions = () => {
     const qe: Record<string, string> = {};
-    questions.forEach((q) => { if (!q.required) return; const v = answers[q.id]; if (q.type === 'checkbox') { if (!Array.isArray(v) || v.length === 0) qe[q.id] = 'Please select at least one option'; } else if (typeof v !== 'string' || v.trim() === '') qe[q.id] = 'This field is required'; });
+    if (schemaLoading || schemaError) return false;
+    questions.forEach(q => {
+      const v = answers[q.id];
+      if (q.published) {
+        const question = q.published;
+        const value = v ?? (question.type === 'checkbox' ? false : undefined);
+        const empty = value === undefined || value === '' || (Array.isArray(value) && !value.length);
+        if (empty) { if (question.required) qe[q.id] = `Enter ${question.label}.`; return; }
+        const allowed = (question.options ?? []).map(option => option.key).filter(key => !question.validation_rules?.allowed_option_keys || question.validation_rules.allowed_option_keys.includes(key));
+        const invalidType = question.type === 'checkbox' ? typeof value !== 'boolean'
+          : question.type === 'multiple_choice' ? !Array.isArray(value) || value.some(key => typeof key !== 'string' || !allowed.includes(key)) || new Set(value).size !== value.length
+          : typeof value !== 'string' || (question.type === 'single_choice' && !allowed.includes(value)) || (question.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value));
+        const error = invalidType ? 'Enter a valid answer.' : giftAnswerError(question, value as GiftAnswer);
+        if (error) qe[q.id] = error;
+      } else {
+        if (!q.required) return;
+        if (q.type === 'checkbox' ? !Array.isArray(v) || !v.length : typeof v !== 'string' || !v.trim()) qe[q.id] = 'This field is required';
+      }
+    });
     setQuestionErrors(qe); return Object.keys(qe).length === 0;
   };
   /** Required consents accepted? Only enforced for live tickets with consents. */
@@ -451,11 +513,14 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
       ...(!isGift && invitationToken ? { invitationToken } : {}),
       ...(!isGift
         ? {
-            answers: questions.map((q) => ({
-              ...(formVersionId ? { formVersionId } : {}),
-              questionKey: q.id,
-              value: answers[q.id],
-            })),
+            answers: questions.flatMap(q => {
+              const value = answers[q.id] ?? (q.published?.type === 'checkbox' ? false : undefined);
+              if (value === undefined || value === '' || (Array.isArray(value) && !value.length)) return [];
+              return [{ ...(q.formVersionId ? { formVersionId: q.formVersionId } : {}),
+                questionKey: q.published?.key ?? q.id, value,
+                ...(q.packageUnitNumber != null ? { packageUnitNumber: q.packageUnitNumber, admissionPosition: q.admissionPosition } : {}),
+              }];
+            }),
             consents: accepted,
           }
         : {}),
@@ -463,6 +528,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         ? {
             gift: {
               recipientPhone: normalizePhone(giftRecipientPhone.trim()),
+              ...(giftRecipientEmail.trim() ? { recipientEmail: giftRecipientEmail.trim() } : {}),
               ...(giftNote.trim() ? { note: giftNote.trim() } : {}),
             },
           }
@@ -476,7 +542,12 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         ...(selectedEventDateId ? { eventDateIds: [selectedEventDateId] } : {}),
       }));
     return {
-      items: [ticketItem, ...addOnItems],
+      items: [...(isGift ? giftRecipients.map(row => ({
+        ...ticketItem, lineId: row.lineId, quantity: 1,
+        gift: { recipientPhone: normalizeGiftPhone(row.phone.trim()),
+          ...(row.email.trim() ? { recipientEmail: row.email.trim() } : {}),
+          ...(row.note.trim() ? { note: row.note.trim() } : {}) },
+      })) : [ticketItem]), ...addOnItems],
       chargeCurrency: 'ETB' as const,
       ...(promoCode ? { promotionCode: promoCode } : {}),
       ...(!isAuthenticated && guestPhone
@@ -503,6 +574,7 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     else if (step === 'details') { if (validateDetails()) setStep(hasQuestions ? 'questions' : 'payment'); }
     else if (step === 'questions') { if (validateQuestions()) setStep('payment'); }
     else if (step === 'payment') {
+      if (!isGift && !validateQuestions()) { setStep('questions'); return; }
       // Pay is single-flight: a second tap while the first is registering /
       // quoting / redirecting must not open a duplicate checkout.
       if (payingRef.current || completeCheckoutMutation.isPending) return;
@@ -579,7 +651,10 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
         verificationToken: verificationTokenRef.current,
       });
       const { nextAction, order, guestOrderToken, giftPurchases: resultGifts } = result;
-      if (order?.id) setOrderId(order.id);
+      if (order?.id) {
+        setOrderId(order.id);
+        if (isGift) { try { sessionStorage.setItem(`digis:gift-lines:${order.id}`, JSON.stringify(giftRecipients.map(row => row.lineId))); } catch { /* Delivery status remains available without local ordering. */ } }
+      }
       else if (nextAction.orderId) setOrderId(nextAction.orderId);
       if (resultGifts && resultGifts.length > 0) {
         setGiftPurchases(resultGifts);
@@ -659,10 +734,11 @@ export function useCheckoutFlow({ basePrice, eventId, eventSlug, ticketType, tic
     });
   };
   const canContinue = useMemo(() => {
+    if (step === 'questions' && (schemaLoading || !!schemaError)) return false;
     if (step === 'seat') return hasFixedSeatRequirement ? selectedSeats.length === seatLimit : selectedSeats.length > 0;
     if (step === 'date') return Boolean(selectedEventDateId);
-    return step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
-  }, [step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId]);
+    return isFreeRsvp || step !== 'payment' || payMethod !== 'card' || (cardNumber.replace(/\s/g, '').length >= 13 && cardExpiry.length === 5 && cardCvc.length >= 3);
+  }, [isFreeRsvp, step, selectedSeats.length, hasFixedSeatRequirement, seatLimit, payMethod, cardNumber, cardExpiry, cardCvc, selectedEventDateId, schemaLoading, schemaError]);
 
-  return { step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, conflictRecovery, closeConflictSheet, resumeActiveCheckout, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp, isGift, setIsGift, giftRecipientPhone, setGiftRecipientPhone, giftNote, setGiftNote, giftErrors, giftPurchases, orderId };
+  return { isFreeRsvp, schemaLoading, schemaError, reloadSchema, step, setStep, quantity, setQuantity, hasSeats, seatSections, selectedSeats, toggleSeat, maxSeats: hasFixedSeatRequirement ? seatLimit : MAX_SEATS, requiredSeats: hasFixedSeatRequirement ? seatLimit : undefined, promoApplied, setPromoApplied, promoCodeInput, setPromoCodeInput, promoExpanded, setPromoExpanded, promoError, setPromoError, promoLoading, validatePromo, removePromo, contactDetails, setContactDetails, errors, setErrors, questions, answers, setAnswers, questionErrors, setQuestionErrors, payMethod, setPayMethod, cardNumber, setCardNumber, cardExpiry, setCardExpiry, cardCvc, setCardCvc, promoCode, discountAmount, subtotal, discountTotal, serviceFee, total, steps, visibleStep, goNext, goBack, canContinue, products, includedProductIds, selectedAddOns, setSelectedAddOns, quoteLoading, quoteError, isLiveTicket, needsDetails, consents, consentsLoading, consentsError, reloadConsents: loadConsents, acceptedConsents, toggleConsent, consentError, registrationError, paymentError, paying, pendingNotice, conflict, conflictRecovery, closeConflictSheet, resumeActiveCheckout, isRegistering: registeringRef.current, needsDate, multiDate, eventDates, selectedEventDateId, setSelectedEventDateId, guestOtp, guestOtpError, guestOtpLoading, guestOtpVerifying, verifyGuestOtp, resendGuestOtp, isGift, setIsGift, additionalRecipients, additionalGiftErrors, addGiftRecipient, updateGiftRecipient, removeGiftRecipient, giftRecipientPhone, setGiftRecipientPhone, giftRecipientEmail, setGiftRecipientEmail, giftNote, setGiftNote, giftErrors, giftPurchases, orderId };
 }

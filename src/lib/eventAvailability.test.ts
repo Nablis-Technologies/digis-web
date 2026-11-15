@@ -4,12 +4,12 @@ import { availabilityMeta, eventSoldOut } from '@/lib/eventAvailability';
 describe('availabilityMeta (G-44 server states)', () => {
   it('maps each server sellability state to a badge + CTA', () => {
     expect(availabilityMeta({ ticketAvailability: 'available' })).toEqual({ badge: null, cta: 'Get Tickets', buyBlocked: false });
-    expect(availabilityMeta({ ticketAvailability: 'coming_soon' })).toEqual({ badge: 'On Sale Soon', cta: 'View Info', buyBlocked: true });
+    expect(availabilityMeta({ ticketAvailability: 'coming_soon' })).toEqual({ badge: 'On Sale Soon', cta: 'View', buyBlocked: true });
     expect(availabilityMeta({ ticketAvailability: 'sold_out' })).toEqual({ badge: 'Sold Out', cta: 'Join Waitlist', buyBlocked: true });
     expect(availabilityMeta({ ticketAvailability: 'sales_closed' })).toEqual({ badge: 'Sales Closed', cta: 'View Details', buyBlocked: true });
-    expect(availabilityMeta({ ticketAvailability: 'no_public_tickets' })).toEqual({ badge: 'Access Code Required', cta: 'Enter Access Code', buyBlocked: true });
-    expect(availabilityMeta({ ticketAvailability: 'no_eligible_dates' })).toEqual({ badge: 'Unavailable', cta: 'View Details', buyBlocked: true });
-    expect(availabilityMeta({ ticketAvailability: 'unavailable' })).toEqual({ badge: 'Check Availability', cta: 'View Details', buyBlocked: true });
+    expect(availabilityMeta({ ticketAvailability: 'no_public_tickets' })).toEqual({ badge: 'Invite only', cta: 'View Access Options', buyBlocked: true });
+    expect(availabilityMeta({ ticketAvailability: 'no_eligible_dates' })).toEqual({ badge: 'No Tickets Right Now', cta: 'View', buyBlocked: true });
+    expect(availabilityMeta({ ticketAvailability: 'unavailable' })).toEqual({ badge: 'Unavailable', cta: 'View', buyBlocked: true });
   });
 
   it('falls back to the local sold-out derivation when the server omits availability', () => {

@@ -1,3 +1,4 @@
+import { apiPath, apiRoute } from './support/api';
 import { test, expect, type Route } from '@playwright/test';
 
 /**
@@ -149,9 +150,9 @@ const PRODUCTS = {
 
 test.describe('festival / multi-day detail', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('http://localhost:3000/**', async (route) => {
+    await page.route(apiRoute(), async (route) => {
       const request = route.request();
-      const path = new URL(request.url()).pathname;
+      const path = apiPath(request.url());
       if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
 
       if (path === `/public/events/${MULTI_SLUG}`) return fulfillJson(route, 200, multiDayDetail());
@@ -177,6 +178,9 @@ test.describe('festival / multi-day detail', () => {
 
     // Special guests for the whole festival while "All days" is selected.
     await expect(page.getByText('Special guests')).toBeVisible();
+    const ticketTop = (await page.getByText('All 3 days').boundingBox())!.y;
+    const guestsTop = (await page.getByText('Special guests').boundingBox())!.y;
+    expect(ticketTop).toBeLessThan(guestsTop);
     await expect(page.getByText('Teddy Afro').first()).toBeVisible();
 
     // Picking Day 2 re-scopes the selector title to that day…
@@ -190,14 +194,47 @@ test.describe('festival / multi-day detail', () => {
     await expect(guestsRail.getByText('Teddy Afro')).toHaveCount(0);
   });
 
-  test('renders the ended notice with a working Browse CTA', async ({ page }) => {
+  test('renders one ended status and a working Browse action on a narrow screen', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
     await page.goto(`/events/${ENDED_SLUG}`);
     await expect(page.getByRole('heading', { name: 'Wrapped Show' })).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByRole('heading', { name: 'This event has ended' })).toBeVisible();
-    await expect(page.getByText('Aug 1, 2020')).toBeVisible();
+    await expect(page.getByText('Event ended', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('Event ended', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: /Browse upcoming events/ }).click();
-    await expect(page.getByRole('heading', { name: 'Worth showing up for.' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Browse events' }).click();
+    await expect(page).toHaveURL(new URL('/', page.url()).href);
   });
+});
+
+test('explicit empty coverage is an event pass even when its name is generic', async ({ page }) => {
+  const all = { ...PRODUCTS.data[0], name: 'Standard Admission', covered_event_date_ids: [], ticket_type: { ...PRODUCTS.data[0].ticket_type, admissions_per_unit: 1 } };
+  const one = { ...PRODUCTS.data[1], name: 'Weekend Pass', covered_event_date_ids: ['d1'] };
+  await page.route(apiRoute(), route => {
+    const path = apiPath(route.request().url());
+    const data = path === `/public/events/${MULTI_SLUG}` ? multiDayDetail().data : path.endsWith('/products') ? [all, one] : path.endsWith('/dates') ? multiDayDetail().data.event_dates : [];
+    return route.fulfill({ json: { success: true, data } });
+  });
+  await page.goto(`/events/${MULTI_SLUG}`);
+  await expect(page.getByRole('heading', { name: 'Standard Admission', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Weekend Pass', exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: /Day 2/ }).click();
+  await expect(page.getByRole('heading', { name: 'Standard Admission', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Weekend Pass', exact: true })).toHaveCount(0);
+});
+
+test('a partial multi-day offer never claims entry to the whole festival', async ({ page }) => {
+  const partial = { ...PRODUCTS.data[0], name: 'Two-night ticket', covered_event_date_ids: ['d1', 'd2'] };
+  const final = { ...PRODUCTS.data[1], name: 'Final night', covered_event_date_ids: ['d3'] };
+  await page.route(apiRoute(), route => {
+    const path = apiPath(route.request().url());
+    const data = path === `/public/events/${MULTI_SLUG}` ? multiDayDetail().data : path.endsWith('/products') ? [partial, final] : path.endsWith('/dates') ? multiDayDetail().data.event_dates : [];
+    return route.fulfill({ json: { success: true, data } });
+  });
+  await page.goto(`/events/${MULTI_SLUG}`);
+  await expect(page.getByRole('tab', { name: /All days/i })).toHaveCount(0);
+  await page.getByRole('tab', { name: /Day 3/ }).click();
+  await expect(page.getByRole('heading', { name: 'Final night', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Two-night ticket', exact: true })).toHaveCount(0);
+  await expect(page.getByText('All 3 days', { exact: true })).toHaveCount(0);
 });

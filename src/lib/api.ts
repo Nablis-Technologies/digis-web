@@ -19,6 +19,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { getSession, setSession, clearSession, type Session } from '@/lib/session';
 import { toApiError } from '@/lib/errors';
+import { routeDevelopmentMedia } from '@/lib/dev-storage-routing';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 
@@ -62,8 +63,12 @@ export function randomUuid(): string {
   return randomIdempotencyKey();
 }
 
-apiClient.interceptors.request.use((config) => {
+type SessionRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean; _digisUserId?: string | null };
+
+apiClient.interceptors.request.use((config: SessionRequestConfig) => {
   const session = getSession();
+  if (config._digisUserId === undefined) config._digisUserId = session?.user.id ?? null;
+  if (config._digisUserId !== (session?.user.id ?? null)) throw new Error('The account changed before this request could finish.');
   if (session?.access_token) {
     config.headers.set('Authorization', `Bearer ${session.access_token}`);
   }
@@ -76,17 +81,22 @@ apiClient.interceptors.request.use((config) => {
 
 /* ─── 401 → refresh → retry (single-flight) ─── */
 
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: { key: string; promise: Promise<string | null> } | null = null;
 
 /**
  * Refresh the access token once and share the result across concurrent 401s.
  * On failure (revoked/expired refresh token) clears the session and returns null.
  */
 async function getNewAccessToken(): Promise<string | null> {
-  if (!refreshInFlight) {
-    refreshInFlight = doRefresh().finally(() => { refreshInFlight = null; });
+  const session = getSession();
+  if (!session) return null;
+  const key = `${session.user.id}:${session.refresh_token}`;
+  if (!refreshInFlight || refreshInFlight.key !== key) {
+    const flight = { key, promise: doRefresh() };
+    flight.promise = flight.promise.finally(() => { if (refreshInFlight === flight) refreshInFlight = null; });
+    refreshInFlight = flight;
   }
-  return refreshInFlight;
+  return refreshInFlight.promise;
 }
 
 async function doRefresh(): Promise<string | null> {
@@ -98,12 +108,14 @@ async function doRefresh(): Promise<string | null> {
     const res = await axios.post<{
       data?: { access_token: string; refresh_token: string; user?: unknown };
     }>(`${BASE_URL}/auth/refresh`, { refresh_token: session.refresh_token });
+    const current = getSession();
+    if (!current || current.user.id !== session.user.id || current.refresh_token !== session.refresh_token) return null;
     const data = res.data?.data;
     if (data?.access_token && data?.refresh_token) {
       setSession({
         access_token: data.access_token,
         refresh_token: data.refresh_token,
-        user: (data.user ?? session.user) as Session['user'],
+        user: (data.user ?? current.user) as Session['user'],
       });
       return data.access_token;
     }
@@ -114,7 +126,8 @@ async function doRefresh(): Promise<string | null> {
     // (rate limit 429, 5xx, offline) must keep the stored session — otherwise a
     // momentary backend hiccup silently logs the user out on the next reload.
     const status = axios.isAxiosError(e) ? e.response?.status : undefined;
-    if (status === 401 || status === 403) clearSession();
+    const current = getSession();
+    if ((status === 401 || status === 403) && current?.user.id === session.user.id && current.refresh_token === session.refresh_token) clearSession();
     return null;
   }
 }
@@ -124,9 +137,10 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (!axios.isAxiosError(error)) return Promise.reject(error);
     const status = error.response?.status;
-    const config = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const config = error.config as SessionRequestConfig | undefined;
 
     if (status === 401 && config && !config._retry && !(config.url ?? '').includes('/auth/refresh')) {
+      if (!config._digisUserId || config._digisUserId !== getSession()?.user.id) return Promise.reject(error);
       config._retry = true;
       const token = await getNewAccessToken();
       if (token) {
@@ -181,7 +195,9 @@ export async function apiFetch<T = unknown>(
     });
     const body = res.data;
     return {
-      data: (body?.data ?? undefined) as T,
+      data: import.meta.env.DEV && BASE_URL === '/__digis_api'
+        ? routeDevelopmentMedia(body?.data as T)
+        : (body?.data ?? undefined) as T,
       pagination: body?.pagination,
     };
   } catch (e) {

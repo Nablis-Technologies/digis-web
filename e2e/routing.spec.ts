@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const API = 'http://localhost:3000';
-// The `attendee` fixture (db/seeds/preview.rb) is seeded with an active paid
-// ticket on the preserved `chapa-test-event` — unlike the plain buyer, who has
-// no seeded ticket (the mock-mirror purges registrations/tickets on reseed).
+// The dev seed gives the `attendee` an active ticket on `chapa-test-event`
+// (db/seeds/dev_extensions.rb) — unlike the plain buyer, who has no seeded
+// ticket.
 const BUYER = '+251911000003';
 const BUYER_PASSWORD = 'password123';
 
@@ -49,7 +49,8 @@ test.describe('routing', () => {
   test('direct deep link to /signup renders the signup form', async ({ page }) => {
     await page.goto('/signup');
     await expect(page.getByRole('heading', { name: 'Create an account' }).first()).toBeVisible();
-    await expect(page.getByPlaceholder('Name', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder('Given name')).toBeVisible();
+    await expect(page.getByPlaceholder("Father's name")).toBeVisible();
   });
 
   test('discovery search is written to ?q= and survives reload', async ({ page }) => {

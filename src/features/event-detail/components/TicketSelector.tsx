@@ -1,7 +1,7 @@
 import type { Event, TicketTier } from '@/types';
 import { TicketTypeCard } from './TicketTypeCard';
 import { Spinner, LoadErrorCard } from '@/components/loading';
-import { glassControl, type GlassReflectionSettings } from '@/lib/ui/glass';
+import type { GlassReflectionSettings } from '@/lib/ui/glass';
 
 export function TicketSelector({
   event,
@@ -32,7 +32,7 @@ export function TicketSelector({
 }) {
   // An offer that accepts a waitlist keeps the section actionable even when
   // every offer is sold out — do not dim/freeze the grid in that case.
-  const anyWaitlist = ticketTypes.some((t) => t.available === 0 && t.waitlistEnabled === true);
+  const anyWaitlist = !!onJoinWaitlist && ticketTypes.some((t) => t.id && t.available === 0 && t.waitlistEnabled === true);
   const blocked = isSoldOut && !anyWaitlist;
   if (loadError) {
     return <LoadErrorCard message="Tickets for this event could not be loaded." onRetry={onRetry ?? (() => {})} />;
@@ -58,25 +58,14 @@ export function TicketSelector({
       <div className="flex items-center justify-center gap-4 mb-3">
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent" />
         <h2 className="text-[12px] tracking-[3px] uppercase" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: isDark ? 'rgba(244,255,128,0.6)' : 'rgba(0,0,0,0.55)' }}>
-          {blocked ? 'Sold Out' : 'Select Your Ticket'}
+          {blocked ? 'Sold Out' : isSoldOut && anyWaitlist ? 'Ticket Waitlist' : 'Select Your Ticket'}
         </h2>
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent" />
       </div>
 
       {/* Availability indicator */}
-      {blocked ? (
-        <div className="flex items-center justify-center gap-2 mb-7">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={glassControl(isDark, 'danger')}>
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#ff3b30' }} />
-            <span className="text-[10px] tracking-[1.5px] uppercase"
-              style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,100,90,0.9)' : 'rgba(200,40,30,0.85)', fontWeight: 600 }}>
-              All tickets sold out
-            </span>
-          </div>
-        </div>
-      ) : event.ticketsLeft != null && (
-        <div className="flex items-center justify-center gap-1.5 mb-7">
+      {!isSoldOut && event.ticketsLeft != null && (
+        <div className="flex items-center justify-center gap-1.5 mb-3">
           <span className="relative flex w-1.5 h-1.5">
             <span className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping"
               style={{ background: '#d6f905' }} />
@@ -95,7 +84,7 @@ export function TicketSelector({
         {ticketTypes.map((type, index) => (
           <TicketTypeCard key={type.name} type={type} selected={selectedTicketType === type.name}
             onSelect={() => !isSoldOut && onSelectTicketType(type.name)}
-            onJoinWaitlist={onJoinWaitlist ? () => onJoinWaitlist(type) : undefined}
+            onJoinWaitlist={type.id && onJoinWaitlist ? () => onJoinWaitlist(type) : undefined}
             index={index} reflectionSettings={reflectionSettings} />
         ))}
       </div>

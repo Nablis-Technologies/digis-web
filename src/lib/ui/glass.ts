@@ -170,12 +170,14 @@ export function glassInputSurface(isDark: boolean): CSSProperties {
  * (the message under the field still carries the failure). The reflected
  * hairline comes from a `GlassReflection` overlay on the wrapper.
  */
-export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean } = {}): CSSProperties {
+export function glassField(isDark: boolean, opts: { error?: boolean; focused?: boolean; shadow?: boolean } = {}): CSSProperties {
   const out = glassInputSurface(isDark);
+  const shadow = opts.shadow === false ? "" : `${out.boxShadow}, `;
   if (opts.error) {
-    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(248,113,113,0.5)" : "rgba(190,18,60,0.4)"}`;
+    out.boxShadow = `${shadow}inset 0 0 0 1px ${isDark ? "rgba(248,113,113,0.5)" : "rgba(190,18,60,0.4)"}`;
   } else if (opts.focused) {
-    out.boxShadow = `${out.boxShadow}, inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.4)" : "rgba(124,154,0,0.34)"}`;
+    out.boxShadow = `${shadow}inset 0 0 0 1px ${isDark ? "rgba(214,249,5,0.4)" : "rgba(124,154,0,0.34)"}`;
   }
+  else if (opts.shadow === false) out.boxShadow = "none";
   return out;
 }

@@ -78,14 +78,14 @@ describe('audienceModule.authorizeAny — gate across tiers', () => {
 describe('audienceModule.resolveProof — one input, code or invitation', () => {
   it('returns an access-code proof when the value is a valid code', async () => {
     mockedApiFetch.mockResolvedValue({ data: { authorized: true, reason: 'access_code' } } as never);
-    expect(await audienceModule.resolveProof(['tt-1'], 'DRILL-CODE')).toEqual({ accessCode: 'DRILL-CODE' });
+    expect(await audienceModule.resolveProof(['tt-1'], 'DRILL-CODE')).toEqual({ accessCode: 'DRILL-CODE', authorizedTicketTypeIds: ['tt-1'] });
   });
 
   it('falls back to an invitation proof when the code attempt is rejected', async () => {
     mockedApiFetch
       .mockRejectedValueOnce(new ApiError('invalid code', 422, 'no_valid_code_or_invitation'))
       .mockResolvedValueOnce({ data: { authorized: true, reason: 'invitation' } } as never);
-    expect(await audienceModule.resolveProof(['tt-1'], 'tok-1')).toEqual({ invitationToken: 'tok-1' });
+    expect(await audienceModule.resolveProof(['tt-1'], 'tok-1')).toEqual({ invitationToken: 'tok-1', authorizedTicketTypeIds: ['tt-1'] });
   });
 
   it('returns null when neither a code nor a token authorizes', async () => {
@@ -103,7 +103,7 @@ describe('audienceModule.resolveProof — one input, code or invitation', () => 
 describe('audienceModule.proveInvitation — link token', () => {
   it('returns an invitation proof when the token authorizes', async () => {
     mockedApiFetch.mockResolvedValue({ data: { authorized: true, reason: 'invitation' } } as never);
-    expect(await audienceModule.proveInvitation(['tt-1'], 'tok-1')).toEqual({ invitationToken: 'tok-1' });
+    expect(await audienceModule.proveInvitation(['tt-1'], 'tok-1')).toEqual({ invitationToken: 'tok-1', authorizedTicketTypeIds: ['tt-1'] });
     const [, opts] = mockedApiFetch.mock.calls[0];
     expect((opts?.body as Record<string, unknown>).invitation_token).toBe('tok-1');
   });

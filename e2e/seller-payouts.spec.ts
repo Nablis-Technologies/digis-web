@@ -1,3 +1,4 @@
+import { apiPath, apiRoute } from './support/api';
 import { test, expect, type Route } from '@playwright/test';
 
 /**
@@ -80,9 +81,9 @@ test('seller cashes out the full balance → POST carries amount + account + key
   let postBody: unknown;
   let postKey: string | undefined;
 
-  await page.route('http://localhost:3000/**', async (route) => {
+  await page.route(apiRoute(), async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(request.url());
     if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
 
     if (path === '/marketplace/seller/balance') return fulfillJson(route, 200, { success: true, data: [BALANCE] });
@@ -128,9 +129,9 @@ test('seller cashes out the full balance → POST carries amount + account + key
 test('no verified destination → offers to add a payout method instead of cashing out', async ({ page }) => {
   test.setTimeout(90_000);
 
-  await page.route('http://localhost:3000/**', async (route) => {
+  await page.route(apiRoute(), async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(request.url());
     if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
     if (path === '/marketplace/seller/balance') return fulfillJson(route, 200, { success: true, data: [BALANCE] });
     if (path === '/marketplace/seller/payout_accounts') return fulfillJson(route, 200, { success: true, data: [accountWire('pending_verification')] });

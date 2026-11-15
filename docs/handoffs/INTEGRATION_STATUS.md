@@ -7,6 +7,384 @@
 > **Hard constraint:** user is the FRONTEND dev. NO backend schema changes.
 > Backend gaps are flagged for the backend dev, not worked around by changing the API.
 
+## Session 2026-11-02 — organizer-created tickets missing admission coverage
+
+NOT_BACKEND_GAPS audit completed: replaced stale classifications with a compact
+current summary and archived prior evidence. Fixed attendee artist follow IDs,
+saved artist/organizer follow reads (paginated, account-scoped), confirmed writes,
+failure retention and read retry. Primary organizer now remains alongside co-hosts
+with ID deduplication. No organizer/admin source changes.
+
+Reopened backend #38: supported `requires_ticket:true` extra receives an
+extras-only quote for a buyer with no event ticket. Probe created no order,
+reservation or payment. Invitation delivery still defaults to a no-op sender;
+seller settlement remains unverified; no messages or payouts were sent. HTTPS
+payment return and callback health both 200. Venue media/coordinates and product
+prices confirmed live. Organizer stats/pagination follow-ups recorded as O-03/O-04.
+
+Validation: **79 controlled browser/API tests, 259 units, TypeScript and build
+passed**. Three new follow regressions are part of the deterministic suite.
+
+Ownership re-audit: O-01 is shared with backend #80. Product activation accepts
+zero admission grants, and publication readiness does not catch incomplete
+active tickets. O-02's missing flag is an organizer omission: authenticated reads
+confirm no rule on affected events; a configured rule returns the correct public
+signal. Existing backend recurrence API/configuration/materialization and public
+projection tests pass: **52 tests, 218 assertions**. Initial run hit stale preview
+seed data in the isolated test database; cleared only that guarded test database
+and reran successfully. No development event changes or backend product edits.
+
+Attendee recurrence follow-up: mobile detail omitted the format badge already
+present on desktop. Added the existing FormatTag to the mobile hero. Recurring
+browser fixtures now mirror public `is_recurring`, bounded previews and the full
+dates endpoint. Nine recurring/multi-day browser regressions pass; live Jazz
+checks pass on desktop/mobile with seven selectable sessions. TypeScript,
+259 unit tests and build pass (Vitest needed unsandboxed retry for Windows temp
+cache permissions). Organizer-created series return false recurrence flags;
+recorded the missing organizer recurrence persistence as O-02, without code edits.
+
+Developer-ready explanation, evidence, expected behavior and acceptance tests:
+[organizer gap O-01](../ORGANIZER_GAPS.md#o-01-published-tickets-have-no-admission-coverage).
+
+Bozo/Mozooo Check Availability is a real server state, not an attendee card bug:
+both active GA offers have four per-date stock pools but zero admission access
+rows. Organizer form omitted access/allocation configuration and swallowed
+activation failures. **Organizer changes REVERTED at the user's request:** we own
+the attendee frontend only. Organizer form, shared store, canonical collection
+and added organizer tests were restored/removed; digis-apps is clean. Missing
+access/allocation setup belongs to the organizer developers. No backend product
+code changes. Attendee availability mapping remains correct.
+
+Backend defensive validation recorded as #80: activation accepts empty admission
+coverage, then public availability correctly becomes unavailable. Existing
+active offers cannot be edited and retirement is permanent. **Do not modify
+Bozo/Mozooo:** user clarified organizer work is out of scope. Leave coverage and
+operational repairs to the organizer/backend engineers. Read-only recheck after
+reversion still returns unavailable/available:false/zero covered dates for both.
+No event/product/order data
+changed during this investigation; browser mutation responses were intercepted.
+
+## Session 2026-11-02 — RSVP/source coverage, unique covers and real form wiring
+
+Imported Pazimo's separate public RSVP source (Tempo Friday) with poster/details/
+host and six original questions. Catalog now owns 21 public showcase events across
+nine categories; other user-created events and the existing order were preserved.
+Prepared all four audiences, free invitation-only RSVP, mixed public/code offers,
+free waitlist, paid manual application, both Saltland proofs and public SHOWCASE10.
+No backend product patches or terminal financial states were manufactured.
+
+Coffee/Jazz and City Cup/Community Run now have distinct covers; each owned public
+cover has unique bytes and each carousel excludes a repeat of its own cover.
+Live verification: 21 unique covers / 203 image URLs / 11 venues passed.
+
+Frontend free automatic action is RSVP; generic gated discovery copy is Access
+Required. Invitations only reveal authorized ticket types; partial unlock keeps
+the remaining gate and proof changes clear stale selection. Published ordinary
+checkout forms now render/validate/serialize canonical fields, option keys,
+per-form versions and attendee coordinates; failed schemas block with Retry.
+Gift handling retained. These were frontend integration gaps exposed by real
+source content, not missing backend fields.
+
+Validation: 74 controlled browser/API tests, 11 source/live integration checks,
+259 units, typecheck/build passed. Seed 3 tests/1,203 assertions and Ruby style
+passed. Both final review axes clear. Real Tempo UI test stops before admission;
+controlled tests assert its submission semantics without provider transactions.
+Coverage/inputs/blocked surfaces: `digis_backend/docs/operations/showcase-coverage.md`.
+New #79 records missing public online/hybrid attendance projection; frontend watch
+integration also remains separate. #77/#78 remain documented, with no invented
+seed flags or broken parking fixture added to disguise them.
+
+## Session 2026-11-01 — showcase diversity and cover-first carousel
+
+Catalog expanded additively to 20 public events/all nine categories. New public
+examples: Tech Forum (Conference), Family Makers (Workshop + Family), Coffee &
+Connections (Networking), Community Run (Charity). Public manual approval,
+waitlist, supported merchandise/food/donation/digital extras and resale/transfer
+policy variants are prepared. Existing recurring Jazz, three-day festival,
+two/three-day Camping, free/group/gated/sold-out/ended fixtures retained.
+
+Adapter now places the selected cover first in the detail carousel, sorts other
+media by position and deduplicates URLs; desktop/mobile browser tests red→green.
+Live UI tests explicitly select a Jazz session and festival day. Backend list
+lacks a multi-day format signal (#77); parking public projection crashed during
+validation (#78), so the new unsupported parking fixture was replaced with a
+supported digital add-on. Both gaps documented; no backend product patches.
+
+Seed 3 tests/1,102 assertions; 20 events/nine categories/10 venues/190 image URLs
+passed. Four live showcase/media checks passed. Units259/typecheck/build passed.
+Final Standards/Spec reviews clear. Full frontend browser/API gate: 69 passed
+(1.5m). Desktop/mobile cover-first screenshots inspected. Original order graphs
+were not rebuilt.
+Report: `digis_backend/docs/operations/showcase-capabilities-2026-11-01.md`.
+
+## Session 2026-11-01 — tunnel image routing fixed
+
+User reported missing images on HTTPS Cloudflare event detail. API media URLs
+were absolute `http://localhost:3000/rails/active_storage/...`; direct local asset
+verification missed the remote browser-origin problem. Dev API responses now
+route only local Rails storage URLs through `/__digis_api`, including venue
+images. Vite rewrites local storage redirect Locations onto the same proxy.
+External URLs and production API behavior are unchanged. No backend edits.
+
+New live browser regression blocks direct port-3000 access and requires event
+and venue image decoding through the same-origin proxy; reproduced red then green.
+67 controlled browser/API tests, eight live detail/media checks, 259 units,
+typecheck and build passed. Actual HTTPS tunnel image chain returned 200
+image/jpeg (57,957 bytes), final origin HTTPS tunnel. Full headless navigation
+through the tunnel timed out; local browser regression and tunneled HTTP image
+verification passed independently. `e2e/media-routing.spec.ts` belongs to the live
+browser gate because it requires real Rails storage/seed media.
+
+## Session 2026-11-01 — local showcase database rebuilt
+
+User explicitly authorized dev seed/scraper cleanup and local database reset.
+Development only rebuilt with backup; test DB, volume, uploaded files and existing
+backend working-tree edits preserved. No backend product code/migration edits.
+Public catalog: 16 complete events, 13 source posters and three illustrative
+scenario covers; internal fixtures private. Local asset cache/digest checks replace
+1×1 placeholders. Date generation now uses Addis local time. No fabricated paid
+Featured outcomes; live Featured remains empty pending a real placement purchase.
+
+Final verification: seed 3 tests/897 assertions; 16 events/four categories/10 venues
+and 166 image URLs passed live API/media checks; ten frontend discovery/detail
+tests passed. Desktop/mobile screenshots inspected. The fresh local schema has
+the gift-line column; #76 remains an upgrade defect elsewhere, not a newly fixed
+backend contract. Live gifts/payment were not re-certified by this seed reset.
+Report: `digis_backend/docs/operations/showcase-rebuild-2026-11-01.md`.
+
+## Session 2026-11-01 — remaining consumer UI and account claim complete
+
+Age display distinguishes missing metadata from explicitly unrestricted events.
+Festival offers preserve empty/all-date coverage and keep partial coverage out of
+All Days. Paid placements have Featured labels and a server-backed Featured only
+filter with failure/retry handling. Legacy profiles link to the existing name editor.
+
+Guest ticket Save to my account now shares auth OTP/password fields: six-digit
+validation, show/hide, field errors, resend, focus management and pending guards.
+Transient claim retries reuse verified proof and the same idempotency key;
+sign-in retries after a successful claim do not repeat the claim.
+
+Validation: 67 controlled browser/API tests, 259 unit tests, typecheck and build
+passed; eight live auth/discovery checks passed. The category regression now
+correlates its exact filtered response and verifies category membership plus the
+rendered result. Desktop/mobile light/dark claim UI inspected; both review axes clear.
+Claim API failure cases use controlled HTTP responses; live SMS delivery was not
+certified. No backend product changes. Gift acceptance still awaits #76; the earlier
+real payment acceptance below was not repeated in this UI pass.
+Evidence: `.scratch/remaining-handoff-2026-11-01/spec.md`.
+
+## Session 2026-11-01 — backend pulled, batch frontend wired, payment green
+
+Backend remote `c15d6ff3` merged as `5c2890c7` (six new commits); pre-existing
+seed/catalog edits preserved. No backend product patches. All documented gap
+entries swept; only gifts/payment expose new frontend obligations.
+
+Batch gifting: multiple recipients, quantity-one items, stable UUID line_id
+through shared admission/OTP serialization, reload-safe identifier-only draft,
+returned gift mapping and recipient-ordered delivery statuses. Controlled
+successful checkout follows actual delivery link. Browser regressions pass.
+**#74 partial/wired; #76 newly blocks live gifts:** client_line_id was added to
+an already-run migration, and the existing database lacks it. No schema repair.
+
+**#75 resolved for new purchases:** after restarting pre-pull Rails/workers,
+real Chapa sandbox acceptance passed (30.2s): confirmation, exact-order ticket,
+QR decoding and fresh wallet read after reload. Historical expired payments were
+not replayed/repaired. Initial pre-restart run failed with incomplete verification;
+fresh-process verification and a clean seeded-buyer acceptance established fix.
+
+Validation: 55 browser/API tests, 259 units, typecheck and production build pass.
+Both final review axes clear. UI desktop/mobile inspected; existing design kept.
+Open blocking #53 seat_map/#57/#73/#76; partial #74; degrading
+#44/#46/#48/#67/#71/#72 unchanged. Next: backend engineer's #76 forward migration,
+then real gift acceptance; remaining earlier handoff UI items remain separate.
+Evidence: `.scratch/backend-wireup-2026-11-01/spec.md` and `gap-sweep.md`.
+
+## Session 2026-10-28 — critical frontend test quality
+
+Frontend critical regressions require exact payment proof and usable active
+credentials, isolate wallet caches and reject stale authentication races.
+Removed wallet-only success/placeholder QR. Added QR decoding, transfer wallet
+outcomes, same-URL avatar refresh and stricter checkout/wallet/discovery tests.
+Mocks recognize the actual Vite proxy. 52 controlled browser/API tests, 259 units,
+typecheck and build passed.
+
+After user started Docker, managed Rails/web and both payment tunnels became
+healthy. Real `pnpm test:acceptance` completed UI login/checkout and Chapa sandbox
+bank payment, then **FAILED after 240s without purchase confirmation/ticket**.
+08:09:02 UTC success webhook ignored/unmatched; preceding pending webhook
+matched/processed. Automatically reproduced #75; evidence added to that gap.
+Backend product code unchanged. This gate now catches the paid-without-ticket
+failure instead of accepting a handled error as success.
+
+`pnpm test:frontend` is controlled API testing; `pnpm test:acceptance` requires
+real sandbox fulfillment/decoded QR/reload persistence. `pnpm test:release`
+combines checks. Full payment acceptance is red, not certified. Detailed evidence:
+`.scratch/test-quality-2026-10-28/spec.md`.
+
+## Session 2026-10-26 — Jazz receipt matched; blocking backend #75
+
+Broader differential audit confirms runtime/file config and code consistency,
+latest remote unchanged, authenticated webhook + immediate job processing.
+Historical September30 Render success is documented. No recent code regression
+or provider response change proved. Current merchant verification fails while
+receipt verification succeeds; #75 captures both provider and correlation
+evidence. See diagnostic spec for checked possibilities and remaining limits.
+
+
+Second live order at 19:26 Nairobi reproduces #75 with both tunnels healthy.
+Receipt HCCePSUoB7pn verifies SUCCESS ETB410.00 and matches new order exactly;
+success webhook arrived eight seconds after order creation and was ignored.
+Transport is working; this is backend correlation, not a lost tunnel callback.
+
+
+Receipt `HCGyXsbvSn5r` verifies SUCCESS for 41000 minor ETB (ETB 410.00).
+Its returned merchant reference exactly matches the failed/expired Jazz order.
+The success webhook arrived before expiry but was marked ignored/payment_id null:
+it carried Chapa reference but merchant_reference null; local provider_reference
+was absent. Stored-reference verification returns not_found although receipt
+verification succeeds. No tickets were issued. Full evidence and backend engineer
+reconciliation request filed in `docs/BACKEND_GAPS.md` **#75** immediately.
+The earlier unresolved/provider-setup-only assessment is superseded by this
+positive provider/order match. No backend product changes or payment/ticket
+mutations. Open blocking now #53 seat_map, #57, #73, #74, #75.
+
+## Session 2026-10-26 — payment return recovery and startup fixes
+
+User reported Jazz Sessions paid but no return/success/ticket. Fixed persisted
+pending-order reconciliation after reload, exact-route opening of the confirmed
+ticket before wallet refetch catches up, and retaining pending state at UI timeout.
+The confirmed snapshot is identity-scoped; logout clears ticket view state.
+Root `Start Digis.cmd` now invokes existing `-Payments` setup and opens the same
+HTTPS app origin as the provider return. Return URL and callback host health are
+200. No backend product changes or manual ticket/payment mutations.
+
+20 focused browser checks pass (checkout/payment/gifts plus guest OTP), as do
+typecheck, 259 unit tests and build; both review axes cleared. The Jazz order
+itself is expired/payment failed `not_found` with no issued ticket, and read-only
+provider checks return `not_found`. Successful receipt reference requested; do not
+claim the reported charge is reconciled or real settlement verified.
+Detailed reproduction, evidence and limits: `.scratch/payment-return-diagnosis/spec.md`.
+Wallet answer implementation paused for this urgent report; its draft test is
+preserved under `.scratch/handoff-wireup-2026-10-26/` outside active e2e.
+
+## Session 2026-10-26 — batch gift contract check
+
+Batch gifting is blocked by new backend gap **#74**. Committed backend `55f535dd`
+rejects repeated products in selection/guest OTP/quote and maps gift intents by
+product ID. The attachment's separate quantity-one recipients for the same ticket
+cannot be wired safely. Issue 01 is blocked; single-recipient gifting is unchanged.
+No backend files edited. Next unblocked frontend item: wallet answer read/revise
+(issue 02). Open blocking gaps now #53 seat_map, #57, #73, #74; degrading gaps
+remain #44, #46, #48, #67, #71, #72.
+
+## Session 2026-10-26 — gift recipient and payer delivery wiring
+
+The attachment audit found earlier “all wired” notes overstated service helpers
+as complete UI. Gift recipient/core payer work is now implemented:
+
+- `gift-link.ts` captures/scrubs fragment links before mount, retains capabilities
+  only in memory, handles malformed IDs and scrubs legacy query links. Refreshing
+  the clean route requires reopening the original link.
+- `ClaimGiftPage` renders versioned/scoped questions and consent content/evidence,
+  preserves submitted answers for consent-only continuation, handles retry and
+  sign-in recovery, and renders QR only after claimed + active credential.
+  Recipient query and mutation responses are removed from cache on unmount.
+- Optional recipient email is carried through checkout. Gift-only auth/guest
+  payment returns now recognize exact server succeeded payment + fulfilled order,
+  rather than waiting for a ticket in the payer wallet.
+- `/orders/:orderId/gifts` is an authenticated, refresh-safe delivery/status/resend
+  destination linked from confirmation. Guest payers sign in/create the purchasing
+  account for tracking. Feedback does not claim delivery before server evidence.
+
+Typecheck, 259 unit tests, build and both reviews pass. All **57 browser tests**
+passed with an ignored temporary direct-API test config. Normal proxy config had
+39 passes/18 failures from older direct-URL mocks/observers; the **11 gift tests**
+work with proxy and direct API. Tracked Vite/environment config was preserved and
+normal dev server restored. Dark/light desktop/mobile gift form inspected.
+Backend `/up` is now reachable; live venue seed verification also passed.
+Gift-specific tests control the HTTP boundary: no real Chapa settlement/SMS
+or live recipient-token claim is asserted by this run.
+
+**Batch checkout is blocked by backend #74. Still unblocked frontend work:** wallet answer read/revise
+UI (#50 metadata alone is not completion); separate required names and avatar
+cache refresh; unknown age, empty coverage and promoted badges/filter. These are
+tracked in `.scratch/handoff-wireup-2026-10-26/issues/`. No backend product edits.
+
+## Session 2026-10-24 — full open backend gap re-verification
+
+Fetched backend origin; tracked remote remains `8419aaaf`, local HEAD `55f535dd`
+(ahead 10 / behind 0). Committed app/routes/schema are identical to the fetched
+remote. All ten open entries checked; no newly resolved API contract to wire.
+
+Corrected #44 to the remaining inert public_guest_limit field; obsolete
+admission keys are superseded. Reclassified #65 to provider-recipient/settlement
+verification in NOT_BACKEND_GAPS (not fixed, not proven successful). Corrected
+#72's impact for the existing schedule-probe mitigation and its preview predicate.
+Open now: blocking #53 seat_map / #57 / #73; degrading #44/#46/#48/#67/#71/#72.
+The resolved/partial wiring sweep found existing consumers in place, including
+payment refresh, incoming transfer accept, age/lineup/recurrence/date allocations,
+registration answers and discovery filters.
+
+Tracked frontend-only Settings honesty work under
+`.scratch/backend-gap-audit-2026-10-24/issues/01-settings-unbacked-controls.md`.
+Full evidence: `.scratch/backend-gap-audit-2026-10-24/spec.md`.
+Docker Desktop started, but engine unavailable and localhost:3000 refused
+connection; source audit only, no new live/provider verification or payouts.
+Backend working changes were preserved; no backend files were edited.
+
+## Session 2026-10-24 — fabricated consumer profile content removed
+
+`ProfilePage.tsx` now renders authenticated identity/contact, Settings and
+wallet-backed tickets. Removed hardcoded Gold/Platinum tiers, XP/progress,
+attendance/spending/streak/city stats, membership year, achievement states and
+taste breakdown. Removed unsupported profile/year sharing buttons. Verification
+now requires the served `verified_at`; no fabricated handle is displayed.
+The wallet section is titled “Your tickets” because it does not establish future
+attendance. Ticket rows retain served content and no longer imply a missing click
+action. Backend code and achievement rules remain unchanged; #73 remains open.
+
+Checks: typecheck, 259 unit tests and production build pass (existing bundle
+warnings). Controlled-API browser inspection confirms identity, wallet ticket,
+absence of invented content/unverified badge, and Settings navigation on desktop
+and mobile in dark/light themes. Both Standards and Spec reviews are clear.
+No live backend verification was performed for this frontend-only cleanup.
+
+## Session 2026-10-24 — achievement ownership and backend dependency
+
+No achievement plan or contract was found in the checked-out backend code/docs.
+The user reiterated that backend behavior/API decisions belong to the backend
+developer. Filed BACKEND_GAPS.md **#73**, open — blocking the achievement detail
+sheet. Updated the tracked issue and prior #51 gamification deferral pointers.
+No attendance/purchase thresholds, XP, tiers, rewards or API shapes are approved;
+no backend code or achievement UI was changed. Resume frontend wiring only after
+the backend developer supplies the committed contract. Verification: source/doc
+inspection only; no live backend probe for this item.
+
+## Session 2026-10-24 — venue profile hydration
+
+Implemented `.scratch/web2-ui-import/issues/01-venue-detail-wireup.md` steps 1–4.
+The event adapter retains `venueId`; `lib/venues.ts` reads the public venue detail
+serializer. The location card and sheet share a cached read with loading/error
+and Retry feedback. Served profile/gallery photos, About, amenities, capacity,
+followers and social links render only when present. Decimal string coordinates
+produce map/Directions; missing coordinates produce neither. Deleted the
+hardcoded `venueCoords.ts` fallback. Backend product code is unchanged.
+
+The existing local-only Follow toggle now uses the authenticated, paginated
+following read and follow/unfollow commands. Server-confirmed state and follower
+count update cache and survive sheet reopening. Radix dialog handles focus and
+Escape; Directions has a 44px target. Sheets keep the plain theme surface.
+
+**Verification:** typecheck clean; 259 unit tests pass; production build passes
+(existing chunk warnings). Four controlled-API Playwright scenarios pass:
+hydration, no coordinates, fetch failure/retry, and follow/count/reopen/unfollow.
+Keyboard focus/Escape and desktop/mobile dark/light captures checked. Two-axis
+review found follow-state/count and touch-target issues, all fixed. The live
+seeded-event test was updated to compare the sheet with the venue API, but live
+verification/full-stack suite remain pending: localhost:3000 timed out and the
+Docker daemon is stopped. Run `npx playwright test e2e/event-detail.spec.ts` once
+that environment is running. No backend gap status changed.
+
 ## Session 2026-10-17e — no-image placeholders: the hashed avatar palette → the theme surface
 
 **Prompt:** *"for the extracting hues from posters but only if an image is [available];

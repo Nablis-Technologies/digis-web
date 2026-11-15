@@ -20,6 +20,8 @@ const PRICE_RANGES: { id: EventPriceFilter; label: string }[] = [
 export function FilterPanel({
   sortBy,
   onSortChange,
+  onlyFeatured,
+  onOnlyFeaturedChange,
   onlyAvailable,
   onOnlyAvailableChange,
   eventTypes,
@@ -30,6 +32,8 @@ export function FilterPanel({
 }: {
   sortBy: EventSortBy;
   onSortChange: (sortBy: EventSortBy) => void;
+  onlyFeatured: boolean;
+  onOnlyFeaturedChange: (value: boolean) => void;
   onlyAvailable: boolean;
   onOnlyAvailableChange: (value: boolean) => void;
   eventTypes: EventAccessFilter[];
@@ -47,6 +51,7 @@ export function FilterPanel({
 
   return (
     <>
+      <AppButton aria-pressed={onlyFeatured} onClick={() => onOnlyFeaturedChange(!onlyFeatured)} className="min-h-11 mb-4 px-3 py-2 rounded-xl text-sm" style={{ color: isDark ? '#fff' : '#1a1a1a', ...glassEdge(isDark) }}>{onlyFeatured && <Check className="w-3 h-3 inline mr-2" />}Featured only</AppButton>
       <FilterLabel>Event access</FilterLabel>
       <div className="flex flex-wrap gap-2 mb-4">
         {EVENT_TYPES.map((option) => (
@@ -90,7 +95,7 @@ export function FilterPanel({
       </AppButton>
 
       {activeFilterCount > 0 && (
-        <AppButton onClick={() => { onSortChange("soonest"); onOnlyAvailableChange(false); onEventTypesChange([]); onPriceRangeChange(null); }} className="mt-3 text-[11px] tracking-[1.2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)", fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2, textDecorationColor: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)" }}>Reset filters</AppButton>
+        <AppButton onClick={() => { onSortChange("soonest"); onOnlyAvailableChange(false); onOnlyFeaturedChange(false); onEventTypesChange([]); onPriceRangeChange(null); }} className="mt-3 text-[11px] tracking-[1.2px] uppercase" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)", fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2, textDecorationColor: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)" }}>Reset filters</AppButton>
       )}
     </>
   );

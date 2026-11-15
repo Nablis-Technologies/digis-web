@@ -132,41 +132,37 @@ test.describe('event detail', () => {
     }
   });
 
-  test('venue sheet invents nothing — no fabricated stats, About, amenities or events', async ({ page }) => {
-    // `VenueProfileSheet` receives a venue **name** only; the venue-detail
-    // wire-up (`GET /venues/:id`) is tracked in
-    // `.scratch/web2-ui-import/issues/01-venue-detail-wireup.md`. Until it lands,
-    // anything beyond the name/address/coords the event payload carries would be
-    // fabricated (ADR-0002). Pin both halves: the honest content is present and
-    // the invented sections are gone.
+  test('venue profile matches the public venue API on a seeded event', async ({ page }) => {
+    const eventRes = await page.request.get('http://localhost:3000/public/events/on-on');
+    expect(eventRes.ok()).toBeTruthy();
+    const event = (await eventRes.json()).data;
+    const summary = (event.event_dates_preview ?? event.event_dates ?? [event.next_event_date])[0]?.venue;
+    expect(summary?.id).toBeTruthy();
+    const venueRes = await page.request.get(`http://localhost:3000/venues/${summary.id}`);
+    expect(venueRes.ok()).toBeTruthy();
+    const venue = (await venueRes.json()).data;
     await page.goto('/events/on-on');
-    await expect(page.getByRole('heading', { name: 'On & On' })).toBeVisible({ timeout: 15_000 });
-
-    await page.getByRole('button', { name: /The Venue Warehouse/ }).first().click();
-    const sheet = page.getByRole('dialog', { name: /The Venue Warehouse/ });
-    await expect(sheet).toBeVisible({ timeout: 10_000 });
-
-    // Honest content — what the sheet can source from the event payload.
-    await expect(sheet.getByRole('heading', { name: 'The Venue Warehouse' })).toBeVisible();
-    await expect(sheet.getByRole('link', { name: 'Directions' })).toBeVisible();
-    await expect(sheet.getByRole('button', { name: 'Follow Venue', exact: true })).toBeVisible();
-    await expect(sheet.getByRole('button', { name: 'Share', exact: true })).toBeVisible();
-
-    // Invented content — absent, not faked.
-    for (const fabricated of [
-      'Events',
-      'Followers',
-      'Capacity',
-      'About',
-      'Amenities',
-      'Socials',
-      'Addis Vibes Festival',
-      'Skyline Sessions Vol. 4',
-    ]) {
-      await expect(sheet.getByText(fabricated)).toHaveCount(0);
-    }
+    await page.getByRole('button', { name: `View ${summary.name} venue profile`, exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: `${venue.name} venue profile` });
+    await expect(sheet.getByRole('heading', { name: venue.name, exact: true })).toBeVisible();
+    const directions = sheet.getByRole('link', { name: 'Directions', exact: true });
+    if (venue.latitude != null && venue.longitude != null) {
+      await expect(directions).toHaveAttribute('href', `https://www.google.com/maps/dir/?api=1&destination=${Number(venue.latitude)},${Number(venue.longitude)}`);
+    } else await expect(directions).toHaveCount(0);
+    expect(venue.profile_url, 'seed venue must carry its profile photo').toBeTruthy();
+    const profileImage = sheet.getByRole('img', { name: venue.name, exact: true });
+    expect(new URL((await profileImage.getAttribute('src'))!, page.url()).pathname.replace(/^\/__digis_api/, '')).toBe(new URL(venue.profile_url).pathname);
+    await expect.poll(() => profileImage.evaluate(image => image instanceof HTMLImageElement ? image.naturalWidth : 0)).toBeGreaterThan(1);
+    expect(venue.gallery_urls?.length, 'seed venue must carry gallery photos').toBeGreaterThan(0);
+    const galleryImage = sheet.getByRole('img', { name: `${venue.name} photo 1`, exact: true });
+    expect(new URL((await galleryImage.getAttribute('src'))!, page.url()).pathname.replace(/^\/__digis_api/, '')).toBe(new URL(venue.gallery_urls[0].medium || venue.gallery_urls[0].original).pathname);
+    await expect.poll(() => galleryImage.evaluate(image => image instanceof HTMLImageElement ? image.naturalWidth : 0)).toBeGreaterThan(1);
+    if (venue.description) await expect(sheet.getByText(venue.description, { exact: true })).toBeVisible();
+    else await expect(sheet.getByRole('heading', { name: 'About', exact: true })).toHaveCount(0);
+    if (venue.follower_count != null) await expect(sheet.getByText(Number(venue.follower_count).toLocaleString(), { exact: true }).first()).toBeVisible();
+    await expect(sheet.getByText('Events', { exact: true })).toHaveCount(0);
+    await expect(sheet.locator('img[src*="unsplash"]')).toHaveCount(0);
   });
-
   test('unknown slug redirects back to discovery', async ({ page }) => {
     await page.goto('/events/does-not-exist');
     await page.waitForURL('http://localhost:5173/', { timeout: 15_000 });

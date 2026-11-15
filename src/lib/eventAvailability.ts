@@ -10,7 +10,7 @@
 import type { Event } from '@/types';
 
 export function eventSoldOut(event: Pick<Event, 'soldOut' | 'ticketsLeft' | 'ticketAvailability'>): boolean {
-  if (event.ticketAvailability === 'sold_out') return true;
+  if (event.ticketAvailability) return event.ticketAvailability === 'sold_out';
   return event.soldOut === true || (typeof event.ticketsLeft === 'number' && event.ticketsLeft === 0);
 }
 
@@ -34,17 +34,17 @@ export function availabilityMeta(
     case 'available':
       return { badge: null, cta: 'Get Tickets', buyBlocked: false };
     case 'coming_soon':
-      return { badge: 'On Sale Soon', cta: 'View Info', buyBlocked: true };
+      return { badge: 'On Sale Soon', cta: 'View', buyBlocked: true };
     case 'sold_out':
       return { badge: 'Sold Out', cta: 'Join Waitlist', buyBlocked: true };
     case 'sales_closed':
       return { badge: 'Sales Closed', cta: 'View Details', buyBlocked: true };
     case 'no_public_tickets':
-      return { badge: 'Access Code Required', cta: 'Enter Access Code', buyBlocked: true };
+      return { badge: 'Invite only', cta: 'View Access Options', buyBlocked: true };
     case 'no_eligible_dates':
-      return { badge: 'Unavailable', cta: 'View Details', buyBlocked: true };
+      return { badge: 'No Tickets Right Now', cta: 'View', buyBlocked: true };
     case 'unavailable':
-      return { badge: 'Check Availability', cta: 'View Details', buyBlocked: true };
+      return { badge: 'Unavailable', cta: 'View', buyBlocked: true };
     default:
       break;
   }

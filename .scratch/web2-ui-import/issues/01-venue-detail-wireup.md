@@ -1,9 +1,6 @@
 # Wire the venue detail onto `GET /venues/:id` (drop the coords stopgap)
 
-- **Status:** `ready-for-agent` — **step 5's de-fabrication landed 2026-10-17**; the
-  wire-up (steps 1–4) is still owed, so this stays open. The **seed** already carries
-  venue geo + media (fixed 2026-10-15, backend `chore(dev)` `ec36172d`), so the
-  remaining steps read real data.
+- **Status:** implemented 2026-10-24; live seeded-event verification passed 2026-10-26 in the full browser suite.
 - **Blocked by:** nothing. This is **not a backend gap** — the API always served
   it; the seed was empty. See `docs/handoffs/DATA_INTEGRITY_AUDIT.md` → "Seed-side
   fixes (2026-10-15)".
@@ -13,7 +10,32 @@
   remove (the backend serves the real data on `GET /venues/:id`); reclassified
   2026-10-16, no longer a backend gap.
 
-## Done 2026-10-17 — step 5, the fabrication is gone
+## Implementation 2026-10-24 — steps 1–4
+
+`Event.venueId` now preserves the public schedule venue identity. `lib/venues.ts`
+types the actual public serializer (decimal coordinates may be strings; gallery
+entries are URL objects). `VenueSection` shares a React Query detail read between
+the location card and profile sheet, with loading and retry feedback.
+The sheet renders served description, profile/gallery photos, amenities, capacity,
+follower count and HTTP(S) social links only. `venueCoords.ts` is deleted; absent
+coordinates mean absent map/Directions. No event counts/history are invented.
+
+Follow now uses the existing authenticated following list (explicit pagination)
+and follow/unfollow commands. Confirmed following state and follower count update
+the query cache and survive closing the sheet. The sheet uses Radix dialog focus
+handling, Escape dismissal and opener focus restoration.
+
+Checks: typecheck, 259 unit tests and production build pass; four network-boundary
+Playwright scenarios pass (hydration, absent coordinates, fetch/retry, follow count
+and reopen/unfollow). Desktop/mobile dark/light captures inspected. The existing
+seeded-event guard now compares photos and directions with `GET /venues/:id`, but
+could not run: backend HTTP timed out and Docker's daemon is stopped. Run
+`npx playwright test e2e/event-detail.spec.ts` when the dev backend is running.
+
+The sections below preserve the original implementation context and checklist;
+their references to remaining work describe the October 17 state.
+
+## Historical progress 2026-10-17 — step 5
 
 `VenueProfileSheet` now renders only what the event payload's venue **name** can
 honestly support: the name, the stopgap address + coords/Directions link, the

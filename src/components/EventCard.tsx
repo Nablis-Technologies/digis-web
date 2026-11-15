@@ -1,3 +1,5 @@
+import { glassEdge } from '@/lib/ui/glass';
+import { FeaturedPlacementLabel } from '@/components/FeaturedPlacementLabel';
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronRight, Clock, MapPin, Radio } from "lucide-react";
@@ -5,7 +7,7 @@ import { useImageColor } from "@/lib/hooks/useImageColor";
 import { useTheme } from "@/app/components/ThemeContext";
 import type { Event } from "@/types";
 import { Money } from "@/lib/money";
-import { getCategoryColor } from "@/lib/categoryColors";
+import { EventCategoryTag } from "@/components/EventCategoryTag";
 import { EventDateBadge } from "@/components/EventDateBadge";
 import { FeaturedDateRangeBadge, FormatTag } from "@/components/EventFormatBadges";
 import { glassShadow } from "@/lib/ui/glass";
@@ -237,18 +239,12 @@ export function CountdownBadge({ event }: { event: Event }) {
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
           boxShadow: isLive
-            ? "0 0 0 1px rgba(255,255,255,0.3), 0 8px 20px rgba(220,38,38,0.3)"
+            ? "0 8px 20px rgba(220,38,38,0.3)"
             : "0 0 0 1px rgba(214,249,5,0.4), 0 8px 20px rgba(0,0,0,0.3)",
         }}
       >
         {isLive ? (
-          <motion.span
-            animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-            className="flex items-center"
-          >
-            <Radio className="w-2.5 h-2.5" strokeWidth={2.5} />
-          </motion.span>
+          <span className="flex items-center"><Radio className="w-2.5 h-2.5" strokeWidth={2.5} /></span>
         ) : (
           <motion.span
             animate={todayHot ? { scale: [1, 1.25, 1] } : { scale: 1 }}
@@ -275,10 +271,14 @@ export function EventCard({
   onClick,
   /** Above-the-fold cards skip lazy-loading so the first paint isn't gated. */
   eager = false,
+  soldOutTreatment = "glass",
+  statusRadius = 13,
 }: {
   event: Event;
   onClick: () => void;
   eager?: boolean;
+  statusRadius?: number;
+  soldOutTreatment?: "stamp" | "badge" | "footer" | "banner" | "glass" | "rail" | "ribbon" | "capacity" | "poster" | "muted" | "archived" | "leftRibbon";
 }) {
   const { rgb } = useImageColor(event.image);
   const { isDark } = useTheme();
@@ -287,14 +287,20 @@ export function EventCard({
   const availability = availabilityMeta(event);
   const isSoldOut = availability.badge === 'Sold Out';
   // Ended: server lifecycle wins; else the local past-date gate (#34).
+  const alternateSoldOut = isSoldOut && soldOutTreatment !== "stamp";
   const isEnded = event.eventLifecycle === 'ended' || eventEnded(event);
-  const isInactive = isSoldOut || isEnded || (availability.buyBlocked && event.ticketAvailability !== 'no_public_tickets');
+  const isInactive = isSoldOut || isEnded || event.ticketAvailability === 'sales_closed';
+  const muteAction = isEnded || (availability.buyBlocked && event.ticketAvailability !== 'coming_soon' && event.ticketAvailability !== 'no_public_tickets');
+  const ticketsUnavailable = event.ticketAvailability === 'unavailable' || event.ticketAvailability === 'no_eligible_dates';
+  const showStatus = isInactive;
+  const showGlassStatus = showStatus && (!isSoldOut || soldOutTreatment === "glass");
+  const statusLabel = isEnded && !isSoldOut ? "Ended" : (availability.badge ?? "Unavailable");
   const isLow =
     typeof event.ticketsLeft === "number" && event.ticketsLeft > 0 && event.ticketsLeft <= 45;
   const accent = isDark ? "#d6f905" : "#d6f905";
   const accentRgb = "214,249,5";
   const priceColor = isDark ? "#d6f905" : "#0a0a0a";
-  const priceLabel = Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
+  const priceLabel = event.priceFromMinor === 0 ? "Free" : Money.fromMinor(event.priceFromMinor, event.currency ?? "ETB").format();
   const format = cardFormat(event);
   const formatLabel = cardFormatLabel(format);
   const range = format === "multiDay" ? cardDateRange(event.eventDates) : null;
@@ -332,7 +338,10 @@ export function EventCard({
           fetchPriority={eager ? "high" : "auto"}
           decoding="async"
           style={{
-            filter: isInactive
+            filter: isSoldOut && soldOutTreatment === "archived"
+              ? "grayscale(1) brightness(0.52)"
+              : ticketsUnavailable ? "saturate(0.65) brightness(0.85)"
+              : isInactive && (!alternateSoldOut || !["badge", "footer"].includes(soldOutTreatment))
               ? "saturate(0.3) brightness(0.65)"
               : "none",
           }}
@@ -345,7 +354,61 @@ export function EventCard({
           }}
         />
 
-        {isInactive && (
+        {isSoldOut && soldOutTreatment === "badge" && (
+          <span className="absolute right-3 top-3 z-20 rounded-lg bg-black/75 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white backdrop-blur-md">
+            Sold out
+          </span>
+        )}
+
+        {isSoldOut && soldOutTreatment === "banner" && (
+          <div className="absolute inset-x-0 bottom-0 z-20 bg-[#d6f905] py-2 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-[#101010]">
+            Sold out
+          </div>
+        )}
+        {showGlassStatus && (
+          <div className={`absolute inset-0 z-20 grid place-items-center ${isInactive ? "bg-black/35" : ""}`}>
+            <span className="-rotate-6 bg-black/65 px-5 py-2.5 font-bold uppercase tracking-widest text-white backdrop-blur-md" style={{ ...glassEdge(true), borderRadius: statusRadius, fontSize: 13, fontFamily: "'Zalando Sans Expanded', sans-serif" }}>
+              {statusLabel}
+            </span>
+          </div>
+        )}
+        {isSoldOut && soldOutTreatment === "rail" && (
+          <div className="absolute inset-y-0 right-0 z-20 grid w-10 place-items-center bg-[#101010]/90 text-[10px] font-bold uppercase tracking-[0.22em] text-[#d6f905] backdrop-blur-md [writing-mode:vertical-rl]">
+            Sold out
+          </div>
+        )}
+
+        {isSoldOut && soldOutTreatment === "leftRibbon" && (
+          <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden bg-black/35">
+            <span className="absolute -left-11 top-7 w-44 -rotate-45 bg-[#26272b]/95 py-2 text-center text-[10px] font-semibold uppercase tracking-widest text-[#e4e4e7]">
+              Sold out
+            </span>
+          </div>
+        )}
+        {isSoldOut && soldOutTreatment === "ribbon" && (
+          <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+            <span className="absolute -right-11 top-7 w-44 rotate-45 bg-[#d6f905] py-2 text-center text-[10px] font-bold uppercase tracking-widest text-[#101010]">
+              Sold out
+            </span>
+          </div>
+        )}
+        {isSoldOut && soldOutTreatment === "capacity" && (
+          <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl bg-[#101010]/90 p-3 text-white backdrop-blur-md">
+            <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+              <strong>Sold out</strong>
+              <span className="text-white/75">At capacity</span>
+            </div>
+            <div aria-hidden="true" className="h-1 rounded-full bg-[#d6f905]" />
+          </div>
+        )}
+        {isSoldOut && soldOutTreatment === "poster" && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#101010]/75 text-center">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#d6f905]">Event at capacity</span>
+            <strong className="mt-1 text-3xl text-white" style={{ fontFamily: "'Zalando Sans Expanded', sans-serif" }}>Sold out</strong>
+          </div>
+        )}
+
+        {showStatus && !alternateSoldOut && !showGlassStatus && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9, rotate: -28 }}
             animate={{ opacity: 1, scale: 1, rotate: -28 }}
@@ -426,24 +489,7 @@ export function EventCard({
 
         {/* Bottom-left of image: category + optional invite */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
-          {(() => {
-            const c = getCategoryColor(event.category, rgb);
-            return (
-              <span
-                className="relative inline-flex items-center h-[22px] overflow-hidden px-2.5 rounded-full text-[9px] tracking-[1.5px] uppercase leading-none"
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  background: `linear-gradient(${c.scrim}, ${c.scrim}), rgba(${c.rgb},${c.tint})`,
-                  backdropFilter: "blur(10px)",
-                  color: `rgba(${c.rgb},${c.text})`,
-                  fontWeight: 600,
-                }}
-              >
-                <GlassReflection isDark={isDark} />
-                <span className="relative z-10">{event.category}</span>
-              </span>
-            );
-          })()}
+          <EventCategoryTag category={event.category} rgb={rgb} isDark={isDark} />
         </div>
 
         {/* Live countdown — same-day & tomorrow only */}
@@ -452,7 +498,8 @@ export function EventCard({
 
       {/* Footer */}
       <div className="relative z-10 px-3.5 pt-3 pb-3 flex flex-col gap-2">
-        <h3
+        {event.featured && <FeaturedPlacementLabel />}
+            <h3
           className="text-[14px] tracking-[-0.2px] leading-[1.2] line-clamp-1"
           style={{
             fontFamily: "'Zalando Sans Expanded', sans-serif",
@@ -522,17 +569,17 @@ export function EventCard({
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full"
             style={{
-              background: isInactive
+              background: muteAction
                 ? isDark
                   ? "rgba(255,255,255,0.10)"
                   : "rgba(0,0,0,0.10)"
                 : accent,
-              color: isInactive
+              color: muteAction
                 ? isDark
                   ? "rgba(255,255,255,0.55)"
                   : "rgba(0,0,0,0.55)"
                 : "#0a0a0a",
-              boxShadow: isInactive
+              boxShadow: muteAction
                 ? `0 0 0 1px ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}`
                 : "none",
             }}
@@ -546,7 +593,11 @@ export function EventCard({
             >
               {isEnded && !isSoldOut
                 ? "Ended"
-                : (availability.badge ?? eventActionLabel())}
+                : (["coming_soon", "no_eligible_dates"].includes(event.ticketAvailability ?? "")
+                    ? availability.cta
+                    : event.ticketAvailability === "unavailable"
+                      ? availability.cta
+                      : (availability.badge ?? eventActionLabel(event)))}
             </span>
             <ChevronRight
               className="w-2.5 h-2.5"

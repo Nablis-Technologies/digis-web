@@ -1,11 +1,11 @@
+import { apiPath, apiRoute } from './support/api';
 import { test, expect, type Route } from '@playwright/test';
 
 /**
  * Recurring-series detail wiring (#68 seam).
  *
- * The public payload carries no series signal yet, so the detail + products
- * endpoints are mocked at the network boundary with the exact wire shape the
- * adapter reads (`recurrence` on the event, `event_date_id` on participants).
+ * The public payload exposes is_recurring and a bounded date preview. Mock that
+ * actual contract, including the full schedule endpoint, at the API boundary.
  * Everything else (event list, auth, notifications) still hits the live dev
  * backend, exactly like `festival.spec.ts`.
  *
@@ -56,9 +56,9 @@ function seriesDetail() {
       currency: 'ETB',
       price_from_minor: 40000,
       categories: [{ id: 'c1', name: 'Music' }],
-      // #68 signal — the adapter normalises this onto `Event.recurrence`.
-      recurrence: { rule_id: 'rule-1', rrule: 'FREQ=WEEKLY;BYDAY=TH', active: true },
-      event_dates: dates,
+      is_recurring: true,
+      event_dates_preview: dates.slice(0, 1),
+      event_dates_url: `/public/events/${SERIES_SLUG}/dates`,
       event_media: [{ id: 'm1', type: 'cover', file: { medium: PIXEL, thumbnail: PIXEL } }],
       event_participants: [
         { id: 'p1', name: 'Always Here' },
@@ -100,21 +100,61 @@ const PRODUCTS = {
 
 test.describe('recurring series detail', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('http://localhost:3000/**', async (route) => {
+    await page.route(apiRoute(), async (route) => {
       const request = route.request();
-      const path = new URL(request.url()).pathname;
+      const path = apiPath(request.url());
       if (request.method() === 'OPTIONS') return fulfillJson(route, 204, {});
 
       if (path === `/public/events/${SERIES_SLUG}`) return fulfillJson(route, 200, seriesDetail());
+      if (path === `/public/events/${SERIES_SLUG}/dates`) return fulfillJson(route, 200, {
+        success: true,
+        data: [...[10, 17, 24].map((day, i) => ({
+          id: `s${i + 1}`, name: `Week ${i + 1}`, starts_at: `2030-01-${day}T12:00:00Z`,
+          ends_at: `2030-01-${day}T15:00:00Z`, status: 'scheduled',
+          venue: { id: 'v1', name: 'Fendika', city: 'Addis Ababa' },
+        })), {
+          id: 's1-late', name: 'Late show', starts_at: '2030-01-10T18:00:00Z',
+          ends_at: '2030-01-10T20:00:00Z', status: 'scheduled',
+          venue: { id: 'v1', name: 'Fendika', city: 'Addis Ababa' },
+        }],
+        pagination: { page: 1, total_pages: 1 },
+      });
       if (path === `/public/events/${SERIES_SLUG}/products`) return fulfillJson(route, 200, PRODUCTS);
 
       return route.fallback();
     });
   });
 
+  test('discovery labels recurrence from the server flag without a rule object', async ({ page }) => {
+    const detail = seriesDetail().data;
+    const listing = {
+      id: detail.id, slug: detail.slug, title: detail.title, currency: detail.currency,
+      categories: detail.categories, event_media: detail.event_media,
+      organization: detail.organization, next_event_date: detail.event_dates_preview[0],
+      event_lifecycle: 'upcoming', ticket_availability: 'available',
+    };
+    await page.route(apiRoute('/public/events**'), route => {
+      const path = apiPath(route.request().url());
+      if (path === '/public/events') return fulfillJson(route, 200, {
+        success: true,
+        data: [
+          { ...listing, is_recurring: true },
+          { ...listing, id: 'ordinary', slug: 'ordinary', title: 'Ordinary Event', is_recurring: false },
+        ], pagination: { page: 1, total_pages: 1 },
+      });
+      if (path === '/public/events/featured') return fulfillJson(route, 200, { success: true, data: [] });
+      return route.fallback();
+    });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Weekly Sessions', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ordinary Event', exact: true })).toBeVisible();
+    await expect(page.getByText('RECURRING', { exact: true }).filter({ visible: true })).toHaveCount(1);
+  });
+
   test('renders the session rail, not the festival track', async ({ page }) => {
     await page.goto(`/events/${SERIES_SLUG}`);
     await expect(page.getByRole('heading', { name: 'Weekly Sessions' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('RECURRING', { exact: true }).first()).toBeVisible();
 
     // The recurring picker is present…
     await expect(page.getByRole('heading', { name: 'Choose a date' })).toBeVisible();
@@ -130,6 +170,14 @@ test.describe('recurring series detail', () => {
     await expect(page.getByRole('button', { name: /Reminding every/ })).toBeVisible();
   });
 
+  test('mobile detail identifies the recurring event and shows its full session list', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/events/${SERIES_SLUG}`);
+    await expect(page.getByRole('heading', { name: 'Weekly Sessions' }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText('RECURRING', { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Session date' }).getByRole('radio')).toHaveCount(3);
+  });
+
   test('picking a session re-scopes Special guests to that session', async ({ page }) => {
     await page.goto(`/events/${SERIES_SLUG}`);
     await expect(page.getByRole('heading', { name: 'Weekly Sessions' })).toBeVisible({ timeout: 15_000 });
@@ -142,6 +190,17 @@ test.describe('recurring series detail', () => {
     const guests = page.getByText('Special guests').locator('..');
     await expect(guests.getByText('Opening Act')).toBeVisible();
     await expect(guests.getByText('Week Two Star')).toHaveCount(0);
+
+    const tier = page.getByText('General Admission', { exact: true });
+    await expect(tier).toBeVisible();
+    expect((await tier.boundingBox())!.y).toBeLessThan((await guests.boundingBox())!.y);
+
+    const showtimes = page.getByRole('radiogroup', { name: 'Showtime' });
+    const lateShow = showtimes.getByRole('radio', { name: /Late show/i });
+    await lateShow.click();
+    await expect(lateShow).toHaveAttribute('aria-checked', 'true');
+    await expect(radios.first()).toHaveAttribute('aria-checked', 'true');
+    await expect(guests.getByText('Opening Act')).toHaveCount(0);
 
     // Picking the next session swaps the roster (event-level guest stays).
     await radios.nth(1).click();

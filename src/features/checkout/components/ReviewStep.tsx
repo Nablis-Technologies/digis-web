@@ -1,5 +1,6 @@
+import type { GiftRecipientDraft } from '@/lib/gift-checkout';
 import { AnimatePresence, motion } from 'motion/react';
-import { Gift, Phone } from 'lucide-react';
+import { Gift, Phone, Mail } from 'lucide-react';
 import { readableCategoryRgb } from '@/lib/categoryColors';
 import { disabledSurface } from '@/lib/ui/disabledStyles';
 import { AppButton } from '@/components/primitives/AppButton';
@@ -14,8 +15,9 @@ export function ReviewStep({
   basePrice, isDark, hasSeats, selectedSeats = [],
   isGift, setIsGift,
   giftRecipientPhone, setGiftRecipientPhone,
+  giftRecipientEmail, setGiftRecipientEmail,
   giftNote, setGiftNote,
-  giftErrors,
+  giftErrors, additionalRecipients = [], additionalGiftErrors = {}, addGiftRecipient, updateGiftRecipient, removeGiftRecipient,
   children,
 }: any) {
   const textPrimary = isDark ? '#fff' : '#1a1a1a';
@@ -63,6 +65,7 @@ export function ReviewStep({
       <div className="h-px mx-4" style={{ background: divider }} />
 
       {/* Ticket + quantity */}
+      {basePrice > 0 && (
       <div className="flex items-center gap-3 p-4">
         <div className="flex-1 min-w-0">
           <p className="text-[9px] tracking-[2px] uppercase mb-1"
@@ -94,13 +97,15 @@ export function ReviewStep({
               onClick={() => setQuantity(Math.max(1, quantity - 1))} isDark={isDark} />
             <span className="text-[14px] min-w-[18px] text-center font-light"
               style={{ fontFamily: "'Zalando Sans Expanded', sans-serif", color: textPrimary }}>
-              {isGift ? 1 : quantity}
+              {quantity}
             </span>
             <Stepper symbol="+" disabled={quantity >= 8 || isGift}
               onClick={() => setQuantity(Math.min(8, quantity + 1))} isDark={isDark} />
           </div>
         )}
       </div>
+
+      )}
 
       {/* Gift Toggle & Recipient Details */}
       {setIsGift && (
@@ -147,6 +152,16 @@ export function ReviewStep({
                   />
 
                   <Field
+                    icon={<Mail className="w-4 h-4" />}
+                    label="Recipient email (optional)"
+                    type="email"
+                    placeholder="friend@example.com"
+                    value={giftRecipientEmail || ''}
+                    onChange={(value: string) => setGiftRecipientEmail?.(value)}
+                    error={giftErrors?.recipientEmail}
+                    isDark={isDark}
+                  />
+                  <Field
                     icon={<Gift className="w-4 h-4" />}
                     label="Gift Note (Optional)"
                     textarea
@@ -159,6 +174,14 @@ export function ReviewStep({
                     helpText={`${(giftNote || '').length}/500`}
                     isDark={isDark}
                   />
+                  {additionalRecipients.map((row: GiftRecipientDraft, index: number) => <fieldset key={row.lineId} className="space-y-3.5 pt-5">
+                    <legend className="text-sm">Recipient {index + 2}</legend>
+                    <Field icon={<Phone className="w-4 h-4" />} label="Recipient Phone Number *" type="tel" placeholder="+251 91 123 4567" value={row.phone} onChange={(phone: string) => updateGiftRecipient(row.lineId, { phone })} error={additionalGiftErrors[row.lineId]?.recipientPhone} isDark={isDark} />
+                    <Field icon={<Mail className="w-4 h-4" />} label="Recipient email (optional)" type="email" placeholder="friend@example.com" value={row.email} onChange={(email: string) => updateGiftRecipient(row.lineId, { email })} error={additionalGiftErrors[row.lineId]?.recipientEmail} isDark={isDark} />
+                    <Field icon={<Gift className="w-4 h-4" />} label="Gift Note (Optional)" textarea rows={2} maxLength={500} placeholder="Add a personal message to your gift..." value={row.note} onChange={(note: string) => updateGiftRecipient(row.lineId, { note })} error={additionalGiftErrors[row.lineId]?.note} isDark={isDark} />
+                    <AppButton onClick={() => removeGiftRecipient(row.lineId)} className="min-h-11 px-3 text-sm">Remove recipient {index + 2}</AppButton>
+                  </fieldset>)}
+                  {addGiftRecipient && <AppButton onClick={addGiftRecipient} className="min-h-11 px-3 text-sm">Add recipient</AppButton>}
                 </motion.div>
               )}
             </AnimatePresence>
